@@ -56,8 +56,9 @@ function render() {
   if (effects && status.effectCoverage) {
     const coverage = status.effectCoverage;
     effects.replaceChildren(
-      valueCard("Known calls", String(coverage.knownCalls ?? 0), "classified or local calls", "ready"),
-      valueCard("Unresolved calls", String(coverage.unresolvedCalls ?? 0), "conservative boundary", coverage.unresolvedCalls === 0 ? "ready" : "open"),
+      valueCard("Known operation edges", String(coverage.knownCalls ?? 0), `sum of per-bundle distinct function-operation edges across ${coverage.bundleCount ?? "registered experiment bundles"}`, "ready"),
+      valueCard("Symbolic callback edges", String(coverage.symbolicCalls ?? 0), "distinct edges modeled with effect variables", "neutral"),
+      valueCard("Unresolved operation edges", String(coverage.unresolvedCalls ?? 0), "distinct conservative boundary edges", coverage.unresolvedCalls === 0 ? "ready" : "open"),
       valueCard("Inventory", coverage.complete ? "COMPLETE" : "PARTIAL", "not a purity proof", coverage.complete ? "ready" : "open"),
     );
   }
@@ -65,7 +66,7 @@ function render() {
     valueCard("R0", String(status.reproducibility.R0), "recorded replay", "neutral"),
     valueCard("R1", String(status.reproducibility.R1), "seeded replay", status.reproducibility.R1 > 0 ? "ready" : "open"),
     valueCard("R2", String(status.reproducibility.R2), "input snapshot", status.reproducibility.R2 > 0 ? "ready" : "open"),
-    valueCard("R3", String(status.reproducibility.R3), `${status.r3.readyCount}/${status.r3.bundleCount} audited · ${status.r3.incompleteEffectBundleCount} partial · ${status.r3.unresolvedEffectCallCount} unresolved`, status.r3.readyCount === status.r3.bundleCount ? "ready" : "open"),
+    valueCard("R3", String(status.reproducibility.R3), `${status.r3.readyCount}/${status.r3.bundleCount} ready · ${status.r3.closedEntryEffectBundleCount}/${status.r3.bundleCount} entry rows closed · ${status.r3.symbolicEffectCallCount} module-wide symbolic · ${status.r3.unresolvedEffectCallCount} unresolved`, status.r3.readyCount === status.r3.bundleCount ? "ready" : "open"),
   );
   if (linguist) {
     const indexed = status.linguist.indexedPublicFiles == null ? "—" : status.linguist.indexedPublicFiles.toLocaleString();

@@ -34,8 +34,8 @@
         "path": "provenance.json",
         "kind": "provenance",
         "media_type": "application/json",
-        "bytes": 39882,
-        "sha256": "sha256:51b3815014ccb5e70717ed7ad3ae78a322d0b7b3c20bfff527ec96bdef042ee2"
+        "bytes": 40591,
+        "sha256": "sha256:36d080f4f156df810dfa2aea59448afea8c9804c07585306ef6b85d832a96fe7"
       },
       {
         "path": "source.ostrin",
@@ -238,294 +238,392 @@
       "experimental": true,
       "conservative": true,
       "kinds": [
-        "concurrency",
+        "filesystem",
         "io",
-        "random(seed)"
+        "random(seed)",
+        "state(local)"
       ],
       "entry": "main",
       "functions": {
-        "add": [],
-        "area": [],
-        "band": [],
-        "bars": [],
-        "bind": [],
-        "boxplot": [],
-        "consume": [],
-        "consume_is": [],
-        "contour": [],
-        "contourf": [],
-        "dark": [],
-        "errorbars": [],
-        "heatmap": [],
-        "hexbin": [],
-        "histogram": [],
-        "hline": [],
         "input_int": [
-          "io"
+          "filesystem",
+          "state(local)"
         ],
         "input_parameter_int": [
-          "io"
+          "filesystem",
+          "state(local)"
         ],
-        "isosurface": [],
-        "line": [],
-        "literal": [],
         "main": [
-          "concurrency",
+          "filesystem",
           "io",
-          "random(seed)"
+          "random(seed)",
+          "state(local)"
         ],
-        "morph": [],
-        "moving_point": [],
-        "moving_segment": [],
-        "parse_array": [],
-        "parse_hex4": [],
-        "parse_number": [],
-        "parse_object": [],
-        "parse_string": [],
-        "parse_value": [],
-        "peek": [],
-        "peek_digit": [],
-        "peek_is": [],
-        "quantity_line": [],
-        "quantity_scatter": [],
-        "quiver": [],
-        "rod": [],
-        "save": [
-          "concurrency",
-          "io"
+        "std.json::Parser.consume": [
+          "state(local)"
         ],
-        "scatter": [],
-        "skip_ws": [],
-        "slice_xy": [],
-        "slice_xz": [],
-        "slice_yz": [],
-        "stairs": [],
-        "std.json::append_text": [],
-        "std.json::append_value": [],
-        "std.json::array_items": [],
+        "std.json::Parser.consume_is": [
+          "state(local)"
+        ],
+        "std.json::Parser.literal": [
+          "state(local)"
+        ],
+        "std.json::Parser.parse_array": [
+          "state(local)"
+        ],
+        "std.json::Parser.parse_hex4": [
+          "state(local)"
+        ],
+        "std.json::Parser.parse_number": [
+          "state(local)"
+        ],
+        "std.json::Parser.parse_object": [
+          "state(local)"
+        ],
+        "std.json::Parser.parse_string": [
+          "state(local)"
+        ],
+        "std.json::Parser.parse_value": [
+          "state(local)"
+        ],
+        "std.json::Parser.peek_digit": [],
+        "std.json::Parser.peek_is": [],
+        "std.json::Parser.skip_ws": [
+          "state(local)"
+        ],
+        "std.json::append_value": [
+          "state(local)"
+        ],
         "std.json::array_value": [],
-        "std.json::as_bool": [],
-        "std.json::as_number": [],
-        "std.json::as_text": [],
         "std.json::bool_value": [],
-        "std.json::char_is": [],
         "std.json::null_value": [],
         "std.json::number_value": [],
-        "std.json::object_get": [],
-        "std.json::object_keys": [],
-        "std.json::object_value": [],
-        "std.json::parse": [],
+        "std.json::parse": [
+          "state(local)"
+        ],
         "std.json::quote_string": [],
         "std.json::render": [],
         "std.json::stringify": [],
         "std.json::text_value": [],
+        "std.viz::Figure.add": [
+          "state(local)"
+        ],
+        "std.viz::Figure.animate": [
+          "state(local)"
+        ],
+        "std.viz::Figure.area": [
+          "state(local)"
+        ],
+        "std.viz::Figure.band": [
+          "state(local)"
+        ],
+        "std.viz::Figure.bars": [
+          "state(local)"
+        ],
+        "std.viz::Figure.bind": [
+          "state(local)"
+        ],
+        "std.viz::Figure.boxplot": [
+          "state(local)"
+        ],
+        "std.viz::Figure.contour": [
+          "state(local)"
+        ],
+        "std.viz::Figure.contourf": [
+          "state(local)"
+        ],
+        "std.viz::Figure.dark": [
+          "state(local)"
+        ],
+        "std.viz::Figure.describe": [
+          "state(local)"
+        ],
+        "std.viz::Figure.errorbars": [
+          "state(local)"
+        ],
+        "std.viz::Figure.heatmap": [
+          "state(local)"
+        ],
+        "std.viz::Figure.hexbin": [
+          "state(local)"
+        ],
+        "std.viz::Figure.histogram": [
+          "state(local)"
+        ],
+        "std.viz::Figure.hline": [
+          "state(local)"
+        ],
+        "std.viz::Figure.labels": [
+          "state(local)"
+        ],
+        "std.viz::Figure.line": [
+          "state(local)"
+        ],
+        "std.viz::Figure.morph": [
+          "state(local)"
+        ],
+        "std.viz::Figure.moving_point": [
+          "state(local)"
+        ],
+        "std.viz::Figure.moving_segment": [
+          "state(local)"
+        ],
+        "std.viz::Figure.no_axes": [
+          "state(local)"
+        ],
+        "std.viz::Figure.no_legend": [
+          "state(local)"
+        ],
+        "std.viz::Figure.provenance": [
+          "state(local)"
+        ],
+        "std.viz::Figure.quantity_line": [
+          "state(local)"
+        ],
+        "std.viz::Figure.quantity_scatter": [
+          "state(local)"
+        ],
+        "std.viz::Figure.quiver": [
+          "state(local)"
+        ],
+        "std.viz::Figure.rod": [
+          "state(local)"
+        ],
+        "std.viz::Figure.save": [
+          "filesystem",
+          "state(local)"
+        ],
+        "std.viz::Figure.scatter": [
+          "state(local)"
+        ],
+        "std.viz::Figure.size": [
+          "state(local)"
+        ],
+        "std.viz::Figure.stairs": [
+          "state(local)"
+        ],
+        "std.viz::Figure.streamplot": [
+          "state(local)"
+        ],
+        "std.viz::Figure.svg": [
+          "state(local)"
+        ],
+        "std.viz::Figure.text": [
+          "state(local)"
+        ],
+        "std.viz::Figure.unit_line": [
+          "state(local)"
+        ],
+        "std.viz::Figure.unit_scatter": [
+          "state(local)"
+        ],
+        "std.viz::Figure.violin": [
+          "state(local)"
+        ],
+        "std.viz::Figure.vline": [
+          "state(local)"
+        ],
+        "std.viz::Figure.xlim": [
+          "state(local)"
+        ],
+        "std.viz::Figure.ylim": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.bind": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.dark": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.describe": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.isosurface": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.labels": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.line": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.provenance": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.save": [
+          "filesystem",
+          "state(local)"
+        ],
+        "std.viz::Scene3D.scatter": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.size": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.slice_xy": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.slice_xz": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.slice_yz": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.surface": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.svg": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.vector_field": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.view": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.wireframe": [
+          "state(local)"
+        ],
+        "std.viz::Table.bind": [
+          "state(local)"
+        ],
+        "std.viz::Table.dark": [
+          "state(local)"
+        ],
+        "std.viz::Table.provenance": [
+          "state(local)"
+        ],
+        "std.viz::Table.row_height": [
+          "state(local)"
+        ],
+        "std.viz::Table.save": [
+          "filesystem",
+          "state(local)"
+        ],
+        "std.viz::Table.size": [
+          "state(local)"
+        ],
+        "std.viz::Table.svg": [
+          "state(local)"
+        ],
         "std.viz::animate": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::animate_attr": [
-          "concurrency"
+        "std.viz::animate_attr": [],
+        "std.viz::argsort": [
+          "state(local)"
         ],
-        "std.viz::argsort": [],
         "std.viz::axes3d": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::binding_attr": [
-          "concurrency"
+        "std.viz::binding_attr": [],
+        "std.viz::colorbar": [
+          "state(local)"
         ],
-        "std.viz::center_gap": [],
-        "std.viz::colorbar": [],
         "std.viz::colormap": [],
-        "std.viz::decimals": [],
         "std.viz::depth": [],
         "std.viz::draw_contour": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_contourf": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_heatmap": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_hexbin": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_mesh3": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_motion": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_quiver": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_series": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_slice": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_surface": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::edge": [],
-        "std.viz::empty": [],
-        "std.viz::escape": [],
         "std.viz::escape_attr": [],
         "std.viz::figure": [],
         "std.viz::gradient": [],
         "std.viz::grid": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::grid_of": [],
+        "std.viz::grid_of": [
+          "state(local)"
+        ],
         "std.viz::header": [],
-        "std.viz::integrate_stream": [],
-        "std.viz::legend": [],
-        "std.viz::min_gap": [],
+        "std.viz::integrate_stream": [
+          "state(local)"
+        ],
+        "std.viz::legend": [
+          "state(local)"
+        ],
         "std.viz::motion_series": [],
         "std.viz::nice_step": [],
-        "std.viz::num": [],
         "std.viz::path_of": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::pick": [],
         "std.viz::project_x": [],
         "std.viz::project_y": [],
         "std.viz::provenance_metadata": [],
         "std.viz::pt": [],
-        "std.viz::px": [],
         "std.viz::render": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::render3d": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::render_table": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::rgb_part": [],
         "std.viz::sample_stream": [],
         "std.viz::scene3d": [],
-        "std.viz::screen_xs": [],
-        "std.viz::screen_ys": [],
+        "std.viz::screen_xs": [
+          "state(local)"
+        ],
+        "std.viz::screen_ys": [
+          "state(local)"
+        ],
         "std.viz::seg": [],
         "std.viz::series": [],
-        "std.viz::shade": [],
-        "std.viz::short": [],
-        "std.viz::slice_xy": [],
-        "std.viz::slice_xz": [],
-        "std.viz::slice_yz": [],
-        "std.viz::stream_inside": [],
-        "std.viz::stream_value": [],
-        "std.viz::svg_size": [],
+        "std.viz::slice_xy": [
+          "state(local)"
+        ],
+        "std.viz::slice_xz": [
+          "state(local)"
+        ],
+        "std.viz::slice_yz": [
+          "state(local)"
+        ],
         "std.viz::table": [],
-        "std.viz::table_column_widths": [],
-        "std.viz::tetra_isoline": [],
+        "std.viz::table_column_widths": [
+          "state(local)"
+        ],
+        "std.viz::tetra_isoline": [
+          "state(local)"
+        ],
         "std.viz::text_at": [],
         "std.viz::tick_label": [],
-        "std.viz::ticks": [],
-        "std.viz::tip": [],
-        "std.viz::uid": [],
-        "std.viz::unit_of": [],
-        "std.viz::values": [],
-        "streamplot": [],
-        "surface": [],
-        "svg": [
-          "concurrency"
+        "std.viz::ticks": [
+          "state(local)"
         ],
-        "text": [],
-        "unit_line": [],
-        "unit_scatter": [],
-        "vector_field": [],
-        "violin": [],
-        "vline": [],
-        "wireframe": []
+        "std.viz::tip": [],
+        "std.viz::values": [
+          "state(local)"
+        ]
       },
       "function_calls": {
-        "add": [
-          "self.series.push"
-        ],
-        "area": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "band": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "bars": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "bind": [
-          "self.bindings.push",
-          "std.viz::binding_name"
-        ],
-        "boxplot": [
-          "array",
-          "data.max",
-          "data.min",
-          "data.percentile",
-          "self.add",
-          "std.viz::series"
-        ],
-        "consume": [
-          "self.text.char_at",
-          "self.text.length"
-        ],
-        "consume_is": [
-          "self.consume"
-        ],
-        "contour": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "contourf": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "dark": [
-          "std.viz::dark"
-        ],
-        "errorbars": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "heatmap": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "hexbin": [
-          "array",
-          "counts.get",
-          "counts.set",
-          "floor",
-          "self.add",
-          "std.viz::empty",
-          "xcenters.push",
-          "xs.length",
-          "xs.max",
-          "xs.min",
-          "ycenters.push",
-          "ys.max",
-          "ys.min",
-          "zeros"
-        ],
-        "histogram": [
-          "data.max",
-          "data.min",
-          "histogram",
-          "linspace",
-          "self.add",
-          "std.viz::series"
-        ],
-        "hline": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
         "input_int": [
           "document.is_err",
           "document.unwrap",
@@ -556,29 +654,6 @@
           "value.is_none",
           "value.unwrap"
         ],
-        "isosurface": [
-          "array",
-          "self.series.push",
-          "std.viz::empty",
-          "std.viz::tetra_isoline",
-          "volume.get",
-          "volume.shape",
-          "vx.push",
-          "vy.push",
-          "vz.push"
-        ],
-        "line": [
-          "self.add",
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "literal": [
-          "Err",
-          "Ok",
-          "expected.length",
-          "self.consume",
-          "std.json::char_is"
-        ],
         "main": [
           "fig.svg",
           "input_int",
@@ -593,24 +668,21 @@
           "ys.set",
           "zeros"
         ],
-        "morph": [
-          "frames.row",
-          "self.add",
-          "std.viz::empty",
-          "std.viz::motion_series"
+        "std.json::Parser.consume": [
+          "self.text.char_at",
+          "self.text.length"
         ],
-        "moving_point": [
-          "self.add",
-          "self.series.push",
-          "std.viz::empty",
-          "std.viz::motion_series"
+        "std.json::Parser.consume_is": [
+          "self.consume"
         ],
-        "moving_segment": [
-          "self.add",
-          "std.viz::empty",
-          "std.viz::motion_series"
+        "std.json::Parser.literal": [
+          "Err",
+          "Ok",
+          "expected.length",
+          "self.consume",
+          "std.json::char_is"
         ],
-        "parse_array": [
+        "std.json::Parser.parse_array": [
           "Err",
           "Ok",
           "self.consume",
@@ -620,13 +692,13 @@
           "std.json::append_value",
           "std.json::array_value"
         ],
-        "parse_hex4": [
+        "std.json::Parser.parse_hex4": [
           "Err",
           "Ok",
           "ch.to_int",
           "self.consume"
         ],
-        "parse_number": [
+        "std.json::Parser.parse_number": [
           "Err",
           "Ok",
           "literal.to_float",
@@ -638,7 +710,7 @@
           "self.text.slice",
           "std.json::number_value"
         ],
-        "parse_object": [
+        "std.json::Parser.parse_object": [
           "Err",
           "keys.push",
           "self.consume",
@@ -650,7 +722,7 @@
           "std.json::append_value",
           "std.json::object_value"
         ],
-        "parse_string": [
+        "std.json::Parser.parse_string": [
           "Err",
           "Ok",
           "char_from_codepoint",
@@ -660,7 +732,7 @@
           "self.text.length",
           "std.json::append_text"
         ],
-        "parse_value": [
+        "std.json::Parser.parse_value": [
           "Ok",
           "self.literal",
           "self.parse_array",
@@ -673,79 +745,20 @@
           "std.json::null_value",
           "std.json::text_value"
         ],
-        "peek": [
+        "std.json::Parser.peek": [
           "self.text.char_at",
           "self.text.length"
         ],
-        "peek_digit": [
+        "std.json::Parser.peek_digit": [
           "self.peek",
           "std.json::is_digit"
         ],
-        "peek_is": [
+        "std.json::Parser.peek_is": [
           "self.peek"
         ],
-        "quantity_line": [
-          "array",
-          "q.unit",
-          "q.value",
-          "self.add",
-          "std.viz::series",
-          "xs.length",
-          "xv.push",
-          "ys.length",
-          "yv.push"
-        ],
-        "quantity_scatter": [
-          "array",
-          "q.unit",
-          "q.value",
-          "self.add",
-          "std.viz::series",
-          "xs.length",
-          "xv.push",
-          "ys.length",
-          "yv.push"
-        ],
-        "quiver": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "rod": [
-          "array",
-          "self.add",
-          "std.viz::empty",
-          "std.viz::motion_series"
-        ],
-        "save": [
-          "std.viz::render",
-          "std.viz::render3d",
-          "std.viz::render_table",
-          "write_file"
-        ],
-        "scatter": [
-          "self.add",
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "skip_ws": [
+        "std.json::Parser.skip_ws": [
           "self.peek",
           "self.text.length"
-        ],
-        "slice_xy": [
-          "array",
-          "self.series.push"
-        ],
-        "slice_xz": [
-          "array",
-          "self.series.push"
-        ],
-        "slice_yz": [
-          "array",
-          "self.series.push"
-        ],
-        "stairs": [
-          "self.add",
-          "std.viz::series"
         ],
         "std.json::append_text": [
           "drop"
@@ -824,6 +837,277 @@
         "std.json::text_value": [
           "std.json::empty_keys",
           "std.json::empty_values"
+        ],
+        "std.viz::Figure.add": [
+          "self.series.push"
+        ],
+        "std.viz::Figure.area": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.band": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.bars": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.bind": [
+          "self.bindings.push",
+          "std.viz::binding_name"
+        ],
+        "std.viz::Figure.boxplot": [
+          "array",
+          "data.max",
+          "data.min",
+          "data.percentile",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.contour": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.contourf": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.dark": [
+          "std.viz::dark"
+        ],
+        "std.viz::Figure.errorbars": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.heatmap": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.hexbin": [
+          "array",
+          "counts.get",
+          "counts.set",
+          "floor",
+          "self.add",
+          "std.viz::empty",
+          "xcenters.push",
+          "xs.length",
+          "xs.max",
+          "xs.min",
+          "ycenters.push",
+          "ys.max",
+          "ys.min",
+          "zeros"
+        ],
+        "std.viz::Figure.histogram": [
+          "data.max",
+          "data.min",
+          "histogram",
+          "linspace",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.hline": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.line": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.morph": [
+          "frames.row",
+          "self.add",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.moving_point": [
+          "self.add",
+          "self.series.push",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.moving_segment": [
+          "self.add",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.quantity_line": [
+          "array",
+          "q.unit",
+          "q.value",
+          "self.add",
+          "std.viz::series",
+          "xs.length",
+          "xv.push",
+          "ys.length",
+          "yv.push"
+        ],
+        "std.viz::Figure.quantity_scatter": [
+          "array",
+          "q.unit",
+          "q.value",
+          "self.add",
+          "std.viz::series",
+          "xs.length",
+          "xv.push",
+          "ys.length",
+          "yv.push"
+        ],
+        "std.viz::Figure.quiver": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.rod": [
+          "array",
+          "self.add",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.save": [
+          "std.viz::render",
+          "write_file"
+        ],
+        "std.viz::Figure.scatter": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.stairs": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.streamplot": [
+          "array",
+          "backward.xs.length",
+          "forward.xs.length",
+          "path_x.push",
+          "path_y.push",
+          "seed_xs.length",
+          "self.add",
+          "std.viz::integrate_stream",
+          "std.viz::series",
+          "xs.length",
+          "ys.length"
+        ],
+        "std.viz::Figure.svg": [
+          "std.viz::render"
+        ],
+        "std.viz::Figure.text": [
+          "self.notes.push"
+        ],
+        "std.viz::Figure.unit_line": [
+          "self.add",
+          "std.viz::series",
+          "xs.unit",
+          "xs.values",
+          "ys.unit",
+          "ys.values"
+        ],
+        "std.viz::Figure.unit_scatter": [
+          "self.add",
+          "std.viz::series",
+          "xs.unit",
+          "xs.values",
+          "ys.unit",
+          "ys.values"
+        ],
+        "std.viz::Figure.violin": [
+          "array",
+          "data.length",
+          "data.max",
+          "data.min",
+          "data.percentile",
+          "data.std",
+          "density.push",
+          "exp",
+          "pi",
+          "pow",
+          "self.add",
+          "sqrt",
+          "std.viz::series",
+          "values.push",
+          "widths.push"
+        ],
+        "std.viz::Figure.vline": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.bind": [
+          "self.bindings.push",
+          "std.viz::binding_name"
+        ],
+        "std.viz::Scene3D.dark": [
+          "std.viz::dark"
+        ],
+        "std.viz::Scene3D.isosurface": [
+          "array",
+          "self.series.push",
+          "std.viz::empty",
+          "std.viz::tetra_isoline",
+          "volume.get",
+          "volume.shape",
+          "vx.push",
+          "vy.push",
+          "vz.push"
+        ],
+        "std.viz::Scene3D.line": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.save": [
+          "std.viz::render3d",
+          "write_file"
+        ],
+        "std.viz::Scene3D.scatter": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.slice_xy": [
+          "array",
+          "self.series.push"
+        ],
+        "std.viz::Scene3D.slice_xz": [
+          "array",
+          "self.series.push"
+        ],
+        "std.viz::Scene3D.slice_yz": [
+          "array",
+          "self.series.push"
+        ],
+        "std.viz::Scene3D.surface": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.svg": [
+          "std.viz::render3d"
+        ],
+        "std.viz::Scene3D.vector_field": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.wireframe": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Table.bind": [
+          "self.bindings.push",
+          "std.viz::binding_name"
+        ],
+        "std.viz::Table.dark": [
+          "std.viz::dark"
+        ],
+        "std.viz::Table.save": [
+          "std.viz::render_table",
+          "write_file"
+        ],
+        "std.viz::Table.svg": [
+          "std.viz::render_table"
         ],
         "std.viz::animate": [
           "ceil",
@@ -1393,374 +1677,49 @@
           "q.unit",
           "q.value",
           "qs.length"
-        ],
-        "streamplot": [
-          "array",
-          "backward.xs.length",
-          "forward.xs.length",
-          "path_x.push",
-          "path_y.push",
-          "seed_xs.length",
-          "self.add",
-          "std.viz::integrate_stream",
-          "std.viz::series",
-          "xs.length",
-          "ys.length"
-        ],
-        "surface": [
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "svg": [
-          "std.viz::render",
-          "std.viz::render3d",
-          "std.viz::render_table"
-        ],
-        "text": [
-          "self.notes.push"
-        ],
-        "unit_line": [
-          "self.add",
-          "std.viz::series",
-          "xs.unit",
-          "xs.values",
-          "ys.unit",
-          "ys.values"
-        ],
-        "unit_scatter": [
-          "self.add",
-          "std.viz::series",
-          "xs.unit",
-          "xs.values",
-          "ys.unit",
-          "ys.values"
-        ],
-        "vector_field": [
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "violin": [
-          "array",
-          "data.length",
-          "data.max",
-          "data.min",
-          "data.percentile",
-          "data.std",
-          "density.push",
-          "exp",
-          "pi",
-          "pow",
-          "self.add",
-          "sqrt",
-          "std.viz::series",
-          "values.push",
-          "widths.push"
-        ],
-        "vline": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "wireframe": [
-          "self.series.push",
-          "std.viz::series"
         ]
       },
       "unresolved_calls": {
-        "boxplot": [
-          "array",
-          "data.max",
-          "data.min",
-          "data.percentile"
-        ],
-        "contour": [
-          "array"
-        ],
-        "contourf": [
-          "array"
-        ],
-        "heatmap": [
-          "array"
-        ],
-        "hexbin": [
-          "array",
-          "counts.set",
-          "floor",
-          "xs.max",
-          "xs.min",
-          "ys.max",
-          "ys.min",
-          "zeros"
-        ],
-        "histogram": [
-          "data.max",
-          "data.min",
-          "histogram",
-          "linspace"
-        ],
-        "hline": [
-          "array"
-        ],
-        "input_int": [
-          "document.is_err",
-          "document.unwrap",
-          "loaded.is_err",
-          "loaded.unwrap",
-          "number.is_none",
-          "number.unwrap",
-          "value.is_none",
-          "value.unwrap"
-        ],
-        "input_parameter_int": [
-          "document.is_err",
-          "document.unwrap",
-          "loaded.is_err",
-          "loaded.unwrap",
-          "number.is_none",
-          "number.unwrap",
-          "parameters.is_none",
-          "parameters.unwrap",
-          "value.is_none",
-          "value.unwrap"
-        ],
-        "isosurface": [
-          "array",
-          "volume.shape"
-        ],
-        "main": [
-          "xs.set",
-          "ys.set",
-          "zeros"
-        ],
-        "morph": [
-          "frames.row"
-        ],
-        "parse_hex4": [
-          "ch.to_int"
-        ],
-        "parse_number": [
-          "literal.to_float",
-          "parsed.is_err",
-          "parsed.unwrap"
-        ],
-        "parse_string": [
-          "char_from_codepoint"
-        ],
-        "quantity_line": [
-          "array"
-        ],
-        "quantity_scatter": [
-          "array"
-        ],
-        "rod": [
-          "array"
-        ],
-        "slice_xy": [
-          "array"
-        ],
-        "slice_xz": [
-          "array"
-        ],
-        "slice_yz": [
-          "array"
-        ],
-        "std.json::append_text": [
-          "drop"
-        ],
-        "std.json::append_value": [
-          "drop"
-        ],
-        "std.json::array_items": [
-          "Some"
-        ],
-        "std.json::as_bool": [
-          "Some"
-        ],
-        "std.json::as_number": [
-          "Some"
-        ],
-        "std.json::as_text": [
-          "Some"
-        ],
-        "std.json::object_get": [
-          "Some"
-        ],
-        "std.json::object_keys": [
-          "Some"
-        ],
-        "std.json::render": [
-          "drop"
-        ],
-        "std.viz::animate": [
-          "ceil",
-          "round"
-        ],
-        "std.viz::colormap": [
-          "floor"
-        ],
-        "std.viz::decimals": [
-          "floor",
-          "log10"
-        ],
-        "std.viz::draw_contour": [
-          "s.grid.max",
-          "s.grid.min",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_contourf": [
-          "floor",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_heatmap": [
-          "s.grid.shape"
-        ],
-        "std.viz::draw_hexbin": [
-          "s.grid.shape"
-        ],
-        "std.viz::draw_mesh3": [
-          "array"
-        ],
-        "std.viz::draw_motion": [
-          "s.grid.row",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_slice": [
-          "array",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_surface": [
-          "array",
-          "s.grid.shape"
-        ],
-        "std.viz::empty": [
-          "zeros"
-        ],
-        "std.viz::escape": [
-          "text.replace"
-        ],
-        "std.viz::grid": [
-          "body.replace"
-        ],
+        "std.viz::grid_of": []
+      },
+      "function_effect_variables": {
         "std.viz::grid_of": [
-          "f",
-          "z.set",
-          "zeros"
-        ],
-        "std.viz::nice_step": [
-          "floor",
-          "log10"
-        ],
-        "std.viz::num": [
-          "round"
-        ],
-        "std.viz::render": [
-          "s.grid.max",
-          "s.grid.min",
-          "s.hi.max",
-          "s.hi.min",
-          "s.lo.max",
-          "s.lo.min",
-          "s.xs.max",
-          "s.xs.min",
-          "s.ys.max",
-          "s.ys.min"
-        ],
-        "std.viz::render3d": [
-          "array",
-          "cos",
-          "pi",
-          "s.grid.max",
-          "s.grid.min",
-          "s.xs.max",
-          "s.xs.min",
-          "s.ys.max",
-          "s.ys.min",
-          "s.zs.max",
-          "s.zs.min",
-          "sin",
-          "zz.max",
-          "zz.min"
-        ],
-        "std.viz::rgb_part": [
-          "round"
-        ],
-        "std.viz::sample_stream": [
-          "floor"
-        ],
-        "std.viz::short": [
-          "round"
-        ],
-        "std.viz::slice_xy": [
-          "plane.set",
-          "volume.shape",
-          "zeros"
-        ],
-        "std.viz::slice_xz": [
-          "plane.set",
-          "volume.shape",
-          "zeros"
-        ],
-        "std.viz::slice_yz": [
-          "plane.set",
-          "volume.shape",
-          "zeros"
-        ],
-        "std.viz::svg_size": [
-          "svg.split"
-        ],
-        "std.viz::tick_label": [
-          "floor",
-          "format_float_value",
-          "log10"
-        ],
-        "std.viz::ticks": [
-          "array",
-          "ceil"
-        ],
-        "std.viz::uid": [
-          "hash"
-        ],
-        "std.viz::values": [
-          "array"
-        ],
-        "streamplot": [
-          "array"
-        ],
-        "unit_line": [
-          "xs.values",
-          "ys.values"
-        ],
-        "unit_scatter": [
-          "xs.values",
-          "ys.values"
-        ],
-        "violin": [
-          "array",
-          "data.max",
-          "data.min",
-          "data.percentile",
-          "data.std",
-          "exp",
-          "pi",
-          "pow"
-        ],
-        "vline": [
-          "array"
+          "ε_f"
         ]
       },
+      "symbolic_effect_calls": {
+        "std.viz::grid_of": [
+          "f"
+        ]
+      },
+      "entry_effect_signature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
+      },
       "effect_coverage": {
-        "complete": false,
-        "known_calls": 586,
-        "unresolved_calls": 150
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 745,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "analyzer": [
         {
           "path": "compiler/src/effects.rs",
-          "sha256": "sha256:ef64dc71532e4a6de23d3e02bf2b6b57f78af2164c1cd0790dc3d8fca3b70228"
+          "sha256": "sha256:8e7a1d9b8b625332ae44b273aec2f594296c796030124545c674b8e41d27bd1b"
         },
         {
           "path": "compiler/src/main.rs",
-          "sha256": "sha256:297fa13c9b960bab16f6df224a9a9a616494c7680fb74ef7d15053e7bcfa39ff"
+          "sha256": "sha256:abc2ab22f8404700fbf187df36d020f3db8054a9be11636ee1f1bf3ba6338e35"
         }
       ]
     },
@@ -1771,6 +1730,6 @@
     "source.ostrin": "// std.viz · hexbin density: a bivariate sample counted in Ostrin.\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 91)\n    n = input_parameter_int(\"samples\", 1200)\n    bins_x = input_parameter_int(\"bins_x\", 18)\n    bins_y = input_parameter_int(\"bins_y\", 14)\n    r = rng(seed)\n    noise_x = r.randn([n])\n    noise_y = r.randn([n])\n    mut xs = zeros([n])\n    mut ys = zeros([n])\n    half = n / 2\n    for i in 0 until n {\n        cluster = if i < half { 0.0 } else { 1.0 }\n        center_x = if cluster == 0.0 { -0.85 } else { 0.95 }\n        center_y = if cluster == 0.0 { -0.55 } else { 0.7 }\n        spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }\n        spread_y = if cluster == 0.0 { 0.28 } else { 0.48 }\n        xs.set(i, noise_x[i] * spread_x + center_x)\n        ys.set(i, noise_y[i] * spread_y + center_y)\n    }\n    fig = viz.figure(\"Bivariate density\")\n        .describe(n.to_string() + \" seeded observations counted into hexagonal bins, seed \" + seed.to_string())\n        .labels(\"x\", \"y\")\n        .hexbin(xs, ys, bins_x, bins_y, \"magma\", \"observations\")\n    print(fig.svg())\n}\n",
     "data.json": "{\n  \"seed\": 91,\n  \"parameters\": {\n    \"samples\": 1200,\n    \"bins_x\": 18,\n    \"bins_y\": 14\n  },\n  \"description\": \"Seeded bivariate sample counted into hexagonal bins.\",\n  \"reproducibility\": {\n    \"level\": \"R2\",\n    \"label\": \"R2 · external snapshot replay verified\",\n    \"next\": \"R3 · auditable artifact (planned verification)\"\n  },\n  \"execution\": {\n    \"mode\": \"input-file\",\n    \"input_file\": \"data.json\",\n    \"consumes\": [\n      \"seed\",\n      \"parameters.samples\",\n      \"parameters.bins_x\",\n      \"parameters.bins_y\"\n    ],\n    \"sensitivity\": {\n      \"path\": \"seed\",\n      \"alternate\": 92\n    },\n    \"randomness\": {\n      \"seed_path\": \"seed\",\n      \"algorithm\": \"xoshiro256**\",\n      \"version\": \"ostrin.rng/v1\",\n      \"partition\": \"single sequential stream\",\n      \"status\": \"verified-in-ci\"\n    },\n    \"command\": \"node scripts/experiment-replay.mjs --fixture hexbin\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"status\": \"verified-in-ci\",\n    \"capabilities\": [\n      \"filesystem.read:data.json\"\n    ],\n    \"snapshot\": {\n      \"path\": \"data.json\",\n      \"kind\": \"json\",\n      \"embedded\": true\n    }\n  }\n}\n",
     "figure.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">\n<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>\n<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>\n\n<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Bivariate density</text>\n<text x=\"66\" y=\"45\" text-anchor=\"start\" font-size=\"12\" fill=\"#6b7280\">1200 seeded observations counted into hexagonal bins, seed 91</text>\n<defs><clipPath id=\"clip692278225871859476\"><rect x=\"66\" y=\"62\" width=\"488\" height=\"286\"/></clipPath></defs>\n<line x1=\"126.39\" y1=\"348\" x2=\"126.39\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"126.39\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-1.5</text>\n<line x1=\"193.55\" y1=\"348\" x2=\"193.55\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"193.55\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-1.0</text>\n<line x1=\"260.71\" y1=\"348\" x2=\"260.71\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"260.71\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-0.5</text>\n<line x1=\"327.87\" y1=\"348\" x2=\"327.87\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"327.87\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">0.0</text>\n<line x1=\"395.03\" y1=\"348\" x2=\"395.03\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"395.03\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">0.5</text>\n<line x1=\"462.19\" y1=\"348\" x2=\"462.19\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"462.19\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">1.0</text>\n<line x1=\"529.36\" y1=\"348\" x2=\"529.36\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"529.36\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">1.5</text>\n<line x1=\"61\" y1=\"316.16\" x2=\"66\" y2=\"316.16\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"320.16\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-1.0</text>\n<line x1=\"61\" y1=\"273.38\" x2=\"66\" y2=\"273.38\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"277.38\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-0.5</text>\n<line x1=\"61\" y1=\"230.6\" x2=\"66\" y2=\"230.6\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"234.6\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.0</text>\n<line x1=\"61\" y1=\"187.83\" x2=\"66\" y2=\"187.83\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"191.83\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.5</text>\n<line x1=\"61\" y1=\"145.05\" x2=\"66\" y2=\"145.05\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"149.05\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">1.0</text>\n<line x1=\"61\" y1=\"102.27\" x2=\"66\" y2=\"102.27\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"106.27\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">1.5</text>\n<g clip-path=\"url(#clip692278225871859476)\">\n<g class=\"viz-series\" data-viz-series-id=\"0\"><g><polygon class=\"hexbin-cell\" points=\"66,337.79 72.78,327.57 86.33,327.57 93.11,337.79 86.33,348 72.78,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,337.79 99.89,327.57 113.44,327.57 120.22,337.79 113.44,348 99.89,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,337.79 127,327.57 140.56,327.57 147.33,337.79 140.56,348 127,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,337.79 154.11,327.57 167.67,327.57 174.44,337.79 167.67,348 154.11,348\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,337.79 181.22,327.57 194.78,327.57 201.56,337.79 194.78,348 181.22,348\" fill=\"rgb(17,10,43)\" fill-opacity=\"0.2\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 4</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,337.79 208.33,327.57 221.89,327.57 228.67,337.79 221.89,348 208.33,348\" fill=\"rgb(22,12,53)\" fill-opacity=\"0.21\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 5</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,337.79 235.44,327.57 249,327.57 255.78,337.79 249,348 235.44,348\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,337.79 262.56,327.57 276.11,327.57 282.89,337.79 276.11,348 262.56,348\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,337.79 289.67,327.57 303.22,327.57 310,337.79 303.22,348 289.67,348\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"310,337.79 316.78,327.57 330.33,327.57 337.11,337.79 330.33,348 316.78,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,337.79 343.89,327.57 357.44,327.57 364.22,337.79 357.44,348 343.89,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,337.79 371,327.57 384.56,327.57 391.33,337.79 384.56,348 371,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,337.79 398.11,327.57 411.67,327.57 418.44,337.79 411.67,348 398.11,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,337.79 425.22,327.57 438.78,327.57 445.56,337.79 438.78,348 425.22,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,337.79 452.33,327.57 465.89,327.57 472.67,337.79 465.89,348 452.33,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,337.79 479.44,327.57 493,327.57 499.78,337.79 493,348 479.44,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,337.79 506.56,327.57 520.11,327.57 526.89,337.79 520.11,348 506.56,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,337.79 533.67,327.57 547.22,327.57 554,337.79 547.22,348 533.67,348\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,317.36 72.78,307.14 86.33,307.14 93.11,317.36 86.33,327.57 72.78,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,317.36 99.89,307.14 113.44,307.14 120.22,317.36 113.44,327.57 99.89,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,317.36 127,307.14 140.56,307.14 147.33,317.36 140.56,327.57 127,327.57\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,317.36 154.11,307.14 167.67,307.14 174.44,317.36 167.67,327.57 154.11,327.57\" fill=\"rgb(32,16,72)\" fill-opacity=\"0.24\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 7</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,317.36 181.22,307.14 194.78,307.14 201.56,317.36 194.78,327.57 181.22,327.57\" fill=\"rgb(71,18,115)\" fill-opacity=\"0.32\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 12</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,317.36 208.33,307.14 221.89,307.14 228.67,317.36 221.89,327.57 208.33,327.57\" fill=\"rgb(63,17,106)\" fill-opacity=\"0.3\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 11</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,317.36 235.44,307.14 249,307.14 255.78,317.36 249,327.57 235.44,327.57\" fill=\"rgb(79,18,123)\" fill-opacity=\"0.33\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 13</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,317.36 262.56,307.14 276.11,307.14 282.89,317.36 276.11,327.57 262.56,327.57\" fill=\"rgb(26,15,63)\" fill-opacity=\"0.23\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 6</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,317.36 289.67,307.14 303.22,307.14 310,317.36 303.22,327.57 289.67,327.57\" fill=\"rgb(22,12,53)\" fill-opacity=\"0.21\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 5</title></polygon><polygon class=\"hexbin-cell\" points=\"310,317.36 316.78,307.14 330.33,307.14 337.11,317.36 330.33,327.57 316.78,327.57\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,317.36 343.89,307.14 357.44,307.14 364.22,317.36 357.44,327.57 343.89,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,317.36 371,307.14 384.56,307.14 391.33,317.36 384.56,327.57 371,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,317.36 398.11,307.14 411.67,307.14 418.44,317.36 411.67,327.57 398.11,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,317.36 425.22,307.14 438.78,307.14 445.56,317.36 438.78,327.57 425.22,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,317.36 452.33,307.14 465.89,307.14 472.67,317.36 465.89,327.57 452.33,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,317.36 479.44,307.14 493,307.14 499.78,317.36 493,327.57 479.44,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,317.36 506.56,307.14 520.11,307.14 526.89,317.36 520.11,327.57 506.56,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,317.36 533.67,307.14 547.22,307.14 554,317.36 547.22,327.57 533.67,327.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,296.93 72.78,286.71 86.33,286.71 93.11,296.93 86.33,307.14 72.78,307.14\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,296.93 99.89,286.71 113.44,286.71 120.22,296.93 113.44,307.14 99.89,307.14\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,296.93 127,286.71 140.56,286.71 147.33,296.93 140.56,307.14 127,307.14\" fill=\"rgb(32,16,72)\" fill-opacity=\"0.24\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 7</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,296.93 154.11,286.71 167.67,286.71 174.44,296.93 167.67,307.14 154.11,307.14\" fill=\"rgb(102,27,126)\" fill-opacity=\"0.37\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 16</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,296.93 181.22,286.71 194.78,286.71 201.56,296.93 194.78,307.14 181.22,307.14\" fill=\"rgb(149,44,126)\" fill-opacity=\"0.46\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 22</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,296.93 208.33,286.71 221.89,286.71 228.67,296.93 221.89,307.14 208.33,307.14\" fill=\"rgb(211,70,108)\" fill-opacity=\"0.58\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 30</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,296.93 235.44,286.71 249,286.71 255.78,296.93 249,307.14 235.44,307.14\" fill=\"rgb(196,62,115)\" fill-opacity=\"0.55\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 28</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,296.93 262.56,286.71 276.11,286.71 282.89,296.93 276.11,307.14 262.56,307.14\" fill=\"rgb(79,18,123)\" fill-opacity=\"0.33\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 13</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,296.93 289.67,286.71 303.22,286.71 310,296.93 303.22,307.14 289.67,307.14\" fill=\"rgb(63,17,106)\" fill-opacity=\"0.3\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 11</title></polygon><polygon class=\"hexbin-cell\" points=\"310,296.93 316.78,286.71 330.33,286.71 337.11,296.93 330.33,307.14 316.78,307.14\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,296.93 343.89,286.71 357.44,286.71 364.22,296.93 357.44,307.14 343.89,307.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,296.93 371,286.71 384.56,286.71 391.33,296.93 384.56,307.14 371,307.14\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,296.93 398.11,286.71 411.67,286.71 418.44,296.93 411.67,307.14 398.11,307.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,296.93 425.22,286.71 438.78,286.71 445.56,296.93 438.78,307.14 425.22,307.14\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,296.93 452.33,286.71 465.89,286.71 472.67,296.93 465.89,307.14 452.33,307.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,296.93 479.44,286.71 493,286.71 499.78,296.93 493,307.14 479.44,307.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,296.93 506.56,286.71 520.11,286.71 526.89,296.93 520.11,307.14 506.56,307.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,296.93 533.67,286.71 547.22,286.71 554,296.93 547.22,307.14 533.67,307.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,276.5 72.78,266.29 86.33,266.29 93.11,276.5 86.33,286.71 72.78,286.71\" fill=\"rgb(17,10,43)\" fill-opacity=\"0.2\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 4</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,276.5 99.89,266.29 113.44,266.29 120.22,276.5 113.44,286.71 99.89,286.71\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,276.5 127,266.29 140.56,266.29 147.33,276.5 140.56,286.71 127,286.71\" fill=\"rgb(71,18,115)\" fill-opacity=\"0.32\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 12</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,276.5 154.11,266.29 167.67,266.29 174.44,276.5 167.67,286.71 154.11,286.71\" fill=\"rgb(218,74,105)\" fill-opacity=\"0.59\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 31</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,276.5 181.22,266.29 194.78,266.29 201.56,276.5 194.78,286.71 181.22,286.71\" fill=\"rgb(234,93,99)\" fill-opacity=\"0.64\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 34</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,276.5 208.33,266.29 221.89,266.29 228.67,276.5 221.89,286.71 208.33,286.71\" fill=\"rgb(252,253,191)\" fill-opacity=\"0.9\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 52</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,276.5 235.44,266.29 249,266.29 255.78,276.5 249,286.71 235.44,286.71\" fill=\"rgb(225,78,102)\" fill-opacity=\"0.61\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 32</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,276.5 262.56,266.29 276.11,266.29 282.89,276.5 276.11,286.71 262.56,286.71\" fill=\"rgb(149,44,126)\" fill-opacity=\"0.46\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 22</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,276.5 289.67,266.29 303.22,266.29 310,276.5 303.22,286.71 289.67,286.71\" fill=\"rgb(71,18,115)\" fill-opacity=\"0.32\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 12</title></polygon><polygon class=\"hexbin-cell\" points=\"310,276.5 316.78,266.29 330.33,266.29 337.11,276.5 330.33,286.71 316.78,286.71\" fill=\"rgb(32,16,72)\" fill-opacity=\"0.24\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 7</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,276.5 343.89,266.29 357.44,266.29 364.22,276.5 357.44,286.71 343.89,286.71\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,276.5 371,266.29 384.56,266.29 391.33,276.5 384.56,286.71 371,286.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,276.5 398.11,266.29 411.67,266.29 418.44,276.5 411.67,286.71 398.11,286.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,276.5 425.22,266.29 438.78,266.29 445.56,276.5 438.78,286.71 425.22,286.71\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,276.5 452.33,266.29 465.89,266.29 472.67,276.5 465.89,286.71 452.33,286.71\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,276.5 479.44,266.29 493,266.29 499.78,276.5 493,286.71 479.44,286.71\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,276.5 506.56,266.29 520.11,266.29 526.89,276.5 520.11,286.71 506.56,286.71\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,276.5 533.67,266.29 547.22,266.29 554,276.5 547.22,286.71 533.67,286.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,256.07 72.78,245.86 86.33,245.86 93.11,256.07 86.33,266.29 72.78,266.29\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,256.07 99.89,245.86 113.44,245.86 120.22,256.07 113.44,266.29 99.89,266.29\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,256.07 127,245.86 140.56,245.86 147.33,256.07 140.56,266.29 127,266.29\" fill=\"rgb(55,17,98)\" fill-opacity=\"0.29\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 10</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,256.07 154.11,245.86 167.67,245.86 174.44,256.07 167.67,266.29 154.11,266.29\" fill=\"rgb(110,30,127)\" fill-opacity=\"0.39\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 17</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,256.07 181.22,245.86 194.78,245.86 201.56,256.07 194.78,266.29 181.22,266.29\" fill=\"rgb(211,70,108)\" fill-opacity=\"0.58\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 30</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,256.07 208.33,245.86 221.89,245.86 228.67,256.07 221.89,266.29 208.33,266.29\" fill=\"rgb(165,49,124)\" fill-opacity=\"0.49\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 24</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,256.07 235.44,245.86 249,245.86 255.78,256.07 249,266.29 235.44,266.29\" fill=\"rgb(181,54,122)\" fill-opacity=\"0.52\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 26</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,256.07 262.56,245.86 276.11,245.86 282.89,256.07 276.11,266.29 262.56,266.29\" fill=\"rgb(63,17,106)\" fill-opacity=\"0.3\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 11</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,256.07 289.67,245.86 303.22,245.86 310,256.07 303.22,266.29 289.67,266.29\" fill=\"rgb(26,15,63)\" fill-opacity=\"0.23\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 6</title></polygon><polygon class=\"hexbin-cell\" points=\"310,256.07 316.78,245.86 330.33,245.86 337.11,256.07 330.33,266.29 316.78,266.29\" fill=\"rgb(22,12,53)\" fill-opacity=\"0.21\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 5</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,256.07 343.89,245.86 357.44,245.86 364.22,256.07 357.44,266.29 343.89,266.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,256.07 371,245.86 384.56,245.86 391.33,256.07 384.56,266.29 371,266.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,256.07 398.11,245.86 411.67,245.86 418.44,256.07 411.67,266.29 398.11,266.29\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,256.07 425.22,245.86 438.78,245.86 445.56,256.07 438.78,266.29 425.22,266.29\" fill=\"rgb(17,10,43)\" fill-opacity=\"0.2\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 4</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,256.07 452.33,245.86 465.89,245.86 472.67,256.07 465.89,266.29 452.33,266.29\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,256.07 479.44,245.86 493,245.86 499.78,256.07 493,266.29 479.44,266.29\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,256.07 506.56,245.86 520.11,245.86 526.89,256.07 520.11,266.29 506.56,266.29\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,256.07 533.67,245.86 547.22,245.86 554,256.07 547.22,266.29 533.67,266.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,235.64 72.78,225.43 86.33,225.43 93.11,235.64 86.33,245.86 72.78,245.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,235.64 99.89,225.43 113.44,225.43 120.22,235.64 113.44,245.86 99.89,245.86\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,235.64 127,225.43 140.56,225.43 147.33,235.64 140.56,245.86 127,245.86\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,235.64 154.11,225.43 167.67,225.43 174.44,235.64 167.67,245.86 154.11,245.86\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,235.64 181.22,225.43 194.78,225.43 201.56,235.64 194.78,245.86 181.22,245.86\" fill=\"rgb(55,17,98)\" fill-opacity=\"0.29\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 10</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,235.64 208.33,225.43 221.89,225.43 228.67,235.64 221.89,245.86 208.33,245.86\" fill=\"rgb(32,16,72)\" fill-opacity=\"0.24\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 7</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,235.64 235.44,225.43 249,225.43 255.78,235.64 249,245.86 235.44,245.86\" fill=\"rgb(48,17,89)\" fill-opacity=\"0.27\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 9</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,235.64 262.56,225.43 276.11,225.43 282.89,235.64 276.11,245.86 262.56,245.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,235.64 289.67,225.43 303.22,225.43 310,235.64 303.22,245.86 289.67,245.86\" fill=\"rgb(32,16,72)\" fill-opacity=\"0.24\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 7</title></polygon><polygon class=\"hexbin-cell\" points=\"310,235.64 316.78,225.43 330.33,225.43 337.11,235.64 330.33,245.86 316.78,245.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,235.64 343.89,225.43 357.44,225.43 364.22,235.64 357.44,245.86 343.89,245.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,235.64 371,225.43 384.56,225.43 391.33,235.64 384.56,245.86 371,245.86\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,235.64 398.11,225.43 411.67,225.43 418.44,235.64 411.67,245.86 398.11,245.86\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,235.64 425.22,225.43 438.78,225.43 445.56,235.64 438.78,245.86 425.22,245.86\" fill=\"rgb(55,17,98)\" fill-opacity=\"0.29\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 10</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,235.64 452.33,225.43 465.89,225.43 472.67,235.64 465.89,245.86 452.33,245.86\" fill=\"rgb(48,17,89)\" fill-opacity=\"0.27\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 9</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,235.64 479.44,225.43 493,225.43 499.78,235.64 493,245.86 479.44,245.86\" fill=\"rgb(22,12,53)\" fill-opacity=\"0.21\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 5</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,235.64 506.56,225.43 520.11,225.43 526.89,235.64 520.11,245.86 506.56,245.86\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,235.64 533.67,225.43 547.22,225.43 554,235.64 547.22,245.86 533.67,245.86\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"66,215.21 72.78,205 86.33,205 93.11,215.21 86.33,225.43 72.78,225.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,215.21 99.89,205 113.44,205 120.22,215.21 113.44,225.43 99.89,225.43\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,215.21 127,205 140.56,205 147.33,215.21 140.56,225.43 127,225.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,215.21 154.11,205 167.67,205 174.44,215.21 167.67,225.43 154.11,225.43\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,215.21 181.22,205 194.78,205 201.56,215.21 194.78,225.43 181.22,225.43\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,215.21 208.33,205 221.89,205 228.67,215.21 221.89,225.43 208.33,225.43\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,215.21 235.44,205 249,205 255.78,215.21 249,225.43 235.44,225.43\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,215.21 262.56,205 276.11,205 282.89,215.21 276.11,225.43 262.56,225.43\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,215.21 289.67,205 303.22,205 310,215.21 303.22,225.43 289.67,225.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,215.21 316.78,205 330.33,205 337.11,215.21 330.33,225.43 316.78,225.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,215.21 343.89,205 357.44,205 364.22,215.21 357.44,225.43 343.89,225.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,215.21 371,205 384.56,205 391.33,215.21 384.56,225.43 371,225.43\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,215.21 398.11,205 411.67,205 418.44,215.21 411.67,225.43 398.11,225.43\" fill=\"rgb(26,15,63)\" fill-opacity=\"0.23\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 6</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,215.21 425.22,205 438.78,205 445.56,215.21 438.78,225.43 425.22,225.43\" fill=\"rgb(149,44,126)\" fill-opacity=\"0.46\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 22</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,215.21 452.33,205 465.89,205 472.67,215.21 465.89,225.43 452.33,225.43\" fill=\"rgb(71,18,115)\" fill-opacity=\"0.32\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 12</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,215.21 479.44,205 493,205 499.78,215.21 493,225.43 479.44,225.43\" fill=\"rgb(63,17,106)\" fill-opacity=\"0.3\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 11</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,215.21 506.56,205 520.11,205 526.89,215.21 520.11,225.43 506.56,225.43\" fill=\"rgb(32,16,72)\" fill-opacity=\"0.24\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 7</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,215.21 533.67,205 547.22,205 554,215.21 547.22,225.43 533.67,225.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,194.79 72.78,184.57 86.33,184.57 93.11,194.79 86.33,205 72.78,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,194.79 99.89,184.57 113.44,184.57 120.22,194.79 113.44,205 99.89,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,194.79 127,184.57 140.56,184.57 147.33,194.79 140.56,205 127,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,194.79 154.11,184.57 167.67,184.57 174.44,194.79 167.67,205 154.11,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,194.79 181.22,184.57 194.78,184.57 201.56,194.79 194.78,205 181.22,205\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,194.79 208.33,184.57 221.89,184.57 228.67,194.79 221.89,205 208.33,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,194.79 235.44,184.57 249,184.57 255.78,194.79 249,205 235.44,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,194.79 262.56,184.57 276.11,184.57 282.89,194.79 276.11,205 262.56,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,194.79 289.67,184.57 303.22,184.57 310,194.79 303.22,205 289.67,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,194.79 316.78,184.57 330.33,184.57 337.11,194.79 330.33,205 316.78,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,194.79 343.89,184.57 357.44,184.57 364.22,194.79 357.44,205 343.89,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,194.79 371,184.57 384.56,184.57 391.33,194.79 384.56,205 371,205\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,194.79 398.11,184.57 411.67,184.57 418.44,194.79 411.67,205 398.11,205\" fill=\"rgb(71,18,115)\" fill-opacity=\"0.32\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 12</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,194.79 425.22,184.57 438.78,184.57 445.56,194.79 438.78,205 425.22,205\" fill=\"rgb(188,58,119)\" fill-opacity=\"0.53\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 27</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,194.79 452.33,184.57 465.89,184.57 472.67,194.79 465.89,205 452.33,205\" fill=\"rgb(196,62,115)\" fill-opacity=\"0.55\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 28</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,194.79 479.44,184.57 493,184.57 499.78,194.79 493,205 479.44,205\" fill=\"rgb(165,49,124)\" fill-opacity=\"0.49\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 24</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,194.79 506.56,184.57 520.11,184.57 526.89,194.79 520.11,205 506.56,205\" fill=\"rgb(17,10,43)\" fill-opacity=\"0.2\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 4</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,194.79 533.67,184.57 547.22,184.57 554,194.79 547.22,205 533.67,205\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,174.36 72.78,164.14 86.33,164.14 93.11,174.36 86.33,184.57 72.78,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,174.36 99.89,164.14 113.44,164.14 120.22,174.36 113.44,184.57 99.89,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,174.36 127,164.14 140.56,164.14 147.33,174.36 140.56,184.57 127,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,174.36 154.11,164.14 167.67,164.14 174.44,174.36 167.67,184.57 154.11,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,174.36 181.22,164.14 194.78,164.14 201.56,174.36 194.78,184.57 181.22,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,174.36 208.33,164.14 221.89,164.14 228.67,174.36 221.89,184.57 208.33,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,174.36 235.44,164.14 249,164.14 255.78,174.36 249,184.57 235.44,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,174.36 262.56,164.14 276.11,164.14 282.89,174.36 276.11,184.57 262.56,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,174.36 289.67,164.14 303.22,164.14 310,174.36 303.22,184.57 289.67,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,174.36 316.78,164.14 330.33,164.14 337.11,174.36 330.33,184.57 316.78,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,174.36 343.89,164.14 357.44,164.14 364.22,174.36 357.44,184.57 343.89,184.57\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,174.36 371,164.14 384.56,164.14 391.33,174.36 384.56,184.57 371,184.57\" fill=\"rgb(26,15,63)\" fill-opacity=\"0.23\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 6</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,174.36 398.11,164.14 411.67,164.14 418.44,174.36 411.67,184.57 398.11,184.57\" fill=\"rgb(117,33,128)\" fill-opacity=\"0.4\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 18</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,174.36 425.22,164.14 438.78,164.14 445.56,174.36 438.78,184.57 425.22,184.57\" fill=\"rgb(165,49,124)\" fill-opacity=\"0.49\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 24</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,174.36 452.33,164.14 465.89,164.14 472.67,174.36 465.89,184.57 452.33,184.57\" fill=\"rgb(231,84,100)\" fill-opacity=\"0.62\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 33</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,174.36 479.44,164.14 493,164.14 499.78,174.36 493,184.57 479.44,184.57\" fill=\"rgb(244,118,98)\" fill-opacity=\"0.68\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 37</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,174.36 506.56,164.14 520.11,164.14 526.89,174.36 520.11,184.57 506.56,184.57\" fill=\"rgb(40,16,81)\" fill-opacity=\"0.26\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 8</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,174.36 533.67,164.14 547.22,164.14 554,174.36 547.22,184.57 533.67,184.57\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"66,153.93 72.78,143.71 86.33,143.71 93.11,153.93 86.33,164.14 72.78,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,153.93 99.89,143.71 113.44,143.71 120.22,153.93 113.44,164.14 99.89,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,153.93 127,143.71 140.56,143.71 147.33,153.93 140.56,164.14 127,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,153.93 154.11,143.71 167.67,143.71 174.44,153.93 167.67,164.14 154.11,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,153.93 181.22,143.71 194.78,143.71 201.56,153.93 194.78,164.14 181.22,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,153.93 208.33,143.71 221.89,143.71 228.67,153.93 221.89,164.14 208.33,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,153.93 235.44,143.71 249,143.71 255.78,153.93 249,164.14 235.44,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,153.93 262.56,143.71 276.11,143.71 282.89,153.93 276.11,164.14 262.56,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,153.93 289.67,143.71 303.22,143.71 310,153.93 303.22,164.14 289.67,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,153.93 316.78,143.71 330.33,143.71 337.11,153.93 330.33,164.14 316.78,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,153.93 343.89,143.71 357.44,143.71 364.22,153.93 357.44,164.14 343.89,164.14\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,153.93 371,143.71 384.56,143.71 391.33,153.93 384.56,164.14 371,164.14\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,153.93 398.11,143.71 411.67,143.71 418.44,153.93 411.67,164.14 398.11,164.14\" fill=\"rgb(55,17,98)\" fill-opacity=\"0.29\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 10</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,153.93 425.22,143.71 438.78,143.71 445.56,153.93 438.78,164.14 425.22,164.14\" fill=\"rgb(181,54,122)\" fill-opacity=\"0.52\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 26</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,153.93 452.33,143.71 465.89,143.71 472.67,153.93 465.89,164.14 452.33,164.14\" fill=\"rgb(234,93,99)\" fill-opacity=\"0.64\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 34</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,153.93 479.44,143.71 493,143.71 499.78,153.93 493,164.14 479.44,164.14\" fill=\"rgb(165,49,124)\" fill-opacity=\"0.49\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 24</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,153.93 506.56,143.71 520.11,143.71 526.89,153.93 520.11,164.14 506.56,164.14\" fill=\"rgb(63,17,106)\" fill-opacity=\"0.3\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 11</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,153.93 533.67,143.71 547.22,143.71 554,153.93 547.22,164.14 533.67,164.14\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"66,133.5 72.78,123.29 86.33,123.29 93.11,133.5 86.33,143.71 72.78,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,133.5 99.89,123.29 113.44,123.29 120.22,133.5 113.44,143.71 99.89,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,133.5 127,123.29 140.56,123.29 147.33,133.5 140.56,143.71 127,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,133.5 154.11,123.29 167.67,123.29 174.44,133.5 167.67,143.71 154.11,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,133.5 181.22,123.29 194.78,123.29 201.56,133.5 194.78,143.71 181.22,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,133.5 208.33,123.29 221.89,123.29 228.67,133.5 221.89,143.71 208.33,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,133.5 235.44,123.29 249,123.29 255.78,133.5 249,143.71 235.44,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,133.5 262.56,123.29 276.11,123.29 282.89,133.5 276.11,143.71 262.56,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,133.5 289.67,123.29 303.22,123.29 310,133.5 303.22,143.71 289.67,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,133.5 316.78,123.29 330.33,123.29 337.11,133.5 330.33,143.71 316.78,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,133.5 343.89,123.29 357.44,123.29 364.22,133.5 357.44,143.71 343.89,143.71\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,133.5 371,123.29 384.56,123.29 391.33,133.5 384.56,143.71 371,143.71\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,133.5 398.11,123.29 411.67,123.29 418.44,133.5 411.67,143.71 398.11,143.71\" fill=\"rgb(63,17,106)\" fill-opacity=\"0.3\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 11</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,133.5 425.22,123.29 438.78,123.29 445.56,133.5 438.78,143.71 425.22,143.71\" fill=\"rgb(133,38,128)\" fill-opacity=\"0.43\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 20</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,133.5 452.33,123.29 465.89,123.29 472.67,133.5 465.89,143.71 452.33,143.71\" fill=\"rgb(188,58,119)\" fill-opacity=\"0.53\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 27</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,133.5 479.44,123.29 493,123.29 499.78,133.5 493,143.71 479.44,143.71\" fill=\"rgb(79,18,123)\" fill-opacity=\"0.33\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 13</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,133.5 506.56,123.29 520.11,123.29 526.89,133.5 520.11,143.71 506.56,143.71\" fill=\"rgb(26,15,63)\" fill-opacity=\"0.23\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 6</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,133.5 533.67,123.29 547.22,123.29 554,133.5 547.22,143.71 533.67,143.71\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"66,113.07 72.78,102.86 86.33,102.86 93.11,113.07 86.33,123.29 72.78,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,113.07 99.89,102.86 113.44,102.86 120.22,113.07 113.44,123.29 99.89,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,113.07 127,102.86 140.56,102.86 147.33,113.07 140.56,123.29 127,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,113.07 154.11,102.86 167.67,102.86 174.44,113.07 167.67,123.29 154.11,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,113.07 181.22,102.86 194.78,102.86 201.56,113.07 194.78,123.29 181.22,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,113.07 208.33,102.86 221.89,102.86 228.67,113.07 221.89,123.29 208.33,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,113.07 235.44,102.86 249,102.86 255.78,113.07 249,123.29 235.44,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,113.07 262.56,102.86 276.11,102.86 282.89,113.07 276.11,123.29 262.56,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,113.07 289.67,102.86 303.22,102.86 310,113.07 303.22,123.29 289.67,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,113.07 316.78,102.86 330.33,102.86 337.11,113.07 330.33,123.29 316.78,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,113.07 343.89,102.86 357.44,102.86 364.22,113.07 357.44,123.29 343.89,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,113.07 371,102.86 384.56,102.86 391.33,113.07 384.56,123.29 371,123.29\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,113.07 398.11,102.86 411.67,102.86 418.44,113.07 411.67,123.29 398.11,123.29\" fill=\"rgb(55,17,98)\" fill-opacity=\"0.29\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 10</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,113.07 425.22,102.86 438.78,102.86 445.56,113.07 438.78,123.29 425.22,123.29\" fill=\"rgb(26,15,63)\" fill-opacity=\"0.23\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 6</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,113.07 452.33,102.86 465.89,102.86 472.67,113.07 465.89,123.29 452.33,123.29\" fill=\"rgb(55,17,98)\" fill-opacity=\"0.29\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 10</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,113.07 479.44,102.86 493,102.86 499.78,113.07 493,123.29 479.44,123.29\" fill=\"rgb(94,24,125)\" fill-opacity=\"0.36\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 15</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,113.07 506.56,102.86 520.11,102.86 526.89,113.07 520.11,123.29 506.56,123.29\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,113.07 533.67,102.86 547.22,102.86 554,113.07 547.22,123.29 533.67,123.29\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"66,92.64 72.78,82.43 86.33,82.43 93.11,92.64 86.33,102.86 72.78,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,92.64 99.89,82.43 113.44,82.43 120.22,92.64 113.44,102.86 99.89,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,92.64 127,82.43 140.56,82.43 147.33,92.64 140.56,102.86 127,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,92.64 154.11,82.43 167.67,82.43 174.44,92.64 167.67,102.86 154.11,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,92.64 181.22,82.43 194.78,82.43 201.56,92.64 194.78,102.86 181.22,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,92.64 208.33,82.43 221.89,82.43 228.67,92.64 221.89,102.86 208.33,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,92.64 235.44,82.43 249,82.43 255.78,92.64 249,102.86 235.44,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,92.64 262.56,82.43 276.11,82.43 282.89,92.64 276.11,102.86 262.56,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,92.64 289.67,82.43 303.22,82.43 310,92.64 303.22,102.86 289.67,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,92.64 316.78,82.43 330.33,82.43 337.11,92.64 330.33,102.86 316.78,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,92.64 343.89,82.43 357.44,82.43 364.22,92.64 357.44,102.86 343.89,102.86\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,92.64 371,82.43 384.56,82.43 391.33,92.64 384.56,102.86 371,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,92.64 398.11,82.43 411.67,82.43 418.44,92.64 411.67,102.86 398.11,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,92.64 425.22,82.43 438.78,82.43 445.56,92.64 438.78,102.86 425.22,102.86\" fill=\"rgb(40,16,81)\" fill-opacity=\"0.26\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 8</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,92.64 452.33,82.43 465.89,82.43 472.67,92.64 465.89,102.86 452.33,102.86\" fill=\"rgb(48,17,89)\" fill-opacity=\"0.27\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 9</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,92.64 479.44,82.43 493,82.43 499.78,92.64 493,102.86 479.44,102.86\" fill=\"rgb(13,7,34)\" fill-opacity=\"0.18\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 3</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,92.64 506.56,82.43 520.11,82.43 526.89,92.64 520.11,102.86 506.56,102.86\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,92.64 533.67,82.43 547.22,82.43 554,92.64 547.22,102.86 533.67,102.86\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"66,72.21 72.78,62 86.33,62 93.11,72.21 86.33,82.43 72.78,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"93.11,72.21 99.89,62 113.44,62 120.22,72.21 113.44,82.43 99.89,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"120.22,72.21 127,62 140.56,62 147.33,72.21 140.56,82.43 127,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"147.33,72.21 154.11,62 167.67,62 174.44,72.21 167.67,82.43 154.11,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"174.44,72.21 181.22,62 194.78,62 201.56,72.21 194.78,82.43 181.22,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"201.56,72.21 208.33,62 221.89,62 228.67,72.21 221.89,82.43 208.33,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"228.67,72.21 235.44,62 249,62 255.78,72.21 249,82.43 235.44,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"255.78,72.21 262.56,62 276.11,62 282.89,72.21 276.11,82.43 262.56,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"282.89,72.21 289.67,62 303.22,62 310,72.21 303.22,82.43 289.67,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"310,72.21 316.78,62 330.33,62 337.11,72.21 330.33,82.43 316.78,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"337.11,72.21 343.89,62 357.44,62 364.22,72.21 357.44,82.43 343.89,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"364.22,72.21 371,62 384.56,62 391.33,72.21 384.56,82.43 371,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon><polygon class=\"hexbin-cell\" points=\"391.33,72.21 398.11,62 411.67,62 418.44,72.21 411.67,82.43 398.11,82.43\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"418.44,72.21 425.22,62 438.78,62 445.56,72.21 438.78,82.43 425.22,82.43\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"445.56,72.21 452.33,62 465.89,62 472.67,72.21 465.89,82.43 452.33,82.43\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"472.67,72.21 479.44,62 493,62 499.78,72.21 493,82.43 479.44,82.43\" fill=\"rgb(4,2,14)\" fill-opacity=\"0.15\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 1</title></polygon><polygon class=\"hexbin-cell\" points=\"499.78,72.21 506.56,62 520.11,62 526.89,72.21 520.11,82.43 506.56,82.43\" fill=\"rgb(9,5,24)\" fill-opacity=\"0.17\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 2</title></polygon><polygon class=\"hexbin-cell\" points=\"526.89,72.21 533.67,62 547.22,62 554,72.21 547.22,82.43 533.67,82.43\" fill=\"rgb(0,0,4)\" fill-opacity=\"0.14\" stroke=\"#ffffff\" stroke-width=\"0.8\"><title>observations: count 0</title></polygon></g></g>\n</g>\n<line x1=\"66\" y1=\"348\" x2=\"554\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<line x1=\"66\" y1=\"62\" x2=\"66\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"310\" y=\"388\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\">x</text>\n<text x=\"16\" y=\"205\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\" transform=\"rotate(-90 16 205)\">y</text>\n<defs><linearGradient id=\"cb7009976493669957231\" x1=\"0\" y1=\"1\" x2=\"0\" y2=\"0\"><stop offset=\"0\" stop-color=\"rgb(0,0,4)\"/><stop offset=\"0.13\" stop-color=\"rgb(28,16,68)\"/><stop offset=\"0.25\" stop-color=\"rgb(79,18,123)\"/><stop offset=\"0.38\" stop-color=\"rgb(129,37,129)\"/><stop offset=\"0.5\" stop-color=\"rgb(181,54,122)\"/><stop offset=\"0.63\" stop-color=\"rgb(229,80,100)\"/><stop offset=\"0.75\" stop-color=\"rgb(251,135,97)\"/><stop offset=\"0.88\" stop-color=\"rgb(254,194,135)\"/><stop offset=\"1\" stop-color=\"rgb(252,253,191)\"/></linearGradient></defs>\n<rect x=\"568\" y=\"62\" width=\"12\" height=\"286\" fill=\"url(#cb7009976493669957231)\" stroke=\"#9ca3af\" stroke-width=\"0.5\"/>\n<line x1=\"580\" y1=\"348\" x2=\"584\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/><text x=\"587\" y=\"351.5\" text-anchor=\"start\" font-size=\"10\" fill=\"#6b7280\">0</text>\n<line x1=\"580\" y1=\"293\" x2=\"584\" y2=\"293\" stroke=\"#9ca3af\" stroke-width=\"1\"/><text x=\"587\" y=\"296.5\" text-anchor=\"start\" font-size=\"10\" fill=\"#6b7280\">10</text>\n<line x1=\"580\" y1=\"238\" x2=\"584\" y2=\"238\" stroke=\"#9ca3af\" stroke-width=\"1\"/><text x=\"587\" y=\"241.5\" text-anchor=\"start\" font-size=\"10\" fill=\"#6b7280\">20</text>\n<line x1=\"580\" y1=\"183\" x2=\"584\" y2=\"183\" stroke=\"#9ca3af\" stroke-width=\"1\"/><text x=\"587\" y=\"186.5\" text-anchor=\"start\" font-size=\"10\" fill=\"#6b7280\">30</text>\n<line x1=\"580\" y1=\"128\" x2=\"584\" y2=\"128\" stroke=\"#9ca3af\" stroke-width=\"1\"/><text x=\"587\" y=\"131.5\" text-anchor=\"start\" font-size=\"10\" fill=\"#6b7280\">40</text>\n<line x1=\"580\" y1=\"73\" x2=\"584\" y2=\"73\" stroke=\"#9ca3af\" stroke-width=\"1\"/><text x=\"587\" y=\"76.5\" text-anchor=\"start\" font-size=\"10\" fill=\"#6b7280\">50</text>\n<text x=\"618\" y=\"205\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\" transform=\"rotate(-90 618 205)\">observations</text>\n\n\n  <ostrin-provenance source-hash=\"sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1\" data-hash=\"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\" seed=\"seed=91\" compiler=\"ostrinc 0.2.0\" />\n</svg>\n",
-    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R2\",\n  \"reproducibility\": {\n    \"level\": \"R2\",\n    \"label\": \"R2 · external snapshot replay verified\",\n    \"next\": \"R3 · auditable artifact (planned verification)\"\n  },\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.\",\n    \"R2\": \"Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"external-snapshot\",\n      \"sha256\": \"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\",\n      \"seed\": 91,\n      \"snapshot\": {\n        \"path\": \"data.json\",\n        \"kind\": \"json\",\n        \"embedded\": true\n      }\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:82b2718162a4563d427bc329152dc4ac83277366c1d27fcab4153bda8fa38b9d\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R2\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI replays the embedded data.json snapshot under its declared filesystem capability, changes the declared seed and verifies the seeded xoshiro256** stream and changed SVG.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1\",\n    \"data_hash\": \"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\",\n    \"seed\": \"seed=91\",\n    \"compiler\": \"ostrinc 0.2.0\"\n  },\n  \"compiler\": \"ostrinc 0.2.0\",\n  \"runtime\": {\n    \"schema\": \"ostrin.runtime/v1\",\n    \"status\": \"partial\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"runner\": \"WASI host\",\n    \"compiler_lockfile\": {\n      \"path\": \"compiler/Cargo.lock\",\n      \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n    },\n    \"dependencies\": {\n      \"compiler_lockfile\": {\n        \"path\": \"compiler/Cargo.lock\",\n        \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n      },\n      \"project_manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"project_lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"scheduler\": {\n      \"mode\": \"single-threaded-wasi-replay\",\n      \"concurrency\": \"not used by gallery fixture\",\n      \"status\": \"declared\"\n    },\n    \"project\": {\n      \"manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"platform_policy\": {\n      \"output\": \"byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee\",\n      \"numeric\": \"cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed\"\n    },\n    \"missing\": [\n      \"captured host and hardware metadata\"\n    ],\n    \"input_snapshots\": [\n      {\n        \"path\": \"data.json\",\n        \"kind\": \"json\",\n        \"embedded\": true,\n        \"sha256\": \"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\"\n      }\n    ],\n    \"invocation\": {\n      \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n      \"status\": \"verified-in-ci\",\n      \"outputs\": [\n        {\n          \"path\": \"figure.svg\",\n          \"bytes\": 65697,\n          \"sha256\": \"sha256:82b2718162a4563d427bc329152dc4ac83277366c1d27fcab4153bda8fa38b9d\"\n        }\n      ]\n    }\n  },\n  \"commit\": \"a773387e2e7ade15a8baffa48e642f5f619b7a9b\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"samples\": 1200,\n    \"bins_x\": 18,\n    \"bins_y\": 14\n  },\n  \"seed\": 91,\n  \"randomness\": {\n    \"contract\": \"ostrin.rng/v1\",\n    \"algorithm\": \"xoshiro256**\",\n    \"version\": \"ostrin.rng/v1\",\n    \"seeding\": \"splitmix64\",\n    \"normal\": \"Marsaglia polar\",\n    \"deterministic_log\": \"detmath::ln\",\n    \"partition\": \"single sequential stream\",\n    \"implementations\": [\n      {\n        \"path\": \"compiler/src/interpreter/rng.rs\",\n        \"sha256\": \"sha256:506abb002d63aa21ea67b51f979c9ff7a45b51fc8acee0c6e04db8ddae772bd9\"\n      },\n      {\n        \"path\": \"compiler/src/rng_runtime.c\",\n        \"sha256\": \"sha256:991c8a4db8d2f3839edbcf01357eef594086cc135d0b9897e7df06e722320a3a\"\n      }\n    ],\n    \"parity\": \"interpreter-native\",\n    \"seed_consumption\": \"data.json:seed\",\n    \"status\": \"input-driven-r1\"\n  },\n  \"execution\": {\n    \"mode\": \"input-file\",\n    \"input_file\": \"data.json\",\n    \"consumes\": [\n      \"seed\",\n      \"parameters.samples\",\n      \"parameters.bins_x\",\n      \"parameters.bins_y\"\n    ],\n    \"sensitivity\": {\n      \"path\": \"seed\",\n      \"alternate\": 92\n    },\n    \"randomness\": {\n      \"seed_path\": \"seed\",\n      \"algorithm\": \"xoshiro256**\",\n      \"version\": \"ostrin.rng/v1\",\n      \"partition\": \"single sequential stream\",\n      \"status\": \"verified-in-ci\"\n    },\n    \"command\": \"node scripts/experiment-replay.mjs --fixture hexbin\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"status\": \"verified-in-ci\",\n    \"capabilities\": [\n      \"filesystem.read:data.json\"\n    ],\n    \"snapshot\": {\n      \"path\": \"data.json\",\n      \"kind\": \"json\",\n      \"embedded\": true\n    }\n  },\n  \"effects\": {\n    \"schema\": \"ostrin.effect-report/v0\",\n    \"status\": \"captured\",\n    \"source\": \"ostrinc --effect-report --json\",\n    \"experimental\": true,\n    \"conservative\": true,\n    \"kinds\": [\n      \"concurrency\",\n      \"io\",\n      \"random(seed)\"\n    ],\n    \"entry\": \"main\",\n    \"functions\": {\n      \"add\": [],\n      \"area\": [],\n      \"band\": [],\n      \"bars\": [],\n      \"bind\": [],\n      \"boxplot\": [],\n      \"consume\": [],\n      \"consume_is\": [],\n      \"contour\": [],\n      \"contourf\": [],\n      \"dark\": [],\n      \"errorbars\": [],\n      \"heatmap\": [],\n      \"hexbin\": [],\n      \"histogram\": [],\n      \"hline\": [],\n      \"input_int\": [\n        \"io\"\n      ],\n      \"input_parameter_int\": [\n        \"io\"\n      ],\n      \"isosurface\": [],\n      \"line\": [],\n      \"literal\": [],\n      \"main\": [\n        \"concurrency\",\n        \"io\",\n        \"random(seed)\"\n      ],\n      \"morph\": [],\n      \"moving_point\": [],\n      \"moving_segment\": [],\n      \"parse_array\": [],\n      \"parse_hex4\": [],\n      \"parse_number\": [],\n      \"parse_object\": [],\n      \"parse_string\": [],\n      \"parse_value\": [],\n      \"peek\": [],\n      \"peek_digit\": [],\n      \"peek_is\": [],\n      \"quantity_line\": [],\n      \"quantity_scatter\": [],\n      \"quiver\": [],\n      \"rod\": [],\n      \"save\": [\n        \"concurrency\",\n        \"io\"\n      ],\n      \"scatter\": [],\n      \"skip_ws\": [],\n      \"slice_xy\": [],\n      \"slice_xz\": [],\n      \"slice_yz\": [],\n      \"stairs\": [],\n      \"std.json::append_text\": [],\n      \"std.json::append_value\": [],\n      \"std.json::array_items\": [],\n      \"std.json::array_value\": [],\n      \"std.json::as_bool\": [],\n      \"std.json::as_number\": [],\n      \"std.json::as_text\": [],\n      \"std.json::bool_value\": [],\n      \"std.json::char_is\": [],\n      \"std.json::null_value\": [],\n      \"std.json::number_value\": [],\n      \"std.json::object_get\": [],\n      \"std.json::object_keys\": [],\n      \"std.json::object_value\": [],\n      \"std.json::parse\": [],\n      \"std.json::quote_string\": [],\n      \"std.json::render\": [],\n      \"std.json::stringify\": [],\n      \"std.json::text_value\": [],\n      \"std.viz::animate\": [\n        \"concurrency\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"concurrency\"\n      ],\n      \"std.viz::argsort\": [],\n      \"std.viz::axes3d\": [\n        \"concurrency\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"concurrency\"\n      ],\n      \"std.viz::center_gap\": [],\n      \"std.viz::colorbar\": [],\n      \"std.viz::colormap\": [],\n      \"std.viz::decimals\": [],\n      \"std.viz::depth\": [],\n      \"std.viz::draw_contour\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_series\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"concurrency\"\n      ],\n      \"std.viz::edge\": [],\n      \"std.viz::empty\": [],\n      \"std.viz::escape\": [],\n      \"std.viz::escape_attr\": [],\n      \"std.viz::figure\": [],\n      \"std.viz::gradient\": [],\n      \"std.viz::grid\": [\n        \"concurrency\"\n      ],\n      \"std.viz::grid_of\": [],\n      \"std.viz::header\": [],\n      \"std.viz::integrate_stream\": [],\n      \"std.viz::legend\": [],\n      \"std.viz::min_gap\": [],\n      \"std.viz::motion_series\": [],\n      \"std.viz::nice_step\": [],\n      \"std.viz::num\": [],\n      \"std.viz::path_of\": [\n        \"concurrency\"\n      ],\n      \"std.viz::pick\": [],\n      \"std.viz::project_x\": [],\n      \"std.viz::project_y\": [],\n      \"std.viz::provenance_metadata\": [],\n      \"std.viz::pt\": [],\n      \"std.viz::px\": [],\n      \"std.viz::render\": [\n        \"concurrency\"\n      ],\n      \"std.viz::render3d\": [\n        \"concurrency\"\n      ],\n      \"std.viz::render_table\": [\n        \"concurrency\"\n      ],\n      \"std.viz::rgb_part\": [],\n      \"std.viz::sample_stream\": [],\n      \"std.viz::scene3d\": [],\n      \"std.viz::screen_xs\": [],\n      \"std.viz::screen_ys\": [],\n      \"std.viz::seg\": [],\n      \"std.viz::series\": [],\n      \"std.viz::shade\": [],\n      \"std.viz::short\": [],\n      \"std.viz::slice_xy\": [],\n      \"std.viz::slice_xz\": [],\n      \"std.viz::slice_yz\": [],\n      \"std.viz::stream_inside\": [],\n      \"std.viz::stream_value\": [],\n      \"std.viz::svg_size\": [],\n      \"std.viz::table\": [],\n      \"std.viz::table_column_widths\": [],\n      \"std.viz::tetra_isoline\": [],\n      \"std.viz::text_at\": [],\n      \"std.viz::tick_label\": [],\n      \"std.viz::ticks\": [],\n      \"std.viz::tip\": [],\n      \"std.viz::uid\": [],\n      \"std.viz::unit_of\": [],\n      \"std.viz::values\": [],\n      \"streamplot\": [],\n      \"surface\": [],\n      \"svg\": [\n        \"concurrency\"\n      ],\n      \"text\": [],\n      \"unit_line\": [],\n      \"unit_scatter\": [],\n      \"vector_field\": [],\n      \"violin\": [],\n      \"vline\": [],\n      \"wireframe\": []\n    },\n    \"function_calls\": {\n      \"add\": [\n        \"self.series.push\"\n      ],\n      \"area\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"band\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"bars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"boxplot\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"consume\": [\n        \"self.text.char_at\",\n        \"self.text.length\"\n      ],\n      \"consume_is\": [\n        \"self.consume\"\n      ],\n      \"contour\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"contourf\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"dark\": [\n        \"std.viz::dark\"\n      ],\n      \"errorbars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"heatmap\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"hexbin\": [\n        \"array\",\n        \"counts.get\",\n        \"counts.set\",\n        \"floor\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"xcenters.push\",\n        \"xs.length\",\n        \"xs.max\",\n        \"xs.min\",\n        \"ycenters.push\",\n        \"ys.max\",\n        \"ys.min\",\n        \"zeros\"\n      ],\n      \"histogram\": [\n        \"data.max\",\n        \"data.min\",\n        \"histogram\",\n        \"linspace\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"hline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"input_int\": [\n        \"document.is_err\",\n        \"document.unwrap\",\n        \"loaded.is_err\",\n        \"loaded.unwrap\",\n        \"number.is_none\",\n        \"number.unwrap\",\n        \"read_file\",\n        \"std.json::as_number\",\n        \"std.json::object_get\",\n        \"std.json::parse\",\n        \"value.is_none\",\n        \"value.unwrap\"\n      ],\n      \"input_parameter_int\": [\n        \"document.is_err\",\n        \"document.unwrap\",\n        \"loaded.is_err\",\n        \"loaded.unwrap\",\n        \"number.is_none\",\n        \"number.unwrap\",\n        \"parameters.is_none\",\n        \"parameters.unwrap\",\n        \"read_file\",\n        \"std.json::as_number\",\n        \"std.json::object_get\",\n        \"std.json::parse\",\n        \"value.is_none\",\n        \"value.unwrap\"\n      ],\n      \"isosurface\": [\n        \"array\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::tetra_isoline\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"vx.push\",\n        \"vy.push\",\n        \"vz.push\"\n      ],\n      \"line\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"literal\": [\n        \"Err\",\n        \"Ok\",\n        \"expected.length\",\n        \"self.consume\",\n        \"std.json::char_is\"\n      ],\n      \"main\": [\n        \"fig.svg\",\n        \"input_int\",\n        \"input_parameter_int\",\n        \"n.to_string\",\n        \"print\",\n        \"r.randn\",\n        \"rng\",\n        \"seed.to_string\",\n        \"std.viz::figure\",\n        \"xs.set\",\n        \"ys.set\",\n        \"zeros\"\n      ],\n      \"morph\": [\n        \"frames.row\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"moving_point\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"moving_segment\": [\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"parse_array\": [\n        \"Err\",\n        \"Ok\",\n        \"self.consume\",\n        \"self.parse_value\",\n        \"self.peek_is\",\n        \"self.skip_ws\",\n        \"std.json::append_value\",\n        \"std.json::array_value\"\n      ],\n      \"parse_hex4\": [\n        \"Err\",\n        \"Ok\",\n        \"ch.to_int\",\n        \"self.consume\"\n      ],\n      \"parse_number\": [\n        \"Err\",\n        \"Ok\",\n        \"literal.to_float\",\n        \"parsed.is_err\",\n        \"parsed.unwrap\",\n        \"self.peek\",\n        \"self.peek_digit\",\n        \"self.peek_is\",\n        \"self.text.slice\",\n        \"std.json::number_value\"\n      ],\n      \"parse_object\": [\n        \"Err\",\n        \"keys.push\",\n        \"self.consume\",\n        \"self.consume_is\",\n        \"self.parse_string\",\n        \"self.parse_value\",\n        \"self.peek_is\",\n        \"self.skip_ws\",\n        \"std.json::append_value\",\n        \"std.json::object_value\"\n      ],\n      \"parse_string\": [\n        \"Err\",\n        \"Ok\",\n        \"char_from_codepoint\",\n        \"self.consume\",\n        \"self.consume_is\",\n        \"self.parse_hex4\",\n        \"self.text.length\",\n        \"std.json::append_text\"\n      ],\n      \"parse_value\": [\n        \"Ok\",\n        \"self.literal\",\n        \"self.parse_array\",\n        \"self.parse_number\",\n        \"self.parse_object\",\n        \"self.parse_string\",\n        \"self.peek\",\n        \"self.skip_ws\",\n        \"std.json::bool_value\",\n        \"std.json::null_value\",\n        \"std.json::text_value\"\n      ],\n      \"peek\": [\n        \"self.text.char_at\",\n        \"self.text.length\"\n      ],\n      \"peek_digit\": [\n        \"self.peek\",\n        \"std.json::is_digit\"\n      ],\n      \"peek_is\": [\n        \"self.peek\"\n      ],\n      \"quantity_line\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"quantity_scatter\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"quiver\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"rod\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"save\": [\n        \"std.viz::render\",\n        \"std.viz::render3d\",\n        \"std.viz::render_table\",\n        \"write_file\"\n      ],\n      \"scatter\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"skip_ws\": [\n        \"self.peek\",\n        \"self.text.length\"\n      ],\n      \"slice_xy\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"slice_xz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"slice_yz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"stairs\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.json::append_text\": [\n        \"drop\"\n      ],\n      \"std.json::append_value\": [\n        \"drop\",\n        \"list.push\"\n      ],\n      \"std.json::array_items\": [\n        \"Some\"\n      ],\n      \"std.json::array_value\": [\n        \"std.json::empty_keys\"\n      ],\n      \"std.json::as_bool\": [\n        \"Some\"\n      ],\n      \"std.json::as_number\": [\n        \"Some\"\n      ],\n      \"std.json::as_text\": [\n        \"Some\"\n      ],\n      \"std.json::bool_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.json::char_is\": [\n        \"text.char_at\"\n      ],\n      \"std.json::null_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.json::number_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.json::object_get\": [\n        \"Some\",\n        \"value.keys.length\"\n      ],\n      \"std.json::object_keys\": [\n        \"Some\"\n      ],\n      \"std.json::object_value\": [\n        \"Err\",\n        \"Ok\",\n        \"keys.length\",\n        \"values.length\"\n      ],\n      \"std.json::parse\": [\n        \"Err\",\n        \"Ok\",\n        \"parser.parse_value\",\n        \"parser.skip_ws\",\n        \"parser.text.length\"\n      ],\n      \"std.json::quote_string\": [\n        \"std.json::append_text\",\n        \"text.char_at\",\n        \"text.length\"\n      ],\n      \"std.json::render\": [\n        \"drop\",\n        \"std.json::append_text\",\n        \"std.json::quote_string\",\n        \"std.json::render\",\n        \"value.items.length\",\n        \"value.keys.length\",\n        \"value.number.to_string\"\n      ],\n      \"std.json::stringify\": [\n        \"std.json::render\"\n      ],\n      \"std.json::text_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.viz::animate\": [\n        \"ceil\",\n        \"frames.length\",\n        \"i.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"round\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::short\",\n        \"std.viz::svg_size\",\n        \"total_ms.to_string\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"values.join\"\n      ],\n      \"std.viz::argsort\": [\n        \"idx.push\",\n        \"keys.length\",\n        \"merged.push\"\n      ],\n      \"std.viz::axes3d\": [\n        \"grid.join\",\n        \"grid.push\",\n        \"out.join\",\n        \"out.push\",\n        \"std.viz::attr\",\n        \"std.viz::depth\",\n        \"std.viz::edge\",\n        \"std.viz::nice_step\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::pt\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"bindings.join\",\n        \"bindings.length\",\n        \"std.viz::attr\",\n        \"std.viz::escape_attr\"\n      ],\n      \"std.viz::center_gap\": [\n        \"abs\",\n        \"centers.length\"\n      ],\n      \"std.viz::colorbar\": [\n        \"std.viz::attr\",\n        \"std.viz::gradient\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::colormap\": [\n        \"floor\",\n        \"std.viz::clamp01\",\n        \"std.viz::rgb_part\",\n        \"std.viz::stops\"\n      ],\n      \"std.viz::decimals\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::depth\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::draw_contour\": [\n        \"d.join\",\n        \"d.push\",\n        \"out.join\",\n        \"out.push\",\n        \"pts.length\",\n        \"pts.push\",\n        \"s.grid.get\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"bands.to_string\",\n        \"cells.join\",\n        \"cells.push\",\n        \"floor\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"cells.join\",\n        \"cells.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pt\",\n        \"std.viz::shade\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"offsets.push\",\n        \"paths.push\",\n        \"s.grid.row\",\n        \"s.grid.shape\",\n        \"s.lo.length\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::animate_attr\",\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::screen_xs\",\n        \"std.viz::screen_ys\",\n        \"std.viz::tip\",\n        \"travelled.push\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::attr\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_series\": [\n        \"abs\",\n        \"i.to_string\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::attr\",\n        \"std.viz::draw_contour\",\n        \"std.viz::draw_contourf\",\n        \"std.viz::draw_heatmap\",\n        \"std.viz::draw_hexbin\",\n        \"std.viz::draw_quiver\",\n        \"std.viz::min_gap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::pt\",\n        \"std.viz::shade\"\n      ],\n      \"std.viz::edge\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::empty\": [\n        \"zeros\"\n      ],\n      \"std.viz::escape\": [\n        \"text.replace\"\n      ],\n      \"std.viz::escape_attr\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::figure\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::gradient\": [\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::grid\": [\n        \"body.replace\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"panels.length\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::text_at\",\n        \"x.to_string\",\n        \"y.to_string\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\",\n        \"xs.length\",\n        \"ys.length\",\n        \"z.set\",\n        \"zeros\"\n      ],\n      \"std.viz::header\": [\n        \"std.viz::attr\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::integrate_stream\": [\n        \"out_x.push\",\n        \"out_y.push\",\n        \"sqrt\",\n        \"std.viz::sample_stream\",\n        \"std.viz::stream_inside\"\n      ],\n      \"std.viz::legend\": [\n        \"colors.push\",\n        \"ids.push\",\n        \"kinds.push\",\n        \"l.length\",\n        \"labels.length\",\n        \"labels.push\",\n        \"s.xs.length\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::is_grid\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\"\n      ],\n      \"std.viz::min_gap\": [\n        \"abs\",\n        \"xs.length\"\n      ],\n      \"std.viz::motion_series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::nice_step\": [\n        \"floor\",\n        \"log10\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::num\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::path_of\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::pick\": [\n        \"theme.palette.length\"\n      ],\n      \"std.viz::project_x\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::project_y\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::provenance_metadata\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\"\n      ],\n      \"std.viz::pt\": [\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::px\": [\n        \"v.to_string\"\n      ],\n      \"std.viz::render\": [\n        \"fig.series.length\",\n        \"out.join\",\n        \"out.push\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.hi.max\",\n        \"s.hi.min\",\n        \"s.lo.max\",\n        \"s.lo.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::axis_title\",\n        \"std.viz::binding_attr\",\n        \"std.viz::center_gap\",\n        \"std.viz::colorbar\",\n        \"std.viz::draw_motion\",\n        \"std.viz::draw_series\",\n        \"std.viz::has_range\",\n        \"std.viz::header\",\n        \"std.viz::is_grid\",\n        \"std.viz::is_motion\",\n        \"std.viz::legend\",\n        \"std.viz::max_of\",\n        \"std.viz::min_gap\",\n        \"std.viz::min_of\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\",\n        \"std.viz::uid\",\n        \"violin_centers.length\",\n        \"violin_centers.push\"\n      ],\n      \"std.viz::render3d\": [\n        \"array\",\n        \"cos\",\n        \"groups.join\",\n        \"groups.push\",\n        \"keys.push\",\n        \"out.join\",\n        \"out.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"pi\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"s.zs.max\",\n        \"s.zs.min\",\n        \"sin\",\n        \"sqrt\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::axes3d\",\n        \"std.viz::binding_attr\",\n        \"std.viz::colorbar\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::draw_mesh3\",\n        \"std.viz::draw_slice\",\n        \"std.viz::draw_surface\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"std.viz::uid\",\n        \"zz.max\",\n        \"zz.min\"\n      ],\n      \"std.viz::render_table\": [\n        \"c.to_string\",\n        \"columns.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"r.to_string\",\n        \"row.length\",\n        \"std.viz::attr\",\n        \"std.viz::binding_attr\",\n        \"std.viz::escape\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::px\",\n        \"std.viz::table_column_widths\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"t.headers.length\",\n        \"t.rows.length\"\n      ],\n      \"std.viz::rgb_part\": [\n        \"round\"\n      ],\n      \"std.viz::sample_stream\": [\n        \"floor\",\n        \"std.viz::stream_value\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::scene3d\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::screen_xs\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::screen_ys\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"ys.length\"\n      ],\n      \"std.viz::seg\": [\n        \"std.viz::attr\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::shade\": [\n        \"abs\",\n        \"sqrt\"\n      ],\n      \"std.viz::short\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::slice_xy\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::stream_inside\": [\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::stream_value\": [\n        \"values.length\"\n      ],\n      \"std.viz::svg_size\": [\n        \"parts.length\",\n        \"svg.split\"\n      ],\n      \"std.viz::table\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::table_column_widths\": [\n        \"heading.length\",\n        \"row.length\",\n        \"t.headers.length\",\n        \"t.rows.length\",\n        \"widths.push\"\n      ],\n      \"std.viz::tetra_isoline\": [\n        \"hits.length\",\n        \"hits.push\",\n        \"std.viz::iso_intersection\"\n      ],\n      \"std.viz::text_at\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\",\n        \"std.viz::num\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::tick_label\": [\n        \"abs\",\n        \"exponent.to_string\",\n        \"floor\",\n        \"format_float_value\",\n        \"log10\",\n        \"std.viz::decimals\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::ticks\": [\n        \"array\",\n        \"ceil\",\n        \"out.push\",\n        \"std.viz::nice_step\"\n      ],\n      \"std.viz::tip\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::uid\": [\n        \"hash\"\n      ],\n      \"std.viz::unit_of\": [\n        \"qs.length\"\n      ],\n      \"std.viz::values\": [\n        \"array\",\n        \"first.unit\",\n        \"first.value\",\n        \"out.push\",\n        \"q.unit\",\n        \"q.value\",\n        \"qs.length\"\n      ],\n      \"streamplot\": [\n        \"array\",\n        \"backward.xs.length\",\n        \"forward.xs.length\",\n        \"path_x.push\",\n        \"path_y.push\",\n        \"seed_xs.length\",\n        \"self.add\",\n        \"std.viz::integrate_stream\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"surface\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"svg\": [\n        \"std.viz::render\",\n        \"std.viz::render3d\",\n        \"std.viz::render_table\"\n      ],\n      \"text\": [\n        \"self.notes.push\"\n      ],\n      \"unit_line\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"unit_scatter\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"vector_field\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"violin\": [\n        \"array\",\n        \"data.length\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"data.std\",\n        \"density.push\",\n        \"exp\",\n        \"pi\",\n        \"pow\",\n        \"self.add\",\n        \"sqrt\",\n        \"std.viz::series\",\n        \"values.push\",\n        \"widths.push\"\n      ],\n      \"vline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"wireframe\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ]\n    },\n    \"unresolved_calls\": {\n      \"boxplot\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\"\n      ],\n      \"contour\": [\n        \"array\"\n      ],\n      \"contourf\": [\n        \"array\"\n      ],\n      \"heatmap\": [\n        \"array\"\n      ],\n      \"hexbin\": [\n        \"array\",\n        \"counts.set\",\n        \"floor\",\n        \"xs.max\",\n        \"xs.min\",\n        \"ys.max\",\n        \"ys.min\",\n        \"zeros\"\n      ],\n      \"histogram\": [\n        \"data.max\",\n        \"data.min\",\n        \"histogram\",\n        \"linspace\"\n      ],\n      \"hline\": [\n        \"array\"\n      ],\n      \"input_int\": [\n        \"document.is_err\",\n        \"document.unwrap\",\n        \"loaded.is_err\",\n        \"loaded.unwrap\",\n        \"number.is_none\",\n        \"number.unwrap\",\n        \"value.is_none\",\n        \"value.unwrap\"\n      ],\n      \"input_parameter_int\": [\n        \"document.is_err\",\n        \"document.unwrap\",\n        \"loaded.is_err\",\n        \"loaded.unwrap\",\n        \"number.is_none\",\n        \"number.unwrap\",\n        \"parameters.is_none\",\n        \"parameters.unwrap\",\n        \"value.is_none\",\n        \"value.unwrap\"\n      ],\n      \"isosurface\": [\n        \"array\",\n        \"volume.shape\"\n      ],\n      \"main\": [\n        \"xs.set\",\n        \"ys.set\",\n        \"zeros\"\n      ],\n      \"morph\": [\n        \"frames.row\"\n      ],\n      \"parse_hex4\": [\n        \"ch.to_int\"\n      ],\n      \"parse_number\": [\n        \"literal.to_float\",\n        \"parsed.is_err\",\n        \"parsed.unwrap\"\n      ],\n      \"parse_string\": [\n        \"char_from_codepoint\"\n      ],\n      \"quantity_line\": [\n        \"array\"\n      ],\n      \"quantity_scatter\": [\n        \"array\"\n      ],\n      \"rod\": [\n        \"array\"\n      ],\n      \"slice_xy\": [\n        \"array\"\n      ],\n      \"slice_xz\": [\n        \"array\"\n      ],\n      \"slice_yz\": [\n        \"array\"\n      ],\n      \"std.json::append_text\": [\n        \"drop\"\n      ],\n      \"std.json::append_value\": [\n        \"drop\"\n      ],\n      \"std.json::array_items\": [\n        \"Some\"\n      ],\n      \"std.json::as_bool\": [\n        \"Some\"\n      ],\n      \"std.json::as_number\": [\n        \"Some\"\n      ],\n      \"std.json::as_text\": [\n        \"Some\"\n      ],\n      \"std.json::object_get\": [\n        \"Some\"\n      ],\n      \"std.json::object_keys\": [\n        \"Some\"\n      ],\n      \"std.json::render\": [\n        \"drop\"\n      ],\n      \"std.viz::animate\": [\n        \"ceil\",\n        \"round\"\n      ],\n      \"std.viz::colormap\": [\n        \"floor\"\n      ],\n      \"std.viz::decimals\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::draw_contour\": [\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"floor\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"array\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"s.grid.row\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"array\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"array\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::empty\": [\n        \"zeros\"\n      ],\n      \"std.viz::escape\": [\n        \"text.replace\"\n      ],\n      \"std.viz::grid\": [\n        \"body.replace\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\",\n        \"z.set\",\n        \"zeros\"\n      ],\n      \"std.viz::nice_step\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::num\": [\n        \"round\"\n      ],\n      \"std.viz::render\": [\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.hi.max\",\n        \"s.hi.min\",\n        \"s.lo.max\",\n        \"s.lo.min\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\"\n      ],\n      \"std.viz::render3d\": [\n        \"array\",\n        \"cos\",\n        \"pi\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"s.zs.max\",\n        \"s.zs.min\",\n        \"sin\",\n        \"zz.max\",\n        \"zz.min\"\n      ],\n      \"std.viz::rgb_part\": [\n        \"round\"\n      ],\n      \"std.viz::sample_stream\": [\n        \"floor\"\n      ],\n      \"std.viz::short\": [\n        \"round\"\n      ],\n      \"std.viz::slice_xy\": [\n        \"plane.set\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"plane.set\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"plane.set\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::svg_size\": [\n        \"svg.split\"\n      ],\n      \"std.viz::tick_label\": [\n        \"floor\",\n        \"format_float_value\",\n        \"log10\"\n      ],\n      \"std.viz::ticks\": [\n        \"array\",\n        \"ceil\"\n      ],\n      \"std.viz::uid\": [\n        \"hash\"\n      ],\n      \"std.viz::values\": [\n        \"array\"\n      ],\n      \"streamplot\": [\n        \"array\"\n      ],\n      \"unit_line\": [\n        \"xs.values\",\n        \"ys.values\"\n      ],\n      \"unit_scatter\": [\n        \"xs.values\",\n        \"ys.values\"\n      ],\n      \"violin\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"data.std\",\n        \"exp\",\n        \"pi\",\n        \"pow\"\n      ],\n      \"vline\": [\n        \"array\"\n      ]\n    },\n    \"effect_coverage\": {\n      \"complete\": false,\n      \"known_calls\": 586,\n      \"unresolved_calls\": 150\n    },\n    \"analyzer\": [\n      {\n        \"path\": \"compiler/src/effects.rs\",\n        \"sha256\": \"sha256:ef64dc71532e4a6de23d3e02bf2b6b57f78af2164c1cd0790dc3d8fca3b70228\"\n      },\n      {\n        \"path\": \"compiler/src/main.rs\",\n        \"sha256\": \"sha256:297fa13c9b960bab16f6df224a9a9a616494c7680fb74ef7d15053e7bcfa39ff\"\n      }\n    ]\n  },\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R2 external snapshot replay and the seeded xoshiro256** sensitivity contract are verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture and a complete R3 auditable artifact guarantee remain pending.\"\n}\n"
+    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R2\",\n  \"reproducibility\": {\n    \"level\": \"R2\",\n    \"label\": \"R2 · external snapshot replay verified\",\n    \"next\": \"R3 · auditable artifact (planned verification)\"\n  },\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.\",\n    \"R2\": \"Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"external-snapshot\",\n      \"sha256\": \"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\",\n      \"seed\": 91,\n      \"snapshot\": {\n        \"path\": \"data.json\",\n        \"kind\": \"json\",\n        \"embedded\": true\n      }\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:82b2718162a4563d427bc329152dc4ac83277366c1d27fcab4153bda8fa38b9d\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R2\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI replays the embedded data.json snapshot under its declared filesystem capability, changes the declared seed and verifies the seeded xoshiro256** stream and changed SVG.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1\",\n    \"data_hash\": \"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\",\n    \"seed\": \"seed=91\",\n    \"compiler\": \"ostrinc 0.2.0\"\n  },\n  \"compiler\": \"ostrinc 0.2.0\",\n  \"runtime\": {\n    \"schema\": \"ostrin.runtime/v1\",\n    \"status\": \"partial\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"runner\": \"WASI host\",\n    \"compiler_lockfile\": {\n      \"path\": \"compiler/Cargo.lock\",\n      \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n    },\n    \"dependencies\": {\n      \"compiler_lockfile\": {\n        \"path\": \"compiler/Cargo.lock\",\n        \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n      },\n      \"project_manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"project_lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"scheduler\": {\n      \"mode\": \"single-threaded-wasi-replay\",\n      \"concurrency\": \"not used by gallery fixture\",\n      \"status\": \"declared\"\n    },\n    \"project\": {\n      \"manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"platform_policy\": {\n      \"output\": \"byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee\",\n      \"numeric\": \"cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed\"\n    },\n    \"missing\": [\n      \"captured host and hardware metadata\"\n    ],\n    \"input_snapshots\": [\n      {\n        \"path\": \"data.json\",\n        \"kind\": \"json\",\n        \"embedded\": true,\n        \"sha256\": \"sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058\"\n      }\n    ],\n    \"invocation\": {\n      \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n      \"status\": \"verified-in-ci\",\n      \"outputs\": [\n        {\n          \"path\": \"figure.svg\",\n          \"bytes\": 65697,\n          \"sha256\": \"sha256:82b2718162a4563d427bc329152dc4ac83277366c1d27fcab4153bda8fa38b9d\"\n        }\n      ]\n    }\n  },\n  \"commit\": \"a773387e2e7ade15a8baffa48e642f5f619b7a9b\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"samples\": 1200,\n    \"bins_x\": 18,\n    \"bins_y\": 14\n  },\n  \"seed\": 91,\n  \"randomness\": {\n    \"contract\": \"ostrin.rng/v1\",\n    \"algorithm\": \"xoshiro256**\",\n    \"version\": \"ostrin.rng/v1\",\n    \"seeding\": \"splitmix64\",\n    \"normal\": \"Marsaglia polar\",\n    \"deterministic_log\": \"detmath::ln\",\n    \"partition\": \"single sequential stream\",\n    \"implementations\": [\n      {\n        \"path\": \"compiler/src/interpreter/rng.rs\",\n        \"sha256\": \"sha256:506abb002d63aa21ea67b51f979c9ff7a45b51fc8acee0c6e04db8ddae772bd9\"\n      },\n      {\n        \"path\": \"compiler/src/rng_runtime.c\",\n        \"sha256\": \"sha256:991c8a4db8d2f3839edbcf01357eef594086cc135d0b9897e7df06e722320a3a\"\n      }\n    ],\n    \"parity\": \"interpreter-native\",\n    \"seed_consumption\": \"data.json:seed\",\n    \"status\": \"input-driven-r1\"\n  },\n  \"execution\": {\n    \"mode\": \"input-file\",\n    \"input_file\": \"data.json\",\n    \"consumes\": [\n      \"seed\",\n      \"parameters.samples\",\n      \"parameters.bins_x\",\n      \"parameters.bins_y\"\n    ],\n    \"sensitivity\": {\n      \"path\": \"seed\",\n      \"alternate\": 92\n    },\n    \"randomness\": {\n      \"seed_path\": \"seed\",\n      \"algorithm\": \"xoshiro256**\",\n      \"version\": \"ostrin.rng/v1\",\n      \"partition\": \"single sequential stream\",\n      \"status\": \"verified-in-ci\"\n    },\n    \"command\": \"node scripts/experiment-replay.mjs --fixture hexbin\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"status\": \"verified-in-ci\",\n    \"capabilities\": [\n      \"filesystem.read:data.json\"\n    ],\n    \"snapshot\": {\n      \"path\": \"data.json\",\n      \"kind\": \"json\",\n      \"embedded\": true\n    }\n  },\n  \"effects\": {\n    \"schema\": \"ostrin.effect-report/v0\",\n    \"status\": \"captured\",\n    \"source\": \"ostrinc --effect-report --json\",\n    \"experimental\": true,\n    \"conservative\": true,\n    \"kinds\": [\n      \"filesystem\",\n      \"io\",\n      \"random(seed)\",\n      \"state(local)\"\n    ],\n    \"entry\": \"main\",\n    \"functions\": {\n      \"input_int\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"input_parameter_int\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"main\": [\n        \"filesystem\",\n        \"io\",\n        \"random(seed)\",\n        \"state(local)\"\n      ],\n      \"std.json::Parser.consume\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.consume_is\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.literal\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.parse_array\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.parse_hex4\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.parse_number\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.parse_object\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.parse_string\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.parse_value\": [\n        \"state(local)\"\n      ],\n      \"std.json::Parser.peek_digit\": [],\n      \"std.json::Parser.peek_is\": [],\n      \"std.json::Parser.skip_ws\": [\n        \"state(local)\"\n      ],\n      \"std.json::append_value\": [\n        \"state(local)\"\n      ],\n      \"std.json::array_value\": [],\n      \"std.json::bool_value\": [],\n      \"std.json::null_value\": [],\n      \"std.json::number_value\": [],\n      \"std.json::parse\": [\n        \"state(local)\"\n      ],\n      \"std.json::quote_string\": [],\n      \"std.json::render\": [],\n      \"std.json::stringify\": [],\n      \"std.json::text_value\": [],\n      \"std.viz::Figure.add\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.animate\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.area\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.band\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.bars\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.bind\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.boxplot\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.contour\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.contourf\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.dark\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.describe\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.errorbars\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.heatmap\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.hexbin\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.histogram\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.hline\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.labels\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.morph\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.moving_point\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.moving_segment\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.no_axes\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.no_legend\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.provenance\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.quantity_line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.quantity_scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.quiver\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.rod\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.save\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.size\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.stairs\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.streamplot\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.svg\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.text\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.unit_line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.unit_scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.violin\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.vline\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.xlim\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.ylim\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.bind\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.dark\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.describe\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.isosurface\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.labels\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.provenance\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.save\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.size\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.slice_xy\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.slice_xz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.slice_yz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.surface\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.svg\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.vector_field\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.view\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.wireframe\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.bind\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.dark\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.provenance\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.row_height\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.save\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"std.viz::Table.size\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.svg\": [\n        \"state(local)\"\n      ],\n      \"std.viz::animate\": [\n        \"state(local)\"\n      ],\n      \"std.viz::animate_attr\": [],\n      \"std.viz::argsort\": [\n        \"state(local)\"\n      ],\n      \"std.viz::axes3d\": [\n        \"state(local)\"\n      ],\n      \"std.viz::binding_attr\": [],\n      \"std.viz::colorbar\": [\n        \"state(local)\"\n      ],\n      \"std.viz::colormap\": [],\n      \"std.viz::depth\": [],\n      \"std.viz::draw_contour\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_series\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"state(local)\"\n      ],\n      \"std.viz::edge\": [],\n      \"std.viz::escape_attr\": [],\n      \"std.viz::figure\": [],\n      \"std.viz::gradient\": [],\n      \"std.viz::grid\": [\n        \"state(local)\"\n      ],\n      \"std.viz::grid_of\": [\n        \"state(local)\"\n      ],\n      \"std.viz::header\": [],\n      \"std.viz::integrate_stream\": [\n        \"state(local)\"\n      ],\n      \"std.viz::legend\": [\n        \"state(local)\"\n      ],\n      \"std.viz::motion_series\": [],\n      \"std.viz::nice_step\": [],\n      \"std.viz::path_of\": [\n        \"state(local)\"\n      ],\n      \"std.viz::project_x\": [],\n      \"std.viz::project_y\": [],\n      \"std.viz::provenance_metadata\": [],\n      \"std.viz::pt\": [],\n      \"std.viz::render\": [\n        \"state(local)\"\n      ],\n      \"std.viz::render3d\": [\n        \"state(local)\"\n      ],\n      \"std.viz::render_table\": [\n        \"state(local)\"\n      ],\n      \"std.viz::sample_stream\": [],\n      \"std.viz::scene3d\": [],\n      \"std.viz::screen_xs\": [\n        \"state(local)\"\n      ],\n      \"std.viz::screen_ys\": [\n        \"state(local)\"\n      ],\n      \"std.viz::seg\": [],\n      \"std.viz::series\": [],\n      \"std.viz::slice_xy\": [\n        \"state(local)\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::table\": [],\n      \"std.viz::table_column_widths\": [\n        \"state(local)\"\n      ],\n      \"std.viz::tetra_isoline\": [\n        \"state(local)\"\n      ],\n      \"std.viz::text_at\": [],\n      \"std.viz::tick_label\": [],\n      \"std.viz::ticks\": [\n        \"state(local)\"\n      ],\n      \"std.viz::tip\": [],\n      \"std.viz::values\": [\n        \"state(local)\"\n      ]\n    },\n    \"function_calls\": {\n      \"input_int\": [\n        \"document.is_err\",\n        \"document.unwrap\",\n        \"loaded.is_err\",\n        \"loaded.unwrap\",\n        \"number.is_none\",\n        \"number.unwrap\",\n        \"read_file\",\n        \"std.json::as_number\",\n        \"std.json::object_get\",\n        \"std.json::parse\",\n        \"value.is_none\",\n        \"value.unwrap\"\n      ],\n      \"input_parameter_int\": [\n        \"document.is_err\",\n        \"document.unwrap\",\n        \"loaded.is_err\",\n        \"loaded.unwrap\",\n        \"number.is_none\",\n        \"number.unwrap\",\n        \"parameters.is_none\",\n        \"parameters.unwrap\",\n        \"read_file\",\n        \"std.json::as_number\",\n        \"std.json::object_get\",\n        \"std.json::parse\",\n        \"value.is_none\",\n        \"value.unwrap\"\n      ],\n      \"main\": [\n        \"fig.svg\",\n        \"input_int\",\n        \"input_parameter_int\",\n        \"n.to_string\",\n        \"print\",\n        \"r.randn\",\n        \"rng\",\n        \"seed.to_string\",\n        \"std.viz::figure\",\n        \"xs.set\",\n        \"ys.set\",\n        \"zeros\"\n      ],\n      \"std.json::Parser.consume\": [\n        \"self.text.char_at\",\n        \"self.text.length\"\n      ],\n      \"std.json::Parser.consume_is\": [\n        \"self.consume\"\n      ],\n      \"std.json::Parser.literal\": [\n        \"Err\",\n        \"Ok\",\n        \"expected.length\",\n        \"self.consume\",\n        \"std.json::char_is\"\n      ],\n      \"std.json::Parser.parse_array\": [\n        \"Err\",\n        \"Ok\",\n        \"self.consume\",\n        \"self.parse_value\",\n        \"self.peek_is\",\n        \"self.skip_ws\",\n        \"std.json::append_value\",\n        \"std.json::array_value\"\n      ],\n      \"std.json::Parser.parse_hex4\": [\n        \"Err\",\n        \"Ok\",\n        \"ch.to_int\",\n        \"self.consume\"\n      ],\n      \"std.json::Parser.parse_number\": [\n        \"Err\",\n        \"Ok\",\n        \"literal.to_float\",\n        \"parsed.is_err\",\n        \"parsed.unwrap\",\n        \"self.peek\",\n        \"self.peek_digit\",\n        \"self.peek_is\",\n        \"self.text.slice\",\n        \"std.json::number_value\"\n      ],\n      \"std.json::Parser.parse_object\": [\n        \"Err\",\n        \"keys.push\",\n        \"self.consume\",\n        \"self.consume_is\",\n        \"self.parse_string\",\n        \"self.parse_value\",\n        \"self.peek_is\",\n        \"self.skip_ws\",\n        \"std.json::append_value\",\n        \"std.json::object_value\"\n      ],\n      \"std.json::Parser.parse_string\": [\n        \"Err\",\n        \"Ok\",\n        \"char_from_codepoint\",\n        \"self.consume\",\n        \"self.consume_is\",\n        \"self.parse_hex4\",\n        \"self.text.length\",\n        \"std.json::append_text\"\n      ],\n      \"std.json::Parser.parse_value\": [\n        \"Ok\",\n        \"self.literal\",\n        \"self.parse_array\",\n        \"self.parse_number\",\n        \"self.parse_object\",\n        \"self.parse_string\",\n        \"self.peek\",\n        \"self.skip_ws\",\n        \"std.json::bool_value\",\n        \"std.json::null_value\",\n        \"std.json::text_value\"\n      ],\n      \"std.json::Parser.peek\": [\n        \"self.text.char_at\",\n        \"self.text.length\"\n      ],\n      \"std.json::Parser.peek_digit\": [\n        \"self.peek\",\n        \"std.json::is_digit\"\n      ],\n      \"std.json::Parser.peek_is\": [\n        \"self.peek\"\n      ],\n      \"std.json::Parser.skip_ws\": [\n        \"self.peek\",\n        \"self.text.length\"\n      ],\n      \"std.json::append_text\": [\n        \"drop\"\n      ],\n      \"std.json::append_value\": [\n        \"drop\",\n        \"list.push\"\n      ],\n      \"std.json::array_items\": [\n        \"Some\"\n      ],\n      \"std.json::array_value\": [\n        \"std.json::empty_keys\"\n      ],\n      \"std.json::as_bool\": [\n        \"Some\"\n      ],\n      \"std.json::as_number\": [\n        \"Some\"\n      ],\n      \"std.json::as_text\": [\n        \"Some\"\n      ],\n      \"std.json::bool_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.json::char_is\": [\n        \"text.char_at\"\n      ],\n      \"std.json::null_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.json::number_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.json::object_get\": [\n        \"Some\",\n        \"value.keys.length\"\n      ],\n      \"std.json::object_keys\": [\n        \"Some\"\n      ],\n      \"std.json::object_value\": [\n        \"Err\",\n        \"Ok\",\n        \"keys.length\",\n        \"values.length\"\n      ],\n      \"std.json::parse\": [\n        \"Err\",\n        \"Ok\",\n        \"parser.parse_value\",\n        \"parser.skip_ws\",\n        \"parser.text.length\"\n      ],\n      \"std.json::quote_string\": [\n        \"std.json::append_text\",\n        \"text.char_at\",\n        \"text.length\"\n      ],\n      \"std.json::render\": [\n        \"drop\",\n        \"std.json::append_text\",\n        \"std.json::quote_string\",\n        \"std.json::render\",\n        \"value.items.length\",\n        \"value.keys.length\",\n        \"value.number.to_string\"\n      ],\n      \"std.json::stringify\": [\n        \"std.json::render\"\n      ],\n      \"std.json::text_value\": [\n        \"std.json::empty_keys\",\n        \"std.json::empty_values\"\n      ],\n      \"std.viz::Figure.add\": [\n        \"self.series.push\"\n      ],\n      \"std.viz::Figure.area\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.band\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.bars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"std.viz::Figure.boxplot\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.contour\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.contourf\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.dark\": [\n        \"std.viz::dark\"\n      ],\n      \"std.viz::Figure.errorbars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.heatmap\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.hexbin\": [\n        \"array\",\n        \"counts.get\",\n        \"counts.set\",\n        \"floor\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"xcenters.push\",\n        \"xs.length\",\n        \"xs.max\",\n        \"xs.min\",\n        \"ycenters.push\",\n        \"ys.max\",\n        \"ys.min\",\n        \"zeros\"\n      ],\n      \"std.viz::Figure.histogram\": [\n        \"data.max\",\n        \"data.min\",\n        \"histogram\",\n        \"linspace\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.hline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.line\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.morph\": [\n        \"frames.row\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.moving_point\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.moving_segment\": [\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.quantity_line\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"std.viz::Figure.quantity_scatter\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"std.viz::Figure.quiver\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.rod\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.save\": [\n        \"std.viz::render\",\n        \"write_file\"\n      ],\n      \"std.viz::Figure.scatter\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.stairs\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.streamplot\": [\n        \"array\",\n        \"backward.xs.length\",\n        \"forward.xs.length\",\n        \"path_x.push\",\n        \"path_y.push\",\n        \"seed_xs.length\",\n        \"self.add\",\n        \"std.viz::integrate_stream\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::Figure.svg\": [\n        \"std.viz::render\"\n      ],\n      \"std.viz::Figure.text\": [\n        \"self.notes.push\"\n      ],\n      \"std.viz::Figure.unit_line\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"std.viz::Figure.unit_scatter\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"std.viz::Figure.violin\": [\n        \"array\",\n        \"data.length\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"data.std\",\n        \"density.push\",\n        \"exp\",\n        \"pi\",\n        \"pow\",\n        \"self.add\",\n        \"sqrt\",\n        \"std.viz::series\",\n        \"values.push\",\n        \"widths.push\"\n      ],\n      \"std.viz::Figure.vline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"std.viz::Scene3D.dark\": [\n        \"std.viz::dark\"\n      ],\n      \"std.viz::Scene3D.isosurface\": [\n        \"array\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::tetra_isoline\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"vx.push\",\n        \"vy.push\",\n        \"vz.push\"\n      ],\n      \"std.viz::Scene3D.line\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.save\": [\n        \"std.viz::render3d\",\n        \"write_file\"\n      ],\n      \"std.viz::Scene3D.scatter\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.slice_xy\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"std.viz::Scene3D.slice_xz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"std.viz::Scene3D.slice_yz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"std.viz::Scene3D.surface\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.svg\": [\n        \"std.viz::render3d\"\n      ],\n      \"std.viz::Scene3D.vector_field\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.wireframe\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Table.bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"std.viz::Table.dark\": [\n        \"std.viz::dark\"\n      ],\n      \"std.viz::Table.save\": [\n        \"std.viz::render_table\",\n        \"write_file\"\n      ],\n      \"std.viz::Table.svg\": [\n        \"std.viz::render_table\"\n      ],\n      \"std.viz::animate\": [\n        \"ceil\",\n        \"frames.length\",\n        \"i.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"round\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::short\",\n        \"std.viz::svg_size\",\n        \"total_ms.to_string\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"values.join\"\n      ],\n      \"std.viz::argsort\": [\n        \"idx.push\",\n        \"keys.length\",\n        \"merged.push\"\n      ],\n      \"std.viz::axes3d\": [\n        \"grid.join\",\n        \"grid.push\",\n        \"out.join\",\n        \"out.push\",\n        \"std.viz::attr\",\n        \"std.viz::depth\",\n        \"std.viz::edge\",\n        \"std.viz::nice_step\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::pt\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"bindings.join\",\n        \"bindings.length\",\n        \"std.viz::attr\",\n        \"std.viz::escape_attr\"\n      ],\n      \"std.viz::center_gap\": [\n        \"abs\",\n        \"centers.length\"\n      ],\n      \"std.viz::colorbar\": [\n        \"std.viz::attr\",\n        \"std.viz::gradient\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::colormap\": [\n        \"floor\",\n        \"std.viz::clamp01\",\n        \"std.viz::rgb_part\",\n        \"std.viz::stops\"\n      ],\n      \"std.viz::decimals\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::depth\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::draw_contour\": [\n        \"d.join\",\n        \"d.push\",\n        \"out.join\",\n        \"out.push\",\n        \"pts.length\",\n        \"pts.push\",\n        \"s.grid.get\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"bands.to_string\",\n        \"cells.join\",\n        \"cells.push\",\n        \"floor\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"cells.join\",\n        \"cells.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pt\",\n        \"std.viz::shade\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"offsets.push\",\n        \"paths.push\",\n        \"s.grid.row\",\n        \"s.grid.shape\",\n        \"s.lo.length\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::animate_attr\",\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::screen_xs\",\n        \"std.viz::screen_ys\",\n        \"std.viz::tip\",\n        \"travelled.push\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::attr\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_series\": [\n        \"abs\",\n        \"i.to_string\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::attr\",\n        \"std.viz::draw_contour\",\n        \"std.viz::draw_contourf\",\n        \"std.viz::draw_heatmap\",\n        \"std.viz::draw_hexbin\",\n        \"std.viz::draw_quiver\",\n        \"std.viz::min_gap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::pt\",\n        \"std.viz::shade\"\n      ],\n      \"std.viz::edge\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::empty\": [\n        \"zeros\"\n      ],\n      \"std.viz::escape\": [\n        \"text.replace\"\n      ],\n      \"std.viz::escape_attr\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::figure\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::gradient\": [\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::grid\": [\n        \"body.replace\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"panels.length\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::text_at\",\n        \"x.to_string\",\n        \"y.to_string\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\",\n        \"xs.length\",\n        \"ys.length\",\n        \"z.set\",\n        \"zeros\"\n      ],\n      \"std.viz::header\": [\n        \"std.viz::attr\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::integrate_stream\": [\n        \"out_x.push\",\n        \"out_y.push\",\n        \"sqrt\",\n        \"std.viz::sample_stream\",\n        \"std.viz::stream_inside\"\n      ],\n      \"std.viz::legend\": [\n        \"colors.push\",\n        \"ids.push\",\n        \"kinds.push\",\n        \"l.length\",\n        \"labels.length\",\n        \"labels.push\",\n        \"s.xs.length\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::is_grid\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\"\n      ],\n      \"std.viz::min_gap\": [\n        \"abs\",\n        \"xs.length\"\n      ],\n      \"std.viz::motion_series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::nice_step\": [\n        \"floor\",\n        \"log10\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::num\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::path_of\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::pick\": [\n        \"theme.palette.length\"\n      ],\n      \"std.viz::project_x\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::project_y\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::provenance_metadata\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\"\n      ],\n      \"std.viz::pt\": [\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::px\": [\n        \"v.to_string\"\n      ],\n      \"std.viz::render\": [\n        \"fig.series.length\",\n        \"out.join\",\n        \"out.push\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.hi.max\",\n        \"s.hi.min\",\n        \"s.lo.max\",\n        \"s.lo.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::axis_title\",\n        \"std.viz::binding_attr\",\n        \"std.viz::center_gap\",\n        \"std.viz::colorbar\",\n        \"std.viz::draw_motion\",\n        \"std.viz::draw_series\",\n        \"std.viz::has_range\",\n        \"std.viz::header\",\n        \"std.viz::is_grid\",\n        \"std.viz::is_motion\",\n        \"std.viz::legend\",\n        \"std.viz::max_of\",\n        \"std.viz::min_gap\",\n        \"std.viz::min_of\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\",\n        \"std.viz::uid\",\n        \"violin_centers.length\",\n        \"violin_centers.push\"\n      ],\n      \"std.viz::render3d\": [\n        \"array\",\n        \"cos\",\n        \"groups.join\",\n        \"groups.push\",\n        \"keys.push\",\n        \"out.join\",\n        \"out.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"pi\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"s.zs.max\",\n        \"s.zs.min\",\n        \"sin\",\n        \"sqrt\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::axes3d\",\n        \"std.viz::binding_attr\",\n        \"std.viz::colorbar\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::draw_mesh3\",\n        \"std.viz::draw_slice\",\n        \"std.viz::draw_surface\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"std.viz::uid\",\n        \"zz.max\",\n        \"zz.min\"\n      ],\n      \"std.viz::render_table\": [\n        \"c.to_string\",\n        \"columns.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"r.to_string\",\n        \"row.length\",\n        \"std.viz::attr\",\n        \"std.viz::binding_attr\",\n        \"std.viz::escape\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::px\",\n        \"std.viz::table_column_widths\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"t.headers.length\",\n        \"t.rows.length\"\n      ],\n      \"std.viz::rgb_part\": [\n        \"round\"\n      ],\n      \"std.viz::sample_stream\": [\n        \"floor\",\n        \"std.viz::stream_value\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::scene3d\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::screen_xs\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::screen_ys\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"ys.length\"\n      ],\n      \"std.viz::seg\": [\n        \"std.viz::attr\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::shade\": [\n        \"abs\",\n        \"sqrt\"\n      ],\n      \"std.viz::short\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::slice_xy\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::stream_inside\": [\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::stream_value\": [\n        \"values.length\"\n      ],\n      \"std.viz::svg_size\": [\n        \"parts.length\",\n        \"svg.split\"\n      ],\n      \"std.viz::table\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::table_column_widths\": [\n        \"heading.length\",\n        \"row.length\",\n        \"t.headers.length\",\n        \"t.rows.length\",\n        \"widths.push\"\n      ],\n      \"std.viz::tetra_isoline\": [\n        \"hits.length\",\n        \"hits.push\",\n        \"std.viz::iso_intersection\"\n      ],\n      \"std.viz::text_at\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\",\n        \"std.viz::num\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::tick_label\": [\n        \"abs\",\n        \"exponent.to_string\",\n        \"floor\",\n        \"format_float_value\",\n        \"log10\",\n        \"std.viz::decimals\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::ticks\": [\n        \"array\",\n        \"ceil\",\n        \"out.push\",\n        \"std.viz::nice_step\"\n      ],\n      \"std.viz::tip\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::uid\": [\n        \"hash\"\n      ],\n      \"std.viz::unit_of\": [\n        \"qs.length\"\n      ],\n      \"std.viz::values\": [\n        \"array\",\n        \"first.unit\",\n        \"first.value\",\n        \"out.push\",\n        \"q.unit\",\n        \"q.value\",\n        \"qs.length\"\n      ]\n    },\n    \"unresolved_calls\": {\n      \"std.viz::grid_of\": []\n    },\n    \"function_effect_variables\": {\n      \"std.viz::grid_of\": [\n        \"ε_f\"\n      ]\n    },\n    \"symbolic_effect_calls\": {\n      \"std.viz::grid_of\": [\n        \"f\"\n      ]\n    },\n    \"entry_effect_signature\": {\n      \"function\": \"main\",\n      \"effects\": [\n        \"filesystem\",\n        \"io\",\n        \"state(local)\",\n        \"random(seed)\"\n      ],\n      \"open_calls\": [],\n      \"purity_proven\": false,\n      \"row_closed\": true,\n      \"variables\": []\n    },\n    \"effect_coverage\": {\n      \"complete\": true,\n      \"count_unit\": \"distinct_function_operation_edges\",\n      \"known_calls\": 745,\n      \"symbolic_calls\": 1,\n      \"unresolved_calls\": 0\n    },\n    \"analyzer\": [\n      {\n        \"path\": \"compiler/src/effects.rs\",\n        \"sha256\": \"sha256:8e7a1d9b8b625332ae44b273aec2f594296c796030124545c674b8e41d27bd1b\"\n      },\n      {\n        \"path\": \"compiler/src/main.rs\",\n        \"sha256\": \"sha256:abc2ab22f8404700fbf187df36d020f3db8054a9be11636ee1f1bf3ba6338e35\"\n      }\n    ]\n  },\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R2 external snapshot replay and the seeded xoshiro256** sensitivity contract are verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture and a complete R3 auditable artifact guarantee remain pending.\"\n}\n"
   }
 }

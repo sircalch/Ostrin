@@ -624,7 +624,7 @@ fn native_backend_types_agree_with_the_checker() {
     // Complex scalar operators and Bool formatting now use typed IR/C.
     const MAX_AST_FALLBACK_FUNCTIONS: usize = 0;
     assert!(
-        ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
+        ast_fallback == MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
     );
     assert!(
@@ -682,7 +682,7 @@ fn hir_covers_the_examples_with_known_types() {
         "{unknown} of {nodes} HIR nodes have no known type (limit {MAX_UNKNOWN_NODES})"
     );
     assert!(
-        violations.len() <= MAX_VIOLATIONS,
+        violations.len() == MAX_VIOLATIONS,
         "HIR invariant violations:\n  {}",
         violations.join("\n  ")
     );

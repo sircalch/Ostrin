@@ -34,8 +34,8 @@
         "path": "provenance.json",
         "kind": "provenance",
         "media_type": "application/json",
-        "bytes": 43470,
-        "sha256": "sha256:f7d5638dea5eabb67f628ffc5401e231c19974643e7b2226a88a619621f41c23"
+        "bytes": 44930,
+        "sha256": "sha256:447baa79777b9499430cfec8a0648184a4dfa0620bb7eb6728a3a735632856c2"
       },
       {
         "path": "source.ostrin",
@@ -183,348 +183,435 @@
       "experimental": true,
       "conservative": true,
       "kinds": [
-        "concurrency",
-        "io"
+        "filesystem",
+        "io",
+        "state(local)"
       ],
       "entry": "main",
       "functions": {
-        "add": [],
-        "area": [],
-        "at": [],
-        "band": [],
-        "bars": [],
-        "bind": [],
-        "boxplot": [],
-        "component": [],
-        "condition_number": [],
-        "conjugate_transpose": [],
-        "contour": [],
-        "contourf": [],
-        "dark": [],
-        "determinant": [],
-        "errorbars": [],
-        "final_state": [],
-        "heatmap": [],
-        "hexbin": [],
-        "histogram": [],
-        "hline": [],
-        "isosurface": [],
-        "length": [],
-        "line": [],
-        "magnitude": [],
         "main": [
-          "concurrency",
-          "io"
+          "io",
+          "state(local)"
         ],
-        "matmul": [],
-        "morph": [],
-        "moving_point": [],
-        "moving_segment": [],
-        "mul_vector": [],
-        "orthogonality": [],
-        "quantity_line": [],
-        "quantity_scatter": [],
-        "quiver": [],
-        "rank": [],
-        "reconstruct": [],
-        "rod": [],
-        "sample": [],
-        "save": [
-          "concurrency",
-          "io"
+        "std.numeric::Cholesky.solve": [
+          "state(local)"
         ],
-        "scatter": [],
-        "slice_xy": [],
-        "slice_xz": [],
-        "slice_yz": [],
-        "solve": [],
-        "stairs": [],
-        "std.numeric::amplitude": [],
-        "std.numeric::bisect": [],
-        "std.numeric::cholesky": [],
+        "std.numeric::ComplexMatrix.at": [],
+        "std.numeric::ComplexMatrix.conjugate_transpose": [
+          "state(local)"
+        ],
+        "std.numeric::ComplexMatrix.matmul": [
+          "state(local)"
+        ],
+        "std.numeric::ComplexMatrix.mul_vector": [
+          "state(local)"
+        ],
+        "std.numeric::ComplexMatrix.solve": [
+          "state(local)"
+        ],
+        "std.numeric::ComplexVector.at": [],
+        "std.numeric::Eigen.reconstruct": [
+          "state(local)"
+        ],
+        "std.numeric::Lu.reconstruct": [
+          "state(local)"
+        ],
+        "std.numeric::Lu.solve": [
+          "state(local)"
+        ],
+        "std.numeric::Spline.at": [],
+        "std.numeric::Spline.sample": [
+          "state(local)"
+        ],
+        "std.numeric::Svd.reconstruct": [
+          "state(local)"
+        ],
+        "std.numeric::Svd.solve": [
+          "state(local)"
+        ],
+        "std.numeric::amplitude": [
+          "state(local)"
+        ],
+        "std.numeric::cholesky": [
+          "state(local)"
+        ],
         "std.numeric::cis": [],
-        "std.numeric::complex_matrix": [],
-        "std.numeric::complex_vector": [],
-        "std.numeric::derivative": [],
-        "std.numeric::eigen": [],
-        "std.numeric::eigen_order": [],
-        "std.numeric::eigen_order_ascending": [],
-        "std.numeric::fft": [],
-        "std.numeric::frequencies": [],
-        "std.numeric::golden_min": [],
-        "std.numeric::ifft": [],
+        "std.numeric::eigen": [
+          "state(local)"
+        ],
+        "std.numeric::eigen_order": [
+          "state(local)"
+        ],
+        "std.numeric::eigen_order_ascending": [
+          "state(local)"
+        ],
+        "std.numeric::fft": [
+          "state(local)"
+        ],
+        "std.numeric::frequencies": [
+          "state(local)"
+        ],
+        "std.numeric::ifft": [
+          "state(local)"
+        ],
         "std.numeric::interp": [],
-        "std.numeric::interp_all": [],
-        "std.numeric::lu": [],
-        "std.numeric::mark_used": [],
-        "std.numeric::newton": [],
-        "std.numeric::polar": [],
+        "std.numeric::interp_all": [
+          "state(local)"
+        ],
+        "std.numeric::lu": [
+          "state(local)"
+        ],
+        "std.numeric::mark_used": [
+          "state(local)"
+        ],
         "std.numeric::powi": [],
-        "std.numeric::qr": [],
-        "std.numeric::rk4": [],
-        "std.numeric::rk45": [],
-        "std.numeric::secant": [],
-        "std.numeric::segment": [],
-        "std.numeric::simpson": [],
-        "std.numeric::solution": [],
-        "std.numeric::spline": [],
-        "std.numeric::svd": [],
-        "std.numeric::symmetric_eigen": [],
-        "std.numeric::transform": [],
-        "std.numeric::trapz": [],
-        "std.numeric::unit_cumtrapz": [],
-        "std.numeric::unit_gradient": [],
+        "std.numeric::qr": [
+          "state(local)"
+        ],
+        "std.numeric::rk4": [
+          "state(local)"
+        ],
+        "std.numeric::rk45": [
+          "state(local)"
+        ],
+        "std.numeric::spline": [
+          "state(local)"
+        ],
+        "std.numeric::svd": [
+          "state(local)"
+        ],
+        "std.numeric::symmetric_eigen": [
+          "state(local)"
+        ],
+        "std.numeric::transform": [
+          "state(local)"
+        ],
+        "std.numeric::unit_cumtrapz": [
+          "state(local)"
+        ],
+        "std.numeric::unit_gradient": [
+          "state(local)"
+        ],
         "std.numeric::unit_interp": [],
-        "std.numeric::unit_trapz": [],
+        "std.viz::Figure.add": [
+          "state(local)"
+        ],
+        "std.viz::Figure.animate": [
+          "state(local)"
+        ],
+        "std.viz::Figure.area": [
+          "state(local)"
+        ],
+        "std.viz::Figure.band": [
+          "state(local)"
+        ],
+        "std.viz::Figure.bars": [
+          "state(local)"
+        ],
+        "std.viz::Figure.bind": [
+          "state(local)"
+        ],
+        "std.viz::Figure.boxplot": [
+          "state(local)"
+        ],
+        "std.viz::Figure.contour": [
+          "state(local)"
+        ],
+        "std.viz::Figure.contourf": [
+          "state(local)"
+        ],
+        "std.viz::Figure.dark": [
+          "state(local)"
+        ],
+        "std.viz::Figure.describe": [
+          "state(local)"
+        ],
+        "std.viz::Figure.errorbars": [
+          "state(local)"
+        ],
+        "std.viz::Figure.heatmap": [
+          "state(local)"
+        ],
+        "std.viz::Figure.hexbin": [
+          "state(local)"
+        ],
+        "std.viz::Figure.histogram": [
+          "state(local)"
+        ],
+        "std.viz::Figure.hline": [
+          "state(local)"
+        ],
+        "std.viz::Figure.labels": [
+          "state(local)"
+        ],
+        "std.viz::Figure.line": [
+          "state(local)"
+        ],
+        "std.viz::Figure.morph": [
+          "state(local)"
+        ],
+        "std.viz::Figure.moving_point": [
+          "state(local)"
+        ],
+        "std.viz::Figure.moving_segment": [
+          "state(local)"
+        ],
+        "std.viz::Figure.no_axes": [
+          "state(local)"
+        ],
+        "std.viz::Figure.no_legend": [
+          "state(local)"
+        ],
+        "std.viz::Figure.provenance": [
+          "state(local)"
+        ],
+        "std.viz::Figure.quantity_line": [
+          "state(local)"
+        ],
+        "std.viz::Figure.quantity_scatter": [
+          "state(local)"
+        ],
+        "std.viz::Figure.quiver": [
+          "state(local)"
+        ],
+        "std.viz::Figure.rod": [
+          "state(local)"
+        ],
+        "std.viz::Figure.save": [
+          "filesystem",
+          "state(local)"
+        ],
+        "std.viz::Figure.scatter": [
+          "state(local)"
+        ],
+        "std.viz::Figure.size": [
+          "state(local)"
+        ],
+        "std.viz::Figure.stairs": [
+          "state(local)"
+        ],
+        "std.viz::Figure.streamplot": [
+          "state(local)"
+        ],
+        "std.viz::Figure.svg": [
+          "state(local)"
+        ],
+        "std.viz::Figure.text": [
+          "state(local)"
+        ],
+        "std.viz::Figure.unit_line": [
+          "state(local)"
+        ],
+        "std.viz::Figure.unit_scatter": [
+          "state(local)"
+        ],
+        "std.viz::Figure.violin": [
+          "state(local)"
+        ],
+        "std.viz::Figure.vline": [
+          "state(local)"
+        ],
+        "std.viz::Figure.xlim": [
+          "state(local)"
+        ],
+        "std.viz::Figure.ylim": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.bind": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.dark": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.describe": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.isosurface": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.labels": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.line": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.provenance": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.save": [
+          "filesystem",
+          "state(local)"
+        ],
+        "std.viz::Scene3D.scatter": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.size": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.slice_xy": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.slice_xz": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.slice_yz": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.surface": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.svg": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.vector_field": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.view": [
+          "state(local)"
+        ],
+        "std.viz::Scene3D.wireframe": [
+          "state(local)"
+        ],
+        "std.viz::Table.bind": [
+          "state(local)"
+        ],
+        "std.viz::Table.dark": [
+          "state(local)"
+        ],
+        "std.viz::Table.provenance": [
+          "state(local)"
+        ],
+        "std.viz::Table.row_height": [
+          "state(local)"
+        ],
+        "std.viz::Table.save": [
+          "filesystem",
+          "state(local)"
+        ],
+        "std.viz::Table.size": [
+          "state(local)"
+        ],
+        "std.viz::Table.svg": [
+          "state(local)"
+        ],
         "std.viz::animate": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::animate_attr": [
-          "concurrency"
+        "std.viz::animate_attr": [],
+        "std.viz::argsort": [
+          "state(local)"
         ],
-        "std.viz::argsort": [],
         "std.viz::axes3d": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::binding_attr": [
-          "concurrency"
+        "std.viz::binding_attr": [],
+        "std.viz::colorbar": [
+          "state(local)"
         ],
-        "std.viz::center_gap": [],
-        "std.viz::colorbar": [],
         "std.viz::colormap": [],
-        "std.viz::decimals": [],
         "std.viz::depth": [],
         "std.viz::draw_contour": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_contourf": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_heatmap": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_hexbin": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_mesh3": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_motion": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_quiver": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_series": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_slice": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::draw_surface": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::edge": [],
-        "std.viz::empty": [],
-        "std.viz::escape": [],
         "std.viz::escape_attr": [],
         "std.viz::figure": [],
         "std.viz::gradient": [],
         "std.viz::grid": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::grid_of": [],
+        "std.viz::grid_of": [
+          "state(local)"
+        ],
         "std.viz::header": [],
-        "std.viz::integrate_stream": [],
-        "std.viz::legend": [],
-        "std.viz::min_gap": [],
+        "std.viz::integrate_stream": [
+          "state(local)"
+        ],
+        "std.viz::legend": [
+          "state(local)"
+        ],
         "std.viz::motion_series": [],
         "std.viz::nice_step": [],
-        "std.viz::num": [],
         "std.viz::path_of": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::pick": [],
         "std.viz::project_x": [],
         "std.viz::project_y": [],
         "std.viz::provenance_metadata": [],
         "std.viz::pt": [],
-        "std.viz::px": [],
         "std.viz::render": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::render3d": [
-          "concurrency"
+          "state(local)"
         ],
         "std.viz::render_table": [
-          "concurrency"
+          "state(local)"
         ],
-        "std.viz::rgb_part": [],
         "std.viz::sample_stream": [],
         "std.viz::scene3d": [],
-        "std.viz::screen_xs": [],
-        "std.viz::screen_ys": [],
+        "std.viz::screen_xs": [
+          "state(local)"
+        ],
+        "std.viz::screen_ys": [
+          "state(local)"
+        ],
         "std.viz::seg": [],
         "std.viz::series": [],
-        "std.viz::shade": [],
-        "std.viz::short": [],
-        "std.viz::slice_xy": [],
-        "std.viz::slice_xz": [],
-        "std.viz::slice_yz": [],
-        "std.viz::stream_inside": [],
-        "std.viz::stream_value": [],
-        "std.viz::svg_size": [],
+        "std.viz::slice_xy": [
+          "state(local)"
+        ],
+        "std.viz::slice_xz": [
+          "state(local)"
+        ],
+        "std.viz::slice_yz": [
+          "state(local)"
+        ],
         "std.viz::table": [],
-        "std.viz::table_column_widths": [],
-        "std.viz::tetra_isoline": [],
+        "std.viz::table_column_widths": [
+          "state(local)"
+        ],
+        "std.viz::tetra_isoline": [
+          "state(local)"
+        ],
         "std.viz::text_at": [],
         "std.viz::tick_label": [],
-        "std.viz::ticks": [],
-        "std.viz::tip": [],
-        "std.viz::uid": [],
-        "std.viz::unit_of": [],
-        "std.viz::values": [],
-        "streamplot": [],
-        "surface": [],
-        "svg": [
-          "concurrency"
+        "std.viz::ticks": [
+          "state(local)"
         ],
-        "text": [],
-        "unit_line": [],
-        "unit_scatter": [],
-        "vector_field": [],
-        "violin": [],
-        "vline": [],
-        "wireframe": []
+        "std.viz::tip": [],
+        "std.viz::values": [
+          "state(local)"
+        ]
       },
       "function_calls": {
-        "add": [
-          "self.series.push"
-        ],
-        "area": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "at": [
-          "std.numeric::complex",
-          "std.numeric::segment"
-        ],
-        "band": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "bars": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "bind": [
-          "self.bindings.push",
-          "std.viz::binding_name"
-        ],
-        "boxplot": [
-          "array",
-          "data.max",
-          "data.min",
-          "data.percentile",
-          "self.add",
-          "std.viz::series"
-        ],
-        "component": [
-          "self.y.col"
-        ],
-        "condition_number": [
-          "Err",
-          "Ok",
-          "self.s.length"
-        ],
-        "conjugate_transpose": [
-          "array",
-          "out_im.push",
-          "out_re.push",
-          "self.at"
-        ],
-        "contour": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "contourf": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "dark": [
-          "std.viz::dark"
-        ],
-        "determinant": [
-          "self.u.get",
-          "self.u.shape"
-        ],
-        "errorbars": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "final_state": [
-          "self.t.length",
-          "self.y.row"
-        ],
-        "heatmap": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "hexbin": [
-          "array",
-          "counts.get",
-          "counts.set",
-          "floor",
-          "self.add",
-          "std.viz::empty",
-          "xcenters.push",
-          "xs.length",
-          "xs.max",
-          "xs.min",
-          "ycenters.push",
-          "ys.max",
-          "ys.min",
-          "zeros"
-        ],
-        "histogram": [
-          "data.max",
-          "data.min",
-          "histogram",
-          "linspace",
-          "self.add",
-          "std.viz::series"
-        ],
-        "hline": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "isosurface": [
-          "array",
-          "self.series.push",
-          "std.viz::empty",
-          "std.viz::tetra_isoline",
-          "volume.get",
-          "volume.shape",
-          "vx.push",
-          "vy.push",
-          "vz.push"
-        ],
-        "length": [
-          "self.re.length",
-          "self.t.length"
-        ],
-        "line": [
-          "self.add",
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "magnitude": [
-          "sqrt"
-        ],
         "main": [
           "array",
           "fig.svg",
@@ -536,7 +623,30 @@
           "std.viz::figure",
           "std.viz::num"
         ],
-        "matmul": [
+        "std.numeric::Cholesky.reconstruct": [
+          "self.l.matmul",
+          "self.l.transpose"
+        ],
+        "std.numeric::Cholesky.solve": [
+          "self.l.get",
+          "self.l.shape",
+          "x.set",
+          "y.set",
+          "zeros"
+        ],
+        "std.numeric::Complex.magnitude": [
+          "sqrt"
+        ],
+        "std.numeric::ComplexMatrix.at": [
+          "std.numeric::complex"
+        ],
+        "std.numeric::ComplexMatrix.conjugate_transpose": [
+          "array",
+          "out_im.push",
+          "out_re.push",
+          "self.at"
+        ],
+        "std.numeric::ComplexMatrix.matmul": [
           "Err",
           "Ok",
           "array",
@@ -546,24 +656,7 @@
           "self.at",
           "std.numeric::complex"
         ],
-        "morph": [
-          "frames.row",
-          "self.add",
-          "std.viz::empty",
-          "std.viz::motion_series"
-        ],
-        "moving_point": [
-          "self.add",
-          "self.series.push",
-          "std.viz::empty",
-          "std.viz::motion_series"
-        ],
-        "moving_segment": [
-          "self.add",
-          "std.viz::empty",
-          "std.viz::motion_series"
-        ],
-        "mul_vector": [
+        "std.numeric::ComplexMatrix.mul_vector": [
           "Err",
           "Ok",
           "array",
@@ -574,92 +667,7 @@
           "vector.at",
           "vector.length"
         ],
-        "orthogonality": [
-          "eye",
-          "norm",
-          "self.q.transpose",
-          "self.r.shape"
-        ],
-        "quantity_line": [
-          "array",
-          "q.unit",
-          "q.value",
-          "self.add",
-          "std.viz::series",
-          "xs.length",
-          "xv.push",
-          "ys.length",
-          "yv.push"
-        ],
-        "quantity_scatter": [
-          "array",
-          "q.unit",
-          "q.value",
-          "self.add",
-          "std.viz::series",
-          "xs.length",
-          "xv.push",
-          "ys.length",
-          "yv.push"
-        ],
-        "quiver": [
-          "self.add",
-          "std.viz::series"
-        ],
-        "rank": [
-          "self.s.length"
-        ],
-        "reconstruct": [
-          "out.set",
-          "self.l.get",
-          "self.l.matmul",
-          "self.l.transpose",
-          "self.q.matmul",
-          "self.s.length",
-          "self.u.get",
-          "self.u.shape",
-          "self.values.length",
-          "self.vectors.get",
-          "self.vt.get",
-          "self.vt.shape",
-          "zeros"
-        ],
-        "rod": [
-          "array",
-          "self.add",
-          "std.viz::empty",
-          "std.viz::motion_series"
-        ],
-        "sample": [
-          "array",
-          "at.length",
-          "out.push",
-          "self.at"
-        ],
-        "save": [
-          "std.viz::render",
-          "std.viz::render3d",
-          "std.viz::render_table",
-          "write_file"
-        ],
-        "scatter": [
-          "self.add",
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "slice_xy": [
-          "array",
-          "self.series.push"
-        ],
-        "slice_xz": [
-          "array",
-          "self.series.push"
-        ],
-        "slice_yz": [
-          "array",
-          "self.series.push"
-        ],
-        "solve": [
+        "std.numeric::ComplexMatrix.solve": [
           "Err",
           "Ok",
           "ai.set",
@@ -667,31 +675,111 @@
           "array",
           "bi.set",
           "br.set",
-          "projected.set",
           "rhs.im.to_list",
           "rhs.length",
           "rhs.re.to_list",
           "self.im.to_list",
-          "self.l.get",
-          "self.l.shape",
           "self.re.to_list",
+          "sqrt",
+          "std.numeric::complex",
+          "xi.set",
+          "xr.set",
+          "zeros"
+        ],
+        "std.numeric::ComplexVector.at": [
+          "std.numeric::complex"
+        ],
+        "std.numeric::ComplexVector.length": [
+          "self.re.length"
+        ],
+        "std.numeric::ComplexVector.magnitude": [
+          "sqrt"
+        ],
+        "std.numeric::Eigen.reconstruct": [
+          "out.set",
+          "self.values.length",
+          "self.vectors.get",
+          "zeros"
+        ],
+        "std.numeric::Lu.determinant": [
+          "self.u.get",
+          "self.u.shape"
+        ],
+        "std.numeric::Lu.reconstruct": [
+          "out.set",
+          "self.l.get",
+          "self.u.get",
+          "self.u.shape",
+          "zeros"
+        ],
+        "std.numeric::Lu.solve": [
+          "self.l.get",
+          "self.u.get",
+          "self.u.shape",
+          "x.set",
+          "y.set",
+          "zeros"
+        ],
+        "std.numeric::Qr.orthogonality": [
+          "eye",
+          "norm",
+          "self.q.transpose",
+          "self.r.shape"
+        ],
+        "std.numeric::Qr.reconstruct": [
+          "self.q.matmul"
+        ],
+        "std.numeric::Solution.component": [
+          "self.y.col"
+        ],
+        "std.numeric::Solution.final_state": [
+          "self.t.length",
+          "self.y.row"
+        ],
+        "std.numeric::Solution.length": [
+          "self.t.length"
+        ],
+        "std.numeric::Spectrum.length": [
+          "self.re.length"
+        ],
+        "std.numeric::Spectrum.magnitude": [
+          "sqrt"
+        ],
+        "std.numeric::Spline.at": [
+          "std.numeric::segment"
+        ],
+        "std.numeric::Spline.sample": [
+          "array",
+          "at.length",
+          "out.push",
+          "self.at"
+        ],
+        "std.numeric::Svd.condition_number": [
+          "Err",
+          "Ok",
+          "self.s.length"
+        ],
+        "std.numeric::Svd.rank": [
+          "self.s.length"
+        ],
+        "std.numeric::Svd.reconstruct": [
+          "out.set",
+          "self.s.length",
+          "self.u.get",
+          "self.u.shape",
+          "self.vt.get",
+          "self.vt.shape",
+          "zeros"
+        ],
+        "std.numeric::Svd.solve": [
+          "projected.set",
           "self.s.length",
           "self.u.get",
           "self.u.shape",
           "self.vt.get",
           "self.vt.shape",
           "solution.set",
-          "sqrt",
-          "std.numeric::complex",
-          "x.set",
-          "xi.set",
-          "xr.set",
-          "y.set",
           "zeros"
-        ],
-        "stairs": [
-          "self.add",
-          "std.viz::series"
         ],
         "std.numeric::amplitude": [
           "array",
@@ -940,6 +1028,277 @@
         ],
         "std.numeric::unit_trapz": [
           "xs.length"
+        ],
+        "std.viz::Figure.add": [
+          "self.series.push"
+        ],
+        "std.viz::Figure.area": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.band": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.bars": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.bind": [
+          "self.bindings.push",
+          "std.viz::binding_name"
+        ],
+        "std.viz::Figure.boxplot": [
+          "array",
+          "data.max",
+          "data.min",
+          "data.percentile",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.contour": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.contourf": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.dark": [
+          "std.viz::dark"
+        ],
+        "std.viz::Figure.errorbars": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.heatmap": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.hexbin": [
+          "array",
+          "counts.get",
+          "counts.set",
+          "floor",
+          "self.add",
+          "std.viz::empty",
+          "xcenters.push",
+          "xs.length",
+          "xs.max",
+          "xs.min",
+          "ycenters.push",
+          "ys.max",
+          "ys.min",
+          "zeros"
+        ],
+        "std.viz::Figure.histogram": [
+          "data.max",
+          "data.min",
+          "histogram",
+          "linspace",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.hline": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.line": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.morph": [
+          "frames.row",
+          "self.add",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.moving_point": [
+          "self.add",
+          "self.series.push",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.moving_segment": [
+          "self.add",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.quantity_line": [
+          "array",
+          "q.unit",
+          "q.value",
+          "self.add",
+          "std.viz::series",
+          "xs.length",
+          "xv.push",
+          "ys.length",
+          "yv.push"
+        ],
+        "std.viz::Figure.quantity_scatter": [
+          "array",
+          "q.unit",
+          "q.value",
+          "self.add",
+          "std.viz::series",
+          "xs.length",
+          "xv.push",
+          "ys.length",
+          "yv.push"
+        ],
+        "std.viz::Figure.quiver": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.rod": [
+          "array",
+          "self.add",
+          "std.viz::empty",
+          "std.viz::motion_series"
+        ],
+        "std.viz::Figure.save": [
+          "std.viz::render",
+          "write_file"
+        ],
+        "std.viz::Figure.scatter": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.stairs": [
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Figure.streamplot": [
+          "array",
+          "backward.xs.length",
+          "forward.xs.length",
+          "path_x.push",
+          "path_y.push",
+          "seed_xs.length",
+          "self.add",
+          "std.viz::integrate_stream",
+          "std.viz::series",
+          "xs.length",
+          "ys.length"
+        ],
+        "std.viz::Figure.svg": [
+          "std.viz::render"
+        ],
+        "std.viz::Figure.text": [
+          "self.notes.push"
+        ],
+        "std.viz::Figure.unit_line": [
+          "self.add",
+          "std.viz::series",
+          "xs.unit",
+          "xs.values",
+          "ys.unit",
+          "ys.values"
+        ],
+        "std.viz::Figure.unit_scatter": [
+          "self.add",
+          "std.viz::series",
+          "xs.unit",
+          "xs.values",
+          "ys.unit",
+          "ys.values"
+        ],
+        "std.viz::Figure.violin": [
+          "array",
+          "data.length",
+          "data.max",
+          "data.min",
+          "data.percentile",
+          "data.std",
+          "density.push",
+          "exp",
+          "pi",
+          "pow",
+          "self.add",
+          "sqrt",
+          "std.viz::series",
+          "values.push",
+          "widths.push"
+        ],
+        "std.viz::Figure.vline": [
+          "array",
+          "self.add",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.bind": [
+          "self.bindings.push",
+          "std.viz::binding_name"
+        ],
+        "std.viz::Scene3D.dark": [
+          "std.viz::dark"
+        ],
+        "std.viz::Scene3D.isosurface": [
+          "array",
+          "self.series.push",
+          "std.viz::empty",
+          "std.viz::tetra_isoline",
+          "volume.get",
+          "volume.shape",
+          "vx.push",
+          "vy.push",
+          "vz.push"
+        ],
+        "std.viz::Scene3D.line": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.save": [
+          "std.viz::render3d",
+          "write_file"
+        ],
+        "std.viz::Scene3D.scatter": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.slice_xy": [
+          "array",
+          "self.series.push"
+        ],
+        "std.viz::Scene3D.slice_xz": [
+          "array",
+          "self.series.push"
+        ],
+        "std.viz::Scene3D.slice_yz": [
+          "array",
+          "self.series.push"
+        ],
+        "std.viz::Scene3D.surface": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.svg": [
+          "std.viz::render3d"
+        ],
+        "std.viz::Scene3D.vector_field": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Scene3D.wireframe": [
+          "self.series.push",
+          "std.viz::series"
+        ],
+        "std.viz::Table.bind": [
+          "self.bindings.push",
+          "std.viz::binding_name"
+        ],
+        "std.viz::Table.dark": [
+          "std.viz::dark"
+        ],
+        "std.viz::Table.save": [
+          "std.viz::render_table",
+          "write_file"
+        ],
+        "std.viz::Table.svg": [
+          "std.viz::render_table"
         ],
         "std.viz::animate": [
           "ceil",
@@ -1509,262 +1868,68 @@
           "q.unit",
           "q.value",
           "qs.length"
-        ],
-        "streamplot": [
-          "array",
-          "backward.xs.length",
-          "forward.xs.length",
-          "path_x.push",
-          "path_y.push",
-          "seed_xs.length",
-          "self.add",
-          "std.viz::integrate_stream",
-          "std.viz::series",
-          "xs.length",
-          "ys.length"
-        ],
-        "surface": [
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "svg": [
-          "std.viz::render",
-          "std.viz::render3d",
-          "std.viz::render_table"
-        ],
-        "text": [
-          "self.notes.push"
-        ],
-        "unit_line": [
-          "self.add",
-          "std.viz::series",
-          "xs.unit",
-          "xs.values",
-          "ys.unit",
-          "ys.values"
-        ],
-        "unit_scatter": [
-          "self.add",
-          "std.viz::series",
-          "xs.unit",
-          "xs.values",
-          "ys.unit",
-          "ys.values"
-        ],
-        "vector_field": [
-          "self.series.push",
-          "std.viz::series"
-        ],
-        "violin": [
-          "array",
-          "data.length",
-          "data.max",
-          "data.min",
-          "data.percentile",
-          "data.std",
-          "density.push",
-          "exp",
-          "pi",
-          "pow",
-          "self.add",
-          "sqrt",
-          "std.viz::series",
-          "values.push",
-          "widths.push"
-        ],
-        "vline": [
-          "array",
-          "self.add",
-          "std.viz::series"
-        ],
-        "wireframe": [
-          "self.series.push",
-          "std.viz::series"
         ]
       },
       "unresolved_calls": {
-        "boxplot": [
-          "array",
-          "data.max",
-          "data.min",
-          "data.percentile"
+        "std.numeric::bisect": [],
+        "std.numeric::derivative": [],
+        "std.numeric::golden_min": [],
+        "std.numeric::newton": [],
+        "std.numeric::rk4": [],
+        "std.numeric::rk45": [],
+        "std.numeric::secant": [],
+        "std.numeric::simpson": [],
+        "std.viz::grid_of": []
+      },
+      "function_effect_variables": {
+        "std.numeric::bisect": [
+          "ε_f"
         ],
-        "component": [
-          "self.y.col"
+        "std.numeric::derivative": [
+          "ε_f"
         ],
-        "conjugate_transpose": [
-          "array"
+        "std.numeric::golden_min": [
+          "ε_f"
         ],
-        "contour": [
-          "array"
+        "std.numeric::newton": [
+          "ε_df",
+          "ε_f"
         ],
-        "contourf": [
-          "array"
+        "std.numeric::rk4": [
+          "ε_f"
         ],
-        "determinant": [
-          "self.u.shape"
+        "std.numeric::rk45": [
+          "ε_f"
         ],
-        "final_state": [
-          "self.y.row"
+        "std.numeric::secant": [
+          "ε_f"
         ],
-        "heatmap": [
-          "array"
+        "std.numeric::simpson": [
+          "ε_f"
         ],
-        "hexbin": [
-          "array",
-          "counts.set",
-          "floor",
-          "xs.max",
-          "xs.min",
-          "ys.max",
-          "ys.min",
-          "zeros"
-        ],
-        "histogram": [
-          "data.max",
-          "data.min",
-          "histogram",
-          "linspace"
-        ],
-        "hline": [
-          "array"
-        ],
-        "isosurface": [
-          "array",
-          "volume.shape"
-        ],
-        "main": [
-          "array",
-          "linspace"
-        ],
-        "matmul": [
-          "array"
-        ],
-        "morph": [
-          "frames.row"
-        ],
-        "mul_vector": [
-          "array"
-        ],
-        "orthogonality": [
-          "eye",
-          "norm",
-          "self.q.transpose",
-          "self.r.shape"
-        ],
-        "quantity_line": [
-          "array"
-        ],
-        "quantity_scatter": [
-          "array"
-        ],
-        "reconstruct": [
-          "out.set",
-          "self.l.transpose",
-          "self.u.shape",
-          "self.vt.shape",
-          "zeros"
-        ],
-        "rod": [
-          "array"
-        ],
-        "sample": [
-          "array"
-        ],
-        "slice_xy": [
-          "array"
-        ],
-        "slice_xz": [
-          "array"
-        ],
-        "slice_yz": [
-          "array"
-        ],
-        "solve": [
-          "ai.set",
-          "ar.set",
-          "array",
-          "bi.set",
-          "br.set",
-          "projected.set",
-          "rhs.im.to_list",
-          "rhs.re.to_list",
-          "self.im.to_list",
-          "self.l.shape",
-          "self.re.to_list",
-          "self.u.shape",
-          "self.vt.shape",
-          "solution.set",
-          "x.set",
-          "xi.set",
-          "xr.set",
-          "y.set",
-          "zeros"
-        ],
-        "std.numeric::amplitude": [
-          "array"
-        ],
+        "std.viz::grid_of": [
+          "ε_f"
+        ]
+      },
+      "symbolic_effect_calls": {
         "std.numeric::bisect": [
           "f"
-        ],
-        "std.numeric::cholesky": [
-          "a.shape",
-          "l.set",
-          "zeros"
         ],
         "std.numeric::derivative": [
           "f"
         ],
-        "std.numeric::eigen": [
-          "a.shape",
-          "values.set",
-          "vectors.set",
-          "zeros"
-        ],
-        "std.numeric::fft": [
-          "zeros"
-        ],
-        "std.numeric::frequencies": [
-          "array"
-        ],
         "std.numeric::golden_min": [
           "f"
-        ],
-        "std.numeric::interp_all": [
-          "array"
-        ],
-        "std.numeric::lu": [
-          "a.shape",
-          "array",
-          "l.set",
-          "u.set",
-          "zeros"
         ],
         "std.numeric::newton": [
           "df",
           "f"
         ],
-        "std.numeric::polar": [
-          "cos",
-          "sin"
-        ],
-        "std.numeric::qr": [
-          "a.col",
-          "a.shape",
-          "norm",
-          "q.col",
-          "q.set",
-          "qi.dot",
-          "r.set",
-          "zeros"
-        ],
         "std.numeric::rk4": [
           "f"
         ],
         "std.numeric::rk45": [
-          "exp",
-          "f",
-          "ln"
+          "f"
         ],
         "std.numeric::secant": [
           "f"
@@ -1772,218 +1937,36 @@
         "std.numeric::simpson": [
           "f"
         ],
-        "std.numeric::solution": [
-          "array"
-        ],
-        "std.numeric::spline": [
-          "m.set",
-          "zeros"
-        ],
-        "std.numeric::svd": [
-          "a.shape",
-          "array",
-          "gram.set",
-          "u.set",
-          "vt.set",
-          "zeros"
-        ],
-        "std.numeric::symmetric_eigen": [
-          "eye",
-          "input.shape",
-          "matrix.set",
-          "values.set",
-          "vectors.set",
-          "zeros"
-        ],
-        "std.numeric::transform": [
-          "ai.set",
-          "ar.set",
-          "cos",
-          "out_im.set",
-          "out_re.set",
-          "pi",
-          "sin",
-          "zeros"
-        ],
-        "std.numeric::unit_cumtrapz": [
-          "array"
-        ],
-        "std.numeric::unit_gradient": [
-          "array"
-        ],
-        "std.numeric::unit_interp": [
-          "xs.values"
-        ],
-        "std.viz::animate": [
-          "ceil",
-          "round"
-        ],
-        "std.viz::colormap": [
-          "floor"
-        ],
-        "std.viz::decimals": [
-          "floor",
-          "log10"
-        ],
-        "std.viz::draw_contour": [
-          "s.grid.max",
-          "s.grid.min",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_contourf": [
-          "floor",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_heatmap": [
-          "s.grid.shape"
-        ],
-        "std.viz::draw_hexbin": [
-          "s.grid.shape"
-        ],
-        "std.viz::draw_mesh3": [
-          "array"
-        ],
-        "std.viz::draw_motion": [
-          "s.grid.row",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_slice": [
-          "array",
-          "s.grid.shape"
-        ],
-        "std.viz::draw_surface": [
-          "array",
-          "s.grid.shape"
-        ],
-        "std.viz::empty": [
-          "zeros"
-        ],
-        "std.viz::escape": [
-          "text.replace"
-        ],
-        "std.viz::grid": [
-          "body.replace"
-        ],
         "std.viz::grid_of": [
-          "f",
-          "z.set",
-          "zeros"
-        ],
-        "std.viz::nice_step": [
-          "floor",
-          "log10"
-        ],
-        "std.viz::num": [
-          "round"
-        ],
-        "std.viz::render": [
-          "s.grid.max",
-          "s.grid.min",
-          "s.hi.max",
-          "s.hi.min",
-          "s.lo.max",
-          "s.lo.min",
-          "s.xs.max",
-          "s.xs.min",
-          "s.ys.max",
-          "s.ys.min"
-        ],
-        "std.viz::render3d": [
-          "array",
-          "cos",
-          "pi",
-          "s.grid.max",
-          "s.grid.min",
-          "s.xs.max",
-          "s.xs.min",
-          "s.ys.max",
-          "s.ys.min",
-          "s.zs.max",
-          "s.zs.min",
-          "sin",
-          "zz.max",
-          "zz.min"
-        ],
-        "std.viz::rgb_part": [
-          "round"
-        ],
-        "std.viz::sample_stream": [
-          "floor"
-        ],
-        "std.viz::short": [
-          "round"
-        ],
-        "std.viz::slice_xy": [
-          "plane.set",
-          "volume.shape",
-          "zeros"
-        ],
-        "std.viz::slice_xz": [
-          "plane.set",
-          "volume.shape",
-          "zeros"
-        ],
-        "std.viz::slice_yz": [
-          "plane.set",
-          "volume.shape",
-          "zeros"
-        ],
-        "std.viz::svg_size": [
-          "svg.split"
-        ],
-        "std.viz::tick_label": [
-          "floor",
-          "format_float_value",
-          "log10"
-        ],
-        "std.viz::ticks": [
-          "array",
-          "ceil"
-        ],
-        "std.viz::uid": [
-          "hash"
-        ],
-        "std.viz::values": [
-          "array"
-        ],
-        "streamplot": [
-          "array"
-        ],
-        "unit_line": [
-          "xs.values",
-          "ys.values"
-        ],
-        "unit_scatter": [
-          "xs.values",
-          "ys.values"
-        ],
-        "violin": [
-          "array",
-          "data.max",
-          "data.min",
-          "data.percentile",
-          "data.std",
-          "exp",
-          "pi",
-          "pow"
-        ],
-        "vline": [
-          "array"
+          "f"
         ]
       },
+      "entry_effect_signature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
+      },
       "effect_coverage": {
-        "complete": false,
-        "known_calls": 644,
-        "unresolved_calls": 215
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 877,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
       },
       "analyzer": [
         {
           "path": "compiler/src/effects.rs",
-          "sha256": "sha256:ef64dc71532e4a6de23d3e02bf2b6b57f78af2164c1cd0790dc3d8fca3b70228"
+          "sha256": "sha256:8e7a1d9b8b625332ae44b273aec2f594296c796030124545c674b8e41d27bd1b"
         },
         {
           "path": "compiler/src/main.rs",
-          "sha256": "sha256:297fa13c9b960bab16f6df224a9a9a616494c7680fb74ef7d15053e7bcfa39ff"
+          "sha256": "sha256:abc2ab22f8404700fbf187df36d020f3db8054a9be11636ee1f1bf3ba6338e35"
         }
       ]
     },
@@ -1994,6 +1977,6 @@
     "source.ostrin": "// std.numeric + std.viz · linear and natural cubic spline interpolation.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    xs = array([0.0, 1.0, 2.5, 3.5, 5.0, 6.0, 7.5, 9.0, 10.0])\n    ys = array([1.0, 2.2, 1.4, 3.1, 2.4, 4.0, 3.3, 5.2, 4.1])\n    fine = linspace(0.0, 10.0, 300)\n    curve = numeric.spline(xs, ys).sample(fine)\n    straight = numeric.interp_all(xs, ys, fine)\n    area = numeric.trapz(fine, curve)\n    print(\"area under the spline \" + viz.num(area))\n    fig = viz.figure(\"Interpolation\")\n        .describe(\"natural cubic spline vs. linear, area \" + viz.num(area))\n        .labels(\"x\", \"y\")\n        .line(fine, straight, label: \"linear\", color: \"#9ca3af\", dash: \"5 4\", width: 1.5)\n        .line(fine, curve, label: \"cubic spline\")\n        .scatter(xs, ys, label: \"data\", color: \"#dc2626\", size: 4.5)\n    print(fig.svg())\n}\n",
     "data.json": "{\n  \"seed\": \"deterministic\",\n  \"parameters\": {\n    \"knots\": 9,\n    \"samples\": 300\n  },\n  \"description\": \"Recorded nine knots, 300 interpolation samples and spline area.\"\n}\n",
     "figure.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">\n<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>\n<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>\n\n<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Interpolation</text>\n<text x=\"66\" y=\"45\" text-anchor=\"start\" font-size=\"12\" fill=\"#6b7280\">natural cubic spline vs. linear, area 30.65</text>\n<defs><clipPath id=\"clip8114373497666268305\"><rect x=\"66\" y=\"62\" width=\"554\" height=\"286\"/></clipPath></defs>\n<line x1=\"76.65\" y1=\"62\" x2=\"76.65\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"76.65\" y1=\"348\" x2=\"76.65\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"76.65\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">0</text>\n<line x1=\"129.92\" y1=\"62\" x2=\"129.92\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"129.92\" y1=\"348\" x2=\"129.92\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"129.92\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">1</text>\n<line x1=\"183.19\" y1=\"62\" x2=\"183.19\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"183.19\" y1=\"348\" x2=\"183.19\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"183.19\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">2</text>\n<line x1=\"236.46\" y1=\"62\" x2=\"236.46\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"236.46\" y1=\"348\" x2=\"236.46\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"236.46\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">3</text>\n<line x1=\"289.73\" y1=\"62\" x2=\"289.73\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"289.73\" y1=\"348\" x2=\"289.73\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"289.73\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">4</text>\n<line x1=\"343\" y1=\"62\" x2=\"343\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"343\" y1=\"348\" x2=\"343\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"343\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">5</text>\n<line x1=\"396.27\" y1=\"62\" x2=\"396.27\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"396.27\" y1=\"348\" x2=\"396.27\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"396.27\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">6</text>\n<line x1=\"449.54\" y1=\"62\" x2=\"449.54\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"449.54\" y1=\"348\" x2=\"449.54\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"449.54\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">7</text>\n<line x1=\"502.81\" y1=\"62\" x2=\"502.81\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"502.81\" y1=\"348\" x2=\"502.81\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"502.81\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">8</text>\n<line x1=\"556.08\" y1=\"62\" x2=\"556.08\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"556.08\" y1=\"348\" x2=\"556.08\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"556.08\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">9</text>\n<line x1=\"609.35\" y1=\"62\" x2=\"609.35\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"609.35\" y1=\"348\" x2=\"609.35\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"609.35\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">10</text>\n<line x1=\"66\" y1=\"335\" x2=\"620\" y2=\"335\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"335\" x2=\"66\" y2=\"335\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"339\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">1</text>\n<line x1=\"66\" y1=\"273.2\" x2=\"620\" y2=\"273.2\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"273.2\" x2=\"66\" y2=\"273.2\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"277.2\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">2</text>\n<line x1=\"66\" y1=\"211.4\" x2=\"620\" y2=\"211.4\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"211.4\" x2=\"66\" y2=\"211.4\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"215.4\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">3</text>\n<line x1=\"66\" y1=\"149.6\" x2=\"620\" y2=\"149.6\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"149.6\" x2=\"66\" y2=\"149.6\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"153.6\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">4</text>\n<line x1=\"66\" y1=\"87.8\" x2=\"620\" y2=\"87.8\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"87.8\" x2=\"66\" y2=\"87.8\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"91.8\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">5</text>\n<g clip-path=\"url(#clip8114373497666268305)\">\n<g class=\"viz-series\" data-viz-series-id=\"0\"><g class=\"series\"><title>linear</title><path d=\"M76.65 335 L78.44 332.52 L80.22 330.04 L82 327.56 L83.78 325.08 L85.56 322.6 L87.34 320.12 L89.12 317.64 L90.91 315.16 L92.69 312.68 L94.47 310.2 L96.25 307.72 L98.03 305.24 L99.81 302.76 L101.6 300.28 L103.38 297.8 L105.16 295.32 L106.94 292.83 L108.72 290.35 L110.5 287.87 L112.29 285.39 L114.07 282.91 L115.85 280.43 L117.63 277.95 L119.41 275.47 L121.19 272.99 L122.97 270.51 L124.76 268.03 L126.54 265.55 L128.32 263.07 L130.1 260.95 L131.88 262.05 L133.66 263.15 L135.45 264.26 L137.23 265.36 L139.01 266.46 L140.79 267.56 L142.57 268.67 L144.35 269.77 L146.14 270.87 L147.92 271.97 L149.7 273.08 L151.48 274.18 L153.26 275.28 L155.04 276.38 L156.82 277.48 L158.61 278.59 L160.39 279.69 L162.17 280.79 L163.95 281.89 L165.73 283 L167.51 284.1 L169.3 285.2 L171.08 286.3 L172.86 287.41 L174.64 288.51 L176.42 289.61 L178.2 290.71 L179.99 291.82 L181.77 292.92 L183.55 294.02 L185.33 295.12 L187.11 296.22 L188.89 297.33 L190.67 298.43 L192.46 299.53 L194.24 300.63 L196.02 301.74 L197.8 302.84 L199.58 303.94 L201.36 305.04 L203.15 306.15 L204.93 307.25 L206.71 308.35 L208.49 309.45 L210.27 309.4 L212.05 305.89 L213.84 302.37 L215.62 298.86 L217.4 295.35 L219.18 291.83 L220.96 288.32 L222.74 284.81 L224.52 281.29 L226.31 277.78 L228.09 274.26 L229.87 270.75 L231.65 267.24 L233.43 263.72 L235.21 260.21 L237 256.7 L238.78 253.18 L240.56 249.67 L242.34 246.15 L244.12 242.64 L245.9 239.13 L247.69 235.61 L249.47 232.1 L251.25 228.59 L253.03 225.07 L254.81 221.56 L256.59 218.04 L258.37 214.53 L260.16 211.02 L261.94 207.5 L263.72 205.56 L265.5 206.52 L267.28 207.49 L269.06 208.45 L270.85 209.41 L272.63 210.38 L274.41 211.34 L276.19 212.31 L277.97 213.27 L279.75 214.24 L281.54 215.2 L283.32 216.17 L285.1 217.13 L286.88 218.1 L288.66 219.06 L290.44 220.02 L292.22 220.99 L294.01 221.95 L295.79 222.92 L297.57 223.88 L299.35 224.85 L301.13 225.81 L302.91 226.78 L304.7 227.74 L306.48 228.71 L308.26 229.67 L310.04 230.63 L311.82 231.6 L313.6 232.56 L315.39 233.53 L317.17 234.49 L318.95 235.46 L320.73 236.42 L322.51 237.39 L324.29 238.35 L326.07 239.32 L327.86 240.28 L329.64 241.24 L331.42 242.21 L333.2 243.17 L334.98 244.14 L336.76 245.1 L338.55 246.07 L340.33 247.03 L342.11 248 L343.89 246.83 L345.67 243.52 L347.45 240.21 L349.24 236.9 L351.02 233.6 L352.8 230.29 L354.58 226.98 L356.36 223.68 L358.14 220.37 L359.93 217.06 L361.71 213.75 L363.49 210.45 L365.27 207.14 L367.05 203.83 L368.83 200.53 L370.61 197.22 L372.4 193.91 L374.18 190.61 L375.96 187.3 L377.74 183.99 L379.52 180.68 L381.3 177.38 L383.09 174.07 L384.87 170.76 L386.65 167.46 L388.43 164.15 L390.21 160.84 L391.99 157.53 L393.78 154.23 L395.56 150.92 L397.34 150.18 L399.12 151.14 L400.9 152.11 L402.68 153.07 L404.46 154.03 L406.25 155 L408.03 155.96 L409.81 156.93 L411.59 157.89 L413.37 158.86 L415.15 159.82 L416.94 160.79 L418.72 161.75 L420.5 162.72 L422.28 163.68 L424.06 164.65 L425.84 165.61 L427.63 166.57 L429.41 167.54 L431.19 168.5 L432.97 169.47 L434.75 170.43 L436.53 171.4 L438.31 172.36 L440.1 173.33 L441.88 174.29 L443.66 175.26 L445.44 176.22 L447.22 177.18 L449 178.15 L450.79 179.11 L452.57 180.08 L454.35 181.04 L456.13 182.01 L457.91 182.97 L459.69 183.94 L461.48 184.9 L463.26 185.87 L465.04 186.83 L466.82 187.79 L468.6 188.76 L470.38 189.72 L472.16 190.69 L473.95 191.65 L475.73 192.62 L477.51 190.89 L479.29 188.28 L481.07 185.66 L482.85 183.04 L484.64 180.42 L486.42 177.8 L488.2 175.19 L489.98 172.57 L491.76 169.95 L493.54 167.33 L495.33 164.71 L497.11 162.1 L498.89 159.48 L500.67 156.86 L502.45 154.24 L504.23 151.62 L506.01 149.01 L507.8 146.39 L509.58 143.77 L511.36 141.15 L513.14 138.53 L514.92 135.91 L516.7 133.3 L518.49 130.68 L520.27 128.06 L522.05 125.44 L523.83 122.82 L525.61 120.21 L527.39 117.59 L529.18 114.97 L530.96 112.35 L532.74 109.73 L534.52 107.12 L536.3 104.5 L538.08 101.88 L539.86 99.26 L541.65 96.64 L543.43 94.03 L545.21 91.41 L546.99 88.79 L548.77 86.17 L550.55 83.55 L552.34 80.94 L554.12 78.32 L555.9 75.7 L557.68 77.48 L559.46 79.76 L561.24 82.03 L563.03 84.3 L564.81 86.58 L566.59 88.85 L568.37 91.13 L570.15 93.4 L571.93 95.67 L573.71 97.95 L575.5 100.22 L577.28 102.49 L579.06 104.77 L580.84 107.04 L582.62 109.31 L584.4 111.59 L586.19 113.86 L587.97 116.13 L589.75 118.41 L591.53 120.68 L593.31 122.96 L595.09 125.23 L596.88 127.5 L598.66 129.78 L600.44 132.05 L602.22 134.32 L604 136.6 L605.78 138.87 L607.56 141.14 L609.35 143.42\" fill=\"none\" stroke=\"#9ca3af\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\" stroke-dasharray=\"5 4\"/></g></g>\n<g class=\"viz-series\" data-viz-series-id=\"1\"><g class=\"series\"><title>cubic spline</title><path d=\"M76.65 335 L78.44 331.32 L80.22 327.64 L82 323.98 L83.78 320.34 L85.56 316.74 L87.34 313.17 L89.12 309.66 L90.91 306.2 L92.69 302.81 L94.47 299.49 L96.25 296.25 L98.03 293.1 L99.81 290.04 L101.6 287.1 L103.38 284.26 L105.16 281.55 L106.94 278.96 L108.72 276.52 L110.5 274.22 L112.29 272.07 L114.07 270.08 L115.85 268.27 L117.63 266.63 L119.41 265.18 L121.19 263.92 L122.97 262.87 L124.76 262.02 L126.54 261.4 L128.32 261 L130.1 260.83 L131.88 260.91 L133.66 261.21 L135.45 261.73 L137.23 262.45 L139.01 263.35 L140.79 264.44 L142.57 265.69 L144.35 267.1 L146.14 268.64 L147.92 270.31 L149.7 272.09 L151.48 273.97 L153.26 275.95 L155.04 277.99 L156.82 280.1 L158.61 282.26 L160.39 284.46 L162.17 286.69 L163.95 288.92 L165.73 291.16 L167.51 293.38 L169.3 295.58 L171.08 297.73 L172.86 299.84 L174.64 301.88 L176.42 303.85 L178.2 305.73 L179.99 307.5 L181.77 309.16 L183.55 310.7 L185.33 312.09 L187.11 313.33 L188.89 314.4 L190.67 315.3 L192.46 316.01 L194.24 316.51 L196.02 316.79 L197.8 316.85 L199.58 316.67 L201.36 316.23 L203.15 315.52 L204.93 314.54 L206.71 313.26 L208.49 311.67 L210.27 309.77 L212.05 307.55 L213.84 305.04 L215.62 302.24 L217.4 299.19 L219.18 295.91 L220.96 292.42 L222.74 288.75 L224.52 284.91 L226.31 280.92 L228.09 276.83 L229.87 272.63 L231.65 268.36 L233.43 264.04 L235.21 259.69 L237 255.34 L238.78 251 L240.56 246.7 L242.34 242.46 L244.12 238.31 L245.9 234.27 L247.69 230.35 L249.47 226.59 L251.25 223 L253.03 219.6 L254.81 216.43 L256.59 213.5 L258.37 210.83 L260.16 208.46 L261.94 206.39 L263.72 204.65 L265.5 203.25 L267.28 202.18 L269.06 201.42 L270.85 200.96 L272.63 200.78 L274.41 200.86 L276.19 201.19 L277.97 201.76 L279.75 202.54 L281.54 203.53 L283.32 204.71 L285.1 206.06 L286.88 207.57 L288.66 209.22 L290.44 211 L292.22 212.89 L294.01 214.88 L295.79 216.95 L297.57 219.09 L299.35 221.27 L301.13 223.5 L302.91 225.74 L304.7 227.99 L306.48 230.22 L308.26 232.43 L310.04 234.6 L311.82 236.72 L313.6 238.76 L315.39 240.72 L317.17 242.57 L318.95 244.3 L320.73 245.91 L322.51 247.36 L324.29 248.65 L326.07 249.76 L327.86 250.68 L329.64 251.39 L331.42 251.87 L333.2 252.12 L334.98 252.1 L336.76 251.82 L338.55 251.25 L340.33 250.38 L342.11 249.2 L343.89 247.68 L345.67 245.83 L347.45 243.68 L349.24 241.24 L351.02 238.55 L352.8 235.61 L354.58 232.45 L356.36 229.1 L358.14 225.57 L359.93 221.89 L361.71 218.08 L363.49 214.16 L365.27 210.16 L367.05 206.09 L368.83 201.98 L370.61 197.86 L372.4 193.73 L374.18 189.63 L375.96 185.57 L377.74 181.59 L379.52 177.69 L381.3 173.91 L383.09 170.26 L384.87 166.77 L386.65 163.45 L388.43 160.34 L390.21 157.45 L391.99 154.81 L393.78 152.43 L395.56 150.35 L397.34 148.57 L399.12 147.1 L400.9 145.94 L402.68 145.06 L404.46 144.45 L406.25 144.1 L408.03 144 L409.81 144.13 L411.59 144.48 L413.37 145.04 L415.15 145.8 L416.94 146.73 L418.72 147.83 L420.5 149.09 L422.28 150.49 L424.06 152.01 L425.84 153.65 L427.63 155.4 L429.41 157.23 L431.19 159.14 L432.97 161.11 L434.75 163.13 L436.53 165.18 L438.31 167.26 L440.1 169.35 L441.88 171.44 L443.66 173.51 L445.44 175.55 L447.22 177.54 L449 179.49 L450.79 181.36 L452.57 183.15 L454.35 184.85 L456.13 186.44 L457.91 187.91 L459.69 189.24 L461.48 190.42 L463.26 191.45 L465.04 192.3 L466.82 192.96 L468.6 193.43 L470.38 193.68 L472.16 193.7 L473.95 193.48 L475.73 193.02 L477.51 192.28 L479.29 191.29 L481.07 190.05 L482.85 188.58 L484.64 186.88 L486.42 184.97 L488.2 182.86 L489.98 180.56 L491.76 178.09 L493.54 175.46 L495.33 172.67 L497.11 169.75 L498.89 166.7 L500.67 163.54 L502.45 160.28 L504.23 156.92 L506.01 153.49 L507.8 150 L509.58 146.45 L511.36 142.86 L513.14 139.24 L514.92 135.6 L516.7 131.97 L518.49 128.34 L520.27 124.72 L522.05 121.15 L523.83 117.61 L525.61 114.14 L527.39 110.73 L529.18 107.4 L530.96 104.16 L532.74 101.04 L534.52 98.02 L536.3 95.14 L538.08 92.4 L539.86 89.82 L541.65 87.4 L543.43 85.16 L545.21 83.11 L546.99 81.26 L548.77 79.63 L550.55 78.22 L552.34 77.05 L554.12 76.14 L555.9 75.49 L557.68 75.11 L559.46 75 L561.24 75.15 L563.03 75.55 L564.81 76.19 L566.59 77.06 L568.37 78.16 L570.15 79.47 L571.93 80.98 L573.71 82.69 L575.5 84.58 L577.28 86.65 L579.06 88.88 L580.84 91.28 L582.62 93.82 L584.4 96.5 L586.19 99.31 L587.97 102.24 L589.75 105.28 L591.53 108.42 L593.31 111.66 L595.09 114.97 L596.88 118.37 L598.66 121.83 L600.44 125.34 L602.22 128.9 L604 132.5 L605.78 136.12 L607.56 139.77 L609.35 143.42\" fill=\"none\" stroke=\"#dc2626\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></g></g>\n<g class=\"viz-series\" data-viz-series-id=\"2\"><g fill=\"#dc2626\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"><circle class=\"pt\" data-viz-index=\"0\" cx=\"76.65\" cy=\"335\" r=\"4.5\"><title>data: (0, 1)</title></circle><circle class=\"pt\" data-viz-index=\"1\" cx=\"129.92\" cy=\"260.84\" r=\"4.5\"><title>data: (1, 2.2)</title></circle><circle class=\"pt\" data-viz-index=\"2\" cx=\"209.83\" cy=\"310.28\" r=\"4.5\"><title>data: (2.5, 1.4)</title></circle><circle class=\"pt\" data-viz-index=\"3\" cx=\"263.1\" cy=\"205.22\" r=\"4.5\"><title>data: (3.5, 3.1)</title></circle><circle class=\"pt\" data-viz-index=\"4\" cx=\"343\" cy=\"248.48\" r=\"4.5\"><title>data: (5, 2.4)</title></circle><circle class=\"pt\" data-viz-index=\"5\" cx=\"396.27\" cy=\"149.6\" r=\"4.5\"><title>data: (6, 4)</title></circle><circle class=\"pt\" data-viz-index=\"6\" cx=\"476.17\" cy=\"192.86\" r=\"4.5\"><title>data: (7.5, 3.3)</title></circle><circle class=\"pt\" data-viz-index=\"7\" cx=\"556.08\" cy=\"75.44\" r=\"4.5\"><title>data: (9, 5.2)</title></circle><circle class=\"pt\" data-viz-index=\"8\" cx=\"609.35\" cy=\"143.42\" r=\"4.5\"><title>data: (10, 4.1)</title></circle></g></g>\n</g>\n<line x1=\"66\" y1=\"348\" x2=\"620\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<line x1=\"66\" y1=\"62\" x2=\"66\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"343\" y=\"388\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\">x</text>\n<text x=\"16\" y=\"205\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\" transform=\"rotate(-90 16 205)\">y</text>\n<g class=\"legend\"><rect x=\"76\" y=\"72\" width=\"113.2\" height=\"64\" rx=\"6\" fill=\"#ffffff\" fill-opacity=\"0.88\" stroke=\"#e5e7eb\"/><g class=\"legend-item\" data-viz-series-id=\"0\"><line x1=\"83\" y1=\"86\" x2=\"99\" y2=\"86\" stroke=\"#9ca3af\" stroke-width=\"2.5\"/><text x=\"104\" y=\"90\" text-anchor=\"start\" font-size=\"11\" fill=\"#1f2937\">linear</text></g><g class=\"legend-item\" data-viz-series-id=\"1\"><line x1=\"83\" y1=\"104\" x2=\"99\" y2=\"104\" stroke=\"#dc2626\" stroke-width=\"2.5\"/><text x=\"104\" y=\"108\" text-anchor=\"start\" font-size=\"11\" fill=\"#1f2937\">cubic spline</text></g><g class=\"legend-item\" data-viz-series-id=\"2\"><circle cx=\"91\" cy=\"122\" r=\"4\" fill=\"#dc2626\"/><text x=\"104\" y=\"126\" text-anchor=\"start\" font-size=\"11\" fill=\"#1f2937\">data</text></g></g>\n  <ostrin-provenance source-hash=\"sha256:77e55805870618fc341b5412eef3f80bb677d3b097ea08696cc461443b114630\" data-hash=\"sha256:e45b4048e1b184eb07952ac954786b839c75f9f5e64fc31d5e93b0ac8fc1c336\" seed=\"seed=deterministic\" compiler=\"ostrinc 0.2.0\" />\n</svg>\n",
-    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R0\",\n  \"reproducibility\": {\n    \"level\": \"R0\",\n    \"label\": \"R0 · exact replay verified\",\n    \"next\": \"R1 · seeded replay (planned verification)\"\n  },\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.\",\n    \"R2\": \"Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:77e55805870618fc341b5412eef3f80bb677d3b097ea08696cc461443b114630\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"parameters\",\n      \"sha256\": \"sha256:e45b4048e1b184eb07952ac954786b839c75f9f5e64fc31d5e93b0ac8fc1c336\",\n      \"seed\": \"deterministic\"\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:fe1bbd9d4bdb6b462ef7358ff766b76be0ab994f73aa123e9d3d45f71e7f6e5b\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R0\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:77e55805870618fc341b5412eef3f80bb677d3b097ea08696cc461443b114630\",\n    \"data_hash\": \"sha256:e45b4048e1b184eb07952ac954786b839c75f9f5e64fc31d5e93b0ac8fc1c336\",\n    \"seed\": \"seed=deterministic\",\n    \"compiler\": \"ostrinc 0.2.0\"\n  },\n  \"compiler\": \"ostrinc 0.2.0\",\n  \"runtime\": {\n    \"schema\": \"ostrin.runtime/v1\",\n    \"status\": \"partial\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"runner\": \"WASI host\",\n    \"compiler_lockfile\": {\n      \"path\": \"compiler/Cargo.lock\",\n      \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n    },\n    \"dependencies\": {\n      \"compiler_lockfile\": {\n        \"path\": \"compiler/Cargo.lock\",\n        \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n      },\n      \"project_manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"project_lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"scheduler\": {\n      \"mode\": \"single-threaded-wasi-replay\",\n      \"concurrency\": \"not used by gallery fixture\",\n      \"status\": \"declared\"\n    },\n    \"project\": {\n      \"manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"platform_policy\": {\n      \"output\": \"byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee\",\n      \"numeric\": \"cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed\"\n    },\n    \"missing\": [\n      \"input snapshots\",\n      \"captured host and hardware metadata\"\n    ],\n    \"invocation\": {\n      \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n      \"status\": \"verified-in-ci\",\n      \"outputs\": [\n        {\n          \"path\": \"figure.svg\",\n          \"bytes\": 16584,\n          \"sha256\": \"sha256:fe1bbd9d4bdb6b462ef7358ff766b76be0ab994f73aa123e9d3d45f71e7f6e5b\"\n        }\n      ]\n    }\n  },\n  \"commit\": \"a773387e2e7ade15a8baffa48e642f5f619b7a9b\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"knots\": 9,\n    \"samples\": 300\n  },\n  \"seed\": \"deterministic\",\n  \"execution\": {\n    \"mode\": \"recorded-parameters\",\n    \"input_file\": \"data.json\",\n    \"consumes\": [\n      \"parameters.knots\",\n      \"parameters.samples\"\n    ],\n    \"capabilities\": [],\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"status\": \"verified-in-ci\"\n  },\n  \"effects\": {\n    \"schema\": \"ostrin.effect-report/v0\",\n    \"status\": \"captured\",\n    \"source\": \"ostrinc --effect-report --json\",\n    \"experimental\": true,\n    \"conservative\": true,\n    \"kinds\": [\n      \"concurrency\",\n      \"io\"\n    ],\n    \"entry\": \"main\",\n    \"functions\": {\n      \"add\": [],\n      \"area\": [],\n      \"at\": [],\n      \"band\": [],\n      \"bars\": [],\n      \"bind\": [],\n      \"boxplot\": [],\n      \"component\": [],\n      \"condition_number\": [],\n      \"conjugate_transpose\": [],\n      \"contour\": [],\n      \"contourf\": [],\n      \"dark\": [],\n      \"determinant\": [],\n      \"errorbars\": [],\n      \"final_state\": [],\n      \"heatmap\": [],\n      \"hexbin\": [],\n      \"histogram\": [],\n      \"hline\": [],\n      \"isosurface\": [],\n      \"length\": [],\n      \"line\": [],\n      \"magnitude\": [],\n      \"main\": [\n        \"concurrency\",\n        \"io\"\n      ],\n      \"matmul\": [],\n      \"morph\": [],\n      \"moving_point\": [],\n      \"moving_segment\": [],\n      \"mul_vector\": [],\n      \"orthogonality\": [],\n      \"quantity_line\": [],\n      \"quantity_scatter\": [],\n      \"quiver\": [],\n      \"rank\": [],\n      \"reconstruct\": [],\n      \"rod\": [],\n      \"sample\": [],\n      \"save\": [\n        \"concurrency\",\n        \"io\"\n      ],\n      \"scatter\": [],\n      \"slice_xy\": [],\n      \"slice_xz\": [],\n      \"slice_yz\": [],\n      \"solve\": [],\n      \"stairs\": [],\n      \"std.numeric::amplitude\": [],\n      \"std.numeric::bisect\": [],\n      \"std.numeric::cholesky\": [],\n      \"std.numeric::cis\": [],\n      \"std.numeric::complex_matrix\": [],\n      \"std.numeric::complex_vector\": [],\n      \"std.numeric::derivative\": [],\n      \"std.numeric::eigen\": [],\n      \"std.numeric::eigen_order\": [],\n      \"std.numeric::eigen_order_ascending\": [],\n      \"std.numeric::fft\": [],\n      \"std.numeric::frequencies\": [],\n      \"std.numeric::golden_min\": [],\n      \"std.numeric::ifft\": [],\n      \"std.numeric::interp\": [],\n      \"std.numeric::interp_all\": [],\n      \"std.numeric::lu\": [],\n      \"std.numeric::mark_used\": [],\n      \"std.numeric::newton\": [],\n      \"std.numeric::polar\": [],\n      \"std.numeric::powi\": [],\n      \"std.numeric::qr\": [],\n      \"std.numeric::rk4\": [],\n      \"std.numeric::rk45\": [],\n      \"std.numeric::secant\": [],\n      \"std.numeric::segment\": [],\n      \"std.numeric::simpson\": [],\n      \"std.numeric::solution\": [],\n      \"std.numeric::spline\": [],\n      \"std.numeric::svd\": [],\n      \"std.numeric::symmetric_eigen\": [],\n      \"std.numeric::transform\": [],\n      \"std.numeric::trapz\": [],\n      \"std.numeric::unit_cumtrapz\": [],\n      \"std.numeric::unit_gradient\": [],\n      \"std.numeric::unit_interp\": [],\n      \"std.numeric::unit_trapz\": [],\n      \"std.viz::animate\": [\n        \"concurrency\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"concurrency\"\n      ],\n      \"std.viz::argsort\": [],\n      \"std.viz::axes3d\": [\n        \"concurrency\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"concurrency\"\n      ],\n      \"std.viz::center_gap\": [],\n      \"std.viz::colorbar\": [],\n      \"std.viz::colormap\": [],\n      \"std.viz::decimals\": [],\n      \"std.viz::depth\": [],\n      \"std.viz::draw_contour\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_series\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"concurrency\"\n      ],\n      \"std.viz::edge\": [],\n      \"std.viz::empty\": [],\n      \"std.viz::escape\": [],\n      \"std.viz::escape_attr\": [],\n      \"std.viz::figure\": [],\n      \"std.viz::gradient\": [],\n      \"std.viz::grid\": [\n        \"concurrency\"\n      ],\n      \"std.viz::grid_of\": [],\n      \"std.viz::header\": [],\n      \"std.viz::integrate_stream\": [],\n      \"std.viz::legend\": [],\n      \"std.viz::min_gap\": [],\n      \"std.viz::motion_series\": [],\n      \"std.viz::nice_step\": [],\n      \"std.viz::num\": [],\n      \"std.viz::path_of\": [\n        \"concurrency\"\n      ],\n      \"std.viz::pick\": [],\n      \"std.viz::project_x\": [],\n      \"std.viz::project_y\": [],\n      \"std.viz::provenance_metadata\": [],\n      \"std.viz::pt\": [],\n      \"std.viz::px\": [],\n      \"std.viz::render\": [\n        \"concurrency\"\n      ],\n      \"std.viz::render3d\": [\n        \"concurrency\"\n      ],\n      \"std.viz::render_table\": [\n        \"concurrency\"\n      ],\n      \"std.viz::rgb_part\": [],\n      \"std.viz::sample_stream\": [],\n      \"std.viz::scene3d\": [],\n      \"std.viz::screen_xs\": [],\n      \"std.viz::screen_ys\": [],\n      \"std.viz::seg\": [],\n      \"std.viz::series\": [],\n      \"std.viz::shade\": [],\n      \"std.viz::short\": [],\n      \"std.viz::slice_xy\": [],\n      \"std.viz::slice_xz\": [],\n      \"std.viz::slice_yz\": [],\n      \"std.viz::stream_inside\": [],\n      \"std.viz::stream_value\": [],\n      \"std.viz::svg_size\": [],\n      \"std.viz::table\": [],\n      \"std.viz::table_column_widths\": [],\n      \"std.viz::tetra_isoline\": [],\n      \"std.viz::text_at\": [],\n      \"std.viz::tick_label\": [],\n      \"std.viz::ticks\": [],\n      \"std.viz::tip\": [],\n      \"std.viz::uid\": [],\n      \"std.viz::unit_of\": [],\n      \"std.viz::values\": [],\n      \"streamplot\": [],\n      \"surface\": [],\n      \"svg\": [\n        \"concurrency\"\n      ],\n      \"text\": [],\n      \"unit_line\": [],\n      \"unit_scatter\": [],\n      \"vector_field\": [],\n      \"violin\": [],\n      \"vline\": [],\n      \"wireframe\": []\n    },\n    \"function_calls\": {\n      \"add\": [\n        \"self.series.push\"\n      ],\n      \"area\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"at\": [\n        \"std.numeric::complex\",\n        \"std.numeric::segment\"\n      ],\n      \"band\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"bars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"boxplot\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"component\": [\n        \"self.y.col\"\n      ],\n      \"condition_number\": [\n        \"Err\",\n        \"Ok\",\n        \"self.s.length\"\n      ],\n      \"conjugate_transpose\": [\n        \"array\",\n        \"out_im.push\",\n        \"out_re.push\",\n        \"self.at\"\n      ],\n      \"contour\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"contourf\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"dark\": [\n        \"std.viz::dark\"\n      ],\n      \"determinant\": [\n        \"self.u.get\",\n        \"self.u.shape\"\n      ],\n      \"errorbars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"final_state\": [\n        \"self.t.length\",\n        \"self.y.row\"\n      ],\n      \"heatmap\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"hexbin\": [\n        \"array\",\n        \"counts.get\",\n        \"counts.set\",\n        \"floor\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"xcenters.push\",\n        \"xs.length\",\n        \"xs.max\",\n        \"xs.min\",\n        \"ycenters.push\",\n        \"ys.max\",\n        \"ys.min\",\n        \"zeros\"\n      ],\n      \"histogram\": [\n        \"data.max\",\n        \"data.min\",\n        \"histogram\",\n        \"linspace\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"hline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"isosurface\": [\n        \"array\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::tetra_isoline\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"vx.push\",\n        \"vy.push\",\n        \"vz.push\"\n      ],\n      \"length\": [\n        \"self.re.length\",\n        \"self.t.length\"\n      ],\n      \"line\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"magnitude\": [\n        \"sqrt\"\n      ],\n      \"main\": [\n        \"array\",\n        \"fig.svg\",\n        \"linspace\",\n        \"print\",\n        \"std.numeric::interp_all\",\n        \"std.numeric::spline\",\n        \"std.numeric::trapz\",\n        \"std.viz::figure\",\n        \"std.viz::num\"\n      ],\n      \"matmul\": [\n        \"Err\",\n        \"Ok\",\n        \"array\",\n        \"other.at\",\n        \"out_im.push\",\n        \"out_re.push\",\n        \"self.at\",\n        \"std.numeric::complex\"\n      ],\n      \"morph\": [\n        \"frames.row\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"moving_point\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"moving_segment\": [\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"mul_vector\": [\n        \"Err\",\n        \"Ok\",\n        \"array\",\n        \"out_im.push\",\n        \"out_re.push\",\n        \"self.at\",\n        \"std.numeric::complex\",\n        \"vector.at\",\n        \"vector.length\"\n      ],\n      \"orthogonality\": [\n        \"eye\",\n        \"norm\",\n        \"self.q.transpose\",\n        \"self.r.shape\"\n      ],\n      \"quantity_line\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"quantity_scatter\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"quiver\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"rank\": [\n        \"self.s.length\"\n      ],\n      \"reconstruct\": [\n        \"out.set\",\n        \"self.l.get\",\n        \"self.l.matmul\",\n        \"self.l.transpose\",\n        \"self.q.matmul\",\n        \"self.s.length\",\n        \"self.u.get\",\n        \"self.u.shape\",\n        \"self.values.length\",\n        \"self.vectors.get\",\n        \"self.vt.get\",\n        \"self.vt.shape\",\n        \"zeros\"\n      ],\n      \"rod\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"sample\": [\n        \"array\",\n        \"at.length\",\n        \"out.push\",\n        \"self.at\"\n      ],\n      \"save\": [\n        \"std.viz::render\",\n        \"std.viz::render3d\",\n        \"std.viz::render_table\",\n        \"write_file\"\n      ],\n      \"scatter\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"slice_xy\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"slice_xz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"slice_yz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"solve\": [\n        \"Err\",\n        \"Ok\",\n        \"ai.set\",\n        \"ar.set\",\n        \"array\",\n        \"bi.set\",\n        \"br.set\",\n        \"projected.set\",\n        \"rhs.im.to_list\",\n        \"rhs.length\",\n        \"rhs.re.to_list\",\n        \"self.im.to_list\",\n        \"self.l.get\",\n        \"self.l.shape\",\n        \"self.re.to_list\",\n        \"self.s.length\",\n        \"self.u.get\",\n        \"self.u.shape\",\n        \"self.vt.get\",\n        \"self.vt.shape\",\n        \"solution.set\",\n        \"sqrt\",\n        \"std.numeric::complex\",\n        \"x.set\",\n        \"xi.set\",\n        \"xr.set\",\n        \"y.set\",\n        \"zeros\"\n      ],\n      \"stairs\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.numeric::amplitude\": [\n        \"array\",\n        \"out.push\",\n        \"spectrum.length\",\n        \"spectrum.magnitude\"\n      ],\n      \"std.numeric::bisect\": [\n        \"Err\",\n        \"Ok\",\n        \"f\"\n      ],\n      \"std.numeric::cholesky\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"abs\",\n        \"l.get\",\n        \"l.set\",\n        \"shape.length\",\n        \"sqrt\",\n        \"zeros\"\n      ],\n      \"std.numeric::cis\": [\n        \"std.numeric::polar\"\n      ],\n      \"std.numeric::complex_matrix\": [\n        \"Err\",\n        \"Ok\",\n        \"im.length\",\n        \"re.length\"\n      ],\n      \"std.numeric::complex_vector\": [\n        \"Err\",\n        \"Ok\",\n        \"im.length\",\n        \"re.length\"\n      ],\n      \"std.numeric::derivative\": [\n        \"f\"\n      ],\n      \"std.numeric::eigen\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"abs\",\n        \"raw.vectors.get\",\n        \"shape.length\",\n        \"std.numeric::eigen_order_ascending\",\n        \"std.numeric::symmetric_eigen\",\n        \"values.set\",\n        \"vectors.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::eigen_order\": [\n        \"order.push\",\n        \"std.numeric::mark_used\",\n        \"used.push\",\n        \"values.length\"\n      ],\n      \"std.numeric::eigen_order_ascending\": [\n        \"order.push\",\n        \"std.numeric::mark_used\",\n        \"used.push\",\n        \"values.length\"\n      ],\n      \"std.numeric::fft\": [\n        \"signal.length\",\n        \"std.numeric::transform\",\n        \"zeros\"\n      ],\n      \"std.numeric::frequencies\": [\n        \"array\",\n        \"out.push\"\n      ],\n      \"std.numeric::golden_min\": [\n        \"f\",\n        \"sqrt\"\n      ],\n      \"std.numeric::ifft\": [\n        \"spectrum.length\",\n        \"std.numeric::transform\"\n      ],\n      \"std.numeric::interp\": [\n        \"std.numeric::segment\"\n      ],\n      \"std.numeric::interp_all\": [\n        \"array\",\n        \"at.length\",\n        \"out.push\",\n        \"std.numeric::interp\"\n      ],\n      \"std.numeric::lu\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"abs\",\n        \"array\",\n        \"l.get\",\n        \"l.set\",\n        \"permutation.push\",\n        \"reordered.push\",\n        \"shape.length\",\n        \"u.get\",\n        \"u.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::mark_used\": [\n        \"flags.length\",\n        \"out.push\"\n      ],\n      \"std.numeric::newton\": [\n        \"Err\",\n        \"Ok\",\n        \"abs\",\n        \"df\",\n        \"f\",\n        \"max_iter.to_string\"\n      ],\n      \"std.numeric::polar\": [\n        \"cos\",\n        \"sin\"\n      ],\n      \"std.numeric::powi\": [\n        \"std.numeric::complex\"\n      ],\n      \"std.numeric::qr\": [\n        \"Err\",\n        \"Ok\",\n        \"a.col\",\n        \"a.shape\",\n        \"norm\",\n        \"q.col\",\n        \"q.set\",\n        \"qi.dot\",\n        \"r.set\",\n        \"shape.length\",\n        \"zeros\"\n      ],\n      \"std.numeric::rk4\": [\n        \"f\",\n        \"states.push\",\n        \"std.numeric::solution\",\n        \"times.push\",\n        \"y.length\",\n        \"y0.length\"\n      ],\n      \"std.numeric::rk45\": [\n        \"abs\",\n        \"exp\",\n        \"f\",\n        \"ln\",\n        \"states.push\",\n        \"std.numeric::solution\",\n        \"times.push\",\n        \"y.length\",\n        \"y0.length\"\n      ],\n      \"std.numeric::secant\": [\n        \"Err\",\n        \"Ok\",\n        \"abs\",\n        \"f\",\n        \"max_iter.to_string\"\n      ],\n      \"std.numeric::segment\": [\n        \"xs.length\"\n      ],\n      \"std.numeric::simpson\": [\n        \"f\"\n      ],\n      \"std.numeric::solution\": [\n        \"array\",\n        \"times.length\"\n      ],\n      \"std.numeric::spline\": [\n        \"c.push\",\n        \"d.push\",\n        \"m.set\",\n        \"xs.length\",\n        \"zeros\"\n      ],\n      \"std.numeric::svd\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"array\",\n        \"eigen.vectors.get\",\n        \"gram.set\",\n        \"shape.length\",\n        \"singular.push\",\n        \"sqrt\",\n        \"std.numeric::eigen_order\",\n        \"std.numeric::symmetric_eigen\",\n        \"u.set\",\n        \"vt.get\",\n        \"vt.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::symmetric_eigen\": [\n        \"abs\",\n        \"eye\",\n        \"input.get\",\n        \"input.shape\",\n        \"matrix.get\",\n        \"matrix.set\",\n        \"sqrt\",\n        \"values.set\",\n        \"vectors.get\",\n        \"vectors.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::transform\": [\n        \"ai.set\",\n        \"ar.set\",\n        \"cos\",\n        \"out_im.set\",\n        \"out_re.set\",\n        \"pi\",\n        \"re.length\",\n        \"sin\",\n        \"std.numeric::pow2\",\n        \"std.numeric::power_of_two\",\n        \"zeros\"\n      ],\n      \"std.numeric::trapz\": [\n        \"xs.length\"\n      ],\n      \"std.numeric::unit_cumtrapz\": [\n        \"array\",\n        \"out.push\",\n        \"xs.length\"\n      ],\n      \"std.numeric::unit_gradient\": [\n        \"array\",\n        \"out.push\",\n        \"xs.length\"\n      ],\n      \"std.numeric::unit_interp\": [\n        \"std.numeric::segment\",\n        \"xs.values\"\n      ],\n      \"std.numeric::unit_trapz\": [\n        \"xs.length\"\n      ],\n      \"std.viz::animate\": [\n        \"ceil\",\n        \"frames.length\",\n        \"i.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"round\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::short\",\n        \"std.viz::svg_size\",\n        \"total_ms.to_string\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"values.join\"\n      ],\n      \"std.viz::argsort\": [\n        \"idx.push\",\n        \"keys.length\",\n        \"merged.push\"\n      ],\n      \"std.viz::axes3d\": [\n        \"grid.join\",\n        \"grid.push\",\n        \"out.join\",\n        \"out.push\",\n        \"std.viz::attr\",\n        \"std.viz::depth\",\n        \"std.viz::edge\",\n        \"std.viz::nice_step\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::pt\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"bindings.join\",\n        \"bindings.length\",\n        \"std.viz::attr\",\n        \"std.viz::escape_attr\"\n      ],\n      \"std.viz::center_gap\": [\n        \"abs\",\n        \"centers.length\"\n      ],\n      \"std.viz::colorbar\": [\n        \"std.viz::attr\",\n        \"std.viz::gradient\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::colormap\": [\n        \"floor\",\n        \"std.viz::clamp01\",\n        \"std.viz::rgb_part\",\n        \"std.viz::stops\"\n      ],\n      \"std.viz::decimals\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::depth\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::draw_contour\": [\n        \"d.join\",\n        \"d.push\",\n        \"out.join\",\n        \"out.push\",\n        \"pts.length\",\n        \"pts.push\",\n        \"s.grid.get\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"bands.to_string\",\n        \"cells.join\",\n        \"cells.push\",\n        \"floor\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"cells.join\",\n        \"cells.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pt\",\n        \"std.viz::shade\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"offsets.push\",\n        \"paths.push\",\n        \"s.grid.row\",\n        \"s.grid.shape\",\n        \"s.lo.length\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::animate_attr\",\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::screen_xs\",\n        \"std.viz::screen_ys\",\n        \"std.viz::tip\",\n        \"travelled.push\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::attr\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_series\": [\n        \"abs\",\n        \"i.to_string\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::attr\",\n        \"std.viz::draw_contour\",\n        \"std.viz::draw_contourf\",\n        \"std.viz::draw_heatmap\",\n        \"std.viz::draw_hexbin\",\n        \"std.viz::draw_quiver\",\n        \"std.viz::min_gap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::pt\",\n        \"std.viz::shade\"\n      ],\n      \"std.viz::edge\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::empty\": [\n        \"zeros\"\n      ],\n      \"std.viz::escape\": [\n        \"text.replace\"\n      ],\n      \"std.viz::escape_attr\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::figure\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::gradient\": [\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::grid\": [\n        \"body.replace\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"panels.length\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::text_at\",\n        \"x.to_string\",\n        \"y.to_string\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\",\n        \"xs.length\",\n        \"ys.length\",\n        \"z.set\",\n        \"zeros\"\n      ],\n      \"std.viz::header\": [\n        \"std.viz::attr\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::integrate_stream\": [\n        \"out_x.push\",\n        \"out_y.push\",\n        \"sqrt\",\n        \"std.viz::sample_stream\",\n        \"std.viz::stream_inside\"\n      ],\n      \"std.viz::legend\": [\n        \"colors.push\",\n        \"ids.push\",\n        \"kinds.push\",\n        \"l.length\",\n        \"labels.length\",\n        \"labels.push\",\n        \"s.xs.length\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::is_grid\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\"\n      ],\n      \"std.viz::min_gap\": [\n        \"abs\",\n        \"xs.length\"\n      ],\n      \"std.viz::motion_series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::nice_step\": [\n        \"floor\",\n        \"log10\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::num\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::path_of\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::pick\": [\n        \"theme.palette.length\"\n      ],\n      \"std.viz::project_x\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::project_y\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::provenance_metadata\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\"\n      ],\n      \"std.viz::pt\": [\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::px\": [\n        \"v.to_string\"\n      ],\n      \"std.viz::render\": [\n        \"fig.series.length\",\n        \"out.join\",\n        \"out.push\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.hi.max\",\n        \"s.hi.min\",\n        \"s.lo.max\",\n        \"s.lo.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::axis_title\",\n        \"std.viz::binding_attr\",\n        \"std.viz::center_gap\",\n        \"std.viz::colorbar\",\n        \"std.viz::draw_motion\",\n        \"std.viz::draw_series\",\n        \"std.viz::has_range\",\n        \"std.viz::header\",\n        \"std.viz::is_grid\",\n        \"std.viz::is_motion\",\n        \"std.viz::legend\",\n        \"std.viz::max_of\",\n        \"std.viz::min_gap\",\n        \"std.viz::min_of\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\",\n        \"std.viz::uid\",\n        \"violin_centers.length\",\n        \"violin_centers.push\"\n      ],\n      \"std.viz::render3d\": [\n        \"array\",\n        \"cos\",\n        \"groups.join\",\n        \"groups.push\",\n        \"keys.push\",\n        \"out.join\",\n        \"out.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"pi\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"s.zs.max\",\n        \"s.zs.min\",\n        \"sin\",\n        \"sqrt\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::axes3d\",\n        \"std.viz::binding_attr\",\n        \"std.viz::colorbar\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::draw_mesh3\",\n        \"std.viz::draw_slice\",\n        \"std.viz::draw_surface\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"std.viz::uid\",\n        \"zz.max\",\n        \"zz.min\"\n      ],\n      \"std.viz::render_table\": [\n        \"c.to_string\",\n        \"columns.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"r.to_string\",\n        \"row.length\",\n        \"std.viz::attr\",\n        \"std.viz::binding_attr\",\n        \"std.viz::escape\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::px\",\n        \"std.viz::table_column_widths\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"t.headers.length\",\n        \"t.rows.length\"\n      ],\n      \"std.viz::rgb_part\": [\n        \"round\"\n      ],\n      \"std.viz::sample_stream\": [\n        \"floor\",\n        \"std.viz::stream_value\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::scene3d\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::screen_xs\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::screen_ys\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"ys.length\"\n      ],\n      \"std.viz::seg\": [\n        \"std.viz::attr\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::shade\": [\n        \"abs\",\n        \"sqrt\"\n      ],\n      \"std.viz::short\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::slice_xy\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::stream_inside\": [\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::stream_value\": [\n        \"values.length\"\n      ],\n      \"std.viz::svg_size\": [\n        \"parts.length\",\n        \"svg.split\"\n      ],\n      \"std.viz::table\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::table_column_widths\": [\n        \"heading.length\",\n        \"row.length\",\n        \"t.headers.length\",\n        \"t.rows.length\",\n        \"widths.push\"\n      ],\n      \"std.viz::tetra_isoline\": [\n        \"hits.length\",\n        \"hits.push\",\n        \"std.viz::iso_intersection\"\n      ],\n      \"std.viz::text_at\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\",\n        \"std.viz::num\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::tick_label\": [\n        \"abs\",\n        \"exponent.to_string\",\n        \"floor\",\n        \"format_float_value\",\n        \"log10\",\n        \"std.viz::decimals\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::ticks\": [\n        \"array\",\n        \"ceil\",\n        \"out.push\",\n        \"std.viz::nice_step\"\n      ],\n      \"std.viz::tip\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::uid\": [\n        \"hash\"\n      ],\n      \"std.viz::unit_of\": [\n        \"qs.length\"\n      ],\n      \"std.viz::values\": [\n        \"array\",\n        \"first.unit\",\n        \"first.value\",\n        \"out.push\",\n        \"q.unit\",\n        \"q.value\",\n        \"qs.length\"\n      ],\n      \"streamplot\": [\n        \"array\",\n        \"backward.xs.length\",\n        \"forward.xs.length\",\n        \"path_x.push\",\n        \"path_y.push\",\n        \"seed_xs.length\",\n        \"self.add\",\n        \"std.viz::integrate_stream\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"surface\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"svg\": [\n        \"std.viz::render\",\n        \"std.viz::render3d\",\n        \"std.viz::render_table\"\n      ],\n      \"text\": [\n        \"self.notes.push\"\n      ],\n      \"unit_line\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"unit_scatter\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"vector_field\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"violin\": [\n        \"array\",\n        \"data.length\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"data.std\",\n        \"density.push\",\n        \"exp\",\n        \"pi\",\n        \"pow\",\n        \"self.add\",\n        \"sqrt\",\n        \"std.viz::series\",\n        \"values.push\",\n        \"widths.push\"\n      ],\n      \"vline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"wireframe\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ]\n    },\n    \"unresolved_calls\": {\n      \"boxplot\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\"\n      ],\n      \"component\": [\n        \"self.y.col\"\n      ],\n      \"conjugate_transpose\": [\n        \"array\"\n      ],\n      \"contour\": [\n        \"array\"\n      ],\n      \"contourf\": [\n        \"array\"\n      ],\n      \"determinant\": [\n        \"self.u.shape\"\n      ],\n      \"final_state\": [\n        \"self.y.row\"\n      ],\n      \"heatmap\": [\n        \"array\"\n      ],\n      \"hexbin\": [\n        \"array\",\n        \"counts.set\",\n        \"floor\",\n        \"xs.max\",\n        \"xs.min\",\n        \"ys.max\",\n        \"ys.min\",\n        \"zeros\"\n      ],\n      \"histogram\": [\n        \"data.max\",\n        \"data.min\",\n        \"histogram\",\n        \"linspace\"\n      ],\n      \"hline\": [\n        \"array\"\n      ],\n      \"isosurface\": [\n        \"array\",\n        \"volume.shape\"\n      ],\n      \"main\": [\n        \"array\",\n        \"linspace\"\n      ],\n      \"matmul\": [\n        \"array\"\n      ],\n      \"morph\": [\n        \"frames.row\"\n      ],\n      \"mul_vector\": [\n        \"array\"\n      ],\n      \"orthogonality\": [\n        \"eye\",\n        \"norm\",\n        \"self.q.transpose\",\n        \"self.r.shape\"\n      ],\n      \"quantity_line\": [\n        \"array\"\n      ],\n      \"quantity_scatter\": [\n        \"array\"\n      ],\n      \"reconstruct\": [\n        \"out.set\",\n        \"self.l.transpose\",\n        \"self.u.shape\",\n        \"self.vt.shape\",\n        \"zeros\"\n      ],\n      \"rod\": [\n        \"array\"\n      ],\n      \"sample\": [\n        \"array\"\n      ],\n      \"slice_xy\": [\n        \"array\"\n      ],\n      \"slice_xz\": [\n        \"array\"\n      ],\n      \"slice_yz\": [\n        \"array\"\n      ],\n      \"solve\": [\n        \"ai.set\",\n        \"ar.set\",\n        \"array\",\n        \"bi.set\",\n        \"br.set\",\n        \"projected.set\",\n        \"rhs.im.to_list\",\n        \"rhs.re.to_list\",\n        \"self.im.to_list\",\n        \"self.l.shape\",\n        \"self.re.to_list\",\n        \"self.u.shape\",\n        \"self.vt.shape\",\n        \"solution.set\",\n        \"x.set\",\n        \"xi.set\",\n        \"xr.set\",\n        \"y.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::amplitude\": [\n        \"array\"\n      ],\n      \"std.numeric::bisect\": [\n        \"f\"\n      ],\n      \"std.numeric::cholesky\": [\n        \"a.shape\",\n        \"l.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::derivative\": [\n        \"f\"\n      ],\n      \"std.numeric::eigen\": [\n        \"a.shape\",\n        \"values.set\",\n        \"vectors.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::fft\": [\n        \"zeros\"\n      ],\n      \"std.numeric::frequencies\": [\n        \"array\"\n      ],\n      \"std.numeric::golden_min\": [\n        \"f\"\n      ],\n      \"std.numeric::interp_all\": [\n        \"array\"\n      ],\n      \"std.numeric::lu\": [\n        \"a.shape\",\n        \"array\",\n        \"l.set\",\n        \"u.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::newton\": [\n        \"df\",\n        \"f\"\n      ],\n      \"std.numeric::polar\": [\n        \"cos\",\n        \"sin\"\n      ],\n      \"std.numeric::qr\": [\n        \"a.col\",\n        \"a.shape\",\n        \"norm\",\n        \"q.col\",\n        \"q.set\",\n        \"qi.dot\",\n        \"r.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::rk4\": [\n        \"f\"\n      ],\n      \"std.numeric::rk45\": [\n        \"exp\",\n        \"f\",\n        \"ln\"\n      ],\n      \"std.numeric::secant\": [\n        \"f\"\n      ],\n      \"std.numeric::simpson\": [\n        \"f\"\n      ],\n      \"std.numeric::solution\": [\n        \"array\"\n      ],\n      \"std.numeric::spline\": [\n        \"m.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::svd\": [\n        \"a.shape\",\n        \"array\",\n        \"gram.set\",\n        \"u.set\",\n        \"vt.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::symmetric_eigen\": [\n        \"eye\",\n        \"input.shape\",\n        \"matrix.set\",\n        \"values.set\",\n        \"vectors.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::transform\": [\n        \"ai.set\",\n        \"ar.set\",\n        \"cos\",\n        \"out_im.set\",\n        \"out_re.set\",\n        \"pi\",\n        \"sin\",\n        \"zeros\"\n      ],\n      \"std.numeric::unit_cumtrapz\": [\n        \"array\"\n      ],\n      \"std.numeric::unit_gradient\": [\n        \"array\"\n      ],\n      \"std.numeric::unit_interp\": [\n        \"xs.values\"\n      ],\n      \"std.viz::animate\": [\n        \"ceil\",\n        \"round\"\n      ],\n      \"std.viz::colormap\": [\n        \"floor\"\n      ],\n      \"std.viz::decimals\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::draw_contour\": [\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"floor\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"array\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"s.grid.row\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"array\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"array\",\n        \"s.grid.shape\"\n      ],\n      \"std.viz::empty\": [\n        \"zeros\"\n      ],\n      \"std.viz::escape\": [\n        \"text.replace\"\n      ],\n      \"std.viz::grid\": [\n        \"body.replace\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\",\n        \"z.set\",\n        \"zeros\"\n      ],\n      \"std.viz::nice_step\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::num\": [\n        \"round\"\n      ],\n      \"std.viz::render\": [\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.hi.max\",\n        \"s.hi.min\",\n        \"s.lo.max\",\n        \"s.lo.min\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\"\n      ],\n      \"std.viz::render3d\": [\n        \"array\",\n        \"cos\",\n        \"pi\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"s.zs.max\",\n        \"s.zs.min\",\n        \"sin\",\n        \"zz.max\",\n        \"zz.min\"\n      ],\n      \"std.viz::rgb_part\": [\n        \"round\"\n      ],\n      \"std.viz::sample_stream\": [\n        \"floor\"\n      ],\n      \"std.viz::short\": [\n        \"round\"\n      ],\n      \"std.viz::slice_xy\": [\n        \"plane.set\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"plane.set\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"plane.set\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::svg_size\": [\n        \"svg.split\"\n      ],\n      \"std.viz::tick_label\": [\n        \"floor\",\n        \"format_float_value\",\n        \"log10\"\n      ],\n      \"std.viz::ticks\": [\n        \"array\",\n        \"ceil\"\n      ],\n      \"std.viz::uid\": [\n        \"hash\"\n      ],\n      \"std.viz::values\": [\n        \"array\"\n      ],\n      \"streamplot\": [\n        \"array\"\n      ],\n      \"unit_line\": [\n        \"xs.values\",\n        \"ys.values\"\n      ],\n      \"unit_scatter\": [\n        \"xs.values\",\n        \"ys.values\"\n      ],\n      \"violin\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"data.std\",\n        \"exp\",\n        \"pi\",\n        \"pow\"\n      ],\n      \"vline\": [\n        \"array\"\n      ]\n    },\n    \"effect_coverage\": {\n      \"complete\": false,\n      \"known_calls\": 644,\n      \"unresolved_calls\": 215\n    },\n    \"analyzer\": [\n      {\n        \"path\": \"compiler/src/effects.rs\",\n        \"sha256\": \"sha256:ef64dc71532e4a6de23d3e02bf2b6b57f78af2164c1cd0790dc3d8fca3b70228\"\n      },\n      {\n        \"path\": \"compiler/src/main.rs\",\n        \"sha256\": \"sha256:297fa13c9b960bab16f6df224a9a9a616494c7680fb74ef7d15053e7bcfa39ff\"\n      }\n    ]\n  },\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R0 exact SVG replay is verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture, seeded-randomness evidence for R1, external snapshots and complete R2/R3 guarantees remain pending.\"\n}\n"
+    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R0\",\n  \"reproducibility\": {\n    \"level\": \"R0\",\n    \"label\": \"R0 · exact replay verified\",\n    \"next\": \"R1 · seeded replay (planned verification)\"\n  },\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.\",\n    \"R2\": \"Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:77e55805870618fc341b5412eef3f80bb677d3b097ea08696cc461443b114630\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"parameters\",\n      \"sha256\": \"sha256:e45b4048e1b184eb07952ac954786b839c75f9f5e64fc31d5e93b0ac8fc1c336\",\n      \"seed\": \"deterministic\"\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:fe1bbd9d4bdb6b462ef7358ff766b76be0ab994f73aa123e9d3d45f71e7f6e5b\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R0\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:77e55805870618fc341b5412eef3f80bb677d3b097ea08696cc461443b114630\",\n    \"data_hash\": \"sha256:e45b4048e1b184eb07952ac954786b839c75f9f5e64fc31d5e93b0ac8fc1c336\",\n    \"seed\": \"seed=deterministic\",\n    \"compiler\": \"ostrinc 0.2.0\"\n  },\n  \"compiler\": \"ostrinc 0.2.0\",\n  \"runtime\": {\n    \"schema\": \"ostrin.runtime/v1\",\n    \"status\": \"partial\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"runner\": \"WASI host\",\n    \"compiler_lockfile\": {\n      \"path\": \"compiler/Cargo.lock\",\n      \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n    },\n    \"dependencies\": {\n      \"compiler_lockfile\": {\n        \"path\": \"compiler/Cargo.lock\",\n        \"sha256\": \"sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311\"\n      },\n      \"project_manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"project_lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"scheduler\": {\n      \"mode\": \"single-threaded-wasi-replay\",\n      \"concurrency\": \"not used by gallery fixture\",\n      \"status\": \"declared\"\n    },\n    \"project\": {\n      \"manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"platform_policy\": {\n      \"output\": \"byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee\",\n      \"numeric\": \"cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed\"\n    },\n    \"missing\": [\n      \"input snapshots\",\n      \"captured host and hardware metadata\"\n    ],\n    \"invocation\": {\n      \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n      \"status\": \"verified-in-ci\",\n      \"outputs\": [\n        {\n          \"path\": \"figure.svg\",\n          \"bytes\": 16584,\n          \"sha256\": \"sha256:fe1bbd9d4bdb6b462ef7358ff766b76be0ab994f73aa123e9d3d45f71e7f6e5b\"\n        }\n      ]\n    }\n  },\n  \"commit\": \"a773387e2e7ade15a8baffa48e642f5f619b7a9b\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"knots\": 9,\n    \"samples\": 300\n  },\n  \"seed\": \"deterministic\",\n  \"execution\": {\n    \"mode\": \"recorded-parameters\",\n    \"input_file\": \"data.json\",\n    \"consumes\": [\n      \"parameters.knots\",\n      \"parameters.samples\"\n    ],\n    \"capabilities\": [],\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"status\": \"verified-in-ci\"\n  },\n  \"effects\": {\n    \"schema\": \"ostrin.effect-report/v0\",\n    \"status\": \"captured\",\n    \"source\": \"ostrinc --effect-report --json\",\n    \"experimental\": true,\n    \"conservative\": true,\n    \"kinds\": [\n      \"filesystem\",\n      \"io\",\n      \"state(local)\"\n    ],\n    \"entry\": \"main\",\n    \"functions\": {\n      \"main\": [\n        \"io\",\n        \"state(local)\"\n      ],\n      \"std.numeric::Cholesky.solve\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::ComplexMatrix.at\": [],\n      \"std.numeric::ComplexMatrix.conjugate_transpose\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::ComplexMatrix.matmul\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::ComplexMatrix.mul_vector\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::ComplexMatrix.solve\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::ComplexVector.at\": [],\n      \"std.numeric::Eigen.reconstruct\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::Lu.reconstruct\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::Lu.solve\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::Spline.at\": [],\n      \"std.numeric::Spline.sample\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::Svd.reconstruct\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::Svd.solve\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::amplitude\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::cholesky\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::cis\": [],\n      \"std.numeric::eigen\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::eigen_order\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::eigen_order_ascending\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::fft\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::frequencies\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::ifft\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::interp\": [],\n      \"std.numeric::interp_all\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::lu\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::mark_used\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::powi\": [],\n      \"std.numeric::qr\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::rk4\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::rk45\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::spline\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::svd\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::symmetric_eigen\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::transform\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::unit_cumtrapz\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::unit_gradient\": [\n        \"state(local)\"\n      ],\n      \"std.numeric::unit_interp\": [],\n      \"std.viz::Figure.add\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.animate\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.area\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.band\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.bars\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.bind\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.boxplot\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.contour\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.contourf\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.dark\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.describe\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.errorbars\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.heatmap\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.hexbin\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.histogram\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.hline\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.labels\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.morph\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.moving_point\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.moving_segment\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.no_axes\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.no_legend\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.provenance\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.quantity_line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.quantity_scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.quiver\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.rod\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.save\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.size\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.stairs\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.streamplot\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.svg\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.text\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.unit_line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.unit_scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.violin\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.vline\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.xlim\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Figure.ylim\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.bind\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.dark\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.describe\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.isosurface\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.labels\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.line\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.provenance\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.save\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.scatter\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.size\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.slice_xy\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.slice_xz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.slice_yz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.surface\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.svg\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.vector_field\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.view\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Scene3D.wireframe\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.bind\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.dark\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.provenance\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.row_height\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.save\": [\n        \"filesystem\",\n        \"state(local)\"\n      ],\n      \"std.viz::Table.size\": [\n        \"state(local)\"\n      ],\n      \"std.viz::Table.svg\": [\n        \"state(local)\"\n      ],\n      \"std.viz::animate\": [\n        \"state(local)\"\n      ],\n      \"std.viz::animate_attr\": [],\n      \"std.viz::argsort\": [\n        \"state(local)\"\n      ],\n      \"std.viz::axes3d\": [\n        \"state(local)\"\n      ],\n      \"std.viz::binding_attr\": [],\n      \"std.viz::colorbar\": [\n        \"state(local)\"\n      ],\n      \"std.viz::colormap\": [],\n      \"std.viz::depth\": [],\n      \"std.viz::draw_contour\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_series\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"state(local)\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"state(local)\"\n      ],\n      \"std.viz::edge\": [],\n      \"std.viz::escape_attr\": [],\n      \"std.viz::figure\": [],\n      \"std.viz::gradient\": [],\n      \"std.viz::grid\": [\n        \"state(local)\"\n      ],\n      \"std.viz::grid_of\": [\n        \"state(local)\"\n      ],\n      \"std.viz::header\": [],\n      \"std.viz::integrate_stream\": [\n        \"state(local)\"\n      ],\n      \"std.viz::legend\": [\n        \"state(local)\"\n      ],\n      \"std.viz::motion_series\": [],\n      \"std.viz::nice_step\": [],\n      \"std.viz::path_of\": [\n        \"state(local)\"\n      ],\n      \"std.viz::project_x\": [],\n      \"std.viz::project_y\": [],\n      \"std.viz::provenance_metadata\": [],\n      \"std.viz::pt\": [],\n      \"std.viz::render\": [\n        \"state(local)\"\n      ],\n      \"std.viz::render3d\": [\n        \"state(local)\"\n      ],\n      \"std.viz::render_table\": [\n        \"state(local)\"\n      ],\n      \"std.viz::sample_stream\": [],\n      \"std.viz::scene3d\": [],\n      \"std.viz::screen_xs\": [\n        \"state(local)\"\n      ],\n      \"std.viz::screen_ys\": [\n        \"state(local)\"\n      ],\n      \"std.viz::seg\": [],\n      \"std.viz::series\": [],\n      \"std.viz::slice_xy\": [\n        \"state(local)\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"state(local)\"\n      ],\n      \"std.viz::table\": [],\n      \"std.viz::table_column_widths\": [\n        \"state(local)\"\n      ],\n      \"std.viz::tetra_isoline\": [\n        \"state(local)\"\n      ],\n      \"std.viz::text_at\": [],\n      \"std.viz::tick_label\": [],\n      \"std.viz::ticks\": [\n        \"state(local)\"\n      ],\n      \"std.viz::tip\": [],\n      \"std.viz::values\": [\n        \"state(local)\"\n      ]\n    },\n    \"function_calls\": {\n      \"main\": [\n        \"array\",\n        \"fig.svg\",\n        \"linspace\",\n        \"print\",\n        \"std.numeric::interp_all\",\n        \"std.numeric::spline\",\n        \"std.numeric::trapz\",\n        \"std.viz::figure\",\n        \"std.viz::num\"\n      ],\n      \"std.numeric::Cholesky.reconstruct\": [\n        \"self.l.matmul\",\n        \"self.l.transpose\"\n      ],\n      \"std.numeric::Cholesky.solve\": [\n        \"self.l.get\",\n        \"self.l.shape\",\n        \"x.set\",\n        \"y.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::Complex.magnitude\": [\n        \"sqrt\"\n      ],\n      \"std.numeric::ComplexMatrix.at\": [\n        \"std.numeric::complex\"\n      ],\n      \"std.numeric::ComplexMatrix.conjugate_transpose\": [\n        \"array\",\n        \"out_im.push\",\n        \"out_re.push\",\n        \"self.at\"\n      ],\n      \"std.numeric::ComplexMatrix.matmul\": [\n        \"Err\",\n        \"Ok\",\n        \"array\",\n        \"other.at\",\n        \"out_im.push\",\n        \"out_re.push\",\n        \"self.at\",\n        \"std.numeric::complex\"\n      ],\n      \"std.numeric::ComplexMatrix.mul_vector\": [\n        \"Err\",\n        \"Ok\",\n        \"array\",\n        \"out_im.push\",\n        \"out_re.push\",\n        \"self.at\",\n        \"std.numeric::complex\",\n        \"vector.at\",\n        \"vector.length\"\n      ],\n      \"std.numeric::ComplexMatrix.solve\": [\n        \"Err\",\n        \"Ok\",\n        \"ai.set\",\n        \"ar.set\",\n        \"array\",\n        \"bi.set\",\n        \"br.set\",\n        \"rhs.im.to_list\",\n        \"rhs.length\",\n        \"rhs.re.to_list\",\n        \"self.im.to_list\",\n        \"self.re.to_list\",\n        \"sqrt\",\n        \"std.numeric::complex\",\n        \"xi.set\",\n        \"xr.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::ComplexVector.at\": [\n        \"std.numeric::complex\"\n      ],\n      \"std.numeric::ComplexVector.length\": [\n        \"self.re.length\"\n      ],\n      \"std.numeric::ComplexVector.magnitude\": [\n        \"sqrt\"\n      ],\n      \"std.numeric::Eigen.reconstruct\": [\n        \"out.set\",\n        \"self.values.length\",\n        \"self.vectors.get\",\n        \"zeros\"\n      ],\n      \"std.numeric::Lu.determinant\": [\n        \"self.u.get\",\n        \"self.u.shape\"\n      ],\n      \"std.numeric::Lu.reconstruct\": [\n        \"out.set\",\n        \"self.l.get\",\n        \"self.u.get\",\n        \"self.u.shape\",\n        \"zeros\"\n      ],\n      \"std.numeric::Lu.solve\": [\n        \"self.l.get\",\n        \"self.u.get\",\n        \"self.u.shape\",\n        \"x.set\",\n        \"y.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::Qr.orthogonality\": [\n        \"eye\",\n        \"norm\",\n        \"self.q.transpose\",\n        \"self.r.shape\"\n      ],\n      \"std.numeric::Qr.reconstruct\": [\n        \"self.q.matmul\"\n      ],\n      \"std.numeric::Solution.component\": [\n        \"self.y.col\"\n      ],\n      \"std.numeric::Solution.final_state\": [\n        \"self.t.length\",\n        \"self.y.row\"\n      ],\n      \"std.numeric::Solution.length\": [\n        \"self.t.length\"\n      ],\n      \"std.numeric::Spectrum.length\": [\n        \"self.re.length\"\n      ],\n      \"std.numeric::Spectrum.magnitude\": [\n        \"sqrt\"\n      ],\n      \"std.numeric::Spline.at\": [\n        \"std.numeric::segment\"\n      ],\n      \"std.numeric::Spline.sample\": [\n        \"array\",\n        \"at.length\",\n        \"out.push\",\n        \"self.at\"\n      ],\n      \"std.numeric::Svd.condition_number\": [\n        \"Err\",\n        \"Ok\",\n        \"self.s.length\"\n      ],\n      \"std.numeric::Svd.rank\": [\n        \"self.s.length\"\n      ],\n      \"std.numeric::Svd.reconstruct\": [\n        \"out.set\",\n        \"self.s.length\",\n        \"self.u.get\",\n        \"self.u.shape\",\n        \"self.vt.get\",\n        \"self.vt.shape\",\n        \"zeros\"\n      ],\n      \"std.numeric::Svd.solve\": [\n        \"projected.set\",\n        \"self.s.length\",\n        \"self.u.get\",\n        \"self.u.shape\",\n        \"self.vt.get\",\n        \"self.vt.shape\",\n        \"solution.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::amplitude\": [\n        \"array\",\n        \"out.push\",\n        \"spectrum.length\",\n        \"spectrum.magnitude\"\n      ],\n      \"std.numeric::bisect\": [\n        \"Err\",\n        \"Ok\",\n        \"f\"\n      ],\n      \"std.numeric::cholesky\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"abs\",\n        \"l.get\",\n        \"l.set\",\n        \"shape.length\",\n        \"sqrt\",\n        \"zeros\"\n      ],\n      \"std.numeric::cis\": [\n        \"std.numeric::polar\"\n      ],\n      \"std.numeric::complex_matrix\": [\n        \"Err\",\n        \"Ok\",\n        \"im.length\",\n        \"re.length\"\n      ],\n      \"std.numeric::complex_vector\": [\n        \"Err\",\n        \"Ok\",\n        \"im.length\",\n        \"re.length\"\n      ],\n      \"std.numeric::derivative\": [\n        \"f\"\n      ],\n      \"std.numeric::eigen\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"abs\",\n        \"raw.vectors.get\",\n        \"shape.length\",\n        \"std.numeric::eigen_order_ascending\",\n        \"std.numeric::symmetric_eigen\",\n        \"values.set\",\n        \"vectors.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::eigen_order\": [\n        \"order.push\",\n        \"std.numeric::mark_used\",\n        \"used.push\",\n        \"values.length\"\n      ],\n      \"std.numeric::eigen_order_ascending\": [\n        \"order.push\",\n        \"std.numeric::mark_used\",\n        \"used.push\",\n        \"values.length\"\n      ],\n      \"std.numeric::fft\": [\n        \"signal.length\",\n        \"std.numeric::transform\",\n        \"zeros\"\n      ],\n      \"std.numeric::frequencies\": [\n        \"array\",\n        \"out.push\"\n      ],\n      \"std.numeric::golden_min\": [\n        \"f\",\n        \"sqrt\"\n      ],\n      \"std.numeric::ifft\": [\n        \"spectrum.length\",\n        \"std.numeric::transform\"\n      ],\n      \"std.numeric::interp\": [\n        \"std.numeric::segment\"\n      ],\n      \"std.numeric::interp_all\": [\n        \"array\",\n        \"at.length\",\n        \"out.push\",\n        \"std.numeric::interp\"\n      ],\n      \"std.numeric::lu\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"abs\",\n        \"array\",\n        \"l.get\",\n        \"l.set\",\n        \"permutation.push\",\n        \"reordered.push\",\n        \"shape.length\",\n        \"u.get\",\n        \"u.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::mark_used\": [\n        \"flags.length\",\n        \"out.push\"\n      ],\n      \"std.numeric::newton\": [\n        \"Err\",\n        \"Ok\",\n        \"abs\",\n        \"df\",\n        \"f\",\n        \"max_iter.to_string\"\n      ],\n      \"std.numeric::polar\": [\n        \"cos\",\n        \"sin\"\n      ],\n      \"std.numeric::powi\": [\n        \"std.numeric::complex\"\n      ],\n      \"std.numeric::qr\": [\n        \"Err\",\n        \"Ok\",\n        \"a.col\",\n        \"a.shape\",\n        \"norm\",\n        \"q.col\",\n        \"q.set\",\n        \"qi.dot\",\n        \"r.set\",\n        \"shape.length\",\n        \"zeros\"\n      ],\n      \"std.numeric::rk4\": [\n        \"f\",\n        \"states.push\",\n        \"std.numeric::solution\",\n        \"times.push\",\n        \"y.length\",\n        \"y0.length\"\n      ],\n      \"std.numeric::rk45\": [\n        \"abs\",\n        \"exp\",\n        \"f\",\n        \"ln\",\n        \"states.push\",\n        \"std.numeric::solution\",\n        \"times.push\",\n        \"y.length\",\n        \"y0.length\"\n      ],\n      \"std.numeric::secant\": [\n        \"Err\",\n        \"Ok\",\n        \"abs\",\n        \"f\",\n        \"max_iter.to_string\"\n      ],\n      \"std.numeric::segment\": [\n        \"xs.length\"\n      ],\n      \"std.numeric::simpson\": [\n        \"f\"\n      ],\n      \"std.numeric::solution\": [\n        \"array\",\n        \"times.length\"\n      ],\n      \"std.numeric::spline\": [\n        \"c.push\",\n        \"d.push\",\n        \"m.set\",\n        \"xs.length\",\n        \"zeros\"\n      ],\n      \"std.numeric::svd\": [\n        \"Err\",\n        \"Ok\",\n        \"a.get\",\n        \"a.shape\",\n        \"array\",\n        \"eigen.vectors.get\",\n        \"gram.set\",\n        \"shape.length\",\n        \"singular.push\",\n        \"sqrt\",\n        \"std.numeric::eigen_order\",\n        \"std.numeric::symmetric_eigen\",\n        \"u.set\",\n        \"vt.get\",\n        \"vt.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::symmetric_eigen\": [\n        \"abs\",\n        \"eye\",\n        \"input.get\",\n        \"input.shape\",\n        \"matrix.get\",\n        \"matrix.set\",\n        \"sqrt\",\n        \"values.set\",\n        \"vectors.get\",\n        \"vectors.set\",\n        \"zeros\"\n      ],\n      \"std.numeric::transform\": [\n        \"ai.set\",\n        \"ar.set\",\n        \"cos\",\n        \"out_im.set\",\n        \"out_re.set\",\n        \"pi\",\n        \"re.length\",\n        \"sin\",\n        \"std.numeric::pow2\",\n        \"std.numeric::power_of_two\",\n        \"zeros\"\n      ],\n      \"std.numeric::trapz\": [\n        \"xs.length\"\n      ],\n      \"std.numeric::unit_cumtrapz\": [\n        \"array\",\n        \"out.push\",\n        \"xs.length\"\n      ],\n      \"std.numeric::unit_gradient\": [\n        \"array\",\n        \"out.push\",\n        \"xs.length\"\n      ],\n      \"std.numeric::unit_interp\": [\n        \"std.numeric::segment\",\n        \"xs.values\"\n      ],\n      \"std.numeric::unit_trapz\": [\n        \"xs.length\"\n      ],\n      \"std.viz::Figure.add\": [\n        \"self.series.push\"\n      ],\n      \"std.viz::Figure.area\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.band\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.bars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"std.viz::Figure.boxplot\": [\n        \"array\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.contour\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.contourf\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.dark\": [\n        \"std.viz::dark\"\n      ],\n      \"std.viz::Figure.errorbars\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.heatmap\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.hexbin\": [\n        \"array\",\n        \"counts.get\",\n        \"counts.set\",\n        \"floor\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"xcenters.push\",\n        \"xs.length\",\n        \"xs.max\",\n        \"xs.min\",\n        \"ycenters.push\",\n        \"ys.max\",\n        \"ys.min\",\n        \"zeros\"\n      ],\n      \"std.viz::Figure.histogram\": [\n        \"data.max\",\n        \"data.min\",\n        \"histogram\",\n        \"linspace\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.hline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.line\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.morph\": [\n        \"frames.row\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.moving_point\": [\n        \"self.add\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.moving_segment\": [\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.quantity_line\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"std.viz::Figure.quantity_scatter\": [\n        \"array\",\n        \"q.unit\",\n        \"q.value\",\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"xv.push\",\n        \"ys.length\",\n        \"yv.push\"\n      ],\n      \"std.viz::Figure.quiver\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.rod\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::empty\",\n        \"std.viz::motion_series\"\n      ],\n      \"std.viz::Figure.save\": [\n        \"std.viz::render\",\n        \"write_file\"\n      ],\n      \"std.viz::Figure.scatter\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.stairs\": [\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Figure.streamplot\": [\n        \"array\",\n        \"backward.xs.length\",\n        \"forward.xs.length\",\n        \"path_x.push\",\n        \"path_y.push\",\n        \"seed_xs.length\",\n        \"self.add\",\n        \"std.viz::integrate_stream\",\n        \"std.viz::series\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::Figure.svg\": [\n        \"std.viz::render\"\n      ],\n      \"std.viz::Figure.text\": [\n        \"self.notes.push\"\n      ],\n      \"std.viz::Figure.unit_line\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"std.viz::Figure.unit_scatter\": [\n        \"self.add\",\n        \"std.viz::series\",\n        \"xs.unit\",\n        \"xs.values\",\n        \"ys.unit\",\n        \"ys.values\"\n      ],\n      \"std.viz::Figure.violin\": [\n        \"array\",\n        \"data.length\",\n        \"data.max\",\n        \"data.min\",\n        \"data.percentile\",\n        \"data.std\",\n        \"density.push\",\n        \"exp\",\n        \"pi\",\n        \"pow\",\n        \"self.add\",\n        \"sqrt\",\n        \"std.viz::series\",\n        \"values.push\",\n        \"widths.push\"\n      ],\n      \"std.viz::Figure.vline\": [\n        \"array\",\n        \"self.add\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"std.viz::Scene3D.dark\": [\n        \"std.viz::dark\"\n      ],\n      \"std.viz::Scene3D.isosurface\": [\n        \"array\",\n        \"self.series.push\",\n        \"std.viz::empty\",\n        \"std.viz::tetra_isoline\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"vx.push\",\n        \"vy.push\",\n        \"vz.push\"\n      ],\n      \"std.viz::Scene3D.line\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.save\": [\n        \"std.viz::render3d\",\n        \"write_file\"\n      ],\n      \"std.viz::Scene3D.scatter\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.slice_xy\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"std.viz::Scene3D.slice_xz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"std.viz::Scene3D.slice_yz\": [\n        \"array\",\n        \"self.series.push\"\n      ],\n      \"std.viz::Scene3D.surface\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.svg\": [\n        \"std.viz::render3d\"\n      ],\n      \"std.viz::Scene3D.vector_field\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Scene3D.wireframe\": [\n        \"self.series.push\",\n        \"std.viz::series\"\n      ],\n      \"std.viz::Table.bind\": [\n        \"self.bindings.push\",\n        \"std.viz::binding_name\"\n      ],\n      \"std.viz::Table.dark\": [\n        \"std.viz::dark\"\n      ],\n      \"std.viz::Table.save\": [\n        \"std.viz::render_table\",\n        \"write_file\"\n      ],\n      \"std.viz::Table.svg\": [\n        \"std.viz::render_table\"\n      ],\n      \"std.viz::animate\": [\n        \"ceil\",\n        \"frames.length\",\n        \"i.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"round\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::short\",\n        \"std.viz::svg_size\",\n        \"total_ms.to_string\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"values.join\"\n      ],\n      \"std.viz::argsort\": [\n        \"idx.push\",\n        \"keys.length\",\n        \"merged.push\"\n      ],\n      \"std.viz::axes3d\": [\n        \"grid.join\",\n        \"grid.push\",\n        \"out.join\",\n        \"out.push\",\n        \"std.viz::attr\",\n        \"std.viz::depth\",\n        \"std.viz::edge\",\n        \"std.viz::nice_step\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::pt\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"bindings.join\",\n        \"bindings.length\",\n        \"std.viz::attr\",\n        \"std.viz::escape_attr\"\n      ],\n      \"std.viz::center_gap\": [\n        \"abs\",\n        \"centers.length\"\n      ],\n      \"std.viz::colorbar\": [\n        \"std.viz::attr\",\n        \"std.viz::gradient\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\"\n      ],\n      \"std.viz::colormap\": [\n        \"floor\",\n        \"std.viz::clamp01\",\n        \"std.viz::rgb_part\",\n        \"std.viz::stops\"\n      ],\n      \"std.viz::decimals\": [\n        \"floor\",\n        \"log10\"\n      ],\n      \"std.viz::depth\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::draw_contour\": [\n        \"d.join\",\n        \"d.push\",\n        \"out.join\",\n        \"out.push\",\n        \"pts.length\",\n        \"pts.push\",\n        \"s.grid.get\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"bands.to_string\",\n        \"cells.join\",\n        \"cells.push\",\n        \"floor\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"cells.join\",\n        \"cells.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pt\",\n        \"std.viz::shade\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"offsets.push\",\n        \"paths.push\",\n        \"s.grid.row\",\n        \"s.grid.shape\",\n        \"s.lo.length\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::animate_attr\",\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::screen_xs\",\n        \"std.viz::screen_ys\",\n        \"std.viz::tip\",\n        \"travelled.push\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"sqrt\",\n        \"std.viz::attr\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_series\": [\n        \"abs\",\n        \"i.to_string\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.xs.length\",\n        \"std.viz::attr\",\n        \"std.viz::draw_contour\",\n        \"std.viz::draw_contourf\",\n        \"std.viz::draw_heatmap\",\n        \"std.viz::draw_hexbin\",\n        \"std.viz::draw_quiver\",\n        \"std.viz::min_gap\",\n        \"std.viz::named\",\n        \"std.viz::num\",\n        \"std.viz::path_of\",\n        \"std.viz::seg\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::tip\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"array\",\n        \"keys.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"s.grid.get\",\n        \"s.grid.shape\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::norm\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::pt\",\n        \"std.viz::shade\"\n      ],\n      \"std.viz::edge\": [\n        \"std.viz::attr\",\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::empty\": [\n        \"zeros\"\n      ],\n      \"std.viz::escape\": [\n        \"text.replace\"\n      ],\n      \"std.viz::escape_attr\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::figure\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::gradient\": [\n        \"std.viz::attr\",\n        \"std.viz::colormap\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::grid\": [\n        \"body.replace\",\n        \"out.join\",\n        \"out.push\",\n        \"panel.length\",\n        \"panel.slice\",\n        \"panels.length\",\n        \"std.viz::attr\",\n        \"std.viz::header\",\n        \"std.viz::light\",\n        \"std.viz::text_at\",\n        \"x.to_string\",\n        \"y.to_string\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\",\n        \"xs.length\",\n        \"ys.length\",\n        \"z.set\",\n        \"zeros\"\n      ],\n      \"std.viz::header\": [\n        \"std.viz::attr\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::integrate_stream\": [\n        \"out_x.push\",\n        \"out_y.push\",\n        \"sqrt\",\n        \"std.viz::sample_stream\",\n        \"std.viz::stream_inside\"\n      ],\n      \"std.viz::legend\": [\n        \"colors.push\",\n        \"ids.push\",\n        \"kinds.push\",\n        \"l.length\",\n        \"labels.length\",\n        \"labels.push\",\n        \"s.xs.length\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::is_grid\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\"\n      ],\n      \"std.viz::min_gap\": [\n        \"abs\",\n        \"xs.length\"\n      ],\n      \"std.viz::motion_series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::nice_step\": [\n        \"floor\",\n        \"log10\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::num\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::path_of\": [\n        \"parts.join\",\n        \"parts.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::pick\": [\n        \"theme.palette.length\"\n      ],\n      \"std.viz::project_x\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::project_y\": [\n        \"std.viz::norm\"\n      ],\n      \"std.viz::provenance_metadata\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\"\n      ],\n      \"std.viz::pt\": [\n        \"std.viz::num\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\"\n      ],\n      \"std.viz::px\": [\n        \"v.to_string\"\n      ],\n      \"std.viz::render\": [\n        \"fig.series.length\",\n        \"out.join\",\n        \"out.push\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.hi.max\",\n        \"s.hi.min\",\n        \"s.lo.max\",\n        \"s.lo.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"series_id.to_string\",\n        \"std.viz::attr\",\n        \"std.viz::axis_title\",\n        \"std.viz::binding_attr\",\n        \"std.viz::center_gap\",\n        \"std.viz::colorbar\",\n        \"std.viz::draw_motion\",\n        \"std.viz::draw_series\",\n        \"std.viz::has_range\",\n        \"std.viz::header\",\n        \"std.viz::is_grid\",\n        \"std.viz::is_motion\",\n        \"std.viz::legend\",\n        \"std.viz::max_of\",\n        \"std.viz::min_gap\",\n        \"std.viz::min_of\",\n        \"std.viz::nice_step\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::seg\",\n        \"std.viz::text_at\",\n        \"std.viz::tick_label\",\n        \"std.viz::ticks\",\n        \"std.viz::uid\",\n        \"violin_centers.length\",\n        \"violin_centers.push\"\n      ],\n      \"std.viz::render3d\": [\n        \"array\",\n        \"cos\",\n        \"groups.join\",\n        \"groups.push\",\n        \"keys.push\",\n        \"out.join\",\n        \"out.push\",\n        \"parts.join\",\n        \"parts.push\",\n        \"pi\",\n        \"s.grid.max\",\n        \"s.grid.min\",\n        \"s.xs.length\",\n        \"s.xs.max\",\n        \"s.xs.min\",\n        \"s.ys.max\",\n        \"s.ys.min\",\n        \"s.zs.max\",\n        \"s.zs.min\",\n        \"sin\",\n        \"sqrt\",\n        \"std.viz::argsort\",\n        \"std.viz::attr\",\n        \"std.viz::axes3d\",\n        \"std.viz::binding_attr\",\n        \"std.viz::colorbar\",\n        \"std.viz::colormap\",\n        \"std.viz::depth\",\n        \"std.viz::draw_mesh3\",\n        \"std.viz::draw_slice\",\n        \"std.viz::draw_surface\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::pick\",\n        \"std.viz::project_x\",\n        \"std.viz::project_y\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::pt\",\n        \"std.viz::short\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"std.viz::uid\",\n        \"zz.max\",\n        \"zz.min\"\n      ],\n      \"std.viz::render_table\": [\n        \"c.to_string\",\n        \"columns.to_string\",\n        \"out.join\",\n        \"out.push\",\n        \"r.to_string\",\n        \"row.length\",\n        \"std.viz::attr\",\n        \"std.viz::binding_attr\",\n        \"std.viz::escape\",\n        \"std.viz::header\",\n        \"std.viz::num\",\n        \"std.viz::provenance_metadata\",\n        \"std.viz::px\",\n        \"std.viz::table_column_widths\",\n        \"std.viz::text_at\",\n        \"std.viz::tip\",\n        \"t.headers.length\",\n        \"t.rows.length\"\n      ],\n      \"std.viz::rgb_part\": [\n        \"round\"\n      ],\n      \"std.viz::sample_stream\": [\n        \"floor\",\n        \"std.viz::stream_value\",\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::scene3d\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::screen_xs\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"xs.length\"\n      ],\n      \"std.viz::screen_ys\": [\n        \"out.push\",\n        \"std.viz::num\",\n        \"ys.length\"\n      ],\n      \"std.viz::seg\": [\n        \"std.viz::attr\",\n        \"std.viz::num\"\n      ],\n      \"std.viz::series\": [\n        \"std.viz::empty\"\n      ],\n      \"std.viz::shade\": [\n        \"abs\",\n        \"sqrt\"\n      ],\n      \"std.viz::short\": [\n        \"r.to_string\",\n        \"round\"\n      ],\n      \"std.viz::slice_xy\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_xz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::slice_yz\": [\n        \"plane.set\",\n        \"std.viz::clamp_index\",\n        \"volume.get\",\n        \"volume.shape\",\n        \"zeros\"\n      ],\n      \"std.viz::stream_inside\": [\n        \"xs.length\",\n        \"ys.length\"\n      ],\n      \"std.viz::stream_value\": [\n        \"values.length\"\n      ],\n      \"std.viz::svg_size\": [\n        \"parts.length\",\n        \"svg.split\"\n      ],\n      \"std.viz::table\": [\n        \"std.viz::light\"\n      ],\n      \"std.viz::table_column_widths\": [\n        \"heading.length\",\n        \"row.length\",\n        \"t.headers.length\",\n        \"t.rows.length\",\n        \"widths.push\"\n      ],\n      \"std.viz::tetra_isoline\": [\n        \"hits.length\",\n        \"hits.push\",\n        \"std.viz::iso_intersection\"\n      ],\n      \"std.viz::text_at\": [\n        \"std.viz::attr\",\n        \"std.viz::escape\",\n        \"std.viz::num\",\n        \"std.viz::px\"\n      ],\n      \"std.viz::tick_label\": [\n        \"abs\",\n        \"exponent.to_string\",\n        \"floor\",\n        \"format_float_value\",\n        \"log10\",\n        \"std.viz::decimals\",\n        \"std.viz::pow10\"\n      ],\n      \"std.viz::ticks\": [\n        \"array\",\n        \"ceil\",\n        \"out.push\",\n        \"std.viz::nice_step\"\n      ],\n      \"std.viz::tip\": [\n        \"std.viz::escape\"\n      ],\n      \"std.viz::uid\": [\n        \"hash\"\n      ],\n      \"std.viz::unit_of\": [\n        \"qs.length\"\n      ],\n      \"std.viz::values\": [\n        \"array\",\n        \"first.unit\",\n        \"first.value\",\n        \"out.push\",\n        \"q.unit\",\n        \"q.value\",\n        \"qs.length\"\n      ]\n    },\n    \"unresolved_calls\": {\n      \"std.numeric::bisect\": [],\n      \"std.numeric::derivative\": [],\n      \"std.numeric::golden_min\": [],\n      \"std.numeric::newton\": [],\n      \"std.numeric::rk4\": [],\n      \"std.numeric::rk45\": [],\n      \"std.numeric::secant\": [],\n      \"std.numeric::simpson\": [],\n      \"std.viz::grid_of\": []\n    },\n    \"function_effect_variables\": {\n      \"std.numeric::bisect\": [\n        \"ε_f\"\n      ],\n      \"std.numeric::derivative\": [\n        \"ε_f\"\n      ],\n      \"std.numeric::golden_min\": [\n        \"ε_f\"\n      ],\n      \"std.numeric::newton\": [\n        \"ε_df\",\n        \"ε_f\"\n      ],\n      \"std.numeric::rk4\": [\n        \"ε_f\"\n      ],\n      \"std.numeric::rk45\": [\n        \"ε_f\"\n      ],\n      \"std.numeric::secant\": [\n        \"ε_f\"\n      ],\n      \"std.numeric::simpson\": [\n        \"ε_f\"\n      ],\n      \"std.viz::grid_of\": [\n        \"ε_f\"\n      ]\n    },\n    \"symbolic_effect_calls\": {\n      \"std.numeric::bisect\": [\n        \"f\"\n      ],\n      \"std.numeric::derivative\": [\n        \"f\"\n      ],\n      \"std.numeric::golden_min\": [\n        \"f\"\n      ],\n      \"std.numeric::newton\": [\n        \"df\",\n        \"f\"\n      ],\n      \"std.numeric::rk4\": [\n        \"f\"\n      ],\n      \"std.numeric::rk45\": [\n        \"f\"\n      ],\n      \"std.numeric::secant\": [\n        \"f\"\n      ],\n      \"std.numeric::simpson\": [\n        \"f\"\n      ],\n      \"std.viz::grid_of\": [\n        \"f\"\n      ]\n    },\n    \"entry_effect_signature\": {\n      \"function\": \"main\",\n      \"effects\": [\n        \"io\",\n        \"state(local)\"\n      ],\n      \"open_calls\": [],\n      \"purity_proven\": false,\n      \"row_closed\": true,\n      \"variables\": []\n    },\n    \"effect_coverage\": {\n      \"complete\": true,\n      \"count_unit\": \"distinct_function_operation_edges\",\n      \"known_calls\": 877,\n      \"symbolic_calls\": 10,\n      \"unresolved_calls\": 0\n    },\n    \"analyzer\": [\n      {\n        \"path\": \"compiler/src/effects.rs\",\n        \"sha256\": \"sha256:8e7a1d9b8b625332ae44b273aec2f594296c796030124545c674b8e41d27bd1b\"\n      },\n      {\n        \"path\": \"compiler/src/main.rs\",\n        \"sha256\": \"sha256:abc2ab22f8404700fbf187df36d020f3db8054a9be11636ee1f1bf3ba6338e35\"\n      }\n    ]\n  },\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R0 exact SVG replay is verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture, seeded-randomness evidence for R1, external snapshots and complete R2/R3 guarantees remain pending.\"\n}\n"
   }
 }

@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
+use crate::effects::{EffectKind, EffectSignature, EffectVariableSubstitution};
 use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirProgram, HirStmt, IteratorInfo};
 use crate::types::Ty;
 
@@ -55,6 +56,7 @@ pub struct IrProgram {
 #[derive(Debug, Clone)]
 pub struct IrFunction {
     pub name: String,
+    pub effect_source_key: String,
     pub params: Vec<(String, Ty)>,
     pub ret: Ty,
     pub entry: BlockId,
@@ -63,8 +65,18 @@ pub struct IrFunction {
     /// stay attached to their owner so a closure's capture ValueIds keep the
     /// same SSA namespace as the `ClosureMake` instruction that creates it.
     pub closures: Vec<IrClosure>,
-    /// Effect row carried through the typed native boundary.
-    pub effects: std::collections::BTreeSet<String>,
+    /// First-class internal effect-bearing signature carried from HIR.
+    pub effect_signature: EffectSignature,
+    /// Proven local substitutions from callee callback variables to caller variables.
+    pub effect_variable_substitutions: std::collections::BTreeSet<EffectVariableSubstitution>,
+    /// Local calls used to validate conservative effect propagation.
+    pub effect_calls: std::collections::BTreeSet<String>,
+    /// Function-valued calls left open because callable types do not carry rows.
+    pub indirect_effect_calls: std::collections::BTreeSet<String>,
+    /// Callback parameters whose effects were substituted at this function's
+    /// known callsites, grouped by local callee effect source key.
+    pub closed_callback_calls:
+        std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -320,6 +332,9 @@ pub struct VerifyReport {
     pub instructions: usize,
     pub opaque: usize,
     pub unterminated: usize,
+    pub effect_edges: usize,
+    pub unresolved_effect_calls: usize,
+    pub indirect_effect_calls: usize,
     pub violations: Vec<String>,
 }
 
@@ -363,12 +378,17 @@ impl Builder {
         Self {
             function: IrFunction {
                 name: function.name.clone(),
+                effect_source_key: function.effect_source_key.clone(),
                 params: function.params.clone(),
                 ret: function.ret.clone(),
                 entry: 0,
                 blocks: vec![entry],
                 closures: Vec::new(),
-                effects: function.effects.clone(),
+                effect_signature: function.effect_signature.clone(),
+                effect_variable_substitutions: function.effect_variable_substitutions.clone(),
+                effect_calls: function.effect_calls.clone(),
+                indirect_effect_calls: function.indirect_effect_calls.clone(),
+                closed_callback_calls: function.closed_callback_calls.clone(),
             },
             current: 0,
             next_value: 0,
@@ -555,12 +575,19 @@ impl Builder {
         child_params.extend(params.iter().cloned().zip(param_tys.iter().cloned()));
         let child = HirFunction {
             name: closure_name.clone(),
+            effect_source_key: closure_name.clone(),
             generics: Vec::new(),
             params: child_params.clone(),
             ret: (**ret).clone(),
             body: body.clone(),
             source_file: Some(self.function.name.clone()),
-            effects: self.function.effects.clone(),
+            effect_signature: self.function.effect_signature.clone(),
+            effect_variable_substitutions: Default::default(),
+            effect_calls: self.function.effect_calls.clone(),
+            indirect_effect_calls: self.function.indirect_effect_calls.clone(),
+            // The parent's callsite substitutions do not describe this
+            // synthesized closure body. Keep the child's proof set empty.
+            closed_callback_calls: Default::default(),
         };
         let body_ir = lower_function(
             &child,
@@ -3230,6 +3257,128 @@ fn collect_pattern_names(pattern: &crate::ast::Pattern, bound: &mut HashSet<Stri
 pub fn verify(program: &IrProgram) -> VerifyReport {
     let mut report = VerifyReport::default();
     for function in &program.functions {
+        report.unresolved_effect_calls += function.effect_signature.open_calls.len();
+        report.indirect_effect_calls += function.indirect_effect_calls.len();
+        for variable in &function.effect_signature.variables {
+            if !function
+                .params
+                .iter()
+                .any(|(name, ty)| name == variable && matches!(ty, Ty::Fn(..)))
+            {
+                report.violations.push(format!(
+                    "{}: effect variable ε_{} does not refer to a function-valued parameter",
+                    function.name, variable
+                ));
+            }
+        }
+        for substitution in &function.effect_variable_substitutions {
+            let caller_is_variable = function
+                .effect_signature
+                .variables
+                .contains(&substitution.caller_parameter)
+                && function.params.iter().any(|(name, ty)| {
+                    name == &substitution.caller_parameter && matches!(ty, Ty::Fn(..))
+                });
+            let callee_is_variable = program.functions.iter().any(|target| {
+                target.effect_source_key == substitution.callee
+                    && target
+                        .effect_signature
+                        .variables
+                        .contains(&substitution.callee_parameter)
+                    && target.params.iter().any(|(name, ty)| {
+                        name == &substitution.callee_parameter && matches!(ty, Ty::Fn(..))
+                    })
+            });
+            if !caller_is_variable || !callee_is_variable {
+                report.violations.push(format!(
+                    "{}: effect substitution ε_{} <- ε_{} via '{}' does not resolve to callback variables",
+                    function.name,
+                    substitution.callee_parameter,
+                    substitution.caller_parameter,
+                    substitution.callee
+                ));
+            }
+        }
+        for callee in &function.effect_calls {
+            let targets: Vec<_> = program
+                .functions
+                .iter()
+                .filter(|candidate| candidate.effect_source_key == *callee)
+                .collect();
+            if targets.is_empty() {
+                report.violations.push(format!(
+                    "{}: local effect call '{}' has no corresponding IR function",
+                    function.name, callee
+                ));
+                continue;
+            }
+            report.effect_edges += 1;
+            for target in targets {
+                for variable in &target.effect_signature.variables {
+                    let closed = function
+                        .closed_callback_calls
+                        .get(&target.effect_source_key)
+                        .is_some_and(|parameters| parameters.contains(variable));
+                    let substituted =
+                        function
+                            .effect_variable_substitutions
+                            .iter()
+                            .any(|mapping| {
+                                mapping.callee == target.effect_source_key
+                                    && mapping.callee_parameter == *variable
+                                    && function
+                                        .effect_signature
+                                        .variables
+                                        .contains(&mapping.caller_parameter)
+                            });
+                    let remains_open =
+                        function.effect_signature.open_calls.iter().any(|call| {
+                            call == variable || call.ends_with(&format!(".{variable}"))
+                        });
+                    if !closed && !substituted && !remains_open {
+                        report.violations.push(format!(
+                            "{}: effect variable ε_{} from local call '{}' was neither substituted nor kept open",
+                            function.name, variable, target.name
+                        ));
+                    }
+                }
+                for effect in &target.effect_signature.effects {
+                    if !function.effect_signature.effects.contains(effect) {
+                        report.violations.push(format!(
+                            "{}: effect row is missing '{}' propagated from local call '{}'",
+                            function.name,
+                            effect.label(),
+                            target.name
+                        ));
+                    }
+                }
+                for call in &target.effect_signature.open_calls {
+                    let substituted = function
+                        .closed_callback_calls
+                        .get(&target.effect_source_key)
+                        .is_some_and(|parameters| parameters.contains(call));
+                    if !substituted && !function.effect_signature.open_calls.contains(call) {
+                        report.violations.push(format!(
+                            "{}: open effect call '{}' was not propagated from local call '{}'",
+                            function.name, call, target.name
+                        ));
+                    }
+                }
+            }
+        }
+        for call in &function.indirect_effect_calls {
+            let symbolic = function
+                .effect_signature
+                .variables
+                .iter()
+                .any(|variable| call == variable || call.ends_with(&format!(".{variable}")));
+            if !function.effect_signature.open_calls.contains(call) && !symbolic {
+                report.violations.push(format!(
+                    "{}: indirect function call '{}' is missing its open effect marker",
+                    function.name, call
+                ));
+            }
+        }
         report.blocks += function.blocks.len();
         let mut predecessors = vec![Vec::<BlockId>::new(); function.blocks.len()];
         for block in &function.blocks {
@@ -3361,17 +3510,45 @@ pub fn dump(program: &IrProgram) -> String {
             function.name,
             function.ret.describe()
         );
-        if !function.effects.is_empty() {
+        if !function.effect_signature.effects.is_empty() {
             let _ = writeln!(
                 out,
                 "  effects: {}",
                 function
+                    .effect_signature
                     .effects
                     .iter()
-                    .cloned()
+                    .map(EffectKind::label)
                     .collect::<Vec<_>>()
                     .join(", ")
             );
+        }
+        if !function.effect_signature.variables.is_empty() {
+            let variables = function
+                .effect_signature
+                .variables
+                .iter()
+                .map(|name| format!("ε_{name}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let _ = writeln!(out, "  effect variables: {variables}");
+        }
+        for substitution in &function.effect_variable_substitutions {
+            let _ = writeln!(
+                out,
+                "  effect substitution: ε_{} <- ε_{} via {}",
+                substitution.callee_parameter, substitution.caller_parameter, substitution.callee
+            );
+        }
+        if !function.effect_signature.open_calls.is_empty() {
+            let calls = function
+                .effect_signature
+                .open_calls
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ");
+            let _ = writeln!(out, "  unresolved effect calls: {calls}");
         }
         for block in &function.blocks {
             let _ = writeln!(out, "bb{}:", block.id);
@@ -3385,6 +3562,116 @@ pub fn dump(program: &IrProgram) -> String {
         out.push('\n');
     }
     out
+}
+
+#[cfg(test)]
+mod effect_verifier_tests {
+    use super::{dump, lower, verify};
+    use crate::effects::{EffectKind, EffectSignature};
+    use crate::hir::{HirBlock, HirFunction, HirProgram};
+    use crate::types::Ty;
+    use std::collections::{BTreeSet, HashMap};
+
+    fn function(name: &str, effects: &[EffectKind], calls: &[&str]) -> HirFunction {
+        let effects: BTreeSet<_> = effects.iter().cloned().collect();
+        HirFunction {
+            name: name.to_string(),
+            effect_source_key: name.to_string(),
+            generics: Vec::new(),
+            params: Vec::new(),
+            ret: Ty::Void,
+            body: HirBlock {
+                stmts: Vec::new(),
+                tail: None,
+            },
+            source_file: None,
+            effect_signature: EffectSignature {
+                effects,
+                ..EffectSignature::default()
+            },
+            effect_variable_substitutions: Default::default(),
+            effect_calls: calls.iter().map(|call| (*call).to_string()).collect(),
+            indirect_effect_calls: BTreeSet::new(),
+            closed_callback_calls: Default::default(),
+        }
+    }
+
+    #[test]
+    fn ir_preserves_typed_effect_rows_and_rejects_a_missing_call_effect() {
+        let mut program = HirProgram {
+            functions: vec![
+                function("caller", &[EffectKind::Io], &["callee"]),
+                function("callee", &[EffectKind::Io], &[]),
+            ],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+        program.functions[0]
+            .effect_signature
+            .open_calls
+            .insert("dynamic.emit".to_string());
+        program.functions[1]
+            .effect_signature
+            .open_calls
+            .insert("dynamic.emit".to_string());
+        let mut ir = lower(&program);
+        assert!(ir.functions[0]
+            .effect_signature
+            .effects
+            .contains(&EffectKind::Io));
+        assert!(ir.functions[0]
+            .effect_signature
+            .open_calls
+            .contains("dynamic.emit"));
+        assert!(dump(&ir).contains("effects: io"));
+
+        let valid = verify(&ir);
+        assert_eq!(valid.effect_edges, 1);
+        assert!(valid.violations.is_empty(), "{:?}", valid.violations);
+
+        ir.functions[0].effect_signature.effects.clear();
+        ir.functions[0].effect_signature.open_calls.clear();
+        let invalid = verify(&ir);
+        assert_eq!(invalid.effect_edges, 1);
+        assert_eq!(invalid.violations.len(), 2);
+        assert!(invalid.violations[0].contains("missing 'io'"));
+        assert!(invalid.violations[1].contains("open effect call 'dynamic.emit'"));
+    }
+
+    #[test]
+    fn ir_requires_forwarded_effect_variables_to_be_substituted_or_open() {
+        let function_ty = || Ty::Fn(Vec::new(), Box::new(Ty::Void));
+        let mut caller = function("caller", &[], &["callee"]);
+        caller.params.push(("action".to_string(), function_ty()));
+        caller
+            .effect_signature
+            .variables
+            .insert("action".to_string());
+        let mut callee = function("callee", &[], &[]);
+        callee.params.push(("callback".to_string(), function_ty()));
+        callee
+            .effect_signature
+            .variables
+            .insert("callback".to_string());
+        let program = HirProgram {
+            functions: vec![caller, callee],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+        let ir = lower(&program);
+
+        let report = verify(&ir);
+        assert!(report
+            .violations
+            .iter()
+            .any(|violation| violation.contains("neither substituted nor kept open")));
+    }
 }
 
 fn display_instruction(instruction: &IrInstr) -> String {

@@ -145,14 +145,16 @@ function numericalValidationStatus() {
 }
 
 function effectCoverageStatus() {
-  const source = text("website/provenance-data.js");
-  const block = source.match(/"effect_coverage":\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
-  const number = (name) => Number(block.match(new RegExp(`"${name}":\\s*(\\d+)`))?.[1] ?? 0);
-  const complete = block.match(/"complete":\s*(true|false)/)?.[1] === "true";
+  const report = buildR3Readiness();
   return {
-    knownCalls: number("known_calls"),
-    unresolvedCalls: number("unresolved_calls"),
-    complete,
+    knownCalls: report.knownEffectCallCount,
+    symbolicCalls: report.symbolicEffectCallCount,
+    unresolvedCalls: report.unresolvedEffectCallCount,
+    countUnit: report.effectCoverageCountUnit,
+    aggregation: "sum_of_per_bundle_distinct_function_operation_edges",
+    bundleCount: report.bundleCount,
+    scope: `registered experiment bundles (${report.bundleCount})`,
+    complete: report.unresolvedEffectCallCount === 0,
   };
 }
 
@@ -195,6 +197,8 @@ export async function buildScorecard() {
         captureReadyCount: report.captureReadyCount,
         captureOpenCount: report.captureOpenCount,
         incompleteEffectBundleCount: report.incompleteEffectBundleCount,
+        closedEntryEffectBundleCount: report.closedEntryEffectBundleCount,
+        symbolicEffectCallCount: report.symbolicEffectCallCount,
         unresolvedEffectCallCount: report.unresolvedEffectCallCount,
       };
     })(),

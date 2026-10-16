@@ -1,6 +1,6 @@
 # 26 — Efectos científicos, determinismo y procedencia
 
-**Estado:** propuesta de diseño con inventario experimental; `ostrinc --effect-report` ya expone
+**Estado:** diseño con inferencia tipada experimental y filas internas verificadas por HIR/IR; `ostrinc --effect-report` expone
 evidencia sintáctica conservadora, conserva etiquetas internas tipadas (`EffectKind`) y produce
 resúmenes por función con propagación conservadora a través de llamadas, ya transportados como
 filas internas de HIR/IR; todavía no modifica la sintaxis pública ni ofrece garantías de pureza.
@@ -211,9 +211,14 @@ El informe debe guardar el peor residuo medido y las plataformas/bibliotecas pro
 no existe o alguna plataforma queda fuera de la matriz, el resultado se marca **no evaluado** y no como
 equivalente.
 
-Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI; el soporte de
-tolerancias cruzadas sigue abierto y la captura de host/hardware ya está implementada en Pages CI,
-pero R3 y el gate de `v0.2` esperan una ejecución CI real que produzca el artefacto host-bound.
+Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI y el soporte de
+tolerancias cruzadas sigue abierto. La ejecución CI `38860279280`, en el head
+`a1eb79bfde4782b82b96a1a1c7357332979a0893`, produjo evidencia host-bound con R3 `READY` para
+29/29 bundles: 29 capturas auténticas, 29 filas de entrada cerradas, 74 bordes simbólicos globales
+y cero bordes sin resolver ([artefacto](https://github.com/sircalch/Ostrin/actions/runs/38860279280/artifacts/12028498290)).
+Ese estado acredita la ejecución capturada. El reporte local versionado sigue `OPEN` porque no
+incluye metadatos de host, y no se afirma equivalencia numérica entre plataformas. La release
+`v0.2.0` ya fue publicada; su gate de release es distinto del nivel R3 de cada ejecución.
 
 ## 8. Inferencia y reglas del checker
 
@@ -319,10 +324,20 @@ en una consola de logs.
    no funciones declaradas puras, porque una llamada no resuelta puede quedar fuera del análisis.
    El JSON también expone `unresolved_calls` por función: llamadas que no se pudieron resolver
    contra una función local ni contra una operación de host clasificada. Esta separación deja
-   visible la deuda de cobertura para la futura inferencia estática de efectos.
-   `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
+   visible la deuda de cobertura para la futura inferencia estática de efectos. La opción
+   experimental `--require-closed-effects` convierte esas fronteras en un gate de CI: requiere
+   que el programa no tenga errores de tipos ni llamadas irresueltas, indirectas o variables
+   simbólicas abiertas en las funciones analizadas. Acepta filas con efectos conocidos como `io`;
+   “cerrada” no equivale a “pura” y esta
+   opción todavía no valida contratos públicos de efectos.
+   `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`). El
+   campo `count_unit` usa `distinct_function_operation_edges`: cuenta pares únicos
+   función-operación, por lo que llamadas repetidas a la misma operación dentro de una función
+   cuentan una sola vez. No representa el total de sitios de llamada del código fuente;
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
-   haya demostrado pureza.
+   haya demostrado pureza. Los bordes de callback simbólicos se reportan aparte y mantienen R3
+   abierto hasta que su efecto también se resuelva; una captura estructuralmente válida no basta
+   para declarar cerrado ese nivel.
    La implementación también reconoce una whitelist pequeña y explícita de operaciones locales
    deterministas —accesos y transformaciones de colecciones, cadenas, mediciones, resultados y
    matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
@@ -341,11 +356,17 @@ en una consola de logs.
    en una orden CLI experimental. La primera superficie ya existe como `ostrinc --provenance-report` y
    [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target,
    perfil WASI, hashes de lockfiles/manifiestos disponibles y sitios de efecto, y marca explícitamente la
-   salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
+   salida como experimental/no verificada. También registra las ocurrencias de llamadas no resueltas en
+   `activity.unresolved_call_sites`. Las rutas que pueden representarse dentro del checkout se serializan
+   relativas a su raíz; las rutas absolutas externas o no resolubles se omiten (`null`) para evitar filtrar
+   ubicaciones locales. El snapshot parcial ostrin.runtime/v1 ya expone la política de
    plataforma; los bundles experimentales añaden snapshots de entradas cuando corresponden, hashes de salida,
    resumen de efectos y, bajo `OSTRIN_CAPTURE_HOST=1`, metadatos públicos de host/hardware. La ejecución local
-   no reclama R3; Pages CI usa `--require-ready` para exigir el artefacto host-bound. Los once bundles input-driven ya constituyen cortes
-   R2: embeben `data.json`, declaran la capacidad `filesystem.read:data.json`, conservan el hash del
+   no reclama R3; Pages CI usa `--require-capture` para exigir una captura host-bound estructuralmente válida.
+   La captura no basta por sí sola: R3 queda listo solo cuando también se satisfacen el contrato completo
+   del bundle, la firma cerrada de efectos del entrypoint y las demás comprobaciones. Los once bundles
+   input-driven ya constituyen cortes R2: embeben `data.json`, declaran la capacidad
+   `filesystem.read:data.json`, conservan el hash del
    snapshot y verifican la sensibilidad de sus parámetros o semilla en WASI; los nueve casos seeded
    además conservan la evidencia algorítmica R1.
 6. **Frontera WASM:** conectar la tabla con permisos del Scientific Lab; denegar red/E/S no declaradas y
@@ -399,3 +420,10 @@ correspondiente no exista.
   límites.
 - No se anuncia esta propuesta como capacidad disponible hasta que exista implementación, paridad,
   pruebas y una superficie web con evidencia.
+## Estado experimental del análisis tipado (2026-10-16)
+
+La rama de trabajo compone resúmenes de efectos a través de llamadas locales, ciclos recursivos, combinadores tipados y wrappers genéricos que reciben callbacks. Los parámetros callback conservan variables simbólicas de efecto entre funciones genéricas; al instanciar una llamada con un callback conocido, el caller hereda sus efectos concretos. Los efectos desconocidos siguen abiertos y no se convierten en llamadas puras. HIR e IR transportan y verifican las aristas y filas inferidas. El reporte distingue efectos de filesystem, I/O, external y estado local cuando el tipo receptor permite clasificarlos.
+
+La resolución local de nombres tiene precedencia sobre la clasificación por nombre de un builtin. Una función del programa llamada `read_file` o `print` recibe los efectos de su propio cuerpo y de sus llamadas resueltas; el mero nombre no añade `filesystem` ni `io`. Las llamadas sin clasificación conservan un inventario de callsites con archivo y posición para que el reporte identifique dónde quedó abierta la inferencia; las invocaciones indirectas también enumeran cada ubicación y remiten al mapa de filas abiertas para su estado. Cuando el parser solo conserva la posición de una expresión contenedora, el reporte recupera la del identificador mediante tokens si la cantidad de ocurrencias AST y léxicas del grupo coincide. Si el archivo no está disponible o el grupo es ambiguo, mantiene la posición original, que puede ser `0:0`. La cobertura sigue contando aristas distintas, no ocurrencias.
+
+Este análisis aún no es un contrato de pureza ni una sintaxis pública estable. Llamadas indirectas sin firma conocida, métodos dinámicos y capacidades de host no modeladas permanecen abiertos; la completitud del inventario tampoco implica reproducibilidad R2/R3. La prueba de wrappers genéricos importados comprueba que un callback conocido propaga `io` a sus llamadores y que `host_effect` sigue abierto en el caller, en los reportes y en HIR/IR. Esta cobertura es evidencia acotada para módulos y callbacks, no soporte completo de efectos para todos los imports o límites FFI. El análisis también está cubierto por pruebas unitarias de inferencia, HIR/IR y reportes, además de paridad de los comportamientos existentes.
