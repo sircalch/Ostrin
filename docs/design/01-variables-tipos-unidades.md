@@ -345,6 +345,35 @@ cantidad es absoluta únicamente a partir de la dimensión `Quantity<Temperature
 distinción representable por el sistema de tipos y preservada por HIR/IR, intérprete, backend
 nativo, arrays, formatters y serialización.
 
+#### Contrato de representación para la implementación
+
+El estado actual del compilador confirma por qué esta distinción debe preceder a la sintaxis: la
+tabla de unidades almacena dimensión y factor; `Qty` y `Array<Quantity<D>>` conservan el valor y el
+nombre de unidad; y `ostrin_convert` convierte únicamente mediante la razón de factores. Ninguna de
+esas representaciones indica si el valor es un punto absoluto o un intervalo. Añadir un offset a la
+tabla por sí solo produciría resultados incorrectos en aritmética, arrays y unidades compuestas.
+
+El primer diseño de tipos preservará `Quantity<D>` como una cantidad **lineal** con la semántica
+multiplicativa existente. Para temperatura podrá representar intervalos, pero no puntos absolutos.
+Los puntos absolutos tendrán un tipo nominal distinto (por ejemplo, `TemperaturePoint`); la
+resta entre dos puntos producirá una cantidad lineal de dimensión `Temperature`, y sumar un punto a
+un intervalo lineal producirá otro punto. Este tipo nominal no se inferirá de una unidad ni se
+reducirá a `Quantity<Temperature>` durante la sustitución de genéricos.
+
+El descriptor de unidad afín deberá registrar dimensión, escala, desplazamiento y espacio afín.
+La comprobación de tipos decidirá qué fórmula usar según el rol de origen y destino. HIR e IR
+conservarán ese rol hasta el lowering; el runtime podrá compartir la representación numérica sólo
+si las operaciones generadas siguen distinguiendo puntos de intervalos. En arrays, el rol formará
+parte del tipo del array y no se permitirá mezclar puntos con intervalos dentro de un mismo array.
+Los genéricos existentes `Unit<D>` y `Quantity<D>` no aceptarán unidades afines implícitamente.
+
+Queda abierta una decisión de compatibilidad y sintaxis: hoy `K` produce `Quantity<Temperature>`.
+Antes de habilitar Celsius/Fahrenheit habrá que decidir cómo expresar un punto Kelvin sin cambiar
+silenciosamente el significado del código existente y cómo escribir un intervalo Kelvin sin
+ambigüedad. No se inferirá el rol por contexto. La primera implementación tampoco permitirá que
+programas declaren unidades afines con `unit`/`define`; esa extensión necesitará validar ciclos,
+espacios de referencia y composición antes de exponerse.
+
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin
 ejecutables. Los resultados se compararán con tolerancias explícitas de coma flotante:
