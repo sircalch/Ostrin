@@ -382,8 +382,13 @@ check(provenance.includes('<script src="provenance.js" defer></script>'),
 const provenanceData = read("website/provenance-data.js");
 check(provenanceData.includes("globalThis.OSTRIN_PROVENANCE") && provenanceData.includes('"schema": "ostrin.provenance/v0"'),
   "website/provenance-data.js: missing generated provenance artifact");
-check(read("website/provenance.js").includes("data-provenance-json"),
+const provenanceRenderer = read("website/provenance.js");
+check(provenanceRenderer.includes("data-provenance-json"),
   "website/provenance.js: missing artifact JSON renderer");
+for (const marker of ["data-provenance-requirement-count", "data-provenance-evidence-list"]) {
+  check(provenance.includes(marker) && provenanceRenderer.includes(marker),
+    "provenance page: missing reproducibility evidence requirement surface " + marker);
+}
 
 const community = read("website/community.html");
 for (const marker of ["issues/new/choose", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "community-labels.md"]) {

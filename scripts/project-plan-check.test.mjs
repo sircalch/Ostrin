@@ -46,10 +46,12 @@ test("the plan gate rejects a stale Quantity plotting fallback claim", () => {
   try {
     const file = path.join(root, "compiler/tests/differential.rs");
     const source = readFileSync(file, "utf8");
-    writeFileSync(file, source.replace(
-      "Generic quantity plotting instantiations\n    // now lower through IR/C",
+    const staleClaim = source.replace(
+      /Generic quantity plotting instantiations\s*\n\s*\/\/ now lower through IR\/C,?/,
       "Generic quantity plotting instantiations remain on the verified HIR/AST fallback",
-    ));
+    );
+    assert.notEqual(staleClaim, source, "the fixture must replace the current IR migration evidence");
+    writeFileSync(file, staleClaim);
     const result = validateProjectPlan(root);
     assert.ok(result.errors.some((error) => error.includes("stale claim"))
       || result.errors.some((error) => error.includes("IR migration")));

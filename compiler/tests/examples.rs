@@ -11911,6 +11911,7 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--members"));
     assert!(stdout(&help).contains("--types"));
     assert!(stdout(&help).contains("--effect-report"));
+    assert!(stdout(&help).contains("--require-closed-effects"));
     assert!(stdout(&help).contains("--provenance-report"));
     assert!(stdout(&help).contains("--project"));
     assert!(stdout(&help).contains("--native-threads"));
@@ -11925,7 +11926,7 @@ fn experimental_effect_report_exposes_measurement_and_io_sites() {
     ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out);
-    assert!(text.contains("effect-report: experimental conservative syntactic inventory"));
+    assert!(text.contains("effect-report: experimental conservative typed effect inference"));
     assert!(
         text.contains("measurement"),
         "missing measurement effect: {text}"
@@ -11945,6 +11946,103 @@ fn experimental_effect_report_exposes_measurement_and_io_sites() {
     assert!(json_text.contains("\"effect_kinds\":["));
     assert!(json_text.contains("\"function_effects\":{") && json_text.contains("\"main\":["));
     assert!(json_text.contains("\"effect\":\"measurement\""));
+}
+
+#[test]
+fn experimental_effect_report_separates_filesystem_external_and_console_io() {
+    let file = temp_source(
+        "effects-host-boundaries.ostrin",
+        "fn read_data(path: String) -> Result<String, String> { read_file(path) }\n\
+         fn read_via_wrapper(path: String) -> Result<String, String> { read_data(path) }\n\
+         fn exists(path: String) -> Bool { file_exists(path) }\n\
+         fn print_message() -> Void { print(\"status\") }\n\
+         fn process_args() -> List<String> { args() }\n\
+         fn read_environment(name: String) -> Option<String> { env(name) }\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    for function in ["read_data", "read_via_wrapper", "exists"] {
+        assert_eq!(
+            report["function_effects"][function],
+            serde_json::json!(["filesystem"]),
+            "{function} must be classified as filesystem access"
+        );
+    }
+    assert_eq!(
+        report["function_effects"]["print_message"],
+        serde_json::json!(["io"])
+    );
+    for function in ["process_args", "read_environment"] {
+        assert_eq!(
+            report["function_effects"][function],
+            serde_json::json!(["external"]),
+            "{function} must be classified as a process environment observation"
+        );
+    }
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("effects: filesystem"));
+    assert!(stdout(&hir).contains("effects: external"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("effects: filesystem"));
+    assert!(stdout(&ir).contains("effects: external"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_respects_local_functions_shadowing_effectful_builtins() {
+    let file = temp_source(
+        "effects-local-builtin-shadowing.ostrin",
+        r#"fn read_file(path: String) -> String { println("local implementation")
+    path
+}
+fn print(value: String) -> Void { }
+fn main() -> Void {
+    contents = read_file("data")
+    print(contents)
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["read_file"],
+        serde_json::json!(["io"]),
+        "the local read_file body should retain its actual println effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["print"]["effects"],
+        serde_json::json!([]),
+        "the local print function should not inherit the builtin's IO effect"
+    );
+    assert_eq!(
+        report["function_effects"]["main"],
+        serde_json::json!(["io"]),
+        "main should inherit only the local read_file implementation's IO row"
+    );
+    assert!(
+        !report["effect_kinds"]
+            .as_array()
+            .is_some_and(|effects| effects.iter().any(|effect| effect == "filesystem")),
+        "a locally resolved read_file call must not be classified as filesystem IO"
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
 }
 
 #[test]
@@ -12047,8 +12145,112 @@ fn experimental_effect_report_propagates_to_callers() {
     assert_eq!(artifact["unresolved_calls"], serde_json::json!({}));
     assert_eq!(
         artifact["effect_coverage"],
-        serde_json::json!({"known_calls": 2, "unresolved_calls": 0, "complete": true})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 2, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
     );
+}
+
+#[test]
+fn effect_coverage_counts_distinct_function_operation_edges() {
+    let file = temp_source(
+        "effects-duplicate-operation-edges.ostrin",
+        "fn main() -> Void {\n    print(\"first\")\n    print(\"second\")\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_calls"]["main"],
+        serde_json::json!(["print"])
+    );
+    assert_eq!(
+        report["effect_coverage"]["count_unit"],
+        "distinct_function_operation_edges"
+    );
+    assert_eq!(report["effect_coverage"]["known_calls"], 1);
+    assert_eq!(report["effect_coverage"]["unresolved_calls"], 0);
+    let _ = fs::remove_file(&file);
+}
+
+#[test]
+fn require_closed_effects_accepts_resolved_rows_and_rejects_open_boundaries() {
+    let resolved = temp_source(
+        "effects-closed-gate.ostrin",
+        "fn emit() -> Void { print(\"known io\") }\nfn main() -> Void { emit() }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &resolved]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "closed");
+    assert_eq!(report["effect_closure"]["required"], true);
+
+    let open = temp_source(
+        "effects-open-gate.ostrin",
+        "fn main() -> Void { unknown_host_call() }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &open]);
+    assert!(
+        !out.status.success(),
+        "open effect boundary passed the gate"
+    );
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "open");
+    assert_eq!(report["effect_closure"]["open_calls"], 1);
+    assert!(stderr(&out).contains("--require-closed-effects"));
+
+    let symbolic = temp_source(
+        "effects-symbolic-gate.ostrin",
+        "fn invoke(callback: fn() -> Void) -> Void { callback() }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &symbolic]);
+    assert!(
+        !out.status.success(),
+        "symbolic effect row passed the closed gate"
+    );
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "open");
+    assert_eq!(report["effect_closure"]["symbolic_variables"], 1);
+
+    let ill_typed = temp_source(
+        "effects-ill-typed-gate.ostrin",
+        "fn main() -> Void { print(1 + true) }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &ill_typed]);
+    assert!(
+        !out.status.success(),
+        "ill-typed source passed the effect gate"
+    );
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "open");
+    assert!(report["effect_closure"]["type_errors"].as_u64().unwrap() > 0);
+    let _ = fs::remove_file(resolved);
+    let _ = fs::remove_file(open);
+    let _ = fs::remove_file(symbolic);
+    let _ = fs::remove_file(ill_typed);
+}
+
+#[test]
+fn hir_verifies_transitive_effect_rows_across_recursive_call_cycles() {
+    let file = temp_source(
+        "effects-recursive-cycle.ostrin",
+        "fn left() -> Void { right() }\n\
+         fn right() -> Void { if true { print(\"effect\") } else { left() } }\n\
+         fn main() -> Void { left() }\n\
+         fn quiet() -> Void {}\n\
+         fn quiet_caller() -> Void { quiet() }\n",
+    );
+    let out = run(&["--hir", "--quiet", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("hir effect edges: 4"), "{text}");
+    assert!(text.contains("hir violations: 0"), "{text}");
+
+    let out = run(&["--ir", "--quiet", &file]);
+    assert!(out.status.success(), "IR stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("ir effect edges: 4"), "{text}");
+    assert!(text.contains("ir violations: 0"), "{text}");
+    let _ = fs::remove_file(&file);
 }
 
 #[test]
@@ -12062,12 +12264,11 @@ fn experimental_effect_report_propagates_through_qualified_impl_methods() {
          fn main() -> Void {\n    forward(Console { marker: 0 })\n}\n",
     );
     let out = run(&["--effect-report", "--json", &file]);
-    let _ = fs::remove_file(&file);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
     assert_eq!(
-        report["function_effects"]["emit"],
+        report["function_effects"]["Console.emit"],
         serde_json::json!(["io"])
     );
     assert_eq!(
@@ -12085,29 +12286,1114 @@ fn experimental_effect_report_propagates_through_qualified_impl_methods() {
     assert_eq!(report["unresolved_calls"], serde_json::json!({}));
     assert_eq!(
         report["effect_coverage"],
-        serde_json::json!({"known_calls": 3, "unresolved_calls": 0, "complete": true})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 3, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
     );
+}
+
+#[test]
+fn experimental_effect_report_resolves_homonymous_methods_by_receiver_type() {
+    let file = temp_source(
+        "effects-ambiguous-method.ostrin",
+        "trait Output {\n    fn emit(self) -> Void\n}\n\
+         record Console { marker: Int }\n\
+         record Logger { marker: Int }\n\
+         impl Output for Console {\n    fn emit(self) -> Void {\n        print(\"console\")\n    }\n}\n\
+         impl Output for Logger {\n    fn emit(self) -> Void {\n        print(\"logger\")\n    }\n}\n\
+         fn forward(console: Console) -> Void {\n    console.emit()\n}\n\
+         fn dynamic_forward(console: dyn Output) -> Void {\n    console.emit()\n}\n\
+         fn dynamic_wrapper(console: dyn Output) -> Void {\n    dynamic_forward(console)\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["Console.emit"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["Logger.emit"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["forward"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["unresolved_calls"]["dynamic_forward"],
+        serde_json::json!(["console.emit"])
+    );
+    assert_eq!(
+        report["open_effect_calls"]["dynamic_wrapper"],
+        serde_json::json!(["console.emit"])
+    );
+    assert_eq!(
+        report["effect_coverage"],
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 4, "symbolic_calls": 0, "unresolved_calls": 1, "complete": false})
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(
+        stdout(&hir).contains("hir effect edges: 2"),
+        "{}",
+        stdout(&hir)
+    );
+    assert!(
+        stdout(&hir).contains("fn forward(console: Console) -> Void\n  effects: io"),
+        "{}",
+        stdout(&hir)
+    );
+    assert!(stdout(&hir).contains("unresolved effect calls: console.emit"));
+    assert!(
+        stdout(&hir).contains("hir unresolved effect calls: 2"),
+        "{}",
+        stdout(&hir)
+    );
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(
+        stdout(&ir).contains("ir effect edges: 2"),
+        "{}",
+        stdout(&ir)
+    );
+    assert!(stdout(&ir).contains("unresolved effect calls: console.emit"));
+    assert!(stdout(&ir).contains("ir unresolved effect calls: 2"));
+    assert!(stdout(&ir).contains("effects: io"));
+    let _ = fs::remove_file(&file);
+}
+
+#[test]
+fn experimental_effect_report_closes_only_typed_intrinsics_and_builtin_methods() {
+    let file = temp_source(
+        "effects-typed-intrinsics.ostrin",
+        "trait Getter {\n    fn get(self) -> Float\n}\n\
+         trait Printer {\n    fn print(self) -> Void\n}\n\
+         trait Normalizer {\n    fn normal(self) -> Float\n}\n\
+         record MutableBox { mut value: Int }\n\
+         fn math(x: Float) -> Float {\n    sin(x)\n}\n\
+         fn array_read(xs: Array<Float>) -> Float {\n    xs.get(0)\n}\n\
+         fn stable_hash(value: Int) -> Int {\n    hash(value)\n}\n\
+         fn stringify(value: Int) -> String {\n    value.to_string()\n}\n\
+         fn dynamic_read(value: dyn Getter) -> Float {\n    value.get()\n}\n\
+         fn dynamic_print(value: dyn Printer) -> Void {\n    value.print()\n}\n\
+         fn dynamic_normal(value: dyn Normalizer) -> Float {\n    value.normal()\n}\n\
+         fn draw(generator: Rng) -> Array<Float> {\n    generator.randn([8])\n}\n\
+         fn list_push() -> Void {\n    mut values: List<Int> = []\n    values.push(1)\n}\n\
+         fn array_set() -> Void {\n    mut values = array([1.0])\n    values.set(0, 2.0)\n}\n\
+         fn map_set() -> Void {\n    mut values: Map<Int, String> = Map<Int, String>()\n    values.set(1, \"one\")\n}\n\
+         fn set_add() -> Void {\n    mut values: Set<Int> = Set<Int>()\n    values.add(1)\n}\n\
+         fn field_mutation() -> Void {\n    mut value = MutableBox { value: 0 }\n    value.value = 1\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert!(report["unresolved_calls"].get("math").is_none());
+    assert!(report["unresolved_calls"].get("array_read").is_none());
+    assert!(report["unresolved_calls"].get("stable_hash").is_none());
+    assert!(report["unresolved_calls"].get("stringify").is_none());
+    assert_eq!(
+        report["unresolved_calls"]["dynamic_read"],
+        serde_json::json!(["value.get"])
+    );
+    assert_eq!(
+        report["unresolved_calls"]["dynamic_print"],
+        serde_json::json!(["value.print"])
+    );
+    assert!(report["function_effects"].get("dynamic_print").is_none());
+    assert_eq!(
+        report["unresolved_calls"]["dynamic_normal"],
+        serde_json::json!(["value.normal"])
+    );
+    assert!(report["function_effects"].get("dynamic_normal").is_none());
+    assert_eq!(
+        report["function_effects"]["draw"],
+        serde_json::json!(["random(seed)"])
+    );
+    for function in [
+        "list_push",
+        "array_set",
+        "map_set",
+        "set_add",
+        "field_mutation",
+    ] {
+        assert_eq!(
+            report["function_effects"][function],
+            serde_json::json!(["state(local)"]),
+            "{function} must expose observable local-state mutation"
+        );
+        assert!(
+            report["unresolved_calls"].get(function).is_none(),
+            "{function} is a typed intrinsic or field mutation, not an unknown call"
+        );
+    }
+    assert_eq!(
+        report["classified_calls"]["list_push"],
+        serde_json::json!(["values.push"])
+    );
+    assert_eq!(
+        report["known_effect_free_calls"]["array_read"],
+        serde_json::json!(["xs.get"])
+    );
+    assert_eq!(
+        report["known_effect_free_calls"]["stable_hash"],
+        serde_json::json!(["hash"])
+    );
+    assert_eq!(
+        report["known_effect_free_calls"]["stringify"],
+        serde_json::json!(["value.to_string"])
+    );
+}
+
+#[test]
+fn experimental_effect_report_tracks_trait_defaults_and_excludes_overrides() {
+    let file = temp_source(
+        "effects-trait-defaults.ostrin",
+        "trait Output {\n\
+             fn inherited(self) -> Void {\n        print(\"inherited\")\n    }\n\
+             fn overridden(self) -> Void {\n        print(\"default\")\n    }\n}\n\
+         record Console { marker: Int }\n\
+         impl Output for Console {\n\
+             fn overridden(self) -> Void {\n        println(\"override\")\n    }\n\
+         }\n\
+         fn exercise(console: Console) -> Void {\n\
+             console.inherited()\n\
+             console.overridden()\n\
+         }\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(
+        out.status.success(),
+        "effect report failed: {}",
+        stderr(&out)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["Console.inherited"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["Console.overridden"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["exercise"],
+        serde_json::json!(["io"])
+    );
+    let sites = report["sites"].as_array().expect("sites must be an array");
+    assert!(sites
+        .iter()
+        .any(|site| { site["function"] == "Console.inherited" && site["operation"] == "print" }));
+    assert!(sites.iter().any(|site| {
+        site["function"] == "Console.overridden" && site["operation"] == "println"
+    }));
+    assert!(!sites
+        .iter()
+        .any(|site| { site["function"] == "Console.overridden" && site["operation"] == "print" }));
+    assert_eq!(
+        report["effect_coverage"],
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 4, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR failed: {}", stderr(&hir));
+    assert!(
+        stdout(&hir).contains("hir effect edges: 2"),
+        "{}",
+        stdout(&hir)
+    );
+    assert!(stdout(&hir).contains("hir unresolved effect calls: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR failed: {}", stderr(&ir));
+    assert!(
+        stdout(&ir).contains("ir effect edges: 2"),
+        "{}",
+        stdout(&ir)
+    );
+    assert!(stdout(&ir).contains("ir unresolved effect calls: 0"));
+    let _ = fs::remove_file(&file);
 }
 
 #[test]
 fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     let file = temp_source(
         "effects-unknown.ostrin",
-        "fn main() -> Void {\n    mystery_host_operation()\n}\n",
+        "fn main() -> Void {\n    value = 1 + mystery_host_operation()\n    value = nested_host_operation() + 1\n    - another_host_operation()\n    mystery_host_operation()\n    -minus_host_operation()\n    value = 1 + host.print()\n    print(\"known builtin\")\n}\n",
     );
     let out = run(&["--effect-report", "--json", &file]);
-    let _ = fs::remove_file(&file);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let artifact: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
     assert_eq!(
         artifact["unresolved_calls"]["main"],
-        serde_json::json!(["mystery_host_operation"])
+        serde_json::json!([
+            "another_host_operation",
+            "host.print",
+            "minus_host_operation",
+            "mystery_host_operation",
+            "nested_host_operation"
+        ])
     );
+    let unresolved_sites = artifact["unresolved_call_sites"]
+        .as_array()
+        .expect("unresolved callsites must be reported as an array");
+    assert_eq!(unresolved_sites.len(), 6);
+    for (site, (operation, line, col)) in unresolved_sites.iter().zip([
+        ("mystery_host_operation", 2, 17),
+        ("nested_host_operation", 3, 13),
+        ("another_host_operation", 4, 7),
+        ("mystery_host_operation", 5, 5),
+        ("minus_host_operation", 6, 6),
+        ("host.print", 7, 17),
+    ]) {
+        assert_eq!(site["function"], "main");
+        assert_eq!(site["operation"], operation);
+        assert_eq!(site["line"], line);
+        assert_eq!(site["col"], col);
+        assert!(site["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("effects-unknown.ostrin")));
+    }
     assert_eq!(
         artifact["effect_coverage"],
-        serde_json::json!({"known_calls": 0, "unresolved_calls": 1, "complete": false})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 1, "symbolic_calls": 0, "unresolved_calls": 5, "complete": false}),
+        "coverage still counts distinct operation edges, not source occurrences"
     );
+    let text = run(&["--effect-report", &file]);
+    assert!(text.status.success(), "stderr: {}", stderr(&text));
+    assert!(stdout(&text).contains("unresolved call sites: 6"));
+    assert!(stdout(&text).contains(":2:17 main -> mystery_host_operation (effect unknown)"));
+    assert!(stdout(&text).contains(":3:13 main -> nested_host_operation (effect unknown)"));
+    assert!(stdout(&text).contains(":4:7 main -> another_host_operation (effect unknown)"));
+    assert!(stdout(&text).contains(":5:5 main -> mystery_host_operation (effect unknown)"));
+    assert!(stdout(&text).contains(":6:6 main -> minus_host_operation (effect unknown)"));
+    assert!(stdout(&text).contains(":7:17 main -> host.print (effect unknown)"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_keeps_function_value_calls_open() {
+    let file = temp_source(
+        "effects-indirect-function.ostrin",
+        concat!(
+            "fn apply(action: fn() -> Void) -> Void {\n",
+            "    action()\n",
+            "    action()\n",
+            "}\n",
+            "fn main() -> Void { apply(fn() { print(\"inside\") }) }\n"
+        ),
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["indirect_calls"]["apply"],
+        serde_json::json!(["action"])
+    );
+    assert_eq!(
+        report["open_effect_calls"]["apply"],
+        serde_json::json!(["action"])
+    );
+    let indirect_sites = report["indirect_call_sites"]
+        .as_array()
+        .expect("indirect callsites must be reported as an array");
+    assert_eq!(
+        indirect_sites.len(),
+        2,
+        "duplicate invocations retain both sites"
+    );
+    for (site, line) in indirect_sites.iter().zip([2, 3]) {
+        assert_eq!(site["function"], "apply");
+        assert_eq!(site["operation"], "action");
+        assert_eq!(site["line"], line);
+        assert_eq!(site["col"], 5);
+        assert!(site["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("effects-indirect-function.ostrin")));
+    }
+    assert!(report["function_effects"].get("apply").is_none());
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("hir indirect effect calls: 1"));
+    assert!(stdout(&hir).contains("hir unresolved effect calls: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir indirect effect calls: 1"));
+    assert!(stdout(&ir).contains("ir unresolved effect calls: 0"));
+    let text = run(&["--effect-report", &file]);
+    assert!(text.status.success(), "stderr: {}", stderr(&text));
+    assert!(stdout(&text).contains("indirect call sites: 2"));
+    assert!(stdout(&text)
+        .contains(":2:5 apply -> action (indirect; effect status in open_effect_calls)"));
+    assert!(stdout(&text)
+        .contains(":3:5 apply -> action (indirect; effect status in open_effect_calls)"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_attributes_direct_lambda_effect_to_invocation() {
+    let file = temp_source(
+        "effects-direct-callback.ostrin",
+        "fn invoke(action: fn() -> Void) -> Void { action() }\n\
+         fn main() -> Void { invoke(fn() { print(\"run\") }) }\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["main"],
+        serde_json::json!(["io"])
+    );
+    assert!(
+        !report["open_effect_calls"]["main"]
+            .as_array()
+            .is_some_and(|calls| calls.iter().any(|call| call == "action")),
+        "a known callback should close the callsite's callback effect row"
+    );
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("effects: io"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_only_attributes_effects_from_invoked_callbacks() {
+    let file = temp_source(
+        "effects-callback-invocation-contract.ostrin",
+        "fn invoke_first(action: fn() -> Void, deferred: fn() -> Void) -> Void { action() }\n\
+         fn forward(action: fn() -> Void) -> Void { invoke_first(action, fn() { print(\"deferred\") }) }\n\
+         fn ignore(action: fn() -> Void) -> Void {}\n\
+         fn emit() -> Void { print(\"function value\") }\n\
+         fn quiet() -> Void {}\n\
+         fn main() -> Void { forward(fn() {}) }\n\
+         fn main_named() -> Void { invoke_first(deferred: emit, action: fn() {}) }\n\
+         fn main_callable() -> Void { invoke_first(emit, fn() {}) }\n\
+         fn apply_unknown(action: fn() -> Void) -> Void { action() }\n\
+         fn main_unknown(action: fn() -> Void) -> Void { apply_unknown(action) }\n\
+         fn apply_alias(action: fn() -> Void) -> Void { saved: fn() -> Void = action\n\
+             saved()\n\
+         }\n\
+         fn main_alias() -> Void { apply_alias(emit) }\n\
+         fn apply_reassigned_alias(action: fn() -> Void) -> Void { mut saved: fn() -> Void = quiet
+             saved = action
+             saved()
+         }\n\
+         fn main_reassigned_alias() -> Void { apply_reassigned_alias(emit) }\n\
+         fn call_known_alias() -> Void { saved: fn() -> Void = emit
+             saved()
+         }\n\
+         fn invoke_mixed(action: fn() -> Void) -> Void { apply_unknown(emit)\n\
+             apply_unknown(action)\n\
+         }\n\
+         fn main_mixed() -> Void { invoke_mixed(fn() {}) }\n\
+         fn unknown_emitter() -> Void { hidden_host_operation() }\n\
+         fn main_open_callback() -> Void { apply_unknown(unknown_emitter) }\n\
+         fn nested_shadow(action: fn() -> Void) -> Void { saved: fn() -> Void = action\n\
+             if true { saved: fn() -> Void = emit }\n\
+             apply_unknown(saved)\n\
+         }\n\
+         fn nested_known_shadow() -> Void { saved: fn() -> Void = emit\n\
+             if true { saved: fn() -> Void = quiet }\n\
+             apply_unknown(saved)\n\
+         }\n\
+         fn unused_callbacks() -> Void {\n\
+             invoke_first(fn() {}, fn() { print(\"not invoked\") })\n\
+             ignore(fn() { print(\"also not invoked\") })\n\
+         }\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    for function in ["main", "main_named", "unused_callbacks"] {
+        assert!(
+            !report["function_effects"][function]
+                .as_array()
+                .is_some_and(|row| row.iter().any(|effect| effect == "io")),
+            "{function} inherited effects from a callback that was not invoked: {}",
+            report["function_effects"]
+        );
+    }
+    for function in ["invoke_first", "forward"] {
+        assert!(
+            !report["function_effects"][function]
+                .as_array()
+                .is_some_and(|row| row.iter().any(|effect| effect == "io")),
+            "the open callback behavior of {function} became a fabricated known effect"
+        );
+    }
+    assert_eq!(
+        report["open_effect_calls"]["apply_unknown"],
+        serde_json::json!(["action"]),
+        "invoking a callback with no effect row must leave the wrapper open"
+    );
+    assert_eq!(
+        report["open_effect_calls"]["main_unknown"],
+        serde_json::json!(["action"]),
+        "an unknown callback parameter must remain open through wrappers"
+    );
+    assert_eq!(
+        report["function_effects"]["main_alias"],
+        serde_json::json!(["io"]),
+        "an invoked local alias of a known callback should preserve its known row"
+    );
+    assert_eq!(
+        report["function_effects"]["main_reassigned_alias"],
+        serde_json::json!(["io"]),
+        "a straight-line alias reassignment must retain the proven callback identity"
+    );
+    assert_eq!(
+        report["function_effects"]["call_known_alias"],
+        serde_json::json!(["io"]),
+        "calling a known local function through an alias must propagate its effects"
+    );
+    assert!(!report["unresolved_calls"]["call_known_alias"]
+        .as_array()
+        .is_some_and(|calls| calls.iter().any(|call| call == "saved")));
+    assert!(
+        !report["open_effect_calls"]["main_alias"]
+            .as_array()
+            .is_some_and(|calls| calls.iter().any(|call| call == "action")),
+        "the known alias callback should discharge the generic open marker"
+    );
+    assert_eq!(
+        report["function_effects"]["main_callable"],
+        serde_json::json!(["io"]),
+        "a known function value's effects should flow when its callback parameter is invoked"
+    );
+    assert_eq!(
+        report["open_effect_calls"]["invoke_mixed"],
+        serde_json::json!(["action"]),
+        "a known sibling call must not close another callsite with an unknown callback"
+    );
+    assert_eq!(
+        report["function_effects"]["main_mixed"],
+        serde_json::json!(["io"]),
+        "known callback effects should substitute at the outer callsite"
+    );
+    assert!(!report["open_effect_calls"]["main_mixed"]
+        .as_array()
+        .is_some_and(|calls| calls.iter().any(|call| call == "action")));
+    assert_eq!(
+        report["open_effect_calls"]["main_open_callback"],
+        serde_json::json!(["hidden_host_operation"]),
+        "substitution must retain unresolved calls from the known callback body"
+    );
+    assert!(
+        report["open_effect_calls"]["nested_shadow"]
+            .as_array()
+            .is_some_and(|calls| calls.iter().any(|call| call == "action")),
+        "an inner shadow must leave the outer callback alias open"
+    );
+    assert!(
+        !report["function_effects"]["nested_shadow"]
+            .as_array()
+            .is_some_and(|row| row.iter().any(|effect| effect == "io")),
+        "an inner shadow must not attribute the inner function's IO to the outer callback"
+    );
+    assert_eq!(
+        report["function_effects"]["nested_known_shadow"],
+        serde_json::json!(["io"]),
+        "leaving a shadowing block must restore the outer known callback alias"
+    );
+    assert!(
+        report["function_effects"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .any(|(name, row)| {
+                name.starts_with("forward::<lambda@") && row == &serde_json::json!(["io"])
+            }),
+        "the deferred lambda's own effect row was lost"
+    );
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(&file);
+}
+
+#[test]
+fn experimental_effect_report_propagates_through_typed_list_combinators() {
+    let file = temp_source(
+        "effects-list-combinators.ostrin",
+        "fn transform_io(value: Int) -> Int { print(\"item\")\n\
+             value\n\
+         }\n\
+         fn map_io() -> Void { values: List<Int> = [1, 2]\n\
+             mapped: List<Int> = values.map(transform_io)\n\
+         }\n\
+         fn map_pure() -> Void { values: List<Int> = [1, 2]\n\
+             mapped: List<Int> = values.map(fn(value) { value })\n\
+         }\n\
+         fn map_inline_io() -> Void { values: List<Int> = [1]\n\
+             mapped: List<Int> = values.map(fn(value) { print(value)\n\
+                 value\n\
+             })\n\
+         }\n\
+         fn map_open(callback: fn(Int) -> Int) -> Void { values: List<Int> = [1]\n\
+             mapped: List<Int> = values.map(callback)\n\
+         }\n\
+         fn option_map_io(value: Option<Int>) -> Option<Int> { value.map(transform_io) }\n\
+         fn result_map_io(value: Result<Int, String>) -> Result<Int, String> { value.map(transform_io) }\n\
+         fn option_then_io(value: Option<Int>) -> Option<Int> { value.then(fn(item) { print(item)\n\
+             Some(item)\n\
+         }) }\n\
+         fn result_then_io(value: Result<Int, String>) -> Result<Int, String> { value.then(fn(item) { print(item)\n\
+             Ok(item)\n\
+         }) }\n\
+         fn transform_error(value: String) -> String { print(value)\n\
+             value\n\
+         }\n\
+         fn result_map_err_io(value: Result<Int, String>) -> Result<Int, String> { value.map_err(transform_error) }\n\
+         record Mapper { value: Int }\n\
+         impl Mapper { fn map(self, callback: fn(Int) -> Int) -> Int { self.value } }\n\
+         fn user_map_no_invoke(mapper: Mapper) -> Int { mapper.map(fn(value) { print(value)\n\
+             value\n\
+         }) }\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["map_io"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["map_inline_io"],
+        serde_json::json!(["io"]),
+        "an inline lambda's effects must flow through List.map"
+    );
+    for function in [
+        "option_map_io",
+        "option_then_io",
+        "result_map_io",
+        "result_map_err_io",
+        "result_then_io",
+    ] {
+        assert_eq!(
+            report["function_effects"][function],
+            serde_json::json!(["io"]),
+            "{function} must inherit the callback's IO effect"
+        );
+    }
+    assert!(
+        !report["function_effects"]["user_map_no_invoke"]
+            .as_array()
+            .is_some_and(|row| row.iter().any(|effect| effect == "io")),
+        "a user-defined map method that ignores its callback must not inherit its effects"
+    );
+    assert!(
+        !report["function_effects"]["map_pure"]
+            .as_array()
+            .is_some_and(|row| row.iter().any(|effect| effect == "io")),
+        "a pure map callback must not invent IO"
+    );
+    assert!(
+        report["open_effect_calls"]["map_open"]
+            .as_array()
+            .is_some_and(|calls| !calls.is_empty()),
+        "a function-typed parameter passed to map must keep the caller open"
+    );
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn map_io() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("fn map_io() -> Void\n  effects: io"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_variables_survive_effect_report_hir_and_ir() {
+    let file = temp_source(
+        "effects-variables.ostrin",
+        r#"fn invoke(callback: fn() -> Void) -> Void { callback() }
+fn wrapper(action: fn() -> Void) -> Void { invoke(action) }
+fn main() -> Void { wrapper(fn() { print("run") }) }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(
+        report["function_effect_variables"]["invoke"],
+        serde_json::json!(["ε_callback"])
+    );
+    assert_eq!(
+        report["function_effect_variables"]["wrapper"],
+        serde_json::json!(["ε_action"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["invoke"]["variables"],
+        serde_json::json!(["ε_callback"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["invoke"]["row_closed"],
+        serde_json::json!(false),
+        "a symbolic callback is covered, but its effect row remains polymorphic"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["invoke"]["open_calls"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        report["symbolic_effect_calls"]["invoke"],
+        serde_json::json!(["callback"])
+    );
+    assert_eq!(report["unresolved_calls"]["invoke"], serde_json::json!([]));
+    assert_eq!(report["effect_coverage"]["symbolic_calls"], 1);
+    assert_eq!(report["effect_coverage"]["unresolved_calls"], 0);
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["purity_proven"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        report["effect_variable_substitutions"]["wrapper"],
+        serde_json::json!([{
+            "callee": "invoke",
+            "callee_parameter": "callback",
+            "caller_parameter": "action"
+        }])
+    );
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir)
+        .contains("fn wrapper(action: fn() -> Void) -> Void\n  effect variables: ε_action"));
+    assert!(stdout(&hir).contains("effect substitution: ε_callback <- ε_action via invoke"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir)
+        .contains("fn wrapper(action: fn() -> Void) -> Void\n  effect variables: ε_action"));
+    assert!(stdout(&ir).contains("effect substitution: ε_callback <- ε_action via invoke"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_variables_compose_through_generic_callback_wrappers() {
+    let file = temp_source(
+        "effects-generic-callback-wrappers.ostrin",
+        r#"fn apply<T>(value: T, action: fn(T) -> Void) -> Void { action(value) }
+fn forward<U>(value: U, action: fn(U) -> Void) -> Void { apply(value, action) }
+fn output(value: Int) -> Void { print("effect") }
+fn unknown(value: Int) -> Void { host_effect() }
+fn main() -> Void { forward(2, output) }
+fn open_main() -> Void { forward(2, unknown) }
+"#,
+    );
+
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    for function in ["apply", "forward"] {
+        assert_eq!(
+            report["function_effect_signatures"][function]["variables"],
+            serde_json::json!(["ε_action"]),
+            "{function} must preserve its generic callback effect variable"
+        );
+        assert_eq!(
+            report["function_effect_signatures"][function]["row_closed"],
+            serde_json::json!(false),
+            "a generic callback row remains symbolic until a caller supplies a callback"
+        );
+    }
+    assert_eq!(
+        report["effect_variable_substitutions"]["forward"],
+        serde_json::json!([{
+            "callee": "apply",
+            "callee_parameter": "action",
+            "caller_parameter": "action"
+        }])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["purity_proven"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host_effect"]),
+        "an unknown effect must remain open through generic callback wrappers"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        serde_json::json!(false)
+    );
+    assert_eq!(report["effect_coverage"]["symbolic_calls"], 1);
+    assert_eq!(report["effect_coverage"]["unresolved_calls"], 1);
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("effect substitution: ε_action <- ε_action via apply"));
+    assert!(stdout(&hir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("fn open_main() -> Void\n  unresolved effect calls: host_effect"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("effect substitution: ε_action <- ε_action via apply"));
+    assert!(stdout(&ir).contains("ir fn main() -> Void\n  effects: io"));
+    assert!(
+        stdout(&ir).contains("ir fn open_main() -> Void\n  unresolved effect calls: host_effect")
+    );
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_variables_compose_through_imported_generic_wrappers() {
+    let project = std::env::temp_dir().join(format!(
+        "ostrin_effect_module_callbacks_{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&project);
+    fs::create_dir_all(&project).unwrap();
+    fs::write(
+        project.join("ostrin.toml"),
+        "[package]\nname = \"effect_module_probe\"\nversion = \"0.1.0\"\nentry = \"main.ostrin\"\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("shared.ostrin"),
+        "pub fn apply<T>(value: T, action: fn(T) -> Void) -> Void { action(value) }\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("main.ostrin"),
+        r#"import shared
+fn output(value: Int) -> Void { print("effect") }
+fn unknown(value: Int) -> Void { host_effect() }
+fn wrapper() -> Void { shared.apply(2, output) }
+fn open_main() -> Void { shared.apply(2, unknown) }
+fn main() -> Void { wrapper() }
+"#,
+    )
+    .unwrap();
+    let project_path = project.display().to_string();
+
+    let out = run(&["--effect-report", "--json", "--project", &project_path]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["shared::apply"]["variables"],
+        serde_json::json!(["ε_action"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["effects"],
+        serde_json::json!(["io"]),
+        "a known callback effect must propagate through the imported generic function"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["row_closed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host_effect"]),
+        "an unknown callback effect must remain open across a module boundary"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        report["effect_coverage"]["symbolic_calls"],
+        serde_json::json!(1)
+    );
+    assert_eq!(
+        report["effect_coverage"]["unresolved_calls"],
+        serde_json::json!(1)
+    );
+
+    let hir = run(&["--hir", "--project", &project_path]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn wrapper() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("fn open_main() -> Void\n  unresolved effect calls: host_effect"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+
+    let ir = run(&["--ir", "--project", &project_path]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir fn wrapper() -> Void\n  effects: io"));
+    assert!(
+        stdout(&ir).contains("ir fn open_main() -> Void\n  unresolved effect calls: host_effect")
+    );
+    assert!(stdout(&ir).contains("ir violations: 0"));
+
+    fs::remove_dir_all(project).unwrap();
+}
+
+#[test]
+fn experimental_effect_signatures_compose_through_callbacks_without_claiming_purity() {
+    let file = temp_source(
+        "effects-signature-composition.ostrin",
+        r#"fn invoke(callback: fn() -> Void) -> Void { callback() }
+fn wrap(callback: fn() -> Void) -> Void { invoke(callback) }
+fn forward(callback: fn() -> Void) -> Void { wrap(callback) }
+fn pure_callback() -> Void {}
+fn io_callback() -> Void { print("io") }
+fn unresolved_callback() -> Void { host_effect() }
+fn pure_call() -> Void { forward(pure_callback) }
+fn io_call() -> Void { forward(io_callback) }
+fn open_call() -> Void { forward(unresolved_callback) }
+fn symbolic_call(callback: fn() -> Void) -> Void { forward(callback) }
+fn main() -> Void {}
+"#,
+    );
+
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    for function in ["pure_callback", "pure_call", "main"] {
+        assert_eq!(
+            report["function_effect_signatures"][function]["effects"],
+            serde_json::json!([]),
+            "{function} should have no inferred known effects"
+        );
+        assert_eq!(
+            report["function_effect_signatures"][function]["row_closed"],
+            serde_json::json!(true),
+            "{function} should have a closed inferred row"
+        );
+        assert_eq!(
+            report["function_effect_signatures"][function]["purity_proven"],
+            serde_json::json!(false),
+            "a closed empty inventory row must not be presented as a purity proof"
+        );
+    }
+    assert_eq!(
+        report["function_effect_signatures"]["io_call"]["effects"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["io_call"]["row_closed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_call"]["open_calls"],
+        serde_json::json!(["host_effect"]),
+        "a known callback body with an unresolved operation must remain open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_call"]["row_closed"],
+        serde_json::json!(false)
+    );
+    for function in ["invoke", "wrap", "forward", "symbolic_call"] {
+        assert_eq!(
+            report["function_effect_signatures"][function]["variables"],
+            serde_json::json!(["ε_callback"]),
+            "{function} should preserve its callback effect variable"
+        );
+        assert_eq!(
+            report["function_effect_signatures"][function]["row_closed"],
+            serde_json::json!(false),
+            "an unresolved symbolic callback is not a closed effect row"
+        );
+    }
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn open_call() -> Void\n  unresolved effect calls: host_effect"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(
+        stdout(&ir).contains("ir fn open_call() -> Void\n  unresolved effect calls: host_effect")
+    );
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_signature_does_not_hide_unknown_calls_with_callback_suffixes() {
+    let file = temp_source(
+        "effects-callback-name-collision.ostrin",
+        r#"fn invoke_and_unknown(callback: fn() -> Void) -> Void {
+    callback()
+    host.callback()
+}
+fn io_callback() -> Void { print("callback") }
+fn main() -> Void { invoke_and_unknown(io_callback) }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["invoke_and_unknown"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "an unrelated unresolved member call must not be mistaken for ε_callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "substituting the known callback must not close another unknown call"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        serde_json::json!(false)
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_drop_uses_typed_recursive_destructor_effects() {
+    let file = temp_source(
+        "effects-typed-drop.ostrin",
+        r#"record SafeChild { text: String }
+record SafeValue {
+    child: SafeChild
+    labels: List<String>
+}
+record TaskValue {
+    task: Task<Int>
+}
+fn release_string(value: String) -> Void { drop(value) }
+fn release_safe(value: SafeValue) -> Void { drop(value) }
+fn release_task_record(value: TaskValue) -> Void { drop(value) }
+fn release_task_list(values: List<Task<Int>>) -> Void { drop(values) }
+fn release_generic<T>(value: T) -> Void { drop(value) }
+fn main() -> Void {
+    task = spawn { 1 }
+    drop(task)
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(
+        out.status.success(),
+        "stdout: {}\nstderr: {}",
+        stdout(&out),
+        stderr(&out)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    for function in ["release_string", "release_safe"] {
+        assert_eq!(report["function_effects"].get(function), None);
+        assert_eq!(
+            report["known_effect_free_calls"][function],
+            serde_json::json!(["drop"]),
+            "known type destructor in {function} has no host effect"
+        );
+        assert_eq!(report["unresolved_calls"].get(function), None);
+    }
+    for function in ["release_task_record", "release_task_list", "main"] {
+        assert_eq!(
+            report["function_effects"][function],
+            serde_json::json!(["concurrency"]),
+            "dropping a task handle in {function} can interact with the scheduler"
+        );
+        assert_eq!(report["unresolved_calls"].get(function), None);
+    }
+    assert_eq!(
+        report["unresolved_calls"]["release_generic"],
+        serde_json::json!(["drop"]),
+        "the generic payload destructor must remain open"
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_signature_keeps_unknown_calls_inside_known_callbacks_open() {
+    let file = temp_source(
+        "effects-open-known-callback-body.ostrin",
+        r#"fn invoke(callback: fn() -> Void) -> Void { callback() }
+fn host_callback() -> Void { host.callback() }
+fn caller() -> Void { invoke(host_callback) }
+fn main() -> Void { caller() }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    for function in ["host_callback", "caller", "main"] {
+        assert_eq!(
+            report["function_effect_signatures"][function]["open_calls"],
+            serde_json::json!(["host.callback"]),
+            "the open call in the known callback body must remain visible in {function}"
+        );
+        assert_eq!(
+            report["function_effect_signatures"][function]["row_closed"],
+            serde_json::json!(false),
+            "{function} must not receive a falsely closed effect row"
+        );
+    }
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_separates_lambda_creation_from_indirect_execution() {
+    let file = temp_source(
+        "effects-lambda-execution.ostrin",
+        "fn invoke(action: fn() -> Void) -> Void { action() }\n\
+         fn make_only() -> Void { action: fn() -> Void = fn() { print(\"deferred\") } }\n\
+         fn wrapper(action: fn() -> Void) -> Void { invoke(action) }\n\
+         fn forwarding(action: fn() -> Void) -> Void { wrapper(action) }\n\
+         fn main() -> Void { forwarding(fn() { print(\"run\") }) }\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert!(report["function_effects"].get("make_only").is_none());
+    assert_eq!(
+        report["open_effect_calls"]["wrapper"],
+        serde_json::json!(["action"])
+    );
+    assert!(!report["open_effect_calls"]["main"]
+        .as_array()
+        .is_some_and(|calls| calls.iter().any(|call| call == "action")));
+    assert_eq!(
+        report["open_effect_calls"]["forwarding"],
+        serde_json::json!(["action"])
+    );
+    assert_eq!(
+        report["function_effects"]["main"],
+        serde_json::json!(["io"])
+    );
+    assert!(!report["open_effect_calls"]["main"]
+        .as_array()
+        .is_some_and(|calls| calls.iter().any(|call| call == "action")));
+    let lambda_rows = report["function_effects"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(name, _)| name.starts_with("make_only::<lambda@"))
+        .collect::<Vec<_>>();
+    assert_eq!(lambda_rows.len(), 1);
+    assert_eq!(lambda_rows[0].1, &serde_json::json!(["io"]));
+    let _ = fs::remove_file(file);
 }
 
 #[test]
@@ -12137,6 +13423,21 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(artifact["runtime"]["missing"]
         .as_array()
         .is_some_and(|missing| missing.iter().any(|item| item == "input snapshots")));
+    let entry = artifact["program"]["entry"]
+        .as_str()
+        .expect("repository entry should use a portable relative path");
+    assert!(!std::path::Path::new(entry).is_absolute());
+    assert!(
+        entry.ends_with("examples/measurement_scalar.ostrin")
+            || entry.ends_with("examples\\measurement_scalar.ostrin")
+    );
+    let repository_path = std::env::current_dir().expect("test working directory");
+    assert!(!artifact
+        .to_string()
+        .contains(&repository_path.display().to_string()));
+    assert!(!artifact
+        .to_string()
+        .contains(&repository_path.to_string_lossy().replace('\\', "/")));
     assert!(artifact["program"]["source_hash"]
         .as_str()
         .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
@@ -12152,6 +13453,156 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(text.status.success(), "stderr: {}", stderr(&text));
     assert!(stdout(&text).contains("provenance-report: experimental artifact"));
     assert!(stdout(&text).contains("source-hash: sha256:"));
+}
+
+#[test]
+fn provenance_report_preserves_open_effects_and_callback_variables() {
+    let file = temp_source(
+        "provenance-open-effect-callback.ostrin",
+        r#"fn invoke(callback: fn() -> Void) -> Void { callback() }
+fn host_callback() -> Void { host.callback() }
+fn caller() -> Void { invoke(host_callback) }
+fn main() -> Void {
+    caller()
+    print("temporary input")
+}
+"#,
+    );
+    let out = run(&["--provenance-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    assert!(artifact["program"]["entry"].is_null());
+    assert_eq!(
+        artifact["activity"]["function_effect_signatures"]["invoke"]["variables"],
+        serde_json::json!(["ε_callback"])
+    );
+    assert_eq!(
+        artifact["activity"]["function_effect_signatures"]["invoke"]["purity_proven"],
+        false
+    );
+    assert_eq!(
+        artifact["reproducibility"]["level"], "unverified",
+        "open callbacks and host calls must not be described as an R0 candidate"
+    );
+    assert_eq!(artifact["activity"]["effect_coverage"]["complete"], false);
+    let unresolved_sites = artifact["activity"]["unresolved_call_sites"]
+        .as_array()
+        .expect("provenance should retain unresolved callsite evidence");
+    assert_eq!(unresolved_sites.len(), 1);
+    assert!(unresolved_sites[0]["file"].is_null());
+    let effect_sites = artifact["activity"]["sites"]
+        .as_array()
+        .expect("classified effect sites should be present");
+    assert!(!effect_sites.is_empty());
+    assert!(effect_sites.iter().all(|site| site["file"].is_null()));
+    assert!(!artifact
+        .to_string()
+        .contains(&std::env::temp_dir().display().to_string()));
+    assert!(!artifact
+        .to_string()
+        .contains(&std::env::temp_dir().to_string_lossy().replace('\\', "/")));
+    assert_eq!(
+        artifact["reproducibility"]["evidence_requirements"]["model"],
+        "constraints-only"
+    );
+    assert_eq!(
+        artifact["reproducibility"]["evidence_requirements"]["guarantee"],
+        false
+    );
+    assert!(
+        artifact["reproducibility"]["evidence_requirements"]["requirements"]
+            .as_array()
+            .is_some_and(|requirements| {
+                requirements
+                    .iter()
+                    .any(|item| item == "callback_effect_rows")
+                    && requirements
+                        .iter()
+                        .any(|item| item == "resolve_or_capture_unknown_calls")
+            })
+    );
+    for function in ["host_callback", "caller", "main"] {
+        assert_eq!(
+            artifact["activity"]["function_effect_signatures"][function]["open_calls"],
+            serde_json::json!(["host.callback"]),
+            "provenance must preserve the open operation in {function}"
+        );
+        assert_eq!(
+            artifact["activity"]["function_effect_signatures"][function]["row_closed"],
+            false
+        );
+    }
+    assert!(artifact["activity"]["indirect_calls"]
+        .as_array()
+        .is_some_and(|calls| calls.iter().any(|entry| {
+            entry["function"] == "invoke" && entry["calls"] == serde_json::json!(["callback"])
+        })));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn provenance_report_maps_effects_to_required_reproducibility_evidence() {
+    let file = temp_source(
+        "provenance-effect-evidence-requirements.ostrin",
+        r#"fn main() -> Void {
+    data = read_file("measurements.csv")
+    rng_value = rng(17)
+    samples = rng_value.randn([8])
+    print(samples.mean())
+}
+"#,
+    );
+    let out = run(&["--provenance-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    let requirements = artifact["reproducibility"]["evidence_requirements"]["requirements"]
+        .as_array()
+        .expect("evidence requirements must be an array");
+    for required in [
+        "input_snapshots_and_hashes",
+        "seed_and_rng_algorithm",
+        "captured_outputs_and_hashes",
+    ] {
+        assert!(
+            requirements.iter().any(|item| item == required),
+            "missing {required}: {requirements:?}"
+        );
+    }
+    assert_eq!(artifact["reproducibility"]["level"], "unverified");
+    assert_eq!(
+        artifact["reproducibility"]["evidence_requirements"]["guarantee"],
+        false
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn provenance_report_keeps_local_state_without_external_capture_requirement() {
+    let file = temp_source(
+        "provenance-local-state-requirements.ostrin",
+        r#"fn main() -> Void {
+    mut values: List<Int> = []
+    values.push(1)
+}
+"#,
+    );
+    let out = run(&["--provenance-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    let signature = &artifact["activity"]["function_effect_signatures"]["main"];
+    assert!(signature["effects"]
+        .as_array()
+        .is_some_and(|effects| { effects.iter().any(|effect| effect == "state(local)") }));
+    let requirements = artifact["reproducibility"]["evidence_requirements"]["requirements"]
+        .as_array()
+        .expect("evidence requirements must be an array");
+    assert!(!requirements
+        .iter()
+        .any(|item| item == "input_snapshots_and_hashes"));
+    let _ = fs::remove_file(file);
 }
 
 #[test]

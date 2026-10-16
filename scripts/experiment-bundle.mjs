@@ -335,16 +335,24 @@ export function validateEffectCapture(effects) {
   if (!isStringArrayMap(effects.functions)) errors.push("effects capture functions must map names to effect arrays");
   if (!isStringArrayMap(effects.function_calls)) errors.push("effects capture function_calls must map names to call arrays");
   if (!isStringArrayMap(effects.unresolved_calls)) errors.push("effects capture unresolved_calls must map names to call arrays");
+  if (!isStringArrayMap(effects.function_effect_variables)) errors.push("effects capture function_effect_variables must map names to effect-variable arrays");
+  if (!isStringArrayMap(effects.symbolic_effect_calls)) errors.push("effects capture symbolic_effect_calls must map names to callback arrays");
 
   const coverage = effects.effect_coverage;
+  if (coverage?.count_unit !== "distinct_function_operation_edges") {
+    errors.push("effects capture effect_coverage.count_unit must be distinct_function_operation_edges");
+    return errors;
+  }
   if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)
     || !Number.isInteger(coverage.known_calls) || coverage.known_calls < 0
+    || !Number.isInteger(coverage.symbolic_calls) || coverage.symbolic_calls < 0
     || !Number.isInteger(coverage.unresolved_calls) || coverage.unresolved_calls < 0
     || typeof coverage.complete !== "boolean") {
     errors.push("effects capture effect_coverage is missing or malformed");
     return errors;
   }
-  if (!isStringArrayMap(effects.function_calls) || !isStringArrayMap(effects.unresolved_calls)) return errors;
+  if (!isStringArrayMap(effects.function_calls) || !isStringArrayMap(effects.unresolved_calls)
+    || !isStringArrayMap(effects.function_effect_variables) || !isStringArrayMap(effects.symbolic_effect_calls)) return errors;
 
   const callCount = Object.values(effects.function_calls).reduce((total, calls) => total + calls.length, 0);
   let unresolvedCount = 0;
@@ -355,13 +363,84 @@ export function validateEffectCapture(effects) {
       if (!recordedCalls.has(call)) errors.push(`unresolved call ${caller}.${call} is absent from function_calls`);
     }
   }
+  let symbolicCount = 0;
+  for (const [caller, calls] of Object.entries(effects.symbolic_effect_calls)) {
+    const recordedCalls = new Set(effects.function_calls[caller] ?? []);
+    const unresolvedCalls = new Set(effects.unresolved_calls[caller] ?? []);
+    const variables = new Set(effects.function_effect_variables[caller] ?? []);
+    for (const call of calls) {
+      symbolicCount++;
+      if (!recordedCalls.has(call)) errors.push(`symbolic callback ${caller}.${call} is absent from function_calls`);
+      if (!variables.has(call) && !variables.has(`ε_${call}`)) errors.push(`symbolic callback ${caller}.${call} has no effect variable`);
+      if (unresolvedCalls.has(call)) errors.push(`symbolic callback ${caller}.${call} is also marked unresolved`);
+    }
+  }
   if (unresolvedCount > callCount
-    || coverage.known_calls !== callCount - unresolvedCount
+    || coverage.known_calls + symbolicCount + unresolvedCount !== callCount
+    || coverage.symbolic_calls !== symbolicCount
     || coverage.unresolved_calls !== unresolvedCount
     || coverage.complete !== (unresolvedCount === 0)) {
-    errors.push("effects capture effect_coverage does not match function_calls/unresolved_calls");
+    errors.push("effects capture effect_coverage does not match concrete/symbolic/unresolved call categories");
   }
   return errors;
+}
+
+export function validateEntryEffectSignature(signature, expectedFunction = "main", effectReport) {
+  if (!signature || typeof signature !== "object" || Array.isArray(signature)) {
+    return ["entry effect signature must be an object"];
+  }
+  const errors = [];
+  if (signature.function !== expectedFunction || typeof signature.function !== "string") {
+    errors.push("entry effect signature must name the recorded entry function");
+  }
+  if (effectReport != null && (!isStringArrayMap(effectReport.functions)
+    || !Object.hasOwn(effectReport.functions, expectedFunction))) {
+    errors.push("entry function must have a recorded effect inventory row");
+  }
+  for (const field of ["effects", "variables", "open_calls"]) {
+    if (!Array.isArray(signature[field]) || !signature[field].every((value) => typeof value === "string")) {
+      errors.push(`entry effect signature ${field} must be a string array`);
+    }
+  }
+  if (typeof signature.row_closed !== "boolean") {
+    errors.push("entry effect signature row_closed must be boolean");
+  }
+  if (signature.purity_proven !== false) {
+    errors.push("entry effect signature must not claim purity proof");
+  }
+  if (Array.isArray(signature.variables) && Array.isArray(signature.open_calls)
+    && typeof signature.row_closed === "boolean"
+    && signature.row_closed !== (signature.variables.length === 0 && signature.open_calls.length === 0)) {
+    errors.push("entry effect signature row_closed disagrees with its variables/open_calls");
+  }
+  if (effectReport != null && Array.isArray(signature.effects)
+    && isStringArrayMap(effectReport.functions)
+    && Object.hasOwn(effectReport.functions, expectedFunction)
+    && !sameStringSet(signature.effects, effectReport.functions[expectedFunction])) {
+    errors.push("entry effect signature effects disagree with the function effect row");
+  }
+  if (effectReport != null && Array.isArray(signature.variables)
+    && isStringArrayMap(effectReport.function_effect_variables)) {
+    const entryVariables = effectReport.function_effect_variables[expectedFunction] ?? [];
+    if (!Array.isArray(entryVariables) || !sameStringSet(signature.variables, entryVariables)) {
+      errors.push("entry effect signature variables disagree with the function effect variables");
+    }
+  }
+  if (effectReport != null && Array.isArray(signature.open_calls)
+    && isStringArrayMap(effectReport.unresolved_calls)) {
+    const openCalls = new Set(signature.open_calls);
+    for (const call of effectReport.unresolved_calls[expectedFunction] ?? []) {
+      if (!openCalls.has(call)) errors.push("entry effect signature omits a direct unresolved call");
+    }
+  }
+  return errors;
+}
+
+function sameStringSet(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
 }
 
 function bytes(value) {
@@ -495,6 +574,12 @@ function compilerEffectSummary(root, sourcePath) {
       .map(([name, kinds]) => [name, [...new Set(kinds)].sort()])),
     function_calls: report.function_calls,
     unresolved_calls: report.unresolved_calls,
+    function_effect_variables: report.function_effect_variables,
+    symbolic_effect_calls: report.symbolic_effect_calls,
+    entry_effect_signature: {
+      function: "main",
+      ...report.function_effect_signatures?.main,
+    },
     effect_coverage: report.effect_coverage,
     analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
       path: relativePath,
@@ -502,6 +587,7 @@ function compilerEffectSummary(root, sourcePath) {
     })),
   };
   const effectErrors = validateEffectCapture(summary);
+  effectErrors.push(...validateEntryEffectSignature(summary.entry_effect_signature, summary.entry, summary));
   if (effectErrors.length > 0) {
     throw new Error(`invalid compiler effect report for ${sourcePath}: ${effectErrors.join("; ")}`);
   }
@@ -810,6 +896,9 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   const effects = bundle?.provenance?.effects;
   for (const error of validateEffectCapture(effects)) errors.push(`provenance ${error}`);
+  for (const error of validateEntryEffectSignature(effects?.entry_effect_signature, effects?.entry, effects)) {
+    errors.push(`provenance ${error}`);
+  }
   const replay = bundle?.provenance?.replay;
   const replayNote = maturity?.level === "R2"
     ? /embedded data\.json snapshot under its declared filesystem capability/.test(replay?.note ?? "")
