@@ -9,9 +9,9 @@ extensiones que todavía faltan.
 node scripts/r3-readiness.mjs --write
 ```
 
-Pages CI usa además `node scripts/r3-readiness.mjs --require-ready`; ese modo
-termina con error si cualquier bundle no tiene todos los campos R3 o una captura
-de efectos estructuralmente válida.
+Pages CI captura metadatos del runner y usa `node scripts/r3-readiness.mjs
+--require-capture`; este modo valida que la captura esté completa y
+estructuralmente válida. No marca el nivel R3 como listo por tener esos metadatos.
 
 El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.json).
 Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
@@ -22,11 +22,12 @@ El checkout local tiene los **29/29 bundles con los campos base completos**, inc
 porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
 reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
 la marca de que el análisis es experimental y conservador. El resumen conserva las llamadas locales,
-las llamadas no resueltas y el conteo de cobertura; el auditor valida su consistencia y reporta por
-separado cuántos bundles tienen inventario parcial y cuántas llamadas siguen sin clasificar. Una captura
-coherente puede estar lista para auditoría R3 aunque su inventario sea parcial; `complete` significa que
-no quedan llamadas sin clasificar, no que el programa sea puro. Una captura ausente o inconsistente
-mantiene R3 `OPEN`. El host sigue siendo un requisito explícito del auditor y no se rellena con valores sintéticos.
+las llamadas no resueltas y los bordes simbólicos; el auditor valida su consistencia y reporta por
+separado los bundles con inventario parcial, los bordes simbólicos y las llamadas sin clasificar.
+`effect_coverage.complete` significa que no quedan llamadas observadas sin clasificar; no demuestra
+pureza ni cierra R3. Un callback simbólico mantiene el bundle incompleto para R3 aunque esté
+representado en el reporte. Una captura ausente o inconsistente también mantiene R3 `OPEN`. El host
+sigue siendo un requisito explícito del auditor y no se rellena con valores sintéticos.
 
 Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
 regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
@@ -36,6 +37,8 @@ R3, el scorecard, la página de estado y los bundles host-bound como el artefact
 `ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
 campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.
 
-La ejecución CI `38162721694` produjo el artefacto host-bound y su reporte confirma
-`READY`, `29/29` bundles preparados y `openCount=0`. Esa evidencia permite auditar R3
-sin convertir el checkout local en un snapshot sintético.
+Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles con
+el criterio de efectos previo, que solo consultaba `effect_coverage.complete`. Ese resultado
+histórico no basta bajo el criterio actual: los callbacks simbólicos también deben cerrarse antes
+de declarar R3 listo. Las capturas host-bound siguen siendo evidencia útil, pero no sustituyen
+ese cierre.

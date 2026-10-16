@@ -1029,6 +1029,11 @@ test("public status dashboard exposes separate evidence dimensions", async ({ pa
   await expect(effectMetrics.nth(1)).toHaveText(String(effects.symbolicCalls));
   await expect(effectMetrics.nth(2)).toHaveText(String(effects.unresolvedCalls));
   await expect(effectMetrics.nth(3)).toHaveText(effects.complete ? "COMPLETE" : "PARTIAL");
+  const r3 = await page.evaluate(() => globalThis.OSTRIN_STATUS.r3);
+  const r3Metric = page.locator("[data-status-reproducibility] .status-metric").last();
+  await expect(r3Metric).toContainText(`${r3.incompleteEffectBundleCount} partial`);
+  await expect(r3Metric).toContainText(`${r3.symbolicEffectCallCount} symbolic`);
+  await expect(r3Metric).toHaveClass(/open/);
   await expect(page.locator("[data-status-reproducibility] .status-metric-value").last()).toHaveText("0");
   await expect(page.locator("[data-status-linguist] .status-metric-value").first()).toHaveText("0");
   await expect(page.locator("[data-status-linguist] .status-metric-value").nth(2)).toHaveText("PENDING");

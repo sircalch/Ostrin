@@ -330,7 +330,9 @@ en una consola de logs.
    función-operación, por lo que llamadas repetidas a la misma operación dentro de una función
    cuentan una sola vez. No representa el total de sitios de llamada del código fuente;
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
-   haya demostrado pureza.
+   haya demostrado pureza. Los bordes de callback simbólicos se reportan aparte y mantienen R3
+   abierto hasta que su efecto también se resuelva; una captura estructuralmente válida no basta
+   para declarar cerrado ese nivel.
    La implementación también reconoce una whitelist pequeña y explícita de operaciones locales
    deterministas —accesos y transformaciones de colecciones, cadenas, mediciones, resultados y
    matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
@@ -352,7 +354,8 @@ en una consola de logs.
    salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
    plataforma; los bundles experimentales añaden snapshots de entradas cuando corresponden, hashes de salida,
    resumen de efectos y, bajo `OSTRIN_CAPTURE_HOST=1`, metadatos públicos de host/hardware. La ejecución local
-   no reclama R3; Pages CI usa `--require-ready` para exigir el artefacto host-bound. Los once bundles input-driven ya constituyen cortes
+   no reclama R3; Pages CI usa `--require-capture` para exigir una captura host-bound estructuralmente válida,
+   sin declarar por ello R3 listo. Los once bundles input-driven ya constituyen cortes
    R2: embeben `data.json`, declaran la capacidad `filesystem.read:data.json`, conservan el hash del
    snapshot y verifican la sensibilidad de sus parámetros o semilla en WASI; los nueve casos seeded
    además conservan la evidencia algorítmica R1.

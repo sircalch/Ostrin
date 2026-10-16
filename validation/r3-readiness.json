@@ -21,7 +21,7 @@
   "openCount": 29,
   "captureReadyCount": 0,
   "captureOpenCount": 29,
-  "incompleteEffectBundleCount": 0,
+  "incompleteEffectBundleCount": 29,
   "knownEffectCallCount": 20589,
   "symbolicEffectCallCount": 74,
   "unresolvedEffectCallCount": 0,
@@ -39,7 +39,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -61,7 +63,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -83,7 +87,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -105,7 +111,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -127,7 +135,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -149,7 +159,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -171,7 +183,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -193,7 +207,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -215,7 +231,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -237,7 +255,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -259,7 +279,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -281,7 +303,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -303,7 +327,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -325,7 +351,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -347,7 +375,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -369,7 +399,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -391,7 +423,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -413,7 +447,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -435,7 +471,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -457,7 +495,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -479,7 +519,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -501,7 +543,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -523,7 +567,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -545,7 +591,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -567,7 +615,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -589,7 +639,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -611,7 +663,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -633,7 +687,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,
@@ -655,7 +711,9 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
         "complete": true,

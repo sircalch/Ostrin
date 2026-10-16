@@ -5,7 +5,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
-  "workingTreeDirty": false,
+  "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
@@ -62,7 +62,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "openCount": 29,
     "captureReadyCount": 0,
     "captureOpenCount": 29,
-    "incompleteEffectBundleCount": 0,
+    "incompleteEffectBundleCount": 29,
     "symbolicEffectCallCount": 74,
     "unresolvedEffectCallCount": 0
   },

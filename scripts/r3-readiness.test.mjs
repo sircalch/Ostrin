@@ -222,9 +222,45 @@ test("R3 stays open while valid captured effects are incomplete", () => {
   assert.equal(requiredCaptureErrors({ entries: [malformed] }).length, 1);
 });
 
-test("readiness totals unresolved effects across incomplete bundles", () => {
+test("R3 stays open when an otherwise complete effect inventory has symbolic callbacks", () => {
+  const effects = {
+    ...validEffects(),
+    function_calls: { main: ["callback"] },
+    function_effect_variables: { main: ["ε_callback"] },
+    symbolic_effect_calls: { main: ["callback"] },
+    effect_coverage: {
+      count_unit: "distinct_function_operation_edges",
+      known_calls: 0,
+      symbolic_calls: 1,
+      unresolved_calls: 0,
+      complete: true,
+    },
+  };
+  const bundle = {
+    provenance: {
+      commit: "fixture-commit",
+      compiler: "ostrinc fixture",
+      target: "wasm32-wasip1",
+      runtime: validRuntime(),
+      inputs: [{ id: "input" }],
+      outputs: [{ id: "output" }],
+      parameters: { scale: 1 },
+      execution: { mode: "recorded" },
+      figure_metadata: { source_hash: "fixture" },
+      effects,
+    },
+  };
+
+  const report = inspectBundle(bundle, "symbolic-callback.json");
+  assert.equal(report.effectCoverage.complete, true);
+  assert.equal(report.effectCoverage.symbolic_calls, 1);
+  assert.equal(report.status, "OPEN");
+  assert.deepEqual(report.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
+});
+
+test("readiness keeps R3 open while any bundle has symbolic callbacks", () => {
   const report = buildReadiness();
-  assert.equal(report.incompleteEffectBundleCount, 0);
+  assert.equal(report.incompleteEffectBundleCount, report.bundleCount);
   assert.ok(report.incompleteEffectBundleCount <= report.bundleCount);
   assert.equal(report.unresolvedEffectCallCount, 0);
   assert.ok(report.knownEffectCallCount > 0);

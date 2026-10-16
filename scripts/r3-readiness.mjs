@@ -97,7 +97,7 @@ export function inspectBundle(bundle, file) {
     const effectErrors = validateEffectCapture(effects);
     if (effectErrors.length > 0) {
       missingR3Extensions.push("provenance.effects.effect_coverage");
-    } else if (!effects.effect_coverage.complete) {
+    } else if (!effects.effect_coverage.complete || effects.effect_coverage.symbolic_calls > 0) {
       incomplete.push("provenance.effects.effect_coverage");
     }
   }
