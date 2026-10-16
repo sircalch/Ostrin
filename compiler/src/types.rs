@@ -479,6 +479,20 @@ pub fn compare_quantities_with_role(
         (QuantityRole::Point(left_space), QuantityRole::Point(right_space))
             if left_space == right_space =>
         {
+            // Validate dimensions, affine-space membership and finite scale
+            // metadata before normalizing directly to the coherent scale.
+            convert_value_with_role(
+                left.value,
+                &left.unit,
+                &left.unit,
+                &QuantityRole::Point(left_space.clone()),
+            )?;
+            convert_value_with_role(
+                right.value,
+                &right.unit,
+                &right.unit,
+                &QuantityRole::Point(right_space.clone()),
+            )?;
             (
                 left.value.mul_add(left.unit.scale, left.unit.offset),
                 right.value.mul_add(right.unit.scale, right.unit.offset),
@@ -1041,6 +1055,18 @@ mod affine_unit_tests {
             &QuantityRole::Point("Temperature".to_string()),
         )
         .is_err());
+
+        let temperature_point = RoleAwareQuantity {
+            value: 20.0,
+            unit: celsius.clone(),
+            role: QuantityRole::Point("Temperature".to_string()),
+        };
+        let pressure_point = RoleAwareQuantity {
+            value: 20.0,
+            unit: pascal,
+            role: QuantityRole::Point("Temperature".to_string()),
+        };
+        assert!(compare_quantities_with_role(&temperature_point, &pressure_point).is_err());
     }
 
     #[test]
