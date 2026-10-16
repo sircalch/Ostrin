@@ -184,9 +184,23 @@
           "bundleCount": 29
         }
       ],
-      "symbolicCallbackReferences": 0,
-      "uniqueSymbolicCallbacks": 0,
+      "symbolicInventoryStatus": "unavailable",
+      "symbolicInventoryBundleCount": 0,
+      "symbolicInventoryUnavailableBundleCount": 29,
+      "symbolicCallbackReferences": null,
+      "uniqueSymbolicCallbacks": null,
+      "observedSymbolicCallbackReferences": 0,
       "topSymbolicCallbacks": [],
+      "directReachability": {
+        "method": "follow function_calls edges only when the operation exactly matches a function key",
+        "status": "unavailable",
+        "availableBundleCount": 0,
+        "unavailableBundleCount": 29,
+        "symbolicCallbackReferences": null,
+        "uniqueSymbolicCallbacks": null,
+        "topSymbolicCallbacks": [],
+        "interpretation": "A missing or dynamic call edge can make this direct graph incomplete. Top callbacks summarize available graphs only; numeric totals are null unless every bundle has graph evidence. This is diagnostic, never a substitute for the conservative entry effect row or R3 gate."
+      },
       "interpretation": "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity."
     },
     "entrypointEffects": {

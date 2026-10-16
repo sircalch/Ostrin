@@ -177,7 +177,8 @@ export function diagnoseEffectCalls(effects) {
   const operationReferences = new Map();
   const symbolicCallbacks = new Map();
   const unresolved = isObject(effects?.unresolved_calls) ? effects.unresolved_calls : {};
-  const symbolic = isObject(effects?.symbolic_effect_calls) ? effects.symbolic_effect_calls : {};
+  const symbolicAvailable = isObject(effects?.symbolic_effect_calls);
+  const symbolic = symbolicAvailable ? effects.symbolic_effect_calls : {};
   let referenceCount = 0;
   for (const calls of Object.values(unresolved)) {
     if (!Array.isArray(calls)) continue;
@@ -198,6 +199,46 @@ export function diagnoseEffectCalls(effects) {
       symbolicCallbacks.set(operation, (symbolicCallbacks.get(operation) ?? 0) + 1);
     }
   }
+  const functions = effects?.functions;
+  const callsByFunction = effects?.function_calls;
+  let directlyReachableSymbolicCallbacks = null;
+  let directlyReachableFunctionCount = null;
+  if (symbolicAvailable && isObject(functions) && isObject(callsByFunction)
+    && typeof effects?.entry === "string" && Object.hasOwn(functions, effects.entry)) {
+    const reachable = new Set([effects.entry]);
+    const pending = [effects.entry];
+    let graphRowsComplete = true;
+    while (pending.length > 0) {
+      const caller = pending.pop();
+      const calls = callsByFunction[caller];
+      if (!Array.isArray(calls)) {
+        graphRowsComplete = false;
+        continue;
+      }
+      for (const target of calls) {
+        if (typeof target === "string" && Object.hasOwn(functions, target) && !reachable.has(target)) {
+          reachable.add(target);
+          pending.push(target);
+        }
+      }
+    }
+    if (graphRowsComplete) {
+      directlyReachableFunctionCount = reachable.size;
+      directlyReachableSymbolicCallbacks = new Map();
+      for (const functionName of reachable) {
+        const callbacks = symbolic[functionName] ?? [];
+        if (!Array.isArray(callbacks)) continue;
+        for (const callback of callbacks) {
+          if (typeof callback !== "string") continue;
+          const operation = `${functionName}.${callback}`;
+          directlyReachableSymbolicCallbacks.set(
+            operation,
+            (directlyReachableSymbolicCallbacks.get(operation) ?? 0) + 1,
+          );
+        }
+      }
+    }
+  }
   return {
     referenceCount,
     uniqueOperationNames: operationReferences.size,
@@ -205,7 +246,10 @@ export function diagnoseEffectCalls(effects) {
     operations: operationReferences,
     symbolicCallbackReferenceCount,
     uniqueSymbolicCallbacks: symbolicCallbacks.size,
+    symbolicInventoryAvailable: symbolicAvailable,
     symbolicCallbacks,
+    directlyReachableFunctionCount,
+    directlyReachableSymbolicCallbacks,
   };
 }
 
@@ -214,9 +258,13 @@ function buildGapDiagnostics(records) {
   const incompleteFields = new Map();
   const effectOperationReferences = new Map();
   const symbolicCallbackReferences = new Map();
+  const directlyReachableSymbolicReferences = new Map();
   const effectSyntaxCounts = { identifier: 0, memberPath: 0, qualifiedPath: 0, other: 0 };
   let effectOperationReferenceCount = 0;
   let symbolicCallbackReferenceCount = 0;
+  let symbolicInventoryBundleCount = 0;
+  let directlyReachableSymbolicReferenceCount = 0;
+  let reachableGraphBundleCount = 0;
   const entrypointBundles = [];
 
   for (const { entry, effectCalls } of records) {
@@ -231,6 +279,19 @@ function buildGapDiagnostics(records) {
     }
     effectOperationReferenceCount += effectCalls.referenceCount;
     symbolicCallbackReferenceCount += effectCalls.symbolicCallbackReferenceCount;
+    if (effectCalls.symbolicInventoryAvailable) symbolicInventoryBundleCount++;
+    if (effectCalls.directlyReachableSymbolicCallbacks !== null) {
+      reachableGraphBundleCount++;
+      for (const [operation, count] of effectCalls.directlyReachableSymbolicCallbacks) {
+        directlyReachableSymbolicReferenceCount += count;
+        if (!directlyReachableSymbolicReferences.has(operation)) {
+          directlyReachableSymbolicReferences.set(operation, { references: 0, bundles: new Set() });
+        }
+        const current = directlyReachableSymbolicReferences.get(operation);
+        current.references += count;
+        current.bundles.add(bundle);
+      }
+    }
     entrypointBundles.push({
       bundle,
       ...entry.entryEffectClosure,
@@ -289,6 +350,15 @@ function buildGapDiagnostics(records) {
     }))
     .sort((left, right) => right.references - left.references || left.operation.localeCompare(right.operation))
     .slice(0, 12);
+  const topDirectlyReachableSymbolicCallbacks = [...directlyReachableSymbolicReferences]
+    .map(([operation, counts]) => ({
+      operation,
+      references: counts.references,
+      bundleCount: counts.bundles.size,
+      bundles: [...counts.bundles].sort(),
+    }))
+    .sort((left, right) => right.references - left.references || left.operation.localeCompare(right.operation))
+    .slice(0, 12);
 
   return {
     captureGaps: {
@@ -301,9 +371,33 @@ function buildGapDiagnostics(records) {
       uniqueOperationNames: effectOperationReferences.size,
       bySyntax: effectSyntaxCounts,
       topOperations,
-      symbolicCallbackReferences: symbolicCallbackReferenceCount,
-      uniqueSymbolicCallbacks: symbolicCallbackReferences.size,
+      symbolicInventoryStatus: symbolicInventoryBundleCount === records.length
+        ? "available"
+        : symbolicInventoryBundleCount === 0 ? "unavailable" : "partial",
+      symbolicInventoryBundleCount,
+      symbolicInventoryUnavailableBundleCount: records.length - symbolicInventoryBundleCount,
+      symbolicCallbackReferences: symbolicInventoryBundleCount === records.length
+        ? symbolicCallbackReferenceCount : null,
+      uniqueSymbolicCallbacks: symbolicInventoryBundleCount === records.length
+        ? symbolicCallbackReferences.size : null,
+      observedSymbolicCallbackReferences: symbolicCallbackReferenceCount,
       topSymbolicCallbacks,
+      directReachability: {
+        method: "follow function_calls edges only when the operation exactly matches a function key",
+        status: reachableGraphBundleCount === records.length
+          ? "available"
+          : reachableGraphBundleCount === 0 ? "unavailable" : "partial",
+        availableBundleCount: reachableGraphBundleCount,
+        unavailableBundleCount: records.length - reachableGraphBundleCount,
+        symbolicCallbackReferences: reachableGraphBundleCount === records.length
+          ? directlyReachableSymbolicReferenceCount
+          : null,
+        uniqueSymbolicCallbacks: reachableGraphBundleCount === records.length
+          ? directlyReachableSymbolicReferences.size
+          : null,
+        topSymbolicCallbacks: topDirectlyReachableSymbolicCallbacks,
+        interpretation: "A missing or dynamic call edge can make this direct graph incomplete. Top callbacks summarize available graphs only; numeric totals are null unless every bundle has graph evidence. This is diagnostic, never a substitute for the conservative entry effect row or R3 gate.",
+      },
       interpretation: "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity.",
     },
     entrypointEffects,

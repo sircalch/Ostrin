@@ -358,6 +358,55 @@ test("effect-gap diagnostics report symbolic callbacks separately from unresolve
   assert.equal(diagnostics.symbolicCallbacks.get("std.viz::grid_of.f"), 1);
 });
 
+test("effect-gap diagnostics distinguish unavailable symbolic inventory from an empty one", () => {
+  const unavailable = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [] },
+    function_calls: { main: ["helper"], helper: [] },
+  });
+  assert.equal(unavailable.symbolicInventoryAvailable, false);
+  assert.equal(unavailable.directlyReachableFunctionCount, null);
+  assert.equal(unavailable.directlyReachableSymbolicCallbacks, null);
+
+  const available = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [] },
+    function_calls: { main: ["helper"], helper: [] },
+    symbolic_effect_calls: {},
+  });
+  assert.equal(available.symbolicInventoryAvailable, true);
+  assert.equal(available.directlyReachableFunctionCount, 2);
+  assert.equal(available.directlyReachableSymbolicCallbacks.size, 0);
+
+  const missingReachableRow = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [] },
+    function_calls: { main: ["helper"] },
+    symbolic_effect_calls: {},
+  });
+  assert.equal(missingReachableRow.directlyReachableFunctionCount, null);
+  assert.equal(missingReachableRow.directlyReachableSymbolicCallbacks, null);
+});
+
+test("direct reachability follows only exact recorded function edges", () => {
+  const diagnostics = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [], "std.viz::grid_of": [] },
+    function_calls: {
+      main: ["helper", "callback", "std.viz::grid_of.f"],
+      helper: ["main"],
+      "std.viz::grid_of": [],
+    },
+    symbolic_effect_calls: {
+      helper: ["callback"],
+      "std.viz::grid_of": ["f"],
+    },
+  });
+  assert.equal(diagnostics.directlyReachableFunctionCount, 2);
+  assert.equal(diagnostics.directlyReachableSymbolicCallbacks.get("helper.callback"), 1);
+  assert.equal(diagnostics.directlyReachableSymbolicCallbacks.has("std.viz::grid_of.f"), false);
+});
+
 test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostrin lexer", () => {
   const diagnostics = diagnoseEffectCalls({
     unresolved_calls: {
@@ -388,8 +437,22 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
     effectInventory.operationReferences);
   assert.equal(effectInventory.uniqueOperationNames > 0, report.unresolvedEffectCallCount > 0);
   assert.equal(effectInventory.topOperations.length > 0, report.unresolvedEffectCallCount > 0);
-  assert.equal(effectInventory.symbolicCallbackReferences,
-    report.entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0));
+  if (effectInventory.symbolicInventoryStatus === "available") {
+    assert.equal(effectInventory.symbolicCallbackReferences,
+      report.entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0));
+  } else {
+    assert.equal(effectInventory.symbolicCallbackReferences, null);
+    assert.equal(effectInventory.uniqueSymbolicCallbacks, null);
+  }
+  assert.equal(effectInventory.symbolicInventoryStatus,
+    effectInventory.symbolicInventoryUnavailableBundleCount === 0 ? "available"
+      : effectInventory.symbolicInventoryBundleCount === 0 ? "unavailable" : "partial");
+  assert.equal(effectInventory.directReachability.availableBundleCount
+    + effectInventory.directReachability.unavailableBundleCount, report.bundleCount);
+  if (effectInventory.directReachability.status !== "available") {
+    assert.equal(effectInventory.directReachability.symbolicCallbackReferences, null);
+    assert.equal(effectInventory.directReachability.uniqueSymbolicCallbacks, null);
+  }
   const entrypoint = report.gapDiagnostics.entrypointEffects;
   assert.equal(entrypoint.closedBundleCount + entrypoint.openBundleCount + entrypoint.unavailableBundleCount,
     report.bundleCount);
