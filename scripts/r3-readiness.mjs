@@ -120,7 +120,7 @@ export function inspectBundle(bundle, file) {
 function effectOperationSyntax(operation) {
   if (operation.includes("::")) return "qualifiedPath";
   if (operation.includes(".")) return "memberPath";
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(operation)) return "identifier";
+  if (/^[\p{Alphabetic}_][\p{Alphabetic}\p{Number}_]*$/u.test(operation)) return "identifier";
   return "other";
 }
 

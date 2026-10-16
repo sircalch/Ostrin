@@ -253,6 +253,23 @@ test("effect-gap diagnostics group operation syntax without inferring resolution
   assert.equal(diagnostics.operations.get("array"), 2);
 });
 
+test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostrin lexer", () => {
+  const diagnostics = diagnoseEffectCalls({
+    unresolved_calls: {
+      main: ["λ", "变量", "callback٢", "_callback1", "host?"],
+    },
+  });
+
+  assert.equal(diagnostics.referenceCount, 5);
+  assert.equal(diagnostics.uniqueOperationNames, 5);
+  assert.deepEqual(diagnostics.bySyntax, {
+    identifier: 4,
+    memberPath: 0,
+    qualifiedPath: 0,
+    other: 1,
+  });
+});
+
 test("R3 gap summary reconciles with per-bundle missing fields and effect coverage", () => {
   const report = buildReadiness();
   const { captureGaps, effectInventory, notAssessed } = report.gapDiagnostics;
