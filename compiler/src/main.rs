@@ -411,6 +411,13 @@ fn real_main() -> ExitCode {
                     })).collect::<Vec<_>>(),
                     "symbolic_effect_calls": report.symbolic_effect_calls,
                     "indirect_calls": report.indirect_calls,
+                    "indirect_call_sites": report.indirect_call_sites.iter().map(|site| serde_json::json!({
+                        "operation": site.operation,
+                        "function": site.function,
+                        "file": site.file,
+                        "line": site.line,
+                        "col": site.col,
+                    })).collect::<Vec<_>>(),
                     "open_effect_calls": report.open_effect_calls,
                     "effect_coverage": {
                         "count_unit": "distinct_function_operation_edges",
@@ -487,6 +494,14 @@ fn real_main() -> ExitCode {
                 .map(std::collections::BTreeSet::len)
                 .sum();
             println!("indirect function calls: {indirect_calls} (effect rows unavailable)");
+            println!("indirect call sites: {}", report.indirect_call_sites.len());
+            for site in &report.indirect_call_sites {
+                let file = site.file.as_deref().unwrap_or("<unknown>");
+                println!(
+                    "  {file}:{}:{} {} -> {} (indirect; effect status in open_effect_calls)",
+                    site.line, site.col, site.function, site.operation
+                );
+            }
             let open_effect_calls: usize = report
                 .open_effect_calls
                 .values()

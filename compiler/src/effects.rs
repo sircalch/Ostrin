@@ -106,6 +106,18 @@ pub struct UnresolvedCallSite {
     pub col: usize,
 }
 
+/// Source location for an invocation through a function-valued expression.
+/// The call can still be open or symbolically tracked; this records only that
+/// the invocation is indirect, not that its effects are known.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndirectCallSite {
+    pub operation: String,
+    pub function: String,
+    pub file: Option<String>,
+    pub line: usize,
+    pub col: usize,
+}
+
 /// A local callsite substitution from one callback effect variable to another.
 /// For a caller `wrapper(action) { invoke(action) }`, this records
 /// `invoke.callback <- wrapper.action`.
@@ -177,6 +189,9 @@ pub struct EffectReport {
     /// Unlike `unresolved_calls`, this preserves duplicate callsites.
     pub unresolved_call_sites: Vec<UnresolvedCallSite>,
     unresolved_call_site_inventory: Vec<UnresolvedCallSite>,
+    /// Source occurrences that invoke a function value rather than a named
+    /// top-level function. Their effect status remains in the call maps.
+    pub indirect_call_sites: Vec<IndirectCallSite>,
     /// Indirect invocations through function-valued bindings. Their effects
     /// are not present in the current function type, so they stay open.
     pub indirect_calls: BTreeMap<String, BTreeSet<String>>,
@@ -943,6 +958,13 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                         .entry(function.to_string())
                         .or_default()
                         .insert(operation.clone());
+                    report.indirect_call_sites.push(IndirectCallSite {
+                        operation: operation.clone(),
+                        function: function.to_string(),
+                        file: file.map(str::to_string),
+                        line,
+                        col,
+                    });
                 }
             }
             walk_expr(callee, function, file, report);

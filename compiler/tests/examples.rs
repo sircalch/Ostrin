@@ -12565,8 +12565,13 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
 fn experimental_effect_report_keeps_function_value_calls_open() {
     let file = temp_source(
         "effects-indirect-function.ostrin",
-        "fn apply(action: fn() -> Void) -> Void { action() }\n\
-         fn main() -> Void { apply(fn() { print(\"inside\") }) }\n",
+        concat!(
+            "fn apply(action: fn() -> Void) -> Void {\n",
+            "    action()\n",
+            "    action()\n",
+            "}\n",
+            "fn main() -> Void { apply(fn() { print(\"inside\") }) }\n"
+        ),
     );
     let out = run(&["--effect-report", "--json", &file]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -12580,6 +12585,23 @@ fn experimental_effect_report_keeps_function_value_calls_open() {
         report["open_effect_calls"]["apply"],
         serde_json::json!(["action"])
     );
+    let indirect_sites = report["indirect_call_sites"]
+        .as_array()
+        .expect("indirect callsites must be reported as an array");
+    assert_eq!(
+        indirect_sites.len(),
+        2,
+        "duplicate invocations retain both sites"
+    );
+    for (site, line) in indirect_sites.iter().zip([2, 3]) {
+        assert_eq!(site["function"], "apply");
+        assert_eq!(site["operation"], "action");
+        assert_eq!(site["line"], line);
+        assert_eq!(site["col"], 5);
+        assert!(site["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("effects-indirect-function.ostrin")));
+    }
     assert!(report["function_effects"].get("apply").is_none());
     let hir = run(&["--hir", &file]);
     assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
@@ -12589,6 +12611,13 @@ fn experimental_effect_report_keeps_function_value_calls_open() {
     assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
     assert!(stdout(&ir).contains("ir indirect effect calls: 1"));
     assert!(stdout(&ir).contains("ir unresolved effect calls: 0"));
+    let text = run(&["--effect-report", &file]);
+    assert!(text.status.success(), "stderr: {}", stderr(&text));
+    assert!(stdout(&text).contains("indirect call sites: 2"));
+    assert!(stdout(&text)
+        .contains(":2:5 apply -> action (indirect; effect status in open_effect_calls)"));
+    assert!(stdout(&text)
+        .contains(":3:5 apply -> action (indirect; effect status in open_effect_calls)"));
     let _ = fs::remove_file(file);
 }
 
