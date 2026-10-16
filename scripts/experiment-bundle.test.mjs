@@ -14,6 +14,7 @@ import {
   renderExperimentBundle,
   runtimeSnapshotFor,
   validateEffectCapture,
+  validateEntryEffectSignature,
   verifyBundleFile,
   verifyExperimentBundle,
 } from "./experiment-bundle.mjs";
@@ -218,6 +219,13 @@ test("every registered fixture produces a verified recorded bundle", () => {
     assert.ok(bundle.provenance.effects.function_calls);
     assert.ok(bundle.provenance.effects.unresolved_calls);
     assert.ok(bundle.provenance.effects.effect_coverage);
+    assert.deepEqual(validateEntryEffectSignature(
+      bundle.provenance.effects.entry_effect_signature,
+      bundle.provenance.effects.entry,
+      bundle.provenance.effects,
+    ), []);
+    assert.equal(bundle.provenance.effects.entry_effect_signature.row_closed, true, `${id}: entry row must be closed`);
+    assert.equal(bundle.provenance.effects.entry_effect_signature.purity_proven, false);
     assert.deepEqual(validateEffectCapture(bundle.provenance.effects), []);
     for (const analyzer of bundle.provenance.effects.analyzer) {
       assert.match(analyzer.sha256, /^sha256:[0-9a-f]{64}$/);
@@ -241,7 +249,9 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     functions: { main: [] },
     function_calls: { main: ["known_call"] },
     unresolved_calls: {},
-    effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+    function_effect_variables: {},
+    symbolic_effect_calls: {},
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   assert.deepEqual(validateEffectCapture(complete), []);
 
@@ -249,7 +259,7 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     ...complete,
     function_calls: { main: ["mystery_operation"] },
     unresolved_calls: { main: ["mystery_operation"] },
-    effect_coverage: { known_calls: 0, unresolved_calls: 1, complete: false },
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   assert.deepEqual(validateEffectCapture(incomplete), []);
 
@@ -257,11 +267,55 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
   delete hiddenBoundary.unresolved_calls;
   assert.ok(validateEffectCapture(hiddenBoundary).some((error) => error.includes("unresolved_calls")));
 
+  const missingCountUnit = { ...complete, effect_coverage: { known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true } };
+  assert.ok(validateEffectCapture(missingCountUnit).some((error) => error.includes("count_unit")));
+
   const overstated = {
     ...incomplete,
-    effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   assert.ok(validateEffectCapture(overstated).some((error) => error.includes("does not match")));
+
+  const symbolic = {
+    ...complete,
+    function_calls: { map_open: ["callback"] },
+    function_effect_variables: { map_open: ["ε_callback"] },
+    symbolic_effect_calls: { map_open: ["callback"] },
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 1, unresolved_calls: 0, complete: true },
+  };
+  assert.deepEqual(validateEffectCapture(symbolic), []);
+  const unsupportedSymbolic = { ...symbolic, function_effect_variables: {} };
+  assert.ok(validateEffectCapture(unsupportedSymbolic).some((error) => error.includes("no effect variable")));
+});
+
+test("entry effect signature validates closure without treating known effects as purity", () => {
+  const closed = {
+    function: "main",
+    effects: ["io", "state(local)"],
+    variables: [],
+    open_calls: [],
+    row_closed: true,
+    purity_proven: false,
+  };
+  const effectReport = {
+    functions: { main: ["io", "state(local)"] },
+    function_effect_variables: {},
+    unresolved_calls: {},
+  };
+  assert.deepEqual(validateEntryEffectSignature(closed, "main", effectReport), []);
+  assert.deepEqual(validateEntryEffectSignature({ ...closed, function: "helper" }, "main", effectReport), [
+    "entry effect signature must name the recorded entry function",
+  ]);
+  assert.ok(validateEntryEffectSignature({ ...closed, variables: ["ε_callback"] }, "main", effectReport)
+    .some((error) => error.includes("row_closed disagrees")));
+  assert.ok(validateEntryEffectSignature({ ...closed, purity_proven: true }, "main", effectReport)
+    .some((error) => error.includes("must not claim purity proof")));
+  assert.ok(validateEntryEffectSignature(closed, "main", { ...effectReport, functions: { helper: [] } })
+    .some((error) => error.includes("effect inventory row")));
+  assert.ok(validateEntryEffectSignature(closed, "main", {
+    ...effectReport,
+    unresolved_calls: { main: ["host_effect"] },
+  }).some((error) => error.includes("omits a direct unresolved call")));
 });
 
 test("tampering with bundled content is rejected by the hash gate", () => {

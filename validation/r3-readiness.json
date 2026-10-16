@@ -21,8 +21,11 @@
   "openCount": 29,
   "captureReadyCount": 0,
   "captureOpenCount": 29,
-  "incompleteEffectBundleCount": 29,
-  "unresolvedEffectCallCount": 4266,
+  "incompleteEffectBundleCount": 0,
+  "closedEntryEffectBundleCount": 29,
+  "knownEffectCallCount": 20589,
+  "symbolicEffectCallCount": 74,
+  "unresolvedEffectCallCount": 0,
   "gapDiagnostics": {
     "captureGaps": {
       "missingExtensionFields": [
@@ -62,358 +65,322 @@
           ]
         }
       ],
-      "incompleteExtensionFields": [
-        {
-          "field": "provenance.effects.effect_coverage",
-          "bundleCount": 29,
-          "bundles": [
-            "animation",
-            "bars",
-            "boxplot",
-            "contourf",
-            "dashboard",
-            "double-pendulum",
-            "fft",
-            "heatmap",
-            "hexbin",
-            "histogram",
-            "isosurface",
-            "lines",
-            "linked-data",
-            "lorenz",
-            "ode",
-            "orbits",
-            "point-cloud",
-            "provenance",
-            "quiver",
-            "scatter-fit",
-            "spline",
-            "streamplot",
-            "string",
-            "surface",
-            "table",
-            "units",
-            "vector-field",
-            "violin",
-            "volume-slices"
-          ]
-        }
-      ]
+      "incompleteExtensionFields": []
     },
     "effectInventory": {
       "countUnit": "recorded function-operation references in unresolved_calls; not source invocation count",
-      "operationReferences": 4266,
-      "uniqueOperationNames": 130,
+      "operationReferences": 0,
+      "uniqueOperationNames": 0,
       "bySyntax": {
-        "identifier": 2003,
-        "memberPath": 2263,
+        "identifier": 0,
+        "memberPath": 0,
         "qualifiedPath": 0,
         "other": 0
       },
-      "topOperations": [
+      "topOperations": [],
+      "symbolicInventoryStatus": "available",
+      "symbolicInventoryBundleCount": 29,
+      "symbolicInventoryUnavailableBundleCount": 0,
+      "symbolicCallbackReferences": 74,
+      "uniqueSymbolicCallbacks": 10,
+      "observedSymbolicCallbackReferences": 74,
+      "topSymbolicCallbacks": [
         {
-          "operation": "array",
-          "syntax": "identifier",
-          "references": 721,
+          "operation": "std.viz::grid_of.f",
+          "references": 29,
           "bundleCount": 29
         },
         {
-          "operation": "zeros",
-          "syntax": "identifier",
-          "references": 233,
-          "bundleCount": 29
+          "operation": "std.numeric::bisect.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "floor",
-          "syntax": "identifier",
-          "references": 203,
-          "bundleCount": 29
+          "operation": "std.numeric::derivative.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "s.grid.shape",
-          "syntax": "memberPath",
-          "references": 203,
-          "bundleCount": 29
+          "operation": "std.numeric::golden_min.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "round",
-          "syntax": "identifier",
-          "references": 116,
-          "bundleCount": 29
+          "operation": "std.numeric::newton.df",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "volume.shape",
-          "syntax": "memberPath",
-          "references": 116,
-          "bundleCount": 29
+          "operation": "std.numeric::newton.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "data.max",
-          "syntax": "memberPath",
-          "references": 87,
-          "bundleCount": 29
+          "operation": "std.numeric::rk4.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "data.min",
-          "syntax": "memberPath",
-          "references": 87,
-          "bundleCount": 29
+          "operation": "std.numeric::rk45.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "log10",
-          "syntax": "identifier",
-          "references": 87,
-          "bundleCount": 29
+          "operation": "std.numeric::secant.f",
+          "references": 5,
+          "bundleCount": 5
         },
         {
-          "operation": "plane.set",
-          "syntax": "memberPath",
-          "references": 87,
-          "bundleCount": 29
-        },
-        {
-          "operation": "s.grid.max",
-          "syntax": "memberPath",
-          "references": 87,
-          "bundleCount": 29
-        },
-        {
-          "operation": "s.grid.min",
-          "syntax": "memberPath",
-          "references": 87,
-          "bundleCount": 29
+          "operation": "std.numeric::simpson.f",
+          "references": 5,
+          "bundleCount": 5
         }
       ],
-      "symbolicInventoryStatus": "unavailable",
-      "symbolicInventoryBundleCount": 0,
-      "symbolicInventoryUnavailableBundleCount": 29,
-      "symbolicCallbackReferences": null,
-      "uniqueSymbolicCallbacks": null,
-      "observedSymbolicCallbackReferences": 0,
-      "topSymbolicCallbacks": [],
       "directReachability": {
         "method": "follow function_calls edges only when the operation exactly matches a function key",
-        "status": "unavailable",
-        "availableBundleCount": 0,
-        "unavailableBundleCount": 29,
-        "symbolicCallbackReferences": null,
-        "uniqueSymbolicCallbacks": null,
-        "topSymbolicCallbacks": [],
+        "status": "available",
+        "availableBundleCount": 29,
+        "unavailableBundleCount": 0,
+        "symbolicCallbackReferences": 7,
+        "uniqueSymbolicCallbacks": 2,
+        "topSymbolicCallbacks": [
+          {
+            "operation": "std.viz::grid_of.f",
+            "references": 4,
+            "bundleCount": 4,
+            "bundles": [
+              "contourf",
+              "dashboard",
+              "heatmap",
+              "surface"
+            ]
+          },
+          {
+            "operation": "std.numeric::rk45.f",
+            "references": 3,
+            "bundleCount": 3,
+            "bundles": [
+              "double-pendulum",
+              "ode",
+              "orbits"
+            ]
+          }
+        ],
         "interpretation": "A missing or dynamic call edge can make this direct graph incomplete. Top callbacks summarize available graphs only; numeric totals are null unless every bundle has graph evidence. This is diagnostic, never a substitute for the conservative entry effect row or R3 gate."
       },
       "interpretation": "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity."
     },
     "entrypointEffects": {
       "countUnit": "one recorded entry function per experiment bundle",
-      "availableBundleCount": 0,
-      "closedBundleCount": 0,
+      "availableBundleCount": 29,
+      "closedBundleCount": 29,
       "openBundleCount": 0,
-      "unavailableBundleCount": 29,
+      "unavailableBundleCount": 0,
       "unresolvedCallReferences": 0,
       "symbolicCallbackReferences": 0,
       "bundles": [
         {
           "bundle": "animation",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "bars",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "boxplot",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "contourf",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "dashboard",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "double-pendulum",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "fft",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "heatmap",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "hexbin",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "histogram",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "isosurface",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "lines",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "linked-data",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "lorenz",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "ode",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "orbits",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "point-cloud",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "provenance",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "quiver",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "scatter-fit",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "spline",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "streamplot",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "string",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "surface",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "table",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "units",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "vector-field",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "violin",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         },
         {
           "bundle": "volume-slices",
           "entry": "main",
-          "status": "unavailable",
-          "unresolvedCalls": null,
-          "symbolicCallbacks": null
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
         }
       ],
       "interpretation": "This reports the recorded entry function row separately from module-wide inventory. It is diagnostic only and does not prove complete runtime reachability, host capture or R3 readiness."
@@ -424,6 +391,7 @@
       "Whether numerical tolerances are scientifically justified"
     ]
   },
+  "effectCoverageCountUnit": "distinct_function_operation_edges",
   "entries": [
     {
       "file": "website/assets/experiments/animation.ostrin-experiment.json",
@@ -437,20 +405,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 486,
-        "unresolved_calls": 119
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 614,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -465,20 +444,34 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "measurement",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 650,
-        "unresolved_calls": 151
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 810,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -493,20 +486,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 584,
-        "unresolved_calls": 147
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 740,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -521,20 +527,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 481,
-        "unresolved_calls": 117
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 607,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -549,20 +566,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 591,
-        "unresolved_calls": 152
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 752,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -577,20 +607,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 647,
-        "unresolved_calls": 221
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 886,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -605,20 +646,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 756,
-        "unresolved_calls": 258
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 1032,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -633,20 +687,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 482,
-        "unresolved_calls": 119
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 610,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -661,20 +726,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 586,
-        "unresolved_calls": 150
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 745,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -689,20 +767,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 586,
-        "unresolved_calls": 154
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 749,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -717,20 +808,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 481,
-        "unresolved_calls": 119
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 609,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -745,20 +847,32 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 577,
-        "unresolved_calls": 142
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 728,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -773,20 +887,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 483,
-        "unresolved_calls": 116
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 608,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -801,20 +926,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 484,
-        "unresolved_calls": 116
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 609,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -829,20 +965,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 646,
-        "unresolved_calls": 217
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 881,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -857,20 +1004,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 648,
-        "unresolved_calls": 221
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 887,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -885,20 +1043,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 588,
-        "unresolved_calls": 148
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 745,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -913,20 +1084,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 481,
-        "unresolved_calls": 120
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 610,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -941,20 +1123,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 487,
-        "unresolved_calls": 117
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 613,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -969,20 +1162,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 585,
-        "unresolved_calls": 149
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 743,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -997,20 +1203,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 644,
-        "unresolved_calls": 215
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 877,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1025,20 +1242,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 488,
-        "unresolved_calls": 119
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 616,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1053,20 +1281,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 484,
-        "unresolved_calls": 120
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 613,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1081,20 +1320,32 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 580,
-        "unresolved_calls": 141
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 730,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1109,20 +1360,30 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 479,
-        "unresolved_calls": 115
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 603,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1137,20 +1398,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 480,
-        "unresolved_calls": 119
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 608,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1165,20 +1437,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 486,
-        "unresolved_calls": 116
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 611,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1193,20 +1476,33 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 584,
-        "unresolved_calls": 149
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 742,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1221,20 +1517,31 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
-        "complete": false,
-        "known_calls": 483,
-        "unresolved_calls": 119
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 611,
+        "symbolic_calls": 1,
+        "unresolved_calls": 0
       },
       "entryEffectClosure": {
         "entry": "main",
-        "status": "unavailable",
-        "unresolvedCalls": null,
-        "symbolicCallbacks": null
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     }
   ]

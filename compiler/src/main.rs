@@ -55,6 +55,7 @@ fn real_main() -> ExitCode {
     let typed_report = args.iter().any(|a| a == "--typed-report");
     let native_type_report = args.iter().any(|a| a == "--native-type-report");
     let effect_report = args.iter().any(|a| a == "--effect-report");
+    let require_closed_effects = args.iter().any(|a| a == "--require-closed-effects");
     let provenance_report = args.iter().any(|a| a == "--provenance-report");
     let hir_mode = args.iter().any(|a| a == "--hir");
     let ir_mode = args.iter().any(|a| a == "--ir");
@@ -318,8 +319,35 @@ fn real_main() -> ExitCode {
         };
     }
 
-    if effect_report {
-        let report = effects::analyze(&items);
+    if effect_report || require_closed_effects {
+        let typed = typeck::Checker::new().check_program_typed(&items);
+        let report = if effect_report {
+            effects::analyze_with_types_for_report(&items, &typed)
+        } else {
+            effects::analyze_with_types(&items, &typed)
+        };
+        let (known_calls, symbolic_call_count, unresolved_call_count) = report.call_coverage();
+        let open_call_count: usize = report
+            .open_effect_calls
+            .values()
+            .map(std::collections::BTreeSet::len)
+            .sum();
+        let indirect_call_count: usize = report
+            .indirect_calls
+            .values()
+            .map(std::collections::BTreeSet::len)
+            .sum();
+        let symbolic_variable_count: usize = report
+            .function_effect_variables
+            .values()
+            .map(std::collections::BTreeSet::len)
+            .sum();
+        let type_error_count = typed.errors.len();
+        let effects_closed = type_error_count == 0
+            && unresolved_call_count == 0
+            && open_call_count == 0
+            && indirect_call_count == 0
+            && symbolic_variable_count == 0;
         if json {
             let sites: Vec<_> = report
                 .sites
@@ -335,7 +363,6 @@ fn real_main() -> ExitCode {
                     })
                 })
                 .collect();
-            let (known_calls, unresolved_call_count) = report.call_coverage();
             println!(
                 "{}",
                 serde_json::json!({
@@ -347,6 +374,25 @@ fn real_main() -> ExitCode {
                     "function_effects": report.function_kinds.iter().map(|(function, kinds)| (
                         function.clone(), kinds.iter().map(|kind| kind.label()).collect::<Vec<_>>()
                     )).collect::<std::collections::BTreeMap<_, _>>(),
+                    "function_effect_variables": report.function_effect_variables.iter().map(|(function, variables)| (
+                        function.clone(), variables.iter().map(|name| format!("ε_{name}")).collect::<Vec<_>>()
+                    )).collect::<std::collections::BTreeMap<_, _>>(),
+                    "function_effect_signatures": report.function_effect_signatures.iter().map(|(function, signature)| (
+                        function.clone(), serde_json::json!({
+                            "effects": signature.effects.iter().map(|effect| effect.label()).collect::<Vec<_>>(),
+                            "variables": signature.variables.iter().map(|name| format!("ε_{name}")).collect::<Vec<_>>(),
+                            "open_calls": signature.open_calls,
+                            "row_closed": signature.is_closed(),
+                            "purity_proven": false,
+                        })
+                    )).collect::<std::collections::BTreeMap<_, _>>(),
+                    "effect_variable_substitutions": report.effect_variable_substitutions.iter().map(|(function, substitutions)| (
+                        function.clone(), substitutions.iter().map(|substitution| serde_json::json!({
+                            "callee": substitution.callee,
+                            "callee_parameter": substitution.callee_parameter,
+                            "caller_parameter": substitution.caller_parameter,
+                        })).collect::<Vec<_>>()
+                    )).collect::<std::collections::BTreeMap<_, _>>(),
                     "functions_without_known_effects": report.function_names.iter()
                         .filter(|function| {
                             report
@@ -357,17 +403,46 @@ fn real_main() -> ExitCode {
                         .cloned()
                         .collect::<Vec<_>>(),
                     "function_calls": report.function_calls,
+                    "classified_calls": report.classified_calls,
+                    "known_effect_free_calls": report.known_effect_free_calls,
                     "unresolved_calls": report.unresolved_calls,
+                    "unresolved_call_sites": report.unresolved_call_sites.iter().map(|site| serde_json::json!({
+                        "operation": site.operation,
+                        "function": site.function,
+                        "file": site.file,
+                        "line": site.line,
+                        "col": site.col,
+                    })).collect::<Vec<_>>(),
+                    "symbolic_effect_calls": report.symbolic_effect_calls,
+                    "indirect_calls": report.indirect_calls,
+                    "indirect_call_sites": report.indirect_call_sites.iter().map(|site| serde_json::json!({
+                        "operation": site.operation,
+                        "function": site.function,
+                        "file": site.file,
+                        "line": site.line,
+                        "col": site.col,
+                    })).collect::<Vec<_>>(),
+                    "open_effect_calls": report.open_effect_calls,
                     "effect_coverage": {
+                        "count_unit": "distinct_function_operation_edges",
                         "known_calls": known_calls,
+                        "symbolic_calls": symbolic_call_count,
                         "unresolved_calls": unresolved_call_count,
                         "complete": unresolved_call_count == 0,
+                    },
+                    "effect_closure": {
+                        "status": if effects_closed { "closed" } else { "open" },
+                        "required": require_closed_effects,
+                        "open_calls": open_call_count,
+                        "indirect_calls": indirect_call_count,
+                        "symbolic_variables": symbolic_variable_count,
+                        "type_errors": type_error_count,
                     },
                     "sites": sites,
                 })
             );
         } else {
-            println!("effect-report: experimental conservative syntactic inventory");
+            println!("effect-report: experimental conservative typed effect inference");
             if report.effects.is_empty() {
                 println!("effects: none known (absence is not a purity proof)");
             } else {
@@ -403,9 +478,42 @@ fn real_main() -> ExitCode {
                 .values()
                 .map(std::collections::BTreeSet::len)
                 .sum();
-            println!("unresolved calls: {unresolved_calls} (effect coverage is incomplete)");
-            let (known_calls, _) = report.call_coverage();
-            println!("effect call coverage: {known_calls} known, {unresolved_calls} unresolved");
+            println!(
+                "unresolved operation edges: {unresolved_calls} (effect coverage is incomplete)"
+            );
+            println!(
+                "unresolved call sites: {}",
+                report.unresolved_call_sites.len()
+            );
+            for site in &report.unresolved_call_sites {
+                let file = site.file.as_deref().unwrap_or("<unknown>");
+                println!(
+                    "  {file}:{}:{} {} -> {} (effect unknown)",
+                    site.line, site.col, site.function, site.operation
+                );
+            }
+            let indirect_calls: usize = report
+                .indirect_calls
+                .values()
+                .map(std::collections::BTreeSet::len)
+                .sum();
+            println!("indirect function calls: {indirect_calls} (effect rows unavailable)");
+            println!("indirect call sites: {}", report.indirect_call_sites.len());
+            for site in &report.indirect_call_sites {
+                let file = site.file.as_deref().unwrap_or("<unknown>");
+                println!(
+                    "  {file}:{}:{} {} -> {} (indirect; effect status in open_effect_calls)",
+                    site.line, site.col, site.function, site.operation
+                );
+            }
+            let open_effect_calls: usize = report
+                .open_effect_calls
+                .values()
+                .map(std::collections::BTreeSet::len)
+                .sum();
+            println!("open effect-call references (direct + inherited): {open_effect_calls}");
+            let (known_calls, symbolic_calls, _) = report.call_coverage();
+            println!("effect operation-edge coverage: {known_calls} concrete, {symbolic_calls} callback-symbolic, {unresolved_calls} unresolved (distinct edges; repeated callsites are counted once per function)");
             for site in &report.sites {
                 let file = site.file.as_deref().unwrap_or("<unknown>");
                 println!(
@@ -414,8 +522,23 @@ fn real_main() -> ExitCode {
                 );
             }
             println!("note: this report is evidence for future effect checking; it is not a static guarantee");
+            println!(
+                "effect closure: {} ({} type errors, {} open calls, {} indirect calls, {} symbolic variables)",
+                if effects_closed { "closed" } else { "open" },
+                type_error_count,
+                open_call_count,
+                indirect_call_count,
+                symbolic_variable_count
+            );
         }
-        return ExitCode::SUCCESS;
+        return if require_closed_effects && !effects_closed {
+            eprintln!(
+                "error: --require-closed-effects found type errors or unresolved/symbolic effect boundaries"
+            );
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        };
     }
 
     if provenance_report {
@@ -427,7 +550,8 @@ fn real_main() -> ExitCode {
             }
         };
         let target = argument_value(&args, "--target").unwrap_or_else(|| "native".to_string());
-        let effects = effects::analyze(&items);
+        let typed = typeck::Checker::new().check_program_typed(&items);
+        let effects = effects::analyze_with_types_for_report(&items, &typed);
         let report = provenance::build_report(entry_path, &source, &target, &effects);
         if json {
             match serde_json::to_string_pretty(&report) {
@@ -544,6 +668,15 @@ fn real_main() -> ExitCode {
         println!("hir functions: {}", program.functions.len());
         println!("hir nodes: {}", report.nodes);
         println!("hir unknown: {}", report.unknown);
+        println!("hir effect edges: {}", report.effect_edges);
+        println!(
+            "hir unresolved effect calls: {}",
+            report.unresolved_effect_calls
+        );
+        println!(
+            "hir indirect effect calls: {}",
+            report.indirect_effect_calls
+        );
         println!("hir violations: {}", report.violations.len());
         for v in &report.violations {
             println!("  {}: {}", v.function, v.message);
@@ -563,6 +696,12 @@ fn real_main() -> ExitCode {
         println!("ir instructions: {}", report.instructions);
         println!("ir opaque: {}", report.opaque);
         println!("ir unterminated: {}", report.unterminated);
+        println!("ir effect edges: {}", report.effect_edges);
+        println!(
+            "ir unresolved effect calls: {}",
+            report.unresolved_effect_calls
+        );
+        println!("ir indirect effect calls: {}", report.indirect_effect_calls);
         println!("ir violations: {}", report.violations.len());
         for violation in &report.violations {
             println!("  {violation}");
@@ -1009,7 +1148,8 @@ fn print_help() {
     println!("  --dap         Run the debug adapter over stdio");
     println!("  --hir         Print the typed, verified HIR");
     println!("  --ir          Lower HIR to explicit basic blocks and temporaries");
-    println!("  --effect-report  Inventory known scientific effects (experimental, conservative)");
+    println!("  --effect-report  Infer conservative scientific effect rows (experimental)");
+    println!("  --require-closed-effects  Fail if any operation or effect row remains open");
     println!("  --provenance-report  Emit an experimental reproducibility artifact");
     println!("  --ownership-report  Report conservative managed values and last-use candidates");
     println!("  --ownership-ir      Insert proof-guided linear release markers into a cloned IR");

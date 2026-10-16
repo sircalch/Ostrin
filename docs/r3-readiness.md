@@ -1,44 +1,76 @@
 # R3 readiness
 
-R3 requiere una captura auditable de procedencia, hashes, lockfile, entorno,
-dependencias, efectos, scheduler, entradas, parámetros y outputs. El auditor
-separa los campos base, las extensiones de captura ausentes y las capturas de
-efectos cuyo inventario todavía no puede cerrarse.
+R3 requiere un artefacto auditable: procedencia, hashes, lockfile, entorno,
+dependencias, efectos, scheduler, inputs, parámetros y outputs. El auditor
+recorre los bundles publicados y separa los campos ya presentes de las
+extensiones que todavía faltan.
 
 ```text
 node scripts/r3-readiness.mjs --write
 ```
 
-Pages CI captura metadatos del host y valida el contrato estructural con
-`node scripts/r3-readiness.mjs --require-capture`. Ese gate permite conservar una
-captura incompleta para diagnóstico; **no equivale** a `--require-ready`. R3 solo
-queda `READY` cuando el reporte vigente marca todos los bundles listos.
+Pages CI captura metadatos del runner y usa `node scripts/r3-readiness.mjs
+--require-capture`; este modo valida que la captura esté completa y
+estructuralmente válida. Los metadatos de host por sí solos no bastan: R3 también
+requiere el contrato completo del bundle y una fila de efectos cerrada para el entrypoint.
 
 El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.json).
-Un estado `OPEN` es deliberado y no promociona un bundle R0/R1/R2 a R3.
+Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
+un bundle R0/R1/R2 a R3.
 
-## Diagnóstico del snapshot actual
+El checkout local tiene los **29/29 bundles con los campos base completos**, incluidos
+`execution`, dependencias y scheduler declarado. Los **0/29** locales están listos para R3
+porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
+reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
+la marca de que el análisis es experimental y conservador. El resumen conserva las llamadas locales,
+las llamadas no resueltas, los bordes simbólicos y la firma calculada para `main`.
+`entry_effect_signature` es la evidencia del cierre de efectos del punto de entrada: debe ser válida,
+estar cerrada y no afirmar pureza. Una fila cerrada puede incluir efectos conocidos como `io` o
+`state(local)`. Los callbacks simbólicos de funciones no alcanzadas o sustituidos por una función
+conocida permanecen en el inventario global y se muestran como diagnóstico, pero no bloquean por sí
+solos el contrato del entrypoint. Un callback desconocido que llegue a `main` mantiene abierta su fila.
+`effect_coverage.complete` describe el inventario global de bordes no resueltos; no demuestra pureza ni
+sustituye la firma del entrypoint. La captura ausente o inconsistente mantiene R3 `OPEN`. El host sigue
+siendo un requisito explícito del auditor y no se rellena con valores sintéticos.
 
-En el snapshot de código `29c24c0bd607822dbc2609a54bfcce545ca563f6`:
+En el snapshot local del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d`, las 29 firmas de `main`
+están cerradas; el inventario agregado contiene 74 bordes simbólicos y cero bordes sin resolver.
+El reporte versionado permanece **0/29 READY** porque los bundles locales no deben fingir una captura
+de host.
 
-- Los 29 bundles tienen completos sus campos base.
-- Ninguno está listo para R3: los 29 carecen de `provenance.runtime.host` y los 29 tienen captura de efectos incompleta.
-- El inventario registra 4,266 referencias `caller-operation` sin clasificar y 130 nombres distintos. Su forma sintáctica se divide en 2,003 identificadores y 2,263 rutas de miembro.
+Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
+regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
+del runner (`RUNNER_OS`, arquitectura, imagen, Node, WASI y hardware visible del proceso);
+no se guardan hostname, usuario ni rutas privadas. La acción conserva además el reporte
+R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
+`ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
+campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.
 
-Son referencias registradas por el inventario, no invocaciones dinámicas del programa. Una ruta como `f` puede ser un builtin, función local o callback; `data.max` puede ser un método, campo o API del host. El agrupamiento no determina resolución tipada ni demuestra pureza. Cuando la captura incluye `symbolic_effect_calls`, el reporte cuenta esos callbacks en un inventario separado; no los mezcla con llamadas realmente no resueltas.
+La ejecución CI del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d` completó el mismo gate con
+captura auténtica: **29/29 READY**, 29/29 capturas de host válidas, 29/29 filas de entrada cerradas,
+74 bordes simbólicos en el inventario global y cero bordes sin resolver. El workflow pasó la
+verificación `--require-capture` y las pruebas de readiness/scorecard. El paquete de evidencia de
+90 días está disponible como [artefacto de la ejecución 38859292510](https://github.com/sircalch/Ostrin/actions/runs/38859292510/artifacts/12028054775).
+Este resultado acredita esa ejecución CI; el reporte local y el tablero estático versionado siguen
+`OPEN` hasta una ejecución de publicación desde `main` que regenere y despliegue la evidencia.
 
-`entrypointEffects` presenta aparte los bordes abiertos y callbacks simbólicos registrados en la función de entrada. Si falta cualquiera de esos mapas, el estado es `unavailable`; la evidencia ausente nunca se interpreta como cierre. Este resumen es diagnóstico y **no cambia el gate R3**, que sigue evaluando la evidencia completa del bundle. Un cierre de la fila de entrada tampoco acredita por sí solo alcanzabilidad dinámica, captura del host ni reproducibilidad integral.
+Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles sin validar la
+captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado histórico no basta
+bajo el contrato actual. Las capturas host-bound siguen siendo evidencia útil, pero no sustituyen
+la firma de efectos del entrypoint ni las demás comprobaciones.
 
-En el snapshot `29c24c0bd607822dbc2609a54bfcce545ca563f6`, las capturas no incluyen el mapa simbólico requerido para este diagnóstico, por lo que el cierre de la entrada queda `unavailable`. El avance de efectos tipados en #186 registra la fila de entrada y permite evaluar esa dimensión al integrarse; no se infiere desde el inventario global de funciones de una biblioteca.
+## Diagnósticos de brechas
 
-En una auditoría separada de los bundles del head `8dd2d54b6ef08429444441bd8ae6cd4f40acbb16` de #186, los 29 mapas de entrada tienen cero llamadas abiertas y cero callbacks simbólicos, mientras el inventario global conserva 74 callbacks simbólicos únicos en 10 operaciones. Siguiendo sólo aristas `function_calls` que coinciden exactamente con una clave de `functions`, el diagnóstico encuentra 7 referencias directas a dos límites simbólicos en siete bundles: `std.viz::grid_of.f` en `contourf`, `dashboard`, `heatmap` y `surface`; y `std.numeric::rk45.f` en `double-pendulum`, `ode` y `orbits`. Esos bordes globales, filas de entrada y recorridos directos son mediciones distintas; el resultado no cambia el estado R3 ni demuestra por sí solo que todas las rutas dinámicas estén capturadas.
+`gapDiagnostics` desglosa los campos de captura ausentes o incompletos, el inventario de referencias
+no resueltas y callbacks simbólicos, la fila de efectos del entrypoint y la alcanzabilidad directa
+que puede reconstruirse desde `function_calls`. Las referencias por sintaxis (identificador, ruta de
+miembro o ruta cualificada) son agrupaciones textuales; no deciden si una llamada resuelve a función,
+método, callback o API externa. El recorrido directo sigue solo aristas que coinciden exactamente
+con nombres registrados de función y no acredita alcanzabilidad dinámica completa.
 
-El campo `effectInventory.symbolicInventoryStatus` distingue entre mapas disponibles, parciales y ausentes. Si no todos están disponibles, los totales consolidados de callbacks son `null` (desconocidos), aunque `observedSymbolicCallbackReferences` registre cualquier evidencia parcial. El diagnóstico `directReachability` sólo sigue aristas `function_calls` cuyo nombre coincide exactamente con una clave de `functions`; no descubre callbacks dinámicos ni demuestra alcanzabilidad completa. Sus totales también son `null` si falta el grafo de algún bundle, y cualquier lista parcial identifica su cobertura. Ninguna de estas métricas cambia el gate R3.
-
-Este reporte tampoco determina si las entradas externas están capturadas de forma completa y segura ni si las tolerancias numéricas están justificadas científicamente. Esos contratos requieren validación independiente.
-
-## Captura del host en CI
-
-La acción de Pages activa `OSTRIN_CAPTURE_HOST=1` al regenerar los bundles. Conserva metadatos públicos del runner (sistema, arquitectura, imagen, Node, WASI y hardware visible al proceso), sin hostname, usuario ni rutas privadas. El artefacto `ostrin-r3-host-evidence-<run_id>` se conserva 90 días.
-
-El artefacto de la ejecución `38162721694` no cierra el estado actual. GitHub informa que esa ejecución fue cancelada; además, su reporte anterior marcaba `READY`, pero los bundles archivados no contenían `effect_coverage` ni `unresolved_calls`. La implementación vigente exige una captura estructuralmente válida y que el inventario de efectos esté completo. Por eso no se usa ese artefacto antiguo para promover los 29 bundles.
+En el reporte local generado desde el código actual hay 29/29 filas de `main` cerradas, 74
+referencias a 10 callbacks simbólicos en el inventario global, cero llamadas no resueltas y 29/29
+capturas sin `provenance.runtime.host`. El recorrido directo encuentra siete referencias a dos
+callbacks en siete bundles. Esos contadores describen vistas distintas del análisis; no prueban
+pureza ni sustituyen la captura de host. Por ello el reporte local continúa **OPEN**, con 0/29
+bundles R3 listos.
