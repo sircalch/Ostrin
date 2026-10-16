@@ -35,10 +35,11 @@ Revision terms are deliberately separate: **source revision** is `d0abbad…`, t
   the ref was untagged. [Benchmarks](https://github.com/sircalch/Ostrin/actions/runs/38609662881)
   and [website deployment](https://github.com/sircalch/Ostrin/actions/runs/38681256306)
   also passed.
-- The readiness manifest marks all 12 criteria `READY` for the evidence scope; the candidate remains
-  unpublished and untagged pending explicit owner authorization. The RC
-  evidence manifest and readiness links point to source revision `d0abbad`
-  and its verified artifact runs. Later evidence-only metadata commits do not
-  change that compiler source revision or the artifact hashes.
+- The frozen v0.2 evidence set records all 12 criteria `READY` for its declared
+  scope. Release `v0.2.0` is now public: its annotated tag peels to
+  `29c24c0bd607822dbc2609a54bfcce545ca563f6`, and its published archives were
+  built from that exact source revision. This readiness result is not a claim
+  of production readiness. RC artifacts remain tied to `d0abbad`; their hashes
+  are not reused for the final release.
 - Nested generic wrappers, broader aggregate combinations, and cancellation
   states beyond the focused pre-run case remain outside the ownership claim.
