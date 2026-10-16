@@ -42,11 +42,14 @@ pub struct EffectSignature {
     pub effects: BTreeSet<EffectKind>,
     pub variables: BTreeSet<String>,
     pub open_calls: BTreeSet<String>,
+    /// A row inferred from a program with type errors cannot be advertised as
+    /// closed, even if its effect-call inventory is otherwise empty.
+    pub type_errors: usize,
 }
 
 impl EffectSignature {
     pub fn is_closed(&self) -> bool {
-        self.variables.is_empty() && self.open_calls.is_empty()
+        self.type_errors == 0 && self.variables.is_empty() && self.open_calls.is_empty()
     }
 }
 
@@ -441,6 +444,7 @@ fn analyze_with_types_internal(
                         .get(function)
                         .cloned()
                         .unwrap_or_default(),
+                    type_errors: typed.errors.len(),
                 },
             )
         })

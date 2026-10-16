@@ -14248,6 +14248,16 @@ fn io_action() -> Void { print("effect") }
         "a type-invalid partial match cannot claim global effect closure"
     );
     assert!(report["effect_closure"]["type_errors"].as_u64().unwrap() > 0);
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], false,
+        "type errors must keep per-function effect rows open"
+    );
+    assert!(
+        report["function_effect_signatures"]["main"]["type_errors"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
     let _ = fs::remove_file(file);
 }
 

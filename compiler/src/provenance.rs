@@ -277,6 +277,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
                     "variables": signature.variables.iter().map(|name| format!("ε_{name}")).collect::<Vec<_>>(),
                     "open_calls": signature.open_calls,
                     "row_closed": signature.is_closed(),
+                    "type_errors": signature.type_errors,
                     "purity_proven": false,
                 }),
             )
