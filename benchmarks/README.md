@@ -42,6 +42,10 @@ report compare `Float`, linear interval and affine point costs on one host. The
 reported wall time includes process startup; it does not isolate per-operation
 latency or allocation counts, and it must not be generalized beyond the
 recorded platform and compiler configuration.
+The first source-backed Windows x64 run is stored in
+`validation/affine-temperature-cost.json`. Its `commit` field identifies the
+clean source revision used for the binaries; the later commit that checks in
+the report is the evidence revision, so the report does not need a self-hash.
 
 Run a local report after building the release compiler:
 
