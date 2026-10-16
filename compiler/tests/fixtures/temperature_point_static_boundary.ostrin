@@ -1,0 +1,9 @@
+fn shift(point: TemperaturePoint, delta: Quantity<Temperature>) -> TemperaturePoint {
+    point + delta
+}
+
+fn difference(left: TemperaturePoint, right: TemperaturePoint) -> Quantity<Temperature> {
+    left - right
+}
+
+fn main() -> Void {}

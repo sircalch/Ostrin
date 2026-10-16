@@ -12093,6 +12093,22 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn temperature_point_boundary_is_explicitly_rejected_natively() {
+    let file = fixture_path("temperature_point_static_boundary.ostrin");
+    let native = run(&["--native-type-report", &file]);
+    assert!(
+        !native.status.success(),
+        "TemperaturePoint was enabled without a native runtime representation"
+    );
+    assert!(
+        stderr(&native)
+            .contains("type 'TemperaturePoint' is not supported by the native backend yet"),
+        "native TemperaturePoint boundary diagnostic changed: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
 fn measurement_array_boundary_has_actionable_diagnostic() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);

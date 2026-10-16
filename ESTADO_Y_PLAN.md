@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-16 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 356 de integración y 22 unitarias en verde.*
+*Corte: 2026-10-16 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 357 de integración y 22 unitarias en verde.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -624,7 +624,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 356 de integración + 22 unitarias
+    cargo test                                   # 6 diferenciales + 357 de integración + 22 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

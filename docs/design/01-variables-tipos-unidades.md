@@ -317,7 +317,7 @@ Estado real del compilador, que concreta §3.1–§3.5:
   ambos lados. El runtime C recibe las unidades declaradas en una tabla generada. Ejemplo:
   `examples/user_units.ostrin`.
 
-### 3.6 Temperaturas absolutas e intervalos (diseño; aún no implementado)
+### 3.6 Temperaturas absolutas e intervalos (modelo; implementación parcial)
 
 Las unidades Celsius y Fahrenheit no pueden entrar en la tabla multiplicativa existente. Esa tabla
 representa cada unidad con `(dimensión, factor)` y convierte como `valor * factor_origen /
@@ -327,8 +327,12 @@ unidades ni de una conversión de intervalos. La conversión de arrays de temper
 aplicar el offset elemento a elemento; los arrays de intervalos solo aplican el factor de escala.
 El array deberá conservar el rol de sus elementos para seleccionar la transformación correcta.
 
-La semántica futura distinguirá una **temperatura absoluta** de un **intervalo de temperatura**.
-Ambos comparten la dimensión física `Temperature`, pero tienen reglas algebraicas distintas:
+La semántica distingue ya estos roles en metadatos internos y el type checker distingue el tipo
+nominal `TemperaturePoint` de `Quantity<Temperature>`. La construcción de valores, la ejecución en
+el intérprete y el lowering nativo/WASI siguen sin estar implementados; por ello, la capacidad no
+está disponible para programas de usuario. El diseño completo separa una **temperatura absoluta**
+de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
+reglas algebraicas distintas:
 
 | Operación | Resultado | Estado propuesto |
 | --- | --- | --- |
