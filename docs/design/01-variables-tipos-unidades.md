@@ -400,11 +400,13 @@ declaren unidades afines con `unit`/`define`; esa extensión necesitará validar
 referencia y composición antes de exponerse.
 
 El compilador ya contiene un núcleo interno de metadatos y operaciones por rol (`UnitDefinition`,
-`QuantityRole` y el catálogo de escalas de punto K/degC/degF), además de una variante interna
-`Ty::TemperaturePoint` con reglas de operadores en el type checker. Las pruebas ejercitan estas
-reglas directamente. La variante aún no se resuelve desde anotaciones fuente ni se produce desde
-el AST; tampoco se ejecuta en HIR/IR, intérprete o backends. Por ello, las pruebas verifican las
-fórmulas y reglas aisladas, no paridad del lenguaje ni disponibilidad de la característica.
+`QuantityRole` y el catálogo de escalas de punto K/degC/degF), además de una variante
+`Ty::TemperaturePoint` con reglas de operadores en el type checker. El nombre también se conserva
+al convertir entre `Ty` y los metadatos de tipo del AST, para que firmas tipadas y sustituciones no
+degraden la identidad del punto. Aún no hay una expresión fuente que construya un punto: HIR puede
+conservarlo en tipos declarados, pero el lowering de operaciones a IR, el intérprete y los
+backends no ejecutan esta variante. Por ello, las pruebas verifican reglas internas y round-trip
+de metadatos, no paridad de ejecución ni disponibilidad de la característica.
 
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin

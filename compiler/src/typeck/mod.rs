@@ -4979,6 +4979,7 @@ fn resolve_type_with_type_subst(
                 "Char" => Ty::Char,
                 "String" => Ty::String,
                 "Void" => Ty::Void,
+                "TemperaturePoint" if args.is_empty() => Ty::TemperaturePoint,
                 "Quantity" if args.len() == 1 => {
                     // A generic method's `D: Dimension` is inferred into
                     // `type_subst` as `Quantity<D>` (see `unify_generic_type`).
@@ -6794,9 +6795,15 @@ fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
 
 #[cfg(test)]
 mod temperature_point_checker_tests {
-    use super::Checker;
+    use super::{resolve_type, type_from_ty, Checker};
     use crate::ast::{BinOp, Expr, UnaryOp};
     use crate::types::{dim_single, Ty};
+
+    #[test]
+    fn temperature_point_type_round_trips_through_source_type_metadata() {
+        let declared = type_from_ty(&Ty::TemperaturePoint);
+        assert_eq!(resolve_type(&declared), Ty::TemperaturePoint);
+    }
 
     fn check(op: BinOp, left: Ty, right: Ty) -> (Ty, bool) {
         let mut checker = Checker::new();
