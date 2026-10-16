@@ -11,7 +11,8 @@ node scripts/r3-readiness.mjs --write
 
 Pages CI captura metadatos del runner y usa `node scripts/r3-readiness.mjs
 --require-capture`; este modo valida que la captura esté completa y
-estructuralmente válida. No marca el nivel R3 como listo por tener esos metadatos.
+estructuralmente válida. Los metadatos de host por sí solos no bastan: R3 también
+requiere el contrato completo del bundle y una fila de efectos cerrada para el entrypoint.
 
 El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.json).
 Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
@@ -32,10 +33,10 @@ solos el contrato del entrypoint. Un callback desconocido que llegue a `main` ma
 sustituye la firma del entrypoint. La captura ausente o inconsistente mantiene R3 `OPEN`. El host sigue
 siendo un requisito explícito del auditor y no se rellena con valores sintéticos.
 
-En el snapshot local del head `8dd2d54b6ef08429444441bd8ae6cd4f40acbb16`, las 29 firmas de `main`
-están cerradas; el inventario agregado todavía contiene 74 bordes simbólicos y cero bordes sin
-resolver. R3 permanece **0/29 READY** porque faltan los metadatos auténticos del host en los bundles
-locales. CI debe reconstruirlos en el runner y volver a ejecutar el mismo gate antes de acreditar R3.
+En el snapshot local del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d`, las 29 firmas de `main`
+están cerradas; el inventario agregado contiene 74 bordes simbólicos y cero bordes sin resolver.
+El reporte versionado permanece **0/29 READY** porque los bundles locales no deben fingir una captura
+de host.
 
 Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
 regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
@@ -44,6 +45,14 @@ no se guardan hostname, usuario ni rutas privadas. La acción conserva además e
 R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
 `ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
 campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.
+
+La ejecución CI del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d` completó el mismo gate con
+captura auténtica: **29/29 READY**, 29/29 capturas de host válidas, 29/29 filas de entrada cerradas,
+74 bordes simbólicos en el inventario global y cero bordes sin resolver. El workflow pasó la
+verificación `--require-capture` y las pruebas de readiness/scorecard. El paquete de evidencia de
+90 días está disponible como [artefacto de la ejecución 38859292510](https://github.com/sircalch/Ostrin/actions/runs/38859292510/artifacts/12028054775).
+Este resultado acredita esa ejecución CI; el reporte local y el tablero estático versionado siguen
+`OPEN` hasta una ejecución de publicación desde `main` que regenere y despliegue la evidencia.
 
 Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles sin validar la
 captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado histórico no basta
