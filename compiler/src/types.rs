@@ -65,6 +65,39 @@ pub enum QuantityArithmetic {
     Subtract,
 }
 
+/// Static result role for the affine arithmetic table. The type checker can
+/// use this before selecting runtime conversion formulas.
+#[allow(dead_code)] // Consumed by type checking when TemperaturePoint is enabled.
+pub fn arithmetic_result_role(
+    left: &QuantityRole,
+    right: &QuantityRole,
+    operation: QuantityArithmetic,
+) -> Result<QuantityRole, String> {
+    match (left, right, operation) {
+        (QuantityRole::Linear, QuantityRole::Linear, _) => Ok(QuantityRole::Linear),
+        (QuantityRole::Point(space), QuantityRole::Linear, _) => {
+            Ok(QuantityRole::Point(space.clone()))
+        }
+        (QuantityRole::Linear, QuantityRole::Point(space), QuantityArithmetic::Add) => {
+            Ok(QuantityRole::Point(space.clone()))
+        }
+        (QuantityRole::Linear, QuantityRole::Point(_), QuantityArithmetic::Subtract) => {
+            Err("subtracting an absolute point from an interval is undefined".to_string())
+        }
+        (QuantityRole::Point(_), QuantityRole::Point(_), QuantityArithmetic::Add) => {
+            Err("adding two absolute points is undefined".to_string())
+        }
+        (QuantityRole::Point(left), QuantityRole::Point(right), QuantityArithmetic::Subtract)
+            if left == right =>
+        {
+            Ok(QuantityRole::Linear)
+        }
+        (QuantityRole::Point(_), QuantityRole::Point(_), QuantityArithmetic::Subtract) => {
+            Err("cannot subtract points from different affine spaces".to_string())
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)] // Values are constructed by the future typed expression path.
 pub struct RoleAwareQuantity {
@@ -336,6 +369,7 @@ pub fn combine_quantities_with_role(
     right: &RoleAwareQuantity,
     operation: QuantityArithmetic,
 ) -> Result<RoleAwareQuantity, String> {
+    let result_role = arithmetic_result_role(&left.role, &right.role, operation)?;
     for value in [left, right] {
         if let QuantityRole::Point(space) = &value.role {
             convert_value_with_role(
@@ -344,13 +378,6 @@ pub fn combine_quantities_with_role(
                 &value.unit,
                 &QuantityRole::Point(space.clone()),
             )?;
-        }
-    }
-    if let (QuantityRole::Point(left_space), QuantityRole::Point(right_space)) =
-        (&left.role, &right.role)
-    {
-        if left_space != right_space {
-            return Err("cannot combine points from different affine spaces".to_string());
         }
     }
     let (left_point, right_point) = (
@@ -377,13 +404,10 @@ pub fn combine_quantities_with_role(
             Ok(RoleAwareQuantity {
                 value: left.value - right_value,
                 unit: UnitDefinition::linear(left.unit.dimension.clone(), left.unit.scale),
-                role: QuantityRole::Linear,
+                role: result_role.clone(),
             })
         }
         (true, false, operation) => {
-            let QuantityRole::Point(space) = &left.role else {
-                unreachable!()
-            };
             let interval = convert_value_with_role(
                 right.value,
                 &right.unit,
@@ -396,13 +420,10 @@ pub fn combine_quantities_with_role(
                     QuantityArithmetic::Subtract => left.value - interval,
                 },
                 unit: left.unit.clone(),
-                role: QuantityRole::Point(space.clone()),
+                role: result_role.clone(),
             })
         }
         (false, true, QuantityArithmetic::Add) => {
-            let QuantityRole::Point(space) = &right.role else {
-                unreachable!()
-            };
             let interval = convert_value_with_role(
                 left.value,
                 &left.unit,
@@ -412,7 +433,7 @@ pub fn combine_quantities_with_role(
             Ok(RoleAwareQuantity {
                 value: interval + right.value,
                 unit: right.unit.clone(),
-                role: QuantityRole::Point(space.clone()),
+                role: result_role.clone(),
             })
         }
         (false, false, operation) => {
@@ -428,7 +449,7 @@ pub fn combine_quantities_with_role(
                     QuantityArithmetic::Subtract => left.value - right_value,
                 },
                 unit: UnitDefinition::linear(left.unit.dimension.clone(), left.unit.scale),
-                role: QuantityRole::Linear,
+                role: result_role,
             })
         }
     }
@@ -893,10 +914,10 @@ impl Ty {
 #[cfg(test)]
 mod affine_unit_tests {
     use super::{
-        builtin_temperature_point_unit, combine_quantities_with_role, compare_quantities_with_role,
-        convert_value_with_role, declare_unit, define_unit, dim_single, negate_quantity_with_role,
-        reset_user_units, unit_definition, unit_info, QuantityArithmetic, QuantityRole,
-        RoleAwareQuantity, UnitDefinition,
+        arithmetic_result_role, builtin_temperature_point_unit, combine_quantities_with_role,
+        compare_quantities_with_role, convert_value_with_role, declare_unit, define_unit,
+        dim_single, negate_quantity_with_role, reset_user_units, unit_definition, unit_info,
+        QuantityArithmetic, QuantityRole, RoleAwareQuantity, UnitDefinition,
     };
 
     fn close(actual: f64, expected: f64) {
@@ -1057,6 +1078,18 @@ mod affine_unit_tests {
             unit,
             role: QuantityRole::Linear,
         };
+
+        let point_role = QuantityRole::Point("Temperature".to_string());
+        let linear_role = QuantityRole::Linear;
+        assert_eq!(
+            arithmetic_result_role(&point_role, &point_role, QuantityArithmetic::Subtract).unwrap(),
+            linear_role
+        );
+        assert_eq!(
+            arithmetic_result_role(&point_role, &linear_role, QuantityArithmetic::Add).unwrap(),
+            point_role
+        );
+        assert!(arithmetic_result_role(&point_role, &point_role, QuantityArithmetic::Add).is_err());
 
         let difference = combine_quantities_with_role(
             &point(0.0, celsius.clone()),
