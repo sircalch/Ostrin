@@ -238,6 +238,31 @@ pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
     unit_definition(symbol).map(|unit| (unit.dimension, unit.scale))
 }
 
+/// Internal point-scale catalog. These symbols intentionally do not enter
+/// `unit_info`: until the parser and type checker preserve point roles, making
+/// them ordinary source units would silently treat absolute readings as
+/// intervals. Interval conversions continue to use the existing linear unit
+/// catalog.
+#[allow(dead_code)] // Wired when source-level TemperaturePoint is lowered.
+pub fn builtin_temperature_point_unit(symbol: &str) -> Option<UnitDefinition> {
+    let temperature = dim_single("Temperature");
+    match symbol {
+        "K" => Some(
+            UnitDefinition::affine(temperature, 1.0, 0.0, "Temperature")
+                .expect("built-in Kelvin metadata is valid"),
+        ),
+        "degC" => Some(
+            UnitDefinition::affine(temperature, 1.0, 273.15, "Temperature")
+                .expect("built-in Celsius metadata is valid"),
+        ),
+        "degF" => Some(
+            UnitDefinition::affine(temperature, 5.0 / 9.0, 459.67 / 1.8, "Temperature")
+                .expect("built-in Fahrenheit metadata is valid"),
+        ),
+        _ => None,
+    }
+}
+
 /// Convert a numerical value while keeping its semantic role explicit.
 /// Linear values use only scales. Absolute points also apply origins, after
 /// confirming that both units belong to the requested affine space.
@@ -708,8 +733,8 @@ impl Ty {
 #[cfg(test)]
 mod affine_unit_tests {
     use super::{
-        convert_value_with_role, declare_unit, define_unit, dim_single, reset_user_units,
-        unit_definition, QuantityRole, UnitDefinition,
+        builtin_temperature_point_unit, convert_value_with_role, declare_unit, define_unit,
+        dim_single, reset_user_units, unit_definition, unit_info, QuantityRole, UnitDefinition,
     };
 
     fn close(actual: f64, expected: f64) {
@@ -722,12 +747,10 @@ mod affine_unit_tests {
     #[test]
     fn affine_point_and_linear_interval_conversions_use_distinct_rules() {
         let temperature = dim_single("Temperature");
-        let celsius =
-            UnitDefinition::affine(temperature.clone(), 1.0, 273.15, "Temperature").unwrap();
-        let fahrenheit =
-            UnitDefinition::affine(temperature.clone(), 5.0 / 9.0, 459.67 / 1.8, "Temperature")
-                .unwrap();
-        let kelvin = unit_definition("K").unwrap();
+        let celsius = builtin_temperature_point_unit("degC").unwrap();
+        let fahrenheit = builtin_temperature_point_unit("degF").unwrap();
+        let kelvin = builtin_temperature_point_unit("K").unwrap();
+        assert_eq!(celsius.dimension, temperature);
 
         close(
             convert_value_with_role(
@@ -750,6 +773,30 @@ mod affine_unit_tests {
             100.0,
         );
         close(
+            convert_value_with_role(
+                0.0,
+                &celsius,
+                &fahrenheit,
+                &QuantityRole::Point("Temperature".to_string()),
+            )
+            .unwrap(),
+            32.0,
+        );
+        let round_trip = convert_value_with_role(
+            convert_value_with_role(
+                23.4,
+                &celsius,
+                &fahrenheit,
+                &QuantityRole::Point("Temperature".to_string()),
+            )
+            .unwrap(),
+            &fahrenheit,
+            &celsius,
+            &QuantityRole::Point("Temperature".to_string()),
+        )
+        .unwrap();
+        close(round_trip, 23.4);
+        close(
             convert_value_with_role(1.0, &fahrenheit, &kelvin, &QuantityRole::Linear).unwrap(),
             5.0 / 9.0,
         );
@@ -757,15 +804,17 @@ mod affine_unit_tests {
             convert_value_with_role(1.0, &celsius, &kelvin, &QuantityRole::Linear).unwrap(),
             1.0,
         );
+        close(
+            convert_value_with_role(1.0, &fahrenheit, &celsius, &QuantityRole::Linear).unwrap(),
+            5.0 / 9.0,
+        );
     }
 
     #[test]
     fn affine_point_conversion_rejects_incompatible_spaces_and_dimensions() {
-        let temperature = dim_single("Temperature");
         let pressure = dim_single("Pressure");
-        let celsius =
-            UnitDefinition::affine(temperature.clone(), 1.0, 273.15, "Temperature").unwrap();
-        let kelvin = unit_definition("K").unwrap();
+        let celsius = builtin_temperature_point_unit("degC").unwrap();
+        let kelvin = builtin_temperature_point_unit("K").unwrap();
         let unmarked_linear = UnitDefinition::linear(dim_single("Temperature"), 1.0);
         let pascal = UnitDefinition::affine(pressure, 1.0, 0.0, "Pressure").unwrap();
 
@@ -794,11 +843,18 @@ mod affine_unit_tests {
 
     #[test]
     fn existing_units_keep_their_scale_and_zero_offset() {
-        let kelvin = unit_definition("K").unwrap();
+        let kelvin = builtin_temperature_point_unit("K").unwrap();
         assert_eq!(kelvin.dimension, dim_single("Temperature"));
         assert_eq!(kelvin.scale, 1.0);
         assert_eq!(kelvin.offset, 0.0);
         assert_eq!(kelvin.affine_space, Some("Temperature".to_string()));
+        assert_eq!(
+            unit_definition("K").unwrap().affine_space,
+            Some("Temperature".to_string())
+        );
+        assert!(unit_info("degC").is_none());
+        assert!(unit_info("degF").is_none());
+        assert!(builtin_temperature_point_unit("m").is_none());
 
         reset_user_units();
         declare_unit("affine_test_foot", dim_single("Length")).unwrap();
