@@ -1369,11 +1369,19 @@ fn register_directly_returned_closures(block: &Block, function: &str, report: &m
                     complete &= value_complete;
                 }
                 Stmt::Return(None) => complete = false,
-                Stmt::For { .. }
-                | Stmt::While { .. }
-                | Stmt::Expr(Expr::If(..) | Expr::Block(..) | Expr::Loop(..) | Expr::Match(..)) => {
+                Stmt::For { .. } | Stmt::While { .. } => {
                     // Returns nested in these constructs are not yet associated
                     // with a complete function result on every path.
+                    complete = false;
+                }
+                Stmt::Expr(value)
+                    if matches!(
+                        value.unlocated(),
+                        Expr::If(..) | Expr::Block(..) | Expr::Loop(..) | Expr::Match(..)
+                    ) =>
+                {
+                    // The parser wraps expressions with source locations, so
+                    // inspect the semantic node to catch nested control flow.
                     complete = false;
                 }
                 Stmt::FieldAssign { .. } | Stmt::Expr(_) | Stmt::Break(_) | Stmt::Continue => {}

@@ -14149,6 +14149,11 @@ fn experimental_effect_signatures_keep_ambiguous_returned_closures_open() {
 fn choose_mixed(action: fn() -> Void, flag: Bool) -> fn() -> Void {
     if flag { fn() { action() } } else { unknown_action }
 }
+fn choose_mutating(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    deferred = fn() { action() }
+    if flag { deferred = unknown_action }
+    deferred
+}
 fn io_action() -> Void { print("effect") }
 fn unknown_action() -> Void { host.callback() }
 fn main() -> Void {
@@ -14157,6 +14162,10 @@ fn main() -> Void {
 }
 fn mixed_main() -> Void {
     deferred: fn() -> Void = choose_mixed(io_action, true)
+    deferred()
+}
+fn mutating_main() -> Void {
+    deferred: fn() -> Void = choose_mutating(io_action, true)
     deferred()
 }
 "#,
@@ -14184,6 +14193,14 @@ fn mixed_main() -> Void {
     );
     assert_eq!(
         report["function_effect_signatures"]["mixed_main"]["open_calls"],
+        serde_json::json!(["deferred"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mutating_main"]["row_closed"], false,
+        "a conditional reassignment must invalidate the earlier closure identity"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mutating_main"]["open_calls"],
         serde_json::json!(["deferred"])
     );
     let _ = fs::remove_file(file);
