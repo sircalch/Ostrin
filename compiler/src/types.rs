@@ -304,8 +304,16 @@ pub fn builtin_temperature_point_unit(symbol: &str) -> Option<UnitDefinition> {
                 .expect("built-in Celsius metadata is valid"),
         ),
         "degF" => Some(
-            UnitDefinition::affine(temperature, 5.0 / 9.0, 459.67 / 1.8, "Temperature")
-                .expect("built-in Fahrenheit metadata is valid"),
+            // Anchor the floating-point offset at the exact reference pair
+            // 32 °F = 273.15 K. Together with `mul_add` below, this keeps
+            // equivalent reference readings equal after conversion.
+            UnitDefinition::affine(
+                temperature,
+                5.0 / 9.0,
+                273.15 - 32.0 * (5.0 / 9.0),
+                "Temperature",
+            )
+            .expect("built-in Fahrenheit metadata is valid"),
         ),
         _ => None,
     }
@@ -353,7 +361,7 @@ pub fn convert_value_with_role(
                     ));
                 }
             }
-            let coherent = value * from.scale + from.offset;
+            let coherent = value.mul_add(from.scale, from.offset);
             Ok((coherent - to.offset) / to.scale)
         }
     }
@@ -1194,6 +1202,34 @@ mod affine_unit_tests {
                     );
                 }
             }
+        }
+
+        // Equivalent reference readings must compare equal across scales.
+        // Fused multiply-add and the Fahrenheit offset anchor avoid a false
+        // ordering caused by intermediate rounding at 32 °F = 0 °C.
+        for celsius in [-40.0, 0.0, 37.0, 100.0] {
+            let celsius_point = RoleAwareQuantity {
+                value: celsius,
+                unit: scales[1].clone(),
+                role: role.clone(),
+            };
+            let fahrenheit_value =
+                convert_value_with_role(celsius, &scales[1], &scales[2], &role).unwrap();
+            let fahrenheit_point = RoleAwareQuantity {
+                value: fahrenheit_value,
+                unit: scales[2].clone(),
+                role: role.clone(),
+            };
+            assert_eq!(
+                compare_quantities_with_role(&celsius_point, &fahrenheit_point).unwrap(),
+                std::cmp::Ordering::Equal,
+                "{celsius} °C and {fahrenheit_value} °F should compare equal"
+            );
+            assert_eq!(
+                compare_quantities_with_role(&fahrenheit_point, &celsius_point).unwrap(),
+                std::cmp::Ordering::Equal,
+                "{fahrenheit_value} °F and {celsius} °C should compare equal"
+            );
         }
 
         // The same interval must move an absolute point by the same coherent

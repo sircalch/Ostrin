@@ -349,7 +349,10 @@ reglas algebraicas distintas:
 La transformación de una lectura absoluta al valor coherente será `base = scale * value + offset`;
 la conversión entre escalas será `value_to = (scale_from * value_from + offset_from -
 offset_to) / scale_to`. Para intervalos solo se aplicará `interval_to =
-scale_from / scale_to * interval_from`. Por tanto, una implementación no debe inferir si una
+scale_from / scale_to * interval_from`. La implementación interna usa una operación fused multiply-add
+para reducir el redondeo al normalizar puntos, y calcula el offset Fahrenheit desde el par de referencia
+exacto `32 °F = 273.15 K`; una prueba verifica que referencias Celsius/Fahrenheit equivalentes comparen
+iguales en ambas direcciones. Por tanto, una implementación no debe inferir si una
 cantidad es absoluta únicamente a partir de la dimensión `Quantity<Temperature>`: requiere una
 distinción representable por el sistema de tipos y preservada por HIR/IR, intérprete, backend
 nativo, arrays, formatters y serialización.
