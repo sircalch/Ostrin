@@ -12956,6 +12956,88 @@ fn open_main() -> Void { forward(2, unknown) }
 }
 
 #[test]
+fn experimental_effect_variables_compose_through_imported_generic_wrappers() {
+    let project = std::env::temp_dir().join(format!(
+        "ostrin_effect_module_callbacks_{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&project);
+    fs::create_dir_all(&project).unwrap();
+    fs::write(
+        project.join("ostrin.toml"),
+        "[package]\nname = \"effect_module_probe\"\nversion = \"0.1.0\"\nentry = \"main.ostrin\"\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("shared.ostrin"),
+        "pub fn apply<T>(value: T, action: fn(T) -> Void) -> Void { action(value) }\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("main.ostrin"),
+        r#"import shared
+fn output(value: Int) -> Void { print("effect") }
+fn unknown(value: Int) -> Void { host_effect() }
+fn wrapper() -> Void { shared.apply(2, output) }
+fn open_main() -> Void { shared.apply(2, unknown) }
+fn main() -> Void { wrapper() }
+"#,
+    )
+    .unwrap();
+    let project_path = project.display().to_string();
+
+    let out = run(&["--effect-report", "--json", "--project", &project_path]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["shared::apply"]["variables"],
+        serde_json::json!(["ε_action"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["effects"],
+        serde_json::json!(["io"]),
+        "a known callback effect must propagate through the imported generic function"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["row_closed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host_effect"]),
+        "an unknown callback effect must remain open across a module boundary"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        report["effect_coverage"]["symbolic_calls"],
+        serde_json::json!(1)
+    );
+    assert_eq!(
+        report["effect_coverage"]["unresolved_calls"],
+        serde_json::json!(1)
+    );
+
+    let hir = run(&["--hir", "--project", &project_path]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn wrapper() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("fn open_main() -> Void\n  unresolved effect calls: host_effect"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+
+    let ir = run(&["--ir", "--project", &project_path]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir fn wrapper() -> Void\n  effects: io"));
+    assert!(
+        stdout(&ir).contains("ir fn open_main() -> Void\n  unresolved effect calls: host_effect")
+    );
+    assert!(stdout(&ir).contains("ir violations: 0"));
+
+    fs::remove_dir_all(project).unwrap();
+}
+
+#[test]
 fn experimental_effect_signatures_compose_through_callbacks_without_claiming_purity() {
     let file = temp_source(
         "effects-signature-composition.ostrin",
