@@ -12884,7 +12884,9 @@ fn experimental_effect_variables_compose_through_generic_callback_wrappers() {
         r#"fn apply<T>(value: T, action: fn(T) -> Void) -> Void { action(value) }
 fn forward<U>(value: U, action: fn(U) -> Void) -> Void { apply(value, action) }
 fn output(value: Int) -> Void { print("effect") }
+fn unknown(value: Int) -> Void { host_effect() }
 fn main() -> Void { forward(2, output) }
+fn open_main() -> Void { forward(2, unknown) }
 "#,
     );
 
@@ -12923,19 +12925,32 @@ fn main() -> Void { forward(2, output) }
         report["function_effect_signatures"]["main"]["purity_proven"],
         serde_json::json!(false)
     );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host_effect"]),
+        "an unknown effect must remain open through generic callback wrappers"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        serde_json::json!(false)
+    );
     assert_eq!(report["effect_coverage"]["symbolic_calls"], 1);
-    assert_eq!(report["effect_coverage"]["unresolved_calls"], 0);
+    assert_eq!(report["effect_coverage"]["unresolved_calls"], 1);
 
     let hir = run(&["--hir", &file]);
     assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
     assert!(stdout(&hir).contains("effect substitution: ε_action <- ε_action via apply"));
     assert!(stdout(&hir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("fn open_main() -> Void\n  unresolved effect calls: host_effect"));
     assert!(stdout(&hir).contains("hir violations: 0"));
 
     let ir = run(&["--ir", &file]);
     assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
     assert!(stdout(&ir).contains("effect substitution: ε_action <- ε_action via apply"));
     assert!(stdout(&ir).contains("ir fn main() -> Void\n  effects: io"));
+    assert!(
+        stdout(&ir).contains("ir fn open_main() -> Void\n  unresolved effect calls: host_effect")
+    );
     assert!(stdout(&ir).contains("ir violations: 0"));
     let _ = fs::remove_file(file);
 }
