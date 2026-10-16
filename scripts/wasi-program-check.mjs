@@ -26,7 +26,7 @@ const programs = [
   },
   {
     name: "temperature_point_affine",
-    source: "compiler/tests/fixtures/temperature_point_affine.ostrin",
+    source: "compiler/tests/fixtures/temperature_point_affine.ostrin.txt",
     args: ["temperature_point_affine.wasm"],
     expected: "10 degC (absolute)\n10 K\n0 K\n10 degC (absolute)\n0 degC (absolute)\n310 K\n",
   },

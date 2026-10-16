@@ -12094,7 +12094,7 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 
 #[test]
 fn temperature_point_native_backend_matches_interpreter() {
-    let file_arg = fixture_path("temperature_point_affine.ostrin");
+    let file_arg = fixture_path("temperature_point_affine.ostrin.txt");
     let interpreted = run(&["--run", &file_arg]);
     assert!(
         interpreted.status.success(),
