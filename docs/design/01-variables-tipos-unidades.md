@@ -323,9 +323,10 @@ Las unidades Celsius y Fahrenheit no pueden entrar en la tabla multiplicativa ex
 representa cada unidad con `(dimensión, factor)` y convierte como `valor * factor_origen /
 factor_destino`; esa regla es correcta para intervalos, pero no para temperaturas absolutas. En
 particular, un offset no puede formar parte de productos, cocientes, potencias, simplificación de
-unidades ni de una conversión de intervalos. La conversión de arrays de temperaturas absolutas debe
-aplicar el offset elemento a elemento; los arrays de intervalos solo aplican el factor de escala.
-El array deberá conservar el rol de sus elementos para seleccionar la transformación correcta.
+unidades ni de la conversión multiplicativa de intervalos. La conversión actual de arrays de
+`Quantity<Temperature>` aplica únicamente factores porque ese tipo representa intervalos lineales.
+Cuando se habiliten arrays de puntos absolutos, deberán aplicar el offset elemento a elemento y
+conservar el rol de sus elementos para seleccionar la transformación correcta.
 
 La semántica distingue estos roles en metadatos internos y el type checker distingue el tipo nominal
 `TemperaturePoint` de `Quantity<Temperature>`. El intérprete expone el constructor explícito
@@ -334,9 +335,9 @@ La semántica distingue estos roles en metadatos internos y el type checker dist
 intervalo lineal. Los puntos se pueden comparar, desplazar por intervalos de temperatura y restar
 entre sí; la diferencia resultante es un intervalo Kelvin. El constructor rechaza escalas distintas
 de las tres permitidas y valores no finitos. El intérprete y los backends nativos IR y AST ejecutan
-el tipo escalar; WASI genera C para este contrato, pero todavía no se ha verificado su compilación y
-ejecución en un runtime WASI. No hay soporte de arrays ni de `Measurement<TemperaturePoint>`. El
-diseño separa una **temperatura absoluta**
+el tipo escalar; WASI también compila y ejecuta el caso en Node WASI Preview 1, incluido en la matriz
+de 29 programas de `scripts/wasi-program-check.mjs`. No hay soporte de arrays ni de
+`Measurement<TemperaturePoint>`. El diseño separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
 reglas algebraicas distintas:
 
@@ -418,9 +419,8 @@ El compilador contiene un núcleo de metadatos y operaciones por rol (`UnitDefin
 al convertir entre `Ty` y los metadatos de tipo del AST, para que firmas tipadas y sustituciones no
 degraden la identidad del punto. Pruebas estáticas verifican que parámetros, retornos,
 `punto + intervalo` y `punto - punto` conservan sus roles en HIR e IR verificada. Una prueba de
-paridad ejecuta `temperature_point` en el intérprete, backend nativo IR y fallback AST; también
-comprueba que WASI emite el tipo y sus operaciones en C, pero no ejecuta el resultado con un runtime
-WASI. Las comparaciones runtime entre
+paridad ejecuta `temperature_point` en el intérprete, backend nativo IR, fallback AST y WASI
+Preview 1. Las comparaciones runtime entre
 puntos normalizan
 ambas lecturas con `scale * value + offset` en la escala coherente antes de ordenar; así se evita que
 una conversión asimétrica entre Celsius y Fahrenheit haga distintos valores equivalentes por un bit

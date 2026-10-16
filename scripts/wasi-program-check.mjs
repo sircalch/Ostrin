@@ -25,6 +25,12 @@ const programs = [
     expected: "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\nhola desde Ostrin\n",
   },
   {
+    name: "temperature_point_affine",
+    source: "compiler/tests/fixtures/temperature_point_affine.ostrin",
+    args: ["temperature_point_affine.wasm"],
+    expected: "10 degC (absolute)\n10 K\n0 K\n10 degC (absolute)\n0 degC (absolute)\n310 K\n",
+  },
+  {
     name: "pkg_project",
     project: "examples/pkg_project/main_app",
     args: ["pkg_project.wasm"],

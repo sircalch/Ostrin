@@ -180,7 +180,7 @@ jobs:
           printf '%s\n' \
             'Ostrin WASI distribution' \
             'Compiler = ostrinc.wasm' \
-            'Programs = 28-program WASI smoke matrix' \
+            'Programs = 29-program WASI smoke matrix' \
             'Target = wasm32-wasip1' \
             'Host = WASI Preview 1 with WebAssembly exception handling' \
             > release-wasi/README.txt

@@ -12094,38 +12094,7 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 
 #[test]
 fn temperature_point_native_backend_matches_interpreter() {
-    let file = std::env::temp_dir().join(format!(
-        "ostrin_temperature_point_static_boundary_{}.ostrin",
-        std::process::id()
-    ));
-    fs::write(
-        &file,
-        "fn make_point(value: Float, scale: String) -> TemperaturePoint {\n\
-         temperature_point(value, scale)\n\
-         }\n\
-         fn shift(point: TemperaturePoint, delta: Quantity<Temperature>) -> TemperaturePoint { point + delta }\n\
-         fn difference(left: TemperaturePoint, right: TemperaturePoint) -> Quantity<Temperature> { left - right }\n\
-         fn main() -> Void {\n\
-             c = make_point(0.0, \"degC\")\n\
-             f = make_point(32.0, \"degF\")\n\
-             k = make_point(273.15, \"K\")\n\
-             cold_c = make_point(-40.0, \"degC\")\n\
-             cold_f = make_point(-40.0, \"degF\")\n\
-             assert(c == f)\n\
-             assert(c == k)\n\
-             assert(cold_c == cold_f)\n\
-             assert(c < shift(c, 0.1 K))\n\
-             moved = shift(c, 10.0 K)\n\
-             print(moved)\n\
-             print(difference(moved, c))\n\
-             print(difference(f, c))\n\
-             print(10.0 K + c)\n\
-             print(moved - (10.0 K))\n\
-             print(310 K)\n\
-         }\n",
-    )
-    .expect("write TemperaturePoint backend-boundary source");
-    let file_arg = file.to_string_lossy().into_owned();
+    let file_arg = fixture_path("temperature_point_affine.ostrin");
     let interpreted = run(&["--run", &file_arg]);
     assert!(
         interpreted.status.success(),
@@ -12203,8 +12172,6 @@ fn temperature_point_native_backend_matches_interpreter() {
         String::from_utf8_lossy(&fallback_native.stdout).replace("\r\n", "\n"),
         expected
     );
-    let _ = fs::remove_file(&file);
-
     let bad_scale = temp_source(
         "temperature_point_native_bad_scale",
         "fn main() -> Void { print(temperature_point(20.0, \"degR\")) }\n",
