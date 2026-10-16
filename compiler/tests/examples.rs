@@ -12094,8 +12094,20 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 
 #[test]
 fn temperature_point_boundary_is_explicitly_rejected_natively() {
-    let file = fixture_path("temperature_point_static_boundary.ostrin");
-    let native = run(&["--native-type-report", &file]);
+    let file = std::env::temp_dir().join(format!(
+        "ostrin_temperature_point_static_boundary_{}.ostrin",
+        std::process::id()
+    ));
+    fs::write(
+        &file,
+        "fn shift(point: TemperaturePoint, delta: Quantity<Temperature>) -> TemperaturePoint { point + delta }\n\
+         fn difference(left: TemperaturePoint, right: TemperaturePoint) -> Quantity<Temperature> { left - right }\n\
+         fn main() -> Void {}\n",
+    )
+    .expect("write TemperaturePoint backend-boundary source");
+    let file_arg = file.to_string_lossy().into_owned();
+    let native = run(&["--native-type-report", &file_arg]);
+    let _ = fs::remove_file(&file);
     assert!(
         !native.status.success(),
         "TemperaturePoint was enabled without a native runtime representation"
