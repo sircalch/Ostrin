@@ -95,18 +95,33 @@ const notes = read(notesPath);
 for (const marker of [
   "## Supported platforms",
   "## Install",
-  "## Known limitations",
+  "## Compatibility and known limitations",
   "## Examples",
   "## Reporting problems",
-  "experimental",
-  "ostrinc-v" + version + "-rc.",
-  "x86_64-unknown-linux-gnu.tar.gz",
-  "aarch64-apple-darwin.tar.gz",
-  "x86_64-pc-windows-msvc.zip",
-  "gh run download",
-  "ostrinc " + version,
+  "experimental 0.x release",
+  `ostrinc-v${version}-x86_64-unknown-linux-gnu.tar.gz`,
+  `ostrinc-v${version}-aarch64-apple-darwin.tar.gz`,
+  `ostrinc-v${version}-x86_64-pc-windows-msvc.zip`,
+  `ostrinc-v${version}-wasm32-wasip1.tar.gz`,
+  "sha256",
+  "ostrinc --version",
 ]) {
   requireText(notes, marker, notesPath);
+}
+if (notes.includes("release candidate") || notes.includes("-rc.")) {
+  failures.push(`${notesPath}: final release notes still describe candidate artifacts`);
+}
+for (const marker of [
+  "build-wasi:",
+  'name="ostrinc-${package_ref}-wasm32-wasip1"',
+  'test "${GITHUB_REF_NAME#v}" = "$version"',
+  'test "$(ls dist | wc -l)" -eq 8',
+  "sha256sum --check SHA256SUMS",
+]) {
+  requireText(release, marker, "release WASI asset");
+}
+if (/^\s*push:\s*$/m.test(wasi) && /tags:/m.test(wasi)) {
+  failures.push("WASI workflow still publishes a separate tag artifact instead of the release asset");
 }
 requireText(changelog, "## " + version + " ", "CHANGELOG.md");
 

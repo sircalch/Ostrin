@@ -19,11 +19,10 @@
   "extensionReadyCount": 0,
   "readyCount": 0,
   "openCount": 29,
-  "incompleteEffectBundleCount": 0,
-  "knownEffectCallCount": 20589,
-  "symbolicEffectCallCount": 74,
-  "unresolvedEffectCallCount": 0,
-  "effectCoverageCountUnit": "distinct_function_operation_edges",
+  "captureReadyCount": 0,
+  "captureOpenCount": 29,
+  "incompleteEffectBundleCount": 29,
+  "unresolvedEffectCallCount": 4266,
   "entries": [
     {
       "file": "website/assets/experiments/animation.ostrin-experiment.json",
@@ -37,14 +36,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 614,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 486,
+        "unresolved_calls": 119
       }
     },
     {
@@ -59,14 +58,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 810,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 650,
+        "unresolved_calls": 151
       }
     },
     {
@@ -81,14 +80,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 740,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 584,
+        "unresolved_calls": 147
       }
     },
     {
@@ -103,14 +102,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 607,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 481,
+        "unresolved_calls": 117
       }
     },
     {
@@ -125,14 +124,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 752,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 591,
+        "unresolved_calls": 152
       }
     },
     {
@@ -147,14 +146,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 886,
-        "symbolic_calls": 10,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 647,
+        "unresolved_calls": 221
       }
     },
     {
@@ -169,14 +168,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 1032,
-        "symbolic_calls": 10,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 756,
+        "unresolved_calls": 258
       }
     },
     {
@@ -191,14 +190,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 610,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 482,
+        "unresolved_calls": 119
       }
     },
     {
@@ -213,14 +212,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 745,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 586,
+        "unresolved_calls": 150
       }
     },
     {
@@ -235,14 +234,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 749,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 586,
+        "unresolved_calls": 154
       }
     },
     {
@@ -257,14 +256,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 609,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 481,
+        "unresolved_calls": 119
       }
     },
     {
@@ -279,14 +278,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 728,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 577,
+        "unresolved_calls": 142
       }
     },
     {
@@ -301,14 +300,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 608,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 483,
+        "unresolved_calls": 116
       }
     },
     {
@@ -323,14 +322,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 609,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 484,
+        "unresolved_calls": 116
       }
     },
     {
@@ -345,14 +344,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 881,
-        "symbolic_calls": 10,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 646,
+        "unresolved_calls": 217
       }
     },
     {
@@ -367,14 +366,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 887,
-        "symbolic_calls": 10,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 648,
+        "unresolved_calls": 221
       }
     },
     {
@@ -389,14 +388,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 745,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 588,
+        "unresolved_calls": 148
       }
     },
     {
@@ -411,14 +410,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 610,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 481,
+        "unresolved_calls": 120
       }
     },
     {
@@ -433,14 +432,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 613,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 487,
+        "unresolved_calls": 117
       }
     },
     {
@@ -455,14 +454,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 743,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 585,
+        "unresolved_calls": 149
       }
     },
     {
@@ -477,14 +476,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 877,
-        "symbolic_calls": 10,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 644,
+        "unresolved_calls": 215
       }
     },
     {
@@ -499,14 +498,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 616,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 488,
+        "unresolved_calls": 119
       }
     },
     {
@@ -521,14 +520,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 613,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 484,
+        "unresolved_calls": 120
       }
     },
     {
@@ -543,14 +542,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 730,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 580,
+        "unresolved_calls": 141
       }
     },
     {
@@ -565,14 +564,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 603,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 479,
+        "unresolved_calls": 115
       }
     },
     {
@@ -587,14 +586,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 608,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 480,
+        "unresolved_calls": 119
       }
     },
     {
@@ -609,14 +608,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 611,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 486,
+        "unresolved_calls": 116
       }
     },
     {
@@ -631,14 +630,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 742,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 584,
+        "unresolved_calls": 149
       }
     },
     {
@@ -653,14 +652,14 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": []
+        "incomplete": [
+          "provenance.effects.effect_coverage"
+        ]
       },
       "effectCoverage": {
-        "complete": true,
-        "count_unit": "distinct_function_operation_edges",
-        "known_calls": 611,
-        "symbolic_calls": 1,
-        "unresolved_calls": 0
+        "complete": false,
+        "known_calls": 483,
+        "unresolved_calls": 119
       }
     }
   ]
