@@ -6805,6 +6805,89 @@ mod temperature_point_checker_tests {
         assert_eq!(resolve_type(&declared), Ty::TemperaturePoint);
     }
 
+    #[test]
+    fn absolute_temperature_roles_survive_typed_hir_and_ir_signatures() {
+        let source = r#"
+            fn shift(point: TemperaturePoint, delta: Quantity<Temperature>) -> TemperaturePoint {
+                point + delta
+            }
+            fn difference(left: TemperaturePoint, right: TemperaturePoint) -> Quantity<Temperature> {
+                left - right
+            }
+        "#;
+        let tokens = crate::lexer::Lexer::new(source)
+            .tokenize()
+            .expect("affine signature source should lex");
+        let (items, parse_errors) = crate::parser::Parser::new(tokens).parse_program();
+        assert!(parse_errors.is_empty(), "{parse_errors:?}");
+
+        let typed = Checker::new().check_program_typed(&items);
+        assert!(typed.errors.is_empty(), "{:?}", typed.errors);
+        let hir = crate::hir::lower(&items, &typed);
+        let shift_hir = hir
+            .functions
+            .iter()
+            .find(|function| function.name == "shift")
+            .expect("shift should lower to HIR");
+        assert_eq!(shift_hir.params[0].1, Ty::TemperaturePoint);
+        assert_eq!(shift_hir.ret, Ty::TemperaturePoint);
+        assert_eq!(
+            shift_hir.body.tail.as_ref().expect("shift has a result").ty,
+            Ty::TemperaturePoint
+        );
+
+        let difference_hir = hir
+            .functions
+            .iter()
+            .find(|function| function.name == "difference")
+            .expect("difference should lower to HIR");
+        let temperature_interval = Ty::Quantity(dim_single("Temperature"));
+        assert_eq!(difference_hir.ret, temperature_interval);
+        assert_eq!(
+            difference_hir
+                .body
+                .tail
+                .as_ref()
+                .expect("difference has a result")
+                .ty,
+            temperature_interval
+        );
+
+        let ir = crate::ir::lower(&hir);
+        let shift_ir = ir
+            .functions
+            .iter()
+            .find(|function| function.name == "shift")
+            .expect("shift should lower to IR");
+        assert_eq!(shift_ir.params[0].1, Ty::TemperaturePoint);
+        assert_eq!(shift_ir.ret, Ty::TemperaturePoint);
+        assert!(shift_ir
+            .blocks
+            .iter()
+            .flat_map(|block| &block.instructions)
+            .any(|instruction| matches!(
+                instruction,
+                crate::ir::IrInstr::Binary {
+                    op: BinOp::Add,
+                    ty: Ty::TemperaturePoint,
+                    ..
+                }
+            )));
+
+        let difference_ir = ir
+            .functions
+            .iter()
+            .find(|function| function.name == "difference")
+            .expect("difference should lower to IR");
+        assert_eq!(difference_ir.ret, temperature_interval);
+        assert!(difference_ir.blocks.iter().flat_map(|block| &block.instructions).any(
+            |instruction| matches!(instruction,
+                crate::ir::IrInstr::Binary { op: BinOp::Sub, ty, .. } if *ty == temperature_interval)
+        ));
+        let verified = crate::ir::verify(&ir);
+        assert!(verified.violations.is_empty(), "{:?}", verified.violations);
+    }
+
     fn check(op: BinOp, left: Ty, right: Ty) -> (Ty, bool) {
         let mut checker = Checker::new();
         let result = checker.check_binary(op, left, right);

@@ -403,10 +403,11 @@ El compilador ya contiene un núcleo interno de metadatos y operaciones por rol 
 `QuantityRole` y el catálogo de escalas de punto K/degC/degF), además de una variante
 `Ty::TemperaturePoint` con reglas de operadores en el type checker. El nombre también se conserva
 al convertir entre `Ty` y los metadatos de tipo del AST, para que firmas tipadas y sustituciones no
-degraden la identidad del punto. Aún no hay una expresión fuente que construya un punto: HIR puede
-conservarlo en tipos declarados, pero el lowering de operaciones a IR, el intérprete y los
-backends no ejecutan esta variante. Por ello, las pruebas verifican reglas internas y round-trip
-de metadatos, no paridad de ejecución ni disponibilidad de la característica.
+degraden la identidad del punto. Una prueba estática también verifica que parámetros, retornos,
+`punto + intervalo` y `punto - punto` conservan sus roles en HIR y en instrucciones `Binary` de IR
+verificada. Aún no hay una expresión fuente que construya un punto; el intérprete no tiene un valor
+runtime para esta variante y los backends no la ejecutan. Estas pruebas validan tipos y lowering
+estático, no paridad de ejecución ni disponibilidad de la característica.
 
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin
@@ -435,11 +436,18 @@ suma el offset. Esto conserva una incertidumbre no negativa y separa el punto es
 dispersión alrededor de ese punto. El modelo de fuentes compartidas de incertidumbre y sus reglas de
 correlación se mantienen según el documento 25; esta sección no define ni habilita covarianza.
 
-Referencias normativas: [NIST, SI Units – Temperature](https://www.nist.gov/pml/owm/si-units-temperature)
-describe las conversiones exactas y la relación entre intervalos Celsius/Fahrenheit; [BIPM, SI
-Brochure, 9th edition](https://www.bipm.org/documents/20126/41483022/SI-Brochure-9-EN.pdf/2d2b50bf-f2b4-9661-f402-5f9d66e4b507?download=true&t=1671101192839&version=1.11)
-define la relación entre temperatura Celsius y termodinámica, y establece que un intervalo puede
-expresarse en K o °C con el mismo valor numérico.
+Referencias y precedentes de diseño:
+
+- [NIST, SI Units – Temperature](https://www.nist.gov/pml/owm/si-units-temperature) documenta las
+  relaciones de escala Celsius, Fahrenheit y kelvin.
+- [BIPM, SI Brochure, 9th edition, actualización 2026](https://www.bipm.org/en/publications/si-brochure/)
+  es la referencia normativa actual para las unidades SI y temperatura Celsius.
+- [Unitful.jl, defining affine units](https://juliaphysics.github.io/Unitful.jl/stable/newunits/)
+  separa metadatos de unidad afín con offset de la aritmética multiplicativa ordinaria.
+- [WG21 P4185R1, Completing the Mathematical Model for C++ Quantities and Units](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p4185r1.html)
+  es una propuesta de diseño (no una norma adoptada) que formula puntos y diferencias mediante
+  espacios afines. Estos antecedentes motivan la distinción de roles; no determinan por sí solos
+  la sintaxis de Ostrin ni implican originalidad científica.
 
 Los prefijos automáticos (por ejemplo, `kft`) continúan pendientes y son independientes de este
 diseño afín.
