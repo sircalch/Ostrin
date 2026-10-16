@@ -1292,7 +1292,7 @@ impl Emitter<'_> {
             HirKind::Bool(v) => Ok(if *v { "true" } else { "false" }.to_string()),
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
-            HirKind::Lambda(params, body) => self.lambda_expr(e, params, body),
+            HirKind::Lambda(lambda) => self.lambda_expr(e, &lambda.params, &lambda.body),
             HirKind::Global(name)
                 if self
                     .variant(name, &e.ty)
@@ -2675,8 +2675,8 @@ fn collect_hir_locals_expr(
         HirKind::Block(block)
         | HirKind::Loop(block)
         | HirKind::Spawn(block)
-        | HirKind::SpawnScope(block)
-        | HirKind::Lambda(_, block) => collect_hir_locals_block(block, used, bound),
+        | HirKind::SpawnScope(block) => collect_hir_locals_block(block, used, bound),
+        HirKind::Lambda(lambda) => collect_hir_locals_block(&lambda.body, used, bound),
         HirKind::List(values) | HirKind::Set(values) => {
             for value in values {
                 collect_hir_locals_expr(value, used, bound);

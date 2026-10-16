@@ -70,6 +70,18 @@ pub struct HirFunction {
     pub closed_callback_calls: BTreeMap<String, BTreeSet<String>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct HirLambda {
+    pub params: Vec<String>,
+    pub body: HirBlock,
+    pub effect_source_key: String,
+    pub effect_signature: EffectSignature,
+    pub effect_variable_substitutions: BTreeSet<EffectVariableSubstitution>,
+    pub effect_calls: BTreeSet<String>,
+    pub indirect_effect_calls: BTreeSet<String>,
+    pub closed_callback_calls: BTreeMap<String, BTreeSet<String>>,
+}
+
 /// Gives impl methods a collision-free HIR name when a generic record/enum
 /// has more than one concrete or trait implementation with the same method
 /// spelling. Plain non-generic impls retain the historical `Type.method`
@@ -217,7 +229,7 @@ pub enum HirKind {
     Index(Box<HirExpr>, Box<HirExpr>),
     If(Box<HirExpr>, HirBlock, Option<HirBlock>),
     Block(HirBlock),
-    Lambda(Vec<String>, HirBlock),
+    Lambda(HirLambda),
     List(Vec<HirExpr>),
     Set(Vec<HirExpr>),
     Map(Vec<(HirExpr, HirExpr)>),
@@ -249,9 +261,11 @@ struct Signatures<'a> {
     variants: std::collections::HashMap<&'a str, Vec<Option<String>>>,
 }
 
-struct Lowerer<'a> {
+struct Lowerer<'a, 'e> {
     typed: &'a TypedProgram,
     signatures: &'a Signatures<'a>,
+    effect_report: &'e crate::effects::EffectReport,
+    effect_source_key: String,
     file: Option<String>,
     /// Innermost-last stack of local names, to tell `Local` from `Global`.
     scopes: Vec<HashSet<String>>,
@@ -259,7 +273,7 @@ struct Lowerer<'a> {
     local_types: std::collections::HashMap<String, Ty>,
 }
 
-impl<'a> Lowerer<'a> {
+impl<'a, 'e> Lowerer<'a, 'e> {
     fn ty_of(&self, expr: &Expr) -> Ty {
         self.typed
             .node_types
@@ -504,10 +518,50 @@ impl<'a> Lowerer<'a> {
             ),
             Expr::Block(b) => HirKind::Block(self.block(b)),
             Expr::Lambda(params, body) => {
+                let position = key.as_ref().map(|key| key.start);
+                let effect_source_key = format!(
+                    "{}::<lambda@{}:{}>",
+                    self.effect_source_key,
+                    position.map_or(0, |position| position.line),
+                    position.map_or(0, |position| position.col)
+                );
+                let previous_source_key =
+                    std::mem::replace(&mut self.effect_source_key, effect_source_key.clone());
                 self.scopes.push(params.iter().cloned().collect());
                 let body = self.block(body);
                 self.scopes.pop();
-                HirKind::Lambda(params.clone(), body)
+                self.effect_source_key = previous_source_key;
+                let effect_report = self.effect_report;
+                HirKind::Lambda(HirLambda {
+                    params: params.clone(),
+                    body,
+                    effect_source_key: effect_source_key.clone(),
+                    effect_signature: effect_report
+                        .function_effect_signatures
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    effect_variable_substitutions: effect_report
+                        .effect_variable_substitutions
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    effect_calls: effect_report
+                        .resolved_function_calls
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    indirect_effect_calls: effect_report
+                        .indirect_calls
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    closed_callback_calls: effect_report
+                        .closed_callback_parameters
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                })
             }
             Expr::ListLiteral(items) => HirKind::List(items.iter().map(|e| self.expr(e)).collect()),
             Expr::SetLiteral(items) => HirKind::Set(items.iter().map(|e| self.expr(e)).collect()),
@@ -806,6 +860,8 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
         let mut lowerer = Lowerer {
             typed,
             signatures,
+            effect_report: &effect_report,
+            effect_source_key: effect_source_key.clone(),
             file: source_file.clone(),
             scopes: vec![HashSet::new()],
             local_types: Default::default(),
@@ -1258,9 +1314,16 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
                 .map(|block| specialize_block(block, subst)),
         ),
         HirKind::Block(block) => HirKind::Block(specialize_block(block, subst)),
-        HirKind::Lambda(params, block) => {
-            HirKind::Lambda(params.clone(), specialize_block(block, subst))
-        }
+        HirKind::Lambda(lambda) => HirKind::Lambda(HirLambda {
+            params: lambda.params.clone(),
+            body: specialize_block(&lambda.body, subst),
+            effect_source_key: lambda.effect_source_key.clone(),
+            effect_signature: lambda.effect_signature.clone(),
+            effect_variable_substitutions: lambda.effect_variable_substitutions.clone(),
+            effect_calls: lambda.effect_calls.clone(),
+            indirect_effect_calls: lambda.indirect_effect_calls.clone(),
+            closed_callback_calls: lambda.closed_callback_calls.clone(),
+        }),
         HirKind::List(values) => HirKind::List(
             values
                 .iter()
@@ -1483,8 +1546,8 @@ where
         HirKind::Block(block)
         | HirKind::Loop(block)
         | HirKind::Spawn(block)
-        | HirKind::SpawnScope(block)
-        | HirKind::Lambda(_, block) => resolve_block_calls(block, resolver),
+        | HirKind::SpawnScope(block) => resolve_block_calls(block, resolver),
+        HirKind::Lambda(lambda) => resolve_block_calls(&mut lambda.body, resolver),
         HirKind::List(values) | HirKind::Set(values) => {
             for value in values {
                 resolve_expr_calls(value, resolver);
@@ -1816,11 +1879,10 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 verify_block(f, generics, ctx);
             }
         }
-        HirKind::Block(b)
-        | HirKind::Loop(b)
-        | HirKind::Spawn(b)
-        | HirKind::SpawnScope(b)
-        | HirKind::Lambda(_, b) => verify_block(b, generics, ctx),
+        HirKind::Block(b) | HirKind::Loop(b) | HirKind::Spawn(b) | HirKind::SpawnScope(b) => {
+            verify_block(b, generics, ctx)
+        }
+        HirKind::Lambda(lambda) => verify_block(&lambda.body, generics, ctx),
         HirKind::List(v) | HirKind::Set(v) => {
             for x in v {
                 go(x, ctx);
@@ -2055,7 +2117,51 @@ fn one_line(e: &HirExpr) -> String {
         HirKind::Index(a, i) => format!("{}[{}]", one_line(a), one_line(i)),
         HirKind::If(c, ..) => format!("if {} {{…}}", one_line(c)),
         HirKind::Block(_) => "{…}".to_string(),
-        HirKind::Lambda(p, _) => format!("fn({}) {{…}}", p.join(", ")),
+        HirKind::Lambda(lambda) => {
+            let mut effects = Vec::new();
+            if !lambda.effect_signature.effects.is_empty() {
+                effects.push(format!(
+                    "effects: {}",
+                    lambda
+                        .effect_signature
+                        .effects
+                        .iter()
+                        .map(EffectKind::label)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !lambda.effect_signature.variables.is_empty() {
+                effects.push(format!(
+                    "effect variables: {}",
+                    lambda
+                        .effect_signature
+                        .variables
+                        .iter()
+                        .map(|name| format!("ε_{name}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !lambda.effect_signature.open_calls.is_empty() {
+                effects.push(format!(
+                    "open calls: {}",
+                    lambda
+                        .effect_signature
+                        .open_calls
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            let suffix = if effects.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", effects.join("; "))
+            };
+            format!("fn({}) {{…}}{suffix}", lambda.params.join(", "))
+        }
         HirKind::List(v) => format!(
             "[{}]",
             v.iter().map(one_line).collect::<Vec<_>>().join(", ")

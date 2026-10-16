@@ -13946,6 +13946,29 @@ fn experimental_effect_report_separates_lambda_creation_from_indirect_execution(
         .collect::<Vec<_>>();
     assert_eq!(lambda_rows.len(), 1);
     assert_eq!(lambda_rows[0].1, &serde_json::json!(["io"]));
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(
+        hir_text.contains("[effects: io]"),
+        "HIR lost the lambda row: {hir_text}"
+    );
+    assert!(
+        !hir_text.contains("fn make_only() -> Void\n  effects: io"),
+        "creating the closure must not attribute its deferred IO to make_only"
+    );
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(
+        ir_text.contains("closure make_only$closure")
+            && ir_text.contains("(effect source: make_only::<lambda@"),
+        "IR must retain the source identity of the synthesized closure: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("effects: io"),
+        "IR lost the lambda row: {ir_text}"
+    );
     let _ = fs::remove_file(file);
 }
 
