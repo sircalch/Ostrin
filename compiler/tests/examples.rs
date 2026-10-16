@@ -12093,7 +12093,7 @@ fn experimental_effect_report_propagates_through_qualified_impl_methods() {
 fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     let file = temp_source(
         "effects-unknown.ostrin",
-        "fn main() -> Void {\n    value = 1 + mystery_host_operation()\n    - another_host_operation()\n    mystery_host_operation()\n}\n",
+        "fn main() -> Void {\n    value = 1 + mystery_host_operation()\n    value = nested_host_operation() + 1\n    - another_host_operation()\n    mystery_host_operation()\n    -minus_host_operation()\n}\n",
     );
     let out = run(&["--effect-report", "--json", &file]);
     let _ = fs::remove_file(&file);
@@ -12102,24 +12102,35 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
     assert_eq!(
         artifact["unresolved_calls"]["main"],
-        serde_json::json!(["another_host_operation", "mystery_host_operation"])
+        serde_json::json!([
+            "another_host_operation",
+            "minus_host_operation",
+            "mystery_host_operation",
+            "nested_host_operation"
+        ])
     );
     let call_sites = artifact["unresolved_call_sites"]
         .as_array()
         .expect("unknown call occurrences must be available for review");
-    assert_eq!(call_sites.len(), 3);
+    assert_eq!(call_sites.len(), 5);
     assert_eq!(call_sites[0]["operation"], "mystery_host_operation");
     assert_eq!(call_sites[0]["function"], "main");
     assert_eq!(call_sites[0]["line"], 2);
     assert_eq!(call_sites[0]["col"], 17);
-    assert_eq!(call_sites[1]["operation"], "another_host_operation");
+    assert_eq!(call_sites[1]["operation"], "nested_host_operation");
     assert_eq!(call_sites[1]["line"], 3);
-    assert_eq!(call_sites[1]["col"], 7);
+    assert_eq!(call_sites[1]["col"], 13);
+    assert_eq!(call_sites[2]["operation"], "another_host_operation");
     assert_eq!(call_sites[2]["line"], 4);
-    assert_eq!(call_sites[2]["col"], 5);
+    assert_eq!(call_sites[2]["col"], 7);
+    assert_eq!(call_sites[3]["line"], 5);
+    assert_eq!(call_sites[3]["col"], 5);
+    assert_eq!(call_sites[4]["operation"], "minus_host_operation");
+    assert_eq!(call_sites[4]["line"], 6);
+    assert_eq!(call_sites[4]["col"], 6);
     assert_eq!(
         artifact["effect_coverage"],
-        serde_json::json!({"known_calls": 0, "unresolved_calls": 2, "complete": false})
+        serde_json::json!({"known_calls": 0, "unresolved_calls": 4, "complete": false})
     );
 }
 
