@@ -14008,6 +14008,10 @@ fn main_same_branch_alias() -> Void {
     deferred: fn() -> Void = choose_same(io_action, true)
     deferred()
 }
+fn main_match_alias() -> Void {
+    deferred: fn() -> Void = choose_match(io_action, Left)
+    deferred()
+}
 fn open_alias() -> Void {
     deferred: fn() -> Void = make_alias(unknown_action)
     deferred()
@@ -14031,6 +14035,14 @@ fn make_alias(action: fn() -> Void) -> fn() -> Void {
 fn choose_same(action: fn() -> Void, flag: Bool) -> fn() -> Void {
     deferred = fn() { action() }
     if flag { deferred } else { deferred }
+}
+enum Choice { Left Right }
+fn choose_match(action: fn() -> Void, choice: Choice) -> fn() -> Void {
+    deferred = fn() { action() }
+    match choice {
+        Left => deferred,
+        Right => deferred,
+    }
 }
 "#,
     );
@@ -14091,6 +14103,20 @@ fn choose_same(action: fn() -> Void, flag: Bool) -> fn() -> Void {
     );
     assert_eq!(
         report["function_effect_signatures"]["main_same_branch_alias"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["choose_match"]["effects"],
+        serde_json::json!([]),
+        "a match that returns the same closure identity must not execute its callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_match_alias"]["effects"],
+        serde_json::json!(["io"]),
+        "exhaustive match arms returning one identity must propagate its callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_match_alias"]["row_closed"],
         true
     );
     assert_eq!(

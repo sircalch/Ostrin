@@ -1330,6 +1330,17 @@ fn register_directly_returned_closures(block: &Block, function: &str, report: &m
                 }
                 (keys, complete)
             }
+            Expr::Match(_, arms) => {
+                let mut keys = BTreeSet::new();
+                let mut complete = !arms.is_empty();
+                for arm in arms {
+                    let (arm_keys, arm_complete) =
+                        closure_keys_from_block(&arm.body, function, aliases);
+                    keys.extend(arm_keys);
+                    complete &= arm.guard.is_none() && arm_complete;
+                }
+                (keys, complete)
+            }
             _ => (BTreeSet::new(), false),
         }
     }
