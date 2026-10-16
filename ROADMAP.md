@@ -6,19 +6,17 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Orden de prioridades
 
 El RC documentado en [`validation/release-candidate-v0.2.0.json`](validation/release-candidate-v0.2.0.json)
-se construyó desde la revisión fuente `d0abbad0f674317c95c389b953507365f3fd1a59`.
-Esa identidad describe únicamente los binarios RC con sus hashes registrados; no describe
-el commit posterior que consolida esta documentación y evidencia. La revisión de evidencia
-se fija aparte en el manifiesto y el scorecard, sin autorreferencias. El commit que se
-proponga para el tag final deberá ser el `main` posterior a la fusión del PR de evidencia,
-y sus binarios/checksums deberán reconstruirse desde el tag autorizado.
+se construyó desde la revisión fuente `d0abbad0f674317c95c389b953507365f3fd1a59`; esos hashes
+identifican sólo los binarios RC. La release pública `v0.2.0` se construyó desde el commit
+`29c24c0bd607822dbc2609a54bfcce545ca563f6`, al que apunta el tag exacto `v0.2.0`. Sus archivos,
+checksums y workflow están documentados por separado en
+[`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md); las revisiones de
+fuente RC, evidencia y release final no se intercambian ni forman un ciclo de metadatos.
 
-El manifest [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json) registra
-12 criterios como `READY` para la evidencia acotada del candidato; no significa que los
-artefactos RC de `d0abbad` se hayan construido desde el futuro commit de `main`. No existe
-tag ni release `v0.2.0`; publicar requiere autorización explícita del propietario. El
-procedimiento reproducible, instalación, compatibilidad, integridad y rollback están en
-[`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md).
+El manifiesto [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json) registra
+12 criterios `READY` para el alcance declarado de v0.2.0. La publicación está cerrada; la
+prioridad de desarrollo pasa al hito de efectos científicos estáticos. Cualquier nueva release
+requiere autorización explícita del propietario.
 
 0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** se auditaron todas
    las referencias contra `main` y los heads de PR fusionados; se eliminaron

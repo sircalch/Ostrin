@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-15 · `v0.1.0` sigue siendo la última release pública; RC `v0.2.0` construido desde `d0abbad0f674317c95c389b953507365f3fd1a59`; la evidencia y el commit propuesto para un futuro tag son revisiones distintas · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
+*Corte: 2026-10-16 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -596,16 +596,14 @@ covarianza, validación numérica, auditoría de accesibilidad/arquitectura web 
 validación analítica inicial de LU, Cholesky, QR, SVD y autovalores simétricos ya pasa localmente
 en intérprete y nativo con residuales independientes, tolerancias por caso y cero fugas; el criterio
 permanece abierto hasta obtener ejecución CI verde en todos los sistemas soportados y adjuntar su URL.
-El gate de publicación de [`v0.2.0`](docs/release-readiness-v0.2.json) contiene 12 criterios
-marcados `READY` y la ratchet medida es 7.198 IR + 41 HIR, con cero fallbacks AST. El manifiesto de candidato distingue la revisión fuente (commit usado para los binarios RC),
-la revisión de evidencia (commit fijo con las entradas documentales, al que apuntan los
-metadatos derivados) y el tag de release (ref exacta, aún inexistente). El commit de `main`
-resultante de fusionar la documentación no cambia retroactivamente el origen de los binarios
-RC. Si se autoriza publicar, se deberá construir y verificar un juego nuevo de artefactos y
-hashes desde el tag exacto; no se reutilizarán los del RC. No se ha creado tag ni release
-`v0.2.0`; la etiqueta activa el workflow que publica, por lo que requiere autorización final.
-El procedimiento previo, instalación, compatibilidad, limitaciones, integridad y rollback
-está en [`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md).
+El gate de evidencia de [`v0.2.0`](docs/release-readiness-v0.2.json) conserva sus 12 criterios
+`READY` para el alcance declarado; la ratchet medida es 7.198 IR + 41 HIR, con cero fallbacks
+AST. El manifiesto distingue la revisión fuente `d0abbad` de los binarios RC, la revisión fija
+de evidencia `aaa9f16` y el tag público `v0.2.0`, que apunta al commit fuente final `29c24c0`.
+Los artefactos publicados se reconstruyeron desde ese tag y tienen hashes propios; los hashes
+del RC no se reutilizaron. La procedencia, los checksums reales, la instalación, compatibilidad,
+limitaciones e instrucciones de rollback están en
+[`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md).
 La clasificación de Ostrin por GitHub Linguist y el crecimiento del ecosistema dependen de
 evidencia de uso externo y validación upstream. GPU, autodiff inverso, registry público y red
 permanecen fuera de la etapa inmediata.
