@@ -14004,6 +14004,10 @@ fn main_alias() -> Void {
     deferred: fn() -> Void = make_alias(io_action)
     deferred()
 }
+fn main_same_branch_alias() -> Void {
+    deferred: fn() -> Void = choose_same(io_action, true)
+    deferred()
+}
 fn open_alias() -> Void {
     deferred: fn() -> Void = make_alias(unknown_action)
     deferred()
@@ -14023,6 +14027,10 @@ fn make(action: fn() -> Void) -> fn() -> Void {
 fn make_alias(action: fn() -> Void) -> fn() -> Void {
     deferred = fn() { action() }
     return deferred
+}
+fn choose_same(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    deferred = fn() { action() }
+    if flag { deferred } else { deferred }
 }
 "#,
     );
@@ -14072,6 +14080,20 @@ fn make_alias(action: fn() -> Void) -> fn() -> Void {
         true
     );
     assert_eq!(
+        report["function_effect_signatures"]["choose_same"]["effects"],
+        serde_json::json!([]),
+        "choosing the same closure identity across branches must defer its callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_same_branch_alias"]["effects"],
+        serde_json::json!(["io"]),
+        "a branch-selected alias with one closure identity must propagate its callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_same_branch_alias"]["row_closed"],
+        true
+    );
+    assert_eq!(
         report["function_effect_signatures"]["open_alias"]["open_calls"],
         serde_json::json!(["host.callback"]),
         "unknown effects captured by an aliased returned closure must remain open"
@@ -14098,9 +14120,17 @@ fn experimental_effect_signatures_keep_ambiguous_returned_closures_open() {
         r#"fn choose(action: fn() -> Void, flag: Bool) -> fn() -> Void {
     if flag { fn() { action() } } else { fn() { action() } }
 }
+fn choose_mixed(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    if flag { fn() { action() } } else { unknown_action }
+}
 fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
 fn main() -> Void {
     deferred: fn() -> Void = choose(io_action, true)
+    deferred()
+}
+fn mixed_main() -> Void {
+    deferred: fn() -> Void = choose_mixed(io_action, true)
     deferred()
 }
 "#,
@@ -14121,6 +14151,14 @@ fn main() -> Void {
         report["function_effect_signatures"]["main"]["open_calls"],
         serde_json::json!(["deferred"]),
         "invoking an ambiguous returned closure must remain explicitly open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mixed_main"]["row_closed"], false,
+        "a known closure on one branch cannot close a return with an unknown alternative"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mixed_main"]["open_calls"],
+        serde_json::json!(["deferred"])
     );
     let _ = fs::remove_file(file);
 }

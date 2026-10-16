@@ -182,10 +182,11 @@ pub struct EffectReport {
     /// Callback parameters captured by each lambda body, keyed by the lambda
     /// source key and then by their lexical owner and binding name.
     pub captured_callback_parameters: BTreeMap<String, BTreeSet<(String, String)>>,
-    /// Lambda bodies that are returned directly from a local function. This
+    /// Lambda bodies returned with one statically resolved identity. This
     /// distinguishes closure creation from the later invocation of its body.
     returned_closure_keys: BTreeSet<String>,
     returned_closures_by_function: BTreeMap<String, BTreeSet<String>>,
+    ambiguous_returned_closure_functions: BTreeSet<String>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
     /// Compiler-known higher-order calls resolved from checked receiver types.
     pub builtin_callback_calls: BTreeMap<String, BTreeSet<String>>,
@@ -1300,46 +1301,95 @@ fn register_lambda_parameters(params: &[String], function: &str, report: &mut Ef
 }
 
 fn register_directly_returned_closures(block: &Block, function: &str, report: &mut EffectReport) {
-    fn closure_key(
+    fn closure_keys_from_expr(
         expression: &Expr,
         function: &str,
         aliases: &BTreeMap<String, String>,
-    ) -> Option<String> {
+    ) -> (BTreeSet<String>, bool) {
         match expression.unlocated() {
-            Expr::Lambda(..) => Some(lambda_function_key(expression, function)),
-            Expr::Ident(name) => aliases.get(name).cloned(),
-            _ => None,
+            Expr::Lambda(..) => (
+                BTreeSet::from([lambda_function_key(expression, function)]),
+                true,
+            ),
+            Expr::Ident(name) => aliases
+                .get(name)
+                .cloned()
+                .map(|key| (BTreeSet::from([key]), true))
+                .unwrap_or_default(),
+            Expr::Block(block) => closure_keys_from_block(block, function, aliases),
+            Expr::If(_, then_block, else_block) => {
+                let (mut keys, mut complete) =
+                    closure_keys_from_block(then_block, function, aliases);
+                if let Some(else_block) = else_block {
+                    let (else_keys, else_complete) =
+                        closure_keys_from_block(else_block, function, aliases);
+                    keys.extend(else_keys);
+                    complete &= else_complete;
+                } else {
+                    complete = false;
+                }
+                (keys, complete)
+            }
+            _ => (BTreeSet::new(), false),
         }
     }
 
-    let mut aliases = BTreeMap::<String, String>::new();
-    let mut returned = BTreeSet::<String>::new();
-    for located in &block.stmts {
-        match &located.stmt {
-            Stmt::Binding { name, value, .. } | Stmt::Assign { name, value } => {
-                if let Some(closure) = closure_key(value, function, &aliases) {
-                    aliases.insert(name.clone(), closure);
-                } else {
-                    aliases.remove(name);
+    fn closure_keys_from_block(
+        block: &Block,
+        function: &str,
+        inherited_aliases: &BTreeMap<String, String>,
+    ) -> (BTreeSet<String>, bool) {
+        let mut aliases = inherited_aliases.clone();
+        let mut returned = BTreeSet::<String>::new();
+        let mut complete = true;
+        for located in &block.stmts {
+            match &located.stmt {
+                Stmt::Binding { name, value, .. } | Stmt::Assign { name, value } => {
+                    let (keys, value_complete) = closure_keys_from_expr(value, function, &aliases);
+                    if value_complete && keys.len() == 1 {
+                        aliases.insert(name.clone(), keys.into_iter().next().unwrap());
+                    } else {
+                        aliases.remove(name);
+                    }
                 }
-            }
-            Stmt::Return(Some(value)) => {
-                if let Some(closure) = closure_key(value, function, &aliases) {
-                    returned.insert(closure);
+                Stmt::Return(Some(value)) => {
+                    let (keys, value_complete) = closure_keys_from_expr(value, function, &aliases);
+                    returned.extend(keys);
+                    complete &= value_complete;
                 }
+                Stmt::Return(None) => complete = false,
+                Stmt::For { .. }
+                | Stmt::While { .. }
+                | Stmt::Expr(Expr::If(..) | Expr::Block(..) | Expr::Loop(..) | Expr::Match(..)) => {
+                    // Returns nested in these constructs are not yet associated
+                    // with a complete function result on every path.
+                    complete = false;
+                }
+                Stmt::FieldAssign { .. } | Stmt::Expr(_) | Stmt::Break(_) | Stmt::Continue => {}
             }
-            _ => {}
         }
+        if let Some(tail) = &block.tail {
+            let (keys, tail_complete) = closure_keys_from_expr(tail, function, &aliases);
+            returned.extend(keys);
+            complete &= tail_complete;
+        } else if returned.is_empty() {
+            complete = false;
+        }
+        (returned, complete)
     }
-    if let Some(tail) = block
-        .tail
-        .as_ref()
-        .and_then(|tail| closure_key(tail, function, &aliases))
-    {
-        returned.insert(tail);
+
+    let (returned, complete) = closure_keys_from_block(block, function, &BTreeMap::new());
+    if !complete {
+        report
+            .ambiguous_returned_closure_functions
+            .insert(function.to_string());
+    }
+    if complete && returned.len() == 1 {
+        report
+            .returned_closure_keys
+            .extend(returned.iter().cloned());
     }
     for lambda in returned {
-        report.returned_closure_keys.insert(lambda.clone());
         report
             .returned_closures_by_function
             .entry(function.to_string())
@@ -1352,6 +1402,7 @@ fn infer_callback_effects(items: &[Item], report: &mut EffectReport) {
     report.symbolic_effect_calls.clear();
     report.returned_closure_keys.clear();
     report.returned_closures_by_function.clear();
+    report.ambiguous_returned_closure_functions.clear();
     for item in items {
         if let Item::Function(function) = item {
             register_directly_returned_closures(&function.body, &function.name, report);
@@ -2222,6 +2273,12 @@ fn returned_closure_source(
         return None;
     }
     let producer = resolve_local_target(callee, report)?;
+    if report
+        .ambiguous_returned_closure_functions
+        .contains(&producer)
+    {
+        return None;
+    }
     let returned = report.returned_closures_by_function.get(&producer)?;
     if returned.len() != 1 {
         return None;

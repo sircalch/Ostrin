@@ -355,9 +355,10 @@ en una consola de logs.
    la fila propia de la lambda. Las llamadas desconocidas que ocurren dentro del callback siguen
    abiertas y se propagan al caller. También siguen abiertas las closures que escapan, se almacenan
    en agregados o cruzan una frontera sin cuerpo local resoluble. Un retorno directo o mediante un
-   alias local lineal de una única lambda conserva sus capturas hasta una variable local y su
-   invocación. Retornos con varias identidades posibles, closures devueltas mediante agregados o
-   pasadas a otro callback quedan abiertos.
+   alias local lineal conserva sus capturas hasta una variable local y su invocación; una selección
+   condicional se cierra solo si todas las ramas resuelven a la misma identidad local. Varias
+   identidades posibles, rutas desconocidas, closures devueltas mediante agregados o pasadas a otro
+   callback quedan abiertos.
    Las llamadas a métodos locales se propagan usando la clave del método que comparte el inventario;
    si no se puede asociar una llamada calificada con una función local, permanece en
    `unresolved_calls` en lugar de presentar una cobertura completa.
