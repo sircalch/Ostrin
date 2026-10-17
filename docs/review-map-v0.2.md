@@ -29,10 +29,12 @@ Revision terms are deliberately separate: **source revision** is `d0abbad…`, t
   and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38681256349)
   passed for the same frozen source.
 - The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38681318079)
-  passed all 28 programs. The [release workflow](https://github.com/sircalch/Ostrin/actions/runs/38681320600)
+  passed all 28 programs. The [pre-publication release rehearsal](https://github.com/sircalch/Ostrin/actions/runs/38681320600)
   passed archive build, checksum, extraction and packaged smoke tests on macOS
-  ARM64, Linux x86_64 and Windows x86_64; its publish job was skipped because
-  the ref was untagged. [Benchmarks](https://github.com/sircalch/Ostrin/actions/runs/38609662881)
+  ARM64, Linux x86_64 and Windows x86_64; its publish job was skipped as expected
+  because that rehearsal ran from an untagged PR ref. This is separate from the
+  successful [tag-triggered publication workflow](https://github.com/sircalch/Ostrin/actions/runs/38815035506)
+  recorded below. [Benchmarks](https://github.com/sircalch/Ostrin/actions/runs/38609662881)
   and [website deployment](https://github.com/sircalch/Ostrin/actions/runs/38681256306)
   also passed.
 - The frozen v0.2 evidence set records all 12 criteria `READY` for its declared
