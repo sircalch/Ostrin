@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const contractPath = path.join(repositoryRoot, "validation/numeric/matrix_algorithms.json");
 const outputDirectory = path.join(repositoryRoot, "target/numeric-validation");
+const parityAbsolute = 1e-13;
+const parityRelative = 1e-12;
 
 function run(command, args, label) {
   const result = spawnSync(command, args, { cwd: repositoryRoot, encoding: "utf8", timeout: 120_000 });
@@ -71,8 +73,6 @@ function normF(a) {
 }
 
 export function compareReports(interpreter, native) {
-  const absolute = 1e-13;
-  const relative = 1e-12;
   let compared = 0;
   let maximumDifference = 0;
   function visit(left, right, path) {
@@ -82,7 +82,7 @@ export function compareReports(interpreter, native) {
       }
       const difference = Math.abs(left - right);
       const scale = Math.max(Math.abs(left), Math.abs(right), 1);
-      checkTolerance(`interpreter/native parity at ${path}`, difference, scale, absolute, relative);
+      checkTolerance(`interpreter/native parity at ${path}`, difference, scale, parityAbsolute, parityRelative);
       compared += 1;
       maximumDifference = Math.max(maximumDifference, difference);
       return;
@@ -104,7 +104,31 @@ export function compareReports(interpreter, native) {
     if (left !== right) throw new Error(`interpreter/native report differs at ${path}`);
   }
   visit(interpreter, native, "report");
-  return { comparedValues: compared, maximumAbsoluteDifference: maximumDifference, absolute, relative };
+  return {
+    comparedValues: compared,
+    maximumAbsoluteDifference: maximumDifference,
+    absolute: parityAbsolute,
+    relative: parityRelative,
+  };
+}
+
+export function compareNumericOutputs(interpreter, native) {
+  if (!Array.isArray(interpreter) || !Array.isArray(native) || interpreter.length !== native.length) {
+    throw new Error(`interpreter/native output length differs (${interpreter?.length ?? "invalid"} vs ${native?.length ?? "invalid"})`);
+  }
+  let maximumDifference = 0;
+  for (let index = 0; index < interpreter.length; index++) {
+    const difference = Math.abs(interpreter[index] - native[index]);
+    const scale = Math.max(Math.abs(interpreter[index]), Math.abs(native[index]), 1);
+    checkTolerance(`interpreter/native emitted value ${index}`, difference, scale, parityAbsolute, parityRelative);
+    maximumDifference = Math.max(maximumDifference, difference);
+  }
+  return {
+    comparedValues: interpreter.length,
+    maximumAbsoluteDifference: maximumDifference,
+    absolute: parityAbsolute,
+    relative: parityRelative,
+  };
 }
 
 export function checkTolerance(label, observed, scale, absolute, relative) {
@@ -329,6 +353,8 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
   rmSync(executable, { force: true });
   if (!native.stderr.includes("live_allocations=0")) throw new Error(`native numerical validation leaked allocations:\n${native.stderr}`);
 
+  const interpreterValues = parseEmittedNumbers(interpreter.stdout);
+  const nativeValues = parseEmittedNumbers(native.stdout);
   const interpreterReports = validateRun(interpreter.stdout, contract);
   const nativeReports = validateRun(native.stdout, contract);
   const ci = process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_RUN_ID ? {
@@ -352,6 +378,7 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
     leakCheck: "live_allocations=0",
     nativeCompileDiagnostics: compile.stderr.trim(),
     parity: compareReports(interpreterReports, nativeReports),
+    emittedOutputParity: compareNumericOutputs(interpreterValues, nativeValues),
     runs: { interpreter: interpreterReports, native: nativeReports },
     ...(ci ? { ci } : {}),
   };

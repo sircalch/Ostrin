@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkTolerance, compareReports, directDft, parseEmittedNumbers, validateFft } from "./numeric-validation.mjs";
+import { checkTolerance, compareNumericOutputs, compareReports, directDft, parseEmittedNumbers, validateFft } from "./numeric-validation.mjs";
 
 test("CI provenance is only emitted when GitHub Actions identifies a run", () => {
   const previous = {
@@ -65,6 +65,14 @@ test("interpreter and native reports require matching numeric leaves", () => {
     () => compareReports(left, { solution: [1.01, -2], residual: { value: 1e-15 } }),
     /interpreter\/native parity/
   );
+});
+
+test("interpreter and native outputs compare every emitted numeric value", () => {
+  const report = compareNumericOutputs([10, 0, -2], [10 + 5e-14, 0, -2]);
+  assert.equal(report.comparedValues, 3);
+  assert.ok(Math.abs(report.maximumAbsoluteDifference - 5e-14) < 1e-15);
+  assert.throws(() => compareNumericOutputs([1, 2], [1]), /output length differs/);
+  assert.throws(() => compareNumericOutputs([1], [1.01]), /emitted value 0/);
 });
 
 test("FFT validation checks a nontrivial power-of-two DFT, inverse, and Parseval energy", () => {

@@ -146,7 +146,7 @@ La matriz inicial cubre seis algoritmos en el intérprete y en C nativo:
 | QR fino | matriz rectangular de rango completo | `A − Q R`, `QᵀQ − I`, `R` triangular superior |
 | SVD fina | valores singulares analíticos de una matriz pequeña | `A − UΣVᵀ`, ortogonalidad de `U`/`V`, orden y valores singulares |
 | Autovalores simétricos | autovalores analíticos `1` y `3` | `A V − V Λ`, ortogonalidad y orden ascendente |
-| FFT | DFT directa independiente `O(n²)` sobre señales deterministas de longitudes 8 y 7 | bins reales/imaginarios, reconstrucción IFFT e identidad de Parseval para radix-2 y DFT directa |
+| FFT | DFT directa independiente `O(n²)` sobre señales deterministas: longitudes 8 (radix-2) y 7 (ruta directa), singleton de longitud 1 y señal nula de longitud 8 | bins reales/imaginarios, reconstrucción IFFT e identidad de Parseval; cubre ambas rutas, el caso no vacío mínimo y energía cero |
 
 Cada caso declara tolerancias absoluta y relativa; para los sistemas lineales se normaliza el residuo
 con `||A||F ||x||2 + ||b||2`, y para factorizaciones se usa la norma Frobenius relativa a `||A||F`.
