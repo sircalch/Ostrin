@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkTolerance, compareReports, parseEmittedNumbers } from "./numeric-validation.mjs";
+import { checkTolerance, compareNumericOutputs, compareReports, directDft, parseEmittedNumbers, validateFft } from "./numeric-validation.mjs";
 
 test("CI provenance is only emitted when GitHub Actions identifies a run", () => {
   const previous = {
@@ -65,4 +65,41 @@ test("interpreter and native reports require matching numeric leaves", () => {
     () => compareReports(left, { solution: [1.01, -2], residual: { value: 1e-15 } }),
     /interpreter\/native parity/
   );
+});
+
+test("interpreter and native outputs compare every emitted numeric value", () => {
+  const report = compareNumericOutputs([10, 0, -2], [10 + 5e-14, 0, -2]);
+  assert.equal(report.comparedValues, 3);
+  assert.ok(Math.abs(report.maximumAbsoluteDifference - 5e-14) < 1e-15);
+  assert.throws(() => compareNumericOutputs([1, 2], [1]), /output length differs/);
+  assert.throws(() => compareNumericOutputs([1], [1.01]), /emitted value 0/);
+});
+
+test("FFT validation checks a nontrivial power-of-two DFT, inverse, and Parseval energy", () => {
+  const signal = [1, 2, 3, 4];
+  const spectrum = directDft(signal);
+  assert.equal(spectrum.re[0], 10);
+  for (const value of spectrum.re.slice(1)) assert.ok(Math.abs(value + 2) < 1e-12);
+  assert.ok(Math.abs(spectrum.im[1] - 2) < 1e-12);
+  assert.ok(Math.abs(spectrum.im[3] + 2) < 1e-12);
+  const values = {
+    numbers: [...spectrum.re, ...spectrum.im, ...signal],
+    offset: 0,
+  };
+  const report = validateFft(values, {
+    cases: { radix2: { signal, absolute: 1e-12, relative: 1e-12 } },
+  });
+  assert.ok(report.radix2.spectralResidual < 1e-12);
+  assert.ok(report.radix2.maximumReconstructionError < 1e-12);
+  assert.equal(report.radix2.inputEnergy, 30);
+  assert.ok(Math.abs(report.radix2.spectralEnergy - 120) < 1e-12);
+  assert.ok(report.radix2.parsevalResidual < 1e-12);
+  assert.equal(values.offset, 12);
+});
+
+test("FFT validation rejects a spectrum that violates the independent DFT reference", () => {
+  const values = { numbers: [10, -2, -2, -2, 0, 2.5, 0, -2, 1, 2, 3, 4], offset: 0 };
+  assert.throws(() => validateFft(values, {
+    cases: { radix2: { signal: [1, 2, 3, 4], absolute: 1e-12, relative: 1e-12 } },
+  }), /imaginary DFT bin 1/);
 });

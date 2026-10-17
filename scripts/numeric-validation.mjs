@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const contractPath = path.join(repositoryRoot, "validation/numeric/matrix_algorithms.json");
 const outputDirectory = path.join(repositoryRoot, "target/numeric-validation");
+const parityAbsolute = 1e-13;
+const parityRelative = 1e-12;
 
 function run(command, args, label) {
   const result = spawnSync(command, args, { cwd: repositoryRoot, encoding: "utf8", timeout: 120_000 });
@@ -71,8 +73,6 @@ function normF(a) {
 }
 
 export function compareReports(interpreter, native) {
-  const absolute = 1e-13;
-  const relative = 1e-12;
   let compared = 0;
   let maximumDifference = 0;
   function visit(left, right, path) {
@@ -82,7 +82,7 @@ export function compareReports(interpreter, native) {
       }
       const difference = Math.abs(left - right);
       const scale = Math.max(Math.abs(left), Math.abs(right), 1);
-      checkTolerance(`interpreter/native parity at ${path}`, difference, scale, absolute, relative);
+      checkTolerance(`interpreter/native parity at ${path}`, difference, scale, parityAbsolute, parityRelative);
       compared += 1;
       maximumDifference = Math.max(maximumDifference, difference);
       return;
@@ -104,7 +104,31 @@ export function compareReports(interpreter, native) {
     if (left !== right) throw new Error(`interpreter/native report differs at ${path}`);
   }
   visit(interpreter, native, "report");
-  return { comparedValues: compared, maximumAbsoluteDifference: maximumDifference, absolute, relative };
+  return {
+    comparedValues: compared,
+    maximumAbsoluteDifference: maximumDifference,
+    absolute: parityAbsolute,
+    relative: parityRelative,
+  };
+}
+
+export function compareNumericOutputs(interpreter, native) {
+  if (!Array.isArray(interpreter) || !Array.isArray(native) || interpreter.length !== native.length) {
+    throw new Error(`interpreter/native output length differs (${interpreter?.length ?? "invalid"} vs ${native?.length ?? "invalid"})`);
+  }
+  let maximumDifference = 0;
+  for (let index = 0; index < interpreter.length; index++) {
+    const difference = Math.abs(interpreter[index] - native[index]);
+    const scale = Math.max(Math.abs(interpreter[index]), Math.abs(native[index]), 1);
+    checkTolerance(`interpreter/native emitted value ${index}`, difference, scale, parityAbsolute, parityRelative);
+    maximumDifference = Math.max(maximumDifference, difference);
+  }
+  return {
+    comparedValues: interpreter.length,
+    maximumAbsoluteDifference: maximumDifference,
+    absolute: parityAbsolute,
+    relative: parityRelative,
+  };
 }
 
 export function checkTolerance(label, observed, scale, absolute, relative) {
@@ -239,6 +263,56 @@ function validateEigen(values, id, contract) {
   };
 }
 
+export function directDft(signal) {
+  const re = [];
+  const im = [];
+  for (let k = 0; k < signal.length; k++) {
+    let real = 0;
+    let imaginary = 0;
+    for (let j = 0; j < signal.length; j++) {
+      const angle = -2 * Math.PI * ((k * j) % signal.length) / signal.length;
+      real += signal[j] * Math.cos(angle);
+      imaginary += signal[j] * Math.sin(angle);
+    }
+    re.push(real);
+    im.push(imaginary);
+  }
+  return { re, im };
+}
+
+export function validateFft(values, contract) {
+  const reports = {};
+  for (const [id, testCase] of Object.entries(contract.cases)) {
+    const n = testCase.signal.length;
+    const re = takeVector(values, `${id} real spectrum`, n);
+    const im = takeVector(values, `${id} imaginary spectrum`, n);
+    const reconstructed = takeVector(values, `${id} inverse transform`, n);
+    const reference = directDft(testCase.signal);
+    let spectralResidual = 0;
+    for (let k = 0; k < n; k++) {
+      const realDifference = Math.abs(re[k] - reference.re[k]);
+      const imaginaryDifference = Math.abs(im[k] - reference.im[k]);
+      checkTolerance(`${id} real DFT bin ${k}`, realDifference, Math.abs(reference.re[k]), testCase.absolute, testCase.relative);
+      checkTolerance(`${id} imaginary DFT bin ${k}`, imaginaryDifference, Math.abs(reference.im[k]), testCase.absolute, testCase.relative);
+      spectralResidual = Math.max(spectralResidual, realDifference, imaginaryDifference);
+    }
+    let inputEnergy = 0;
+    let spectralEnergy = 0;
+    let maximumReconstructionError = 0;
+    for (let i = 0; i < n; i++) {
+      inputEnergy += testCase.signal[i] ** 2;
+      spectralEnergy += re[i] ** 2 + im[i] ** 2;
+      const difference = Math.abs(reconstructed[i] - testCase.signal[i]);
+      checkTolerance(`${id} inverse reconstruction sample ${i}`, difference, Math.abs(testCase.signal[i]), testCase.absolute, testCase.relative);
+      maximumReconstructionError = Math.max(maximumReconstructionError, difference);
+    }
+    const parsevalResidual = Math.abs(spectralEnergy / n - inputEnergy);
+    checkTolerance(`${id} Parseval energy`, parsevalResidual, inputEnergy, testCase.absolute, testCase.relative);
+    reports[id] = { spectralResidual, maximumReconstructionError, parsevalResidual, inputEnergy, spectralEnergy };
+  }
+  return reports;
+}
+
 export function validateRun(output, contract) {
   const parsed = parseEmittedNumbers(output);
   const values = { numbers: parsed, offset: 0 };
@@ -250,6 +324,7 @@ export function validateRun(output, contract) {
   reports.qr = validateQr(values, "qr", contract.cases.qr);
   reports.svd = validateSvd(values, "svd", contract.cases.svd);
   reports.eigen = validateEigen(values, "eigen", contract.cases.eigen);
+  reports.fft = validateFft(values, contract.cases.fft);
   if (values.offset !== values.numbers.length) {
     throw new Error(`numeric validation emitted ${values.numbers.length - values.offset} unexpected trailing values`);
   }
@@ -270,7 +345,7 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
   }
 
   mkdirSync(outputDirectory, { recursive: true });
-  const executable = path.join(outputDirectory, `matrix-algorithms${process.platform === "win32" ? ".exe" : ""}`);
+  const executable = path.join(outputDirectory, `numeric-validation${process.platform === "win32" ? ".exe" : ""}`);
   rmSync(executable, { force: true });
   const interpreter = run(compiler, ["--run", source], "interpreter numerical fixture");
   const compile = run(compiler, ["--compile", "--leak-check", "--out", executable, source], "native numerical fixture compile");
@@ -278,6 +353,8 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
   rmSync(executable, { force: true });
   if (!native.stderr.includes("live_allocations=0")) throw new Error(`native numerical validation leaked allocations:\n${native.stderr}`);
 
+  const interpreterValues = parseEmittedNumbers(interpreter.stdout);
+  const nativeValues = parseEmittedNumbers(native.stdout);
   const interpreterReports = validateRun(interpreter.stdout, contract);
   const nativeReports = validateRun(native.stdout, contract);
   const ci = process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_RUN_ID ? {
@@ -301,6 +378,7 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
     leakCheck: "live_allocations=0",
     nativeCompileDiagnostics: compile.stderr.trim(),
     parity: compareReports(interpreterReports, nativeReports),
+    emittedOutputParity: compareNumericOutputs(interpreterValues, nativeValues),
     runs: { interpreter: interpreterReports, native: nativeReports },
     ...(ci ? { ci } : {}),
   };
