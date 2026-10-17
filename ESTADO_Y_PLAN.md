@@ -27,11 +27,11 @@ checks del head final ni cierra gates por sí mismo.
 | Categoría | Contenido |
 |---|---|
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
-| **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
+| **En fallback** | La suite medida mantiene 7.198 funciones IR, 41 HIR y 0 fallbacks AST. HIR sigue siendo una ruta tipada para casos complejos; la cobertura fuera de esa suite y el ownership de agregados y escapes aún requieren pruebas específicas antes de reclamar soporte general. |
 | **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad, estados `Exact`/`Standard`/`Unknown`, validación de valores no finitos y referencias analíticas para productos correlacionados/independientes; paridad intérprete/nativo, WASI destructor check, `live_allocations=0` y suites ASan/UBSan verdes en CI `38182030421`); inventarios `--effect-report` y `--provenance-report` con artefacto público en `website/provenance.html`, target/WASI y snapshot parcial `ostrin.runtime/v1`; los efectos científicos ya tienen inventario experimental, propagación interna y bundles R0–R2; el checking estático completo y la reclamación R3 siguen en desarrollo (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST restante, completar ownership de agregados/escapes, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, checking estático y niveles R2/R3 de efectos/procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; `Figure.unit_line`/`unit_scatter` ya usan IR/C con paridad nativa, emisión WASI y cero fugas, mientras los trazados basados en listas conservan su frontera propia; contrato de ownership en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md) |
-| **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
-| **Higiene del repositorio** | Auditoría del 2026-10-07: se retiraron 49 ramas remotas y 53 referencias locales ya integradas (24 sin worktree y 29 de worktrees limpios; estos checkouts quedaron en el mismo commit, detached y con sus archivos preservados). GitHub elimina ramas al fusionar. El auditor reproducible [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs) confirma que `origin` solo conserva `main`, clasifica 4 ramas locales integradas y 7 con commits únicos; las integradas aún tienen worktrees con cambios locales, por lo que su eliminación queda pendiente hasta preservarlos. Política: [`CONTRIBUTING.md`](CONTRIBUTING.md) y [`docs/branch-hygiene.md`](docs/branch-hygiene.md) |
+| **Pendiente** | Ampliar la cobertura tipada y proteger el trinquete de 0 fallbacks AST en la suite medida; completar ownership de agregados/escapes, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, checking estático y R3 de efectos/procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; `Figure.unit_line`/`unit_scatter` ya usan IR/C con paridad nativa, emisión WASI y cero fugas, mientras los trazados basados en listas conservan su frontera propia; contrato de ownership en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md) |
+| **Release** | [`v0.2.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.2.0) publicada el 2026-10-15 desde el tag de `29c24c0`, con archivos Linux x86_64, macOS ARM64, Windows x64 y WASI Preview 1 y checksums propios. El RC anterior de `d0abbad` conserva hashes separados en [`validation/release-candidate-v0.2.0.json`](validation/release-candidate-v0.2.0.json); instalación, compatibilidad y limitaciones están en [`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md). |
+| **Higiene del repositorio** | La auditoría del 2026-10-07 retiró 49 ramas remotas y 53 referencias locales ya integradas, preservando los checkouts y sus archivos. Desde entonces se abrieron nuevas ramas de trabajo: el estado actual se obtiene con [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs), no con los conteos históricos. Las ramas con commits únicos y los worktrees con cambios se preservan hasta verificar su destino. GitHub elimina las ramas de PR al fusionar. Política: [`CONTRIBUTING.md`](CONTRIBUTING.md) y [`docs/branch-hygiene.md`](docs/branch-hygiene.md). |
 
 ---
 
@@ -568,8 +568,8 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
 | **5** | E (WASM) + G (playground) | Difusión |
 | **6** | Definición upstream para GitHub Linguist, validación local y clasificación de `.ostrin` tras la aceptación | Ostrin visible como lenguaje en GitHub |
 
-Plan activo (2026-10-08): la fase actual es calidad, corrección científica, reproducibilidad y
-usabilidad externa. La auditoría de ramas está cerrada (§0): los refs remotos obsoletos y ramas
+El corte de trabajo del 2026-10-08 inició la fase de calidad, corrección científica,
+reproducibilidad y usabilidad externa. La auditoría inicial de ramas quedó cerrada (§0): los refs remotos obsoletos y ramas
 locales limpias/fusionadas se retiraron; se preservaron los checkouts con cambios y los commits
 únicos aún no integrados. GitHub elimina nuevas ramas al fusionar. La matriz inicial de ownership
 por tipo y contexto está en [`docs/ownership-matrix.md`](docs/ownership-matrix.md). Se cerró una
@@ -590,12 +590,12 @@ cuatro regresiones de enums gestionados pasan focalmente bajo ASan y UBSan. La p
 en capas distintas y comprueba paridad, `live_allocations=0` y el destructor recursivo emitido para
 WASI. Su ejecución en ASan/UBSan queda incluida en los jobs de sanitizer; el run 38112752608 terminó correctamente. El siguiente bloque técnico sigue siendo cerrar otros riesgos altos en agregados, escapes, `Phi`, closures y
 tareas. Después se
-reduce el fallback AST de forma segura, sin sacrificar semántica ni memoria. Siguen
-reproducción R1/R2, inferencia estática de efectos, `Measurement<T>` con cantidades/arreglos/
-covarianza, validación numérica, auditoría de accesibilidad/arquitectura web y preparación de `v0.2`. La
-validación analítica inicial de LU, Cholesky, QR, SVD y autovalores simétricos ya pasa localmente
-en intérprete y nativo con residuales independientes, tolerancias por caso y cero fugas; el criterio
-permanece abierto hasta obtener ejecución CI verde en todos los sistemas soportados y adjuntar su URL.
+amplía el camino HIR/IR de forma segura, sin sacrificar semántica ni memoria. Tras publicar
+`v0.2.0`, siguen la generalización de R1/R2, el cierre verificable de R3, la inferencia estática de
+efectos, `Measurement<T>` con cantidades/arreglos/covarianza, la validación numérica y la auditoría
+de accesibilidad y arquitectura web. La evidencia numérica vigente y sus límites se consultan en
+[`validation/quality-scorecard.json`](validation/quality-scorecard.json), sus reportes enlazados y los
+workflows correspondientes; este párrafo no sustituye sus resultados por plataforma.
 El gate de evidencia de [`v0.2.0`](docs/release-readiness-v0.2.json) conserva sus 12 criterios
 `READY` para el alcance declarado; la ratchet medida es 7.198 IR + 41 HIR, con cero fallbacks
 AST. El manifiesto distingue la revisión fuente `d0abbad` de los binarios RC, la revisión fija

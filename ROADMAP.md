@@ -18,17 +18,14 @@ El manifiesto [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.j
 prioridad de desarrollo pasa al hito de efectos científicos estáticos. Cualquier nueva release
 requiere autorización explícita del propietario.
 
-0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** se auditaron todas
-   las referencias contra `main` y los heads de PR fusionados; se eliminaron
-   49 ramas remotas y 53 referencias locales limpias e integradas. De las
-   referencias locales, 29 estaban en worktrees limpios: esos checkouts quedaron
-   en el mismo commit detached, con archivos ignorados y demás contenido
-   preservados. Permanecen 11 ramas locales además de `main`: seis checkouts con
-   cambios sin confirmar (incluido el principal) y cinco con commits únicos no
-   cubiertos por `main` o PR fusionados. Se activó `delete_branch_on_merge`.
-   La política queda en
-   [`CONTRIBUTING.md`](CONTRIBUTING.md); el auditor actual está en
-   [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs) y el detalle está en
+0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** el corte del
+   2026-10-07 retiró 49 ramas remotas y 53 referencias locales limpias e integradas.
+   Los 29 worktrees limpios asociados quedaron detached con sus archivos preservados.
+   Ese conteo es histórico: las ramas abiertas después para nuevos PR se consultan con
+   [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs). Se activó
+   `delete_branch_on_merge`; las referencias con commits únicos y los worktrees con cambios
+   requieren verificación antes de limpiarse. La política queda en
+   [`CONTRIBUTING.md`](CONTRIBUTING.md) y el detalle en
    [`ESTADO_Y_PLAN.md`](ESTADO_Y_PLAN.md).
 
    **Fuentes documentales — sincronizadas:** la auditoría arquitectónica antigua
