@@ -67,21 +67,31 @@ test("interpreter and native reports require matching numeric leaves", () => {
   );
 });
 
-test("FFT validation independently checks a power-of-two impulse and inverse reconstruction", () => {
-  const signal = [1, 0];
+test("FFT validation checks a nontrivial power-of-two DFT, inverse, and Parseval energy", () => {
+  const signal = [1, 2, 3, 4];
   const spectrum = directDft(signal);
-  const values = { numbers: [...spectrum.re, ...spectrum.im, ...signal], offset: 0 };
+  assert.equal(spectrum.re[0], 10);
+  for (const value of spectrum.re.slice(1)) assert.ok(Math.abs(value + 2) < 1e-12);
+  assert.ok(Math.abs(spectrum.im[1] - 2) < 1e-12);
+  assert.ok(Math.abs(spectrum.im[3] + 2) < 1e-12);
+  const values = {
+    numbers: [...spectrum.re, ...spectrum.im, ...signal],
+    offset: 0,
+  };
   const report = validateFft(values, {
     cases: { radix2: { signal, absolute: 1e-12, relative: 1e-12 } },
   });
-  assert.equal(report.radix2.spectralResidual, 0);
-  assert.equal(report.radix2.maximumReconstructionError, 0);
-  assert.equal(values.offset, 6);
+  assert.ok(report.radix2.spectralResidual < 1e-12);
+  assert.ok(report.radix2.maximumReconstructionError < 1e-12);
+  assert.equal(report.radix2.inputEnergy, 30);
+  assert.ok(Math.abs(report.radix2.spectralEnergy - 120) < 1e-12);
+  assert.ok(report.radix2.parsevalResidual < 1e-12);
+  assert.equal(values.offset, 12);
 });
 
 test("FFT validation rejects a spectrum that violates the independent DFT reference", () => {
-  const values = { numbers: [1, 0, 0, 0, 1, 0], offset: 0 };
+  const values = { numbers: [10, -2, -2, -2, 0, 2.5, 0, -2, 1, 2, 3, 4], offset: 0 };
   assert.throws(() => validateFft(values, {
-    cases: { radix2: { signal: [1, 0], absolute: 1e-12, relative: 1e-12 } },
-  }), /real DFT bin 1/);
+    cases: { radix2: { signal: [1, 2, 3, 4], absolute: 1e-12, relative: 1e-12 } },
+  }), /imaginary DFT bin 1/);
 });
