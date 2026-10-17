@@ -58,9 +58,24 @@ function captureExtensionErrors(runtime) {
     errors.push("provenance.runtime.compiler_lockfile");
   }
   const host = runtime?.host;
+  const ciRun = host?.ci_run;
+  const ciRunId = typeof ciRun?.run_id === "string" ? ciRun.run_id : "";
+  const expectedRunUrl = `https://github.com/${ciRun?.repository ?? "unknown"}/actions/runs/${ciRunId}`;
+  const validCiRun = isObject(ciRun)
+    && ciRun.schema === "ostrin.ci-run/v1"
+    && typeof ciRun.repository === "string" && /^[^/\s]+\/[^/\s]+$/.test(ciRun.repository)
+    && typeof ciRun.workflow === "string" && ciRun.workflow.length > 0 && ciRun.workflow !== "unknown"
+    && /^[1-9][0-9]*$/.test(ciRunId)
+    && /^[1-9][0-9]*$/.test(typeof ciRun.run_attempt === "string" ? ciRun.run_attempt : "")
+    && typeof ciRun.event === "string" && ciRun.event.length > 0 && ciRun.event !== "unknown"
+    && typeof ciRun.ref === "string" && ciRun.ref.startsWith("refs/")
+    && typeof ciRun.head_sha === "string" && /^[a-f0-9]{40}$/.test(ciRun.head_sha)
+    && typeof ciRun.tested_sha === "string" && /^[a-f0-9]{40}$/.test(ciRun.tested_sha)
+    && ciRun.url === expectedRunUrl;
   if (!isObject(host)
     || host.schema !== "ostrin.host/v1"
     || host.source !== "github-actions"
+    || !validCiRun
     || typeof host.runner_os !== "string" || host.runner_os.length === 0 || host.runner_os === "unknown"
     || typeof host.runner_arch !== "string" || host.runner_arch.length === 0 || host.runner_arch === "unknown"
     || typeof host.runner_environment !== "string" || host.runner_environment.length === 0 || host.runner_environment === "unknown"

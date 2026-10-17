@@ -45,7 +45,14 @@ de host.
 Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
 regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
 del runner (`RUNNER_OS`, arquitectura, imagen, Node, WASI y hardware visible del proceso);
-no se guardan hostname, usuario ni rutas privadas. La acción conserva además el reporte
+no se guardan hostname, usuario ni rutas privadas. Cada captura registra también el repositorio,
+workflow, evento, ref, número de ejecución/intento, URL de Actions y el SHA probado como
+`runtime.host.ci_run`. `head_sha` identifica la punta del PR y `tested_sha` el commit que ejecutó el
+workflow (en `pull_request`, normalmente el merge sintético); no se confunden entre sí.
+`provenance.commit` sigue identificando el commit de los archivos del experimento. La asociación de
+los SHA y la URL es metadato estructural del runner, no una firma criptográfica ni una atestación
+independiente.
+La acción conserva además el reporte
 R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
 `ostrin-r3-host-evidence-<run_id>` durante 90 días, y lo sube solo después de que terminen
 correctamente los replays, las comprobaciones web y los demás gates de distribución de ese job.

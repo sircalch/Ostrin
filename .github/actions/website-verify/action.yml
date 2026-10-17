@@ -43,6 +43,7 @@ runs:
       shell: bash
       env:
         OSTRIN_CAPTURE_HOST: "1"
+        OSTRIN_EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         node scripts/experiment-bundle.mjs --write-all
         node scripts/r3-readiness.mjs --write --require-capture

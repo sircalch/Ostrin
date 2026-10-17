@@ -22,6 +22,18 @@ const validRuntime = () => ({
   host: {
     schema: "ostrin.host/v1",
     source: "github-actions",
+    ci_run: {
+      schema: "ostrin.ci-run/v1",
+      repository: "sircalch/Ostrin",
+      workflow: "Ostrin CI",
+      run_id: "1234",
+      run_attempt: "1",
+      event: "pull_request",
+      ref: "refs/pull/193/merge",
+      head_sha: "a".repeat(40),
+      tested_sha: "b".repeat(40),
+      url: "https://github.com/sircalch/Ostrin/actions/runs/1234",
+    },
     runner_os: "Linux",
     runner_arch: "X64",
     runner_environment: "github-hosted",
@@ -128,8 +140,12 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
   assert.equal(inspectBundle(bundle, "fixture.json").status, "OPEN");
 });
 
-test("R3 accepts the host and dependency capture emitted by the bundle generator", () => {
-  const names = ["OSTRIN_CAPTURE_HOST", "RUNNER_OS", "RUNNER_ARCH", "RUNNER_ENVIRONMENT", "ImageOS", "ImageVersion"];
+test("R3 accepts the host and CI run capture emitted by the bundle generator", () => {
+  const names = [
+    "OSTRIN_CAPTURE_HOST", "RUNNER_OS", "RUNNER_ARCH", "RUNNER_ENVIRONMENT", "ImageOS", "ImageVersion",
+    "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_EVENT_NAME",
+    "GITHUB_REF", "GITHUB_SHA", "OSTRIN_EVIDENCE_HEAD_SHA",
+  ];
   const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
   Object.assign(process.env, {
     OSTRIN_CAPTURE_HOST: "1",
@@ -138,6 +154,14 @@ test("R3 accepts the host and dependency capture emitted by the bundle generator
     RUNNER_ENVIRONMENT: "github-hosted",
     ImageOS: "ubuntu24",
     ImageVersion: "20261001.1.0",
+    GITHUB_REPOSITORY: "sircalch/Ostrin",
+    GITHUB_WORKFLOW: "Ostrin CI",
+    GITHUB_RUN_ID: "1234",
+    GITHUB_RUN_ATTEMPT: "1",
+    GITHUB_EVENT_NAME: "pull_request",
+    GITHUB_REF: "refs/pull/193/merge",
+    GITHUB_SHA: "b".repeat(40),
+    OSTRIN_EVIDENCE_HEAD_SHA: "a".repeat(40),
   });
   try {
     const bundle = {
@@ -177,6 +201,20 @@ test("R3 capture rejects present but malformed host, dependency and scheduler me
     "provenance.runtime.scheduler",
   ]);
   assert.ok(requiredCaptureErrors({ entries: [report] }).length > 0);
+});
+
+test("R3 capture requires a traceable workflow run and tested source revision", () => {
+  const runtime = validRuntime();
+  delete runtime.host.ci_run.tested_sha;
+  const report = inspectBundle({ provenance: { runtime, effects: validEffects() } }, "missing-tested-sha.json");
+  assert.equal(report.status, "OPEN");
+  assert.ok(report.r3Extensions.missing.includes("provenance.runtime.host"));
+
+  const malformed = validRuntime();
+  malformed.host.ci_run.url = "https://example.invalid/run";
+  const invalid = inspectBundle({ provenance: { runtime: malformed, effects: validEffects() } }, "invalid-ci-run.json");
+  assert.equal(invalid.status, "OPEN");
+  assert.ok(invalid.r3Extensions.missing.includes("provenance.runtime.host"));
 });
 
 test("R3 capture rejects invalid dependency hashes and unknown runner metadata", () => {

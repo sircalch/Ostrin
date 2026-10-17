@@ -483,6 +483,18 @@ export function runtimeSnapshotFor(root = repositoryRoot, sourcePath = "") {
   const host = process.env.OSTRIN_CAPTURE_HOST === "1" ? {
     schema: "ostrin.host/v1",
     source: "github-actions",
+    ci_run: {
+      schema: "ostrin.ci-run/v1",
+      repository: process.env.GITHUB_REPOSITORY ?? "unknown",
+      workflow: process.env.GITHUB_WORKFLOW ?? "unknown",
+      run_id: process.env.GITHUB_RUN_ID ?? "unknown",
+      run_attempt: process.env.GITHUB_RUN_ATTEMPT ?? "unknown",
+      event: process.env.GITHUB_EVENT_NAME ?? "unknown",
+      ref: process.env.GITHUB_REF ?? "unknown",
+      head_sha: process.env.OSTRIN_EVIDENCE_HEAD_SHA ?? process.env.GITHUB_SHA ?? "unknown",
+      tested_sha: process.env.GITHUB_SHA ?? "unknown",
+      url: `https://github.com/${process.env.GITHUB_REPOSITORY ?? "unknown"}/actions/runs/${process.env.GITHUB_RUN_ID ?? "unknown"}`,
+    },
     runner_os: process.env.RUNNER_OS ?? "unknown",
     runner_arch: process.env.RUNNER_ARCH ?? "unknown",
     runner_environment: process.env.RUNNER_ENVIRONMENT ?? "unknown",
