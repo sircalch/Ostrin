@@ -244,6 +244,39 @@ static OstrinTemperaturePoint ostrin_temperature_point_new(double value, const c
     return point;
 }
 
+static OstrinTemperaturePoint ostrin_temperature_point_to(
+    OstrinTemperaturePoint point, const char* scale
+) {
+    int tag;
+    if (strcmp(scale, "K") == 0) tag = OSTRIN_TEMP_K;
+    else if (strcmp(scale, "degC") == 0) tag = OSTRIN_TEMP_C;
+    else if (strcmp(scale, "degF") == 0) tag = OSTRIN_TEMP_F;
+    else {
+        fprintf(stderr, "runtime error: 'temperature_point_to' scale must be 'K', 'degC' or 'degF', got '%s'\n", scale);
+        exit(1);
+    }
+    const double coherent = ostrin_temperature_point_to_kelvin(point);
+    double converted;
+    if (point.scale == OSTRIN_TEMP_K) {
+        converted = tag == OSTRIN_TEMP_K ? point.value :
+            tag == OSTRIN_TEMP_C ? point.value - 273.15 :
+            fma(point.value, 9.0 / 5.0, -459.67);
+    } else if (point.scale == OSTRIN_TEMP_C) {
+        converted = tag == OSTRIN_TEMP_K ? point.value + 273.15 :
+            tag == OSTRIN_TEMP_C ? point.value :
+            fma(point.value, 9.0 / 5.0, 32.0);
+    } else {
+        converted = tag == OSTRIN_TEMP_K ?
+            fma(point.value, 5.0 / 9.0, OSTRIN_TEMP_F_OFFSET) :
+            tag == OSTRIN_TEMP_C ? (point.value - 32.0) * (5.0 / 9.0) :
+            point.value;
+    }
+    if (!isfinite(coherent) || !isfinite(converted))
+        OSTRIN_FAIL("absolute temperature arithmetic overflowed");
+    OstrinTemperaturePoint result = { converted, tag };
+    return result;
+}
+
 static int ostrin_temperature_point_cmp(OstrinTemperaturePoint left, OstrinTemperaturePoint right) {
     double a = ostrin_temperature_point_to_kelvin(left);
     double b = ostrin_temperature_point_to_kelvin(right);

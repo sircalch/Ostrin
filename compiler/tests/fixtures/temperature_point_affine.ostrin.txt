@@ -26,5 +26,7 @@ fn main() -> Void {
     print(difference(f, c))
     print(10.0 K + c)
     print(moved - (10.0 K))
+    print(temperature_point_to(c, "degF"))
+    assert(temperature_point_to(moved, "degF") == make_point(50.0, "degF"))
     print(310 K)
 }

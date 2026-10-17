@@ -362,7 +362,23 @@ pub fn convert_value_with_role(
                 }
             }
             let coherent = value.mul_add(from.scale, from.offset);
-            let converted = (coherent - to.offset) / to.scale;
+            let point_scales = ["K", "degC", "degF"];
+            let source_scale = point_scales
+                .iter()
+                .position(|symbol| builtin_temperature_point_unit(symbol).as_ref() == Some(from));
+            let target_scale = point_scales
+                .iter()
+                .position(|symbol| builtin_temperature_point_unit(symbol).as_ref() == Some(to));
+            let converted = match (source_scale, target_scale) {
+                (Some(0), Some(0)) | (Some(1), Some(1)) | (Some(2), Some(2)) => value,
+                (Some(0), Some(1)) => value - 273.15,
+                (Some(0), Some(2)) => value.mul_add(9.0 / 5.0, -459.67),
+                (Some(1), Some(0)) => value + 273.15,
+                (Some(1), Some(2)) => value.mul_add(9.0 / 5.0, 32.0),
+                (Some(2), Some(0)) => value.mul_add(5.0 / 9.0, 273.15 - 32.0 * (5.0 / 9.0)),
+                (Some(2), Some(1)) => (value - 32.0) * (5.0 / 9.0),
+                _ => coherent.mul_add(1.0 / to.scale, -to.offset / to.scale),
+            };
             if !coherent.is_finite() || !converted.is_finite() {
                 return Err("absolute temperature arithmetic overflowed".to_string());
             }

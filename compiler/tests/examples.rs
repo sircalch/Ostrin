@@ -12172,6 +12172,35 @@ fn temperature_point_native_backend_matches_interpreter() {
         String::from_utf8_lossy(&fallback_native.stdout).replace("\r\n", "\n"),
         expected
     );
+    let bad_conversion = temp_source(
+        "temperature_point_native_bad_conversion_scale",
+        "fn main() -> Void {\n\
+         point = temperature_point(0.0, \"degC\")\n\
+         print(temperature_point_to(point, \"degR\"))\n\
+         }\n",
+    );
+    let interpreted_bad_conversion = run(&["--run", &bad_conversion]);
+    assert!(!interpreted_bad_conversion.status.success());
+    assert!(stderr(&interpreted_bad_conversion).contains("scale must be 'K', 'degC' or 'degF'"));
+    let bad_conversion_exe = temp_artifact("temperature_point_bad_conversion_scale.exe");
+    let bad_conversion_compile = run(&["--compile", "--out", &bad_conversion_exe, &bad_conversion]);
+    assert!(
+        bad_conversion_compile.status.success(),
+        "native invalid conversion scale did not compile: {}",
+        stderr(&bad_conversion_compile)
+    );
+    let native_bad_conversion = Command::new(&bad_conversion_exe)
+        .output()
+        .expect("run native invalid point conversion");
+    let _ = fs::remove_file(&bad_conversion_exe);
+    let _ = fs::remove_file(&bad_conversion);
+    assert!(!native_bad_conversion.status.success());
+    assert!(
+        String::from_utf8_lossy(&native_bad_conversion.stderr)
+            .contains("scale must be 'K', 'degC' or 'degF'"),
+        "native invalid conversion scale diagnostic was unclear: {}",
+        String::from_utf8_lossy(&native_bad_conversion.stderr)
+    );
     let bad_scale = temp_source(
         "temperature_point_native_bad_scale",
         "fn main() -> Void { print(temperature_point(20.0, \"degR\")) }\n",
@@ -12215,6 +12244,8 @@ fn temperature_point_constructor_keeps_kelvin_intervals_linear() {
              shifted = c + (10.0 K)\n\
              print(shifted)\n\
              print(shifted - c)\n\
+             assert(temperature_point_to(shifted, \"degF\") == make_point(50.0, \"degF\"))\n\
+             print(temperature_point_to(c, \"degF\"))\n\
              print(310 K)\n\
          }\n",
     );
@@ -12227,7 +12258,7 @@ fn temperature_point_constructor_keeps_kelvin_intervals_linear() {
     );
     assert_eq!(
         stdout(&interpreted).replace("\r\n", "\n"),
-        "10 degC (absolute)\n10 K\n310 K\n"
+        "10 degC (absolute)\n10 K\n32 degF (absolute)\n310 K\n"
     );
 
     let invalid = temp_source(

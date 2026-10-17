@@ -3670,6 +3670,13 @@ fn emit_instruction(
                     "ostrin_temperature_point_new((double)({}), {})",
                     codes[0], codes[1]
                 )
+            } else if callee == "temperature_point_to"
+                && args.len() == 2
+                && *ty == Ty::TemperaturePoint
+                && value_ty(values, args[0])? == Ty::TemperaturePoint
+                && value_ty(values, args[1])? == Ty::String
+            {
+                format!("ostrin_temperature_point_to({}, {})", codes[0], codes[1])
             } else if callee == "panic"
                 && args.len() == 1
                 && *ty == Ty::Void

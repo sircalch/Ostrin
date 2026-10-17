@@ -3005,6 +3005,39 @@ impl Interpreter {
                     }
                     return Ok(Value::TemperaturePoint(value, unit));
                 }
+                "temperature_point_to" => {
+                    let Value::TemperaturePoint(value, from_unit) = self.eval_arg(&args[0], env)?
+                    else {
+                        return Err(RuntimeError::Error(
+                            "'temperature_point_to' expects a TemperaturePoint and a String scale"
+                                .to_string(),
+                        ));
+                    };
+                    let Value::String(to_unit) = self.eval_arg(&args[1], env)? else {
+                        return Err(RuntimeError::Error(
+                            "'temperature_point_to' expects a TemperaturePoint and a String scale"
+                                .to_string(),
+                        ));
+                    };
+                    let from = builtin_temperature_point_unit(&from_unit).ok_or_else(|| {
+                        RuntimeError::Error(format!(
+                            "'temperature_point_to' source has invalid scale '{from_unit}'"
+                        ))
+                    })?;
+                    let to = builtin_temperature_point_unit(&to_unit).ok_or_else(|| {
+                        RuntimeError::Error(format!(
+                            "'temperature_point_to' scale must be 'K', 'degC' or 'degF', got '{to_unit}'"
+                        ))
+                    })?;
+                    let converted = convert_value_with_role(
+                        value,
+                        &from,
+                        &to,
+                        &QuantityRole::Point("Temperature".to_string()),
+                    )
+                    .map_err(RuntimeError::Error)?;
+                    return Ok(Value::TemperaturePoint(converted, to_unit));
+                }
                 "select" => {
                     let channels = self.eval_arg(&args[0], env)?;
                     let Value::List(channels) = channels else {

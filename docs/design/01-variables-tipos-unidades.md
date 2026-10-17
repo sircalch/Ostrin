@@ -329,12 +329,13 @@ Cuando se habiliten arrays de puntos absolutos, deberán aplicar el offset eleme
 conservar el rol de sus elementos para seleccionar la transformación correcta.
 
 La semántica distingue estos roles en metadatos internos y el type checker distingue el tipo nominal
-`TemperaturePoint` de `Quantity<Temperature>`. El intérprete expone el constructor explícito
-`temperature_point(valor, escala)` para crear puntos en `"K"`, `"degC"` o `"degF"`. Por ejemplo,
+`TemperaturePoint` de `Quantity<Temperature>`. El constructor explícito
+`temperature_point(valor, escala)` crea puntos en `"K"`, `"degC"` o `"degF"`. Por ejemplo,
 `temperature_point(20.0, "degC")` es un punto absoluto, mientras que `20 K` sigue siendo un
-intervalo lineal. Los puntos se pueden comparar, desplazar por intervalos de temperatura y restar
-entre sí; la diferencia resultante es un intervalo Kelvin. El constructor rechaza escalas distintas
-de las tres permitidas y valores no finitos. El intérprete y los backends nativos IR y AST ejecutan
+intervalo lineal. `temperature_point_to(punto, escala)` convierte un punto ya creado y preserva su
+rol absoluto. Los puntos se pueden comparar, desplazar por intervalos de temperatura y restar
+entre sí; la diferencia resultante es un intervalo Kelvin. Ambos builtins rechazan escalas distintas
+de las tres permitidas; el constructor también rechaza valores no finitos. El intérprete y los backends nativos IR y AST ejecutan
 el tipo escalar; WASI también compila y ejecuta el caso en Node WASI Preview 1. Su matriz de
 30 programas comprueba además un desbordamiento de resta de puntos. No hay soporte de arrays ni de
 `Measurement<TemperaturePoint>`. El diseño separa una **temperatura absoluta**
@@ -361,7 +362,9 @@ offset_to) / scale_to`. Para intervalos solo se aplicará `interval_to =
 scale_from / scale_to * interval_from`. La implementación interna usa una operación fused multiply-add
 para reducir el redondeo al normalizar puntos, y calcula el offset Fahrenheit desde el par de referencia
 exacto `32 °F = 273.15 K`; una prueba verifica que referencias Celsius/Fahrenheit equivalentes comparen
-iguales en ambas direcciones. Por tanto, una implementación no debe inferir si una
+iguales en ambas direcciones. La conversión pública `temperature_point_to` emplea
+transformaciones directas por par de escalas (con FMA donde aporta estabilidad) equivalentes a
+la fórmula general. Por tanto, una implementación no debe inferir si una
 cantidad es absoluta únicamente a partir de la dimensión `Quantity<Temperature>`: requiere una
 distinción representable por el sistema de tipos y preservada por HIR/IR, intérprete, backend
 nativo, arrays, formatters y serialización.
@@ -396,7 +399,7 @@ ni de mediciones:
 | --- | --- | --- |
 | Tipos escalares | `TemperaturePoint` nominal en parámetros, retornos y expresiones tipadas; el rol sobrevive en HIR/IR. | Mezclar un punto con `Quantity<D>` en una firma o sustitución genérica. |
 | Operaciones escalares | Punto − punto, punto ± intervalo, intervalo + punto y comparación entre puntos en escalas K/degC/degF. | Punto + punto, intervalo − punto, punto ×/÷, potencia, producto o negación; comparar punto con intervalo. |
-| Construcción y unidades | `temperature_point(valor, escala)` crea explícitamente un punto finito en K, degC o degF. `n K` continúa siendo un intervalo. | Conversión explícita de un punto ya construido a otra escala; no existe todavía una API de conversión de puntos. |
+| Construcción y unidades | `temperature_point(valor, escala)` crea explícitamente un punto finito y `temperature_point_to(punto, escala)` lo convierte preservando el rol. `n K` continúa siendo un intervalo. | Unidades afines definidas por el usuario; sólo están habilitadas las escalas K, degC y degF. |
 | Backends escalares | Paridad de salida entre intérprete, backend nativo IR y fallback AST; el programa también se ejecuta en WASI Preview 1. | No se infiere a partir de estas pruebas la seguridad universal de memoria ni el soporte de otros tipos de payload. |
 | Arrays | La conversión actual de `Array<Quantity<Temperature>>` conserva la semántica lineal y aplica solo factores. | Los arrays de `TemperaturePoint`, conversión de offset elemento a elemento y preservación del rol en arrays aún no están implementados. |
 | Medición y persistencia | No habilitado para puntos absolutos. | `Measurement<TemperaturePoint>`, propagación de incertidumbre, serialización y persistencia de puntos requieren diseño y pruebas propios. |

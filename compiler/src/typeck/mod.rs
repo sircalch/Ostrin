@@ -5777,6 +5777,7 @@ fn check_builtin_call(
         // `K` remains the ordinary linear interval unit. Absolute readings
         // require this explicit role-bearing constructor.
         "temperature_point" => vec![Ty::Float, Ty::String],
+        "temperature_point_to" => vec![Ty::TemperaturePoint, Ty::String],
         "select" => vec![Ty::Unknown],
         // Ownership primitives are intentionally generic. `clone` creates a
         // new native reference to the same identity-managed value; `drop`
@@ -5859,6 +5860,7 @@ fn check_builtin_call(
             vec![Ty::String, Ty::String],
         )),
         "temperature_point" => Some(Ty::TemperaturePoint),
+        "temperature_point_to" => Some(Ty::TemperaturePoint),
         "select" => {
             let Some(Ty::List(channel_ty)) = arg_types.first() else {
                 errors.push(TypeError {

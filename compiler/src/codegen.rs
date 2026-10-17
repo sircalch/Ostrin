@@ -8525,7 +8525,7 @@ impl<'a> Codegen<'a> {
             "file_exists" | "hash" => 1,
             "char_from_codepoint" => 1,
             "select" => 1,
-            "format" | "format_float_value" | "temperature_point" => 2,
+            "format" | "format_float_value" | "temperature_point" | "temperature_point_to" => 2,
             "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int"
             | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs"
@@ -8575,6 +8575,18 @@ impl<'a> Codegen<'a> {
                         "ostrin_temperature_point_new((double)({}), {})",
                         codes[0], codes[1]
                     ),
+                    CType::TemperaturePoint,
+                )))
+            }
+            "temperature_point_to" => {
+                if types[0] != CType::TemperaturePoint || types[1] != CType::Str {
+                    return Err(
+                        "'temperature_point_to' expects a TemperaturePoint and a String scale"
+                            .to_string(),
+                    );
+                }
+                Ok(Some((
+                    format!("ostrin_temperature_point_to({}, {})", codes[0], codes[1]),
                     CType::TemperaturePoint,
                 )))
             }
