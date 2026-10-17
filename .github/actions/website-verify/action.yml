@@ -53,6 +53,7 @@ runs:
       shell: bash
       env:
         OSTRIN_CAPTURE_HOST: "1"
+        OSTRIN_EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         node scripts/linguist-check.mjs
         node --test scripts/linguist-check.test.mjs
