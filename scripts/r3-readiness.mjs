@@ -291,10 +291,29 @@ function buildGapDiagnostics(records) {
     numericComparisonNotClaimedBundles: 0,
     numericPolicyToleranceMentionBundles: 0,
   };
+  const externalInputEvidence = {
+    declaredInputRecords: 0,
+    externalSnapshotInputRecords: 0,
+    bundlesWithExternalSnapshotInputs: 0,
+    externalSnapshotInputsWithMatchingEmbeddedDeclaration: 0,
+    externalSnapshotInputsMissingMatchingEmbeddedDeclaration: 0,
+    bundlesWithFilesystemReadCapability: 0,
+    inputKinds: new Map(),
+    bundlesMissingSnapshotDeclaration: [],
+  };
 
   for (const { entry, effectCalls, bundle: sourceBundle } of records) {
     const bundle = entry.id ?? entry.file;
     const provenance = sourceBundle?.provenance ?? {};
+    const inputRecords = Array.isArray(provenance.inputs) ? provenance.inputs : [];
+    externalInputEvidence.declaredInputRecords += inputRecords.length;
+    for (const input of inputRecords) {
+      const kind = typeof input?.kind === "string" ? input.kind : "<missing>";
+      externalInputEvidence.inputKinds.set(kind, (externalInputEvidence.inputKinds.get(kind) ?? 0) + 1);
+    }
+    const externalSnapshotInputs = inputRecords.filter((input) => input?.kind === "external-snapshot");
+    if (externalSnapshotInputs.length > 0) externalInputEvidence.bundlesWithExternalSnapshotInputs++;
+    externalInputEvidence.externalSnapshotInputRecords += externalSnapshotInputs.length;
     const declaredSnapshots = Array.isArray(provenance.runtime?.input_snapshots)
       ? provenance.runtime.input_snapshots.filter((snapshot) =>
         snapshot?.embedded === true && typeof snapshot.path === "string"
@@ -302,6 +321,31 @@ function buildGapDiagnostics(records) {
       : [];
     if (declaredSnapshots.length > 0) reproducibility.embeddedInputSnapshotBundles++;
     reproducibility.declaredEmbeddedInputSnapshotCount += declaredSnapshots.length;
+    const missingSnapshotInputs = [];
+    for (const input of externalSnapshotInputs) {
+      const source = input?.snapshot;
+      const matches = source?.embedded === true
+        && typeof source.path === "string"
+        && typeof input.sha256 === "string"
+        && declaredSnapshots.some((snapshot) => snapshot.path === source.path && snapshot.sha256 === input.sha256);
+      if (matches) externalInputEvidence.externalSnapshotInputsWithMatchingEmbeddedDeclaration++;
+      else {
+        externalInputEvidence.externalSnapshotInputsMissingMatchingEmbeddedDeclaration++;
+        missingSnapshotInputs.push(input?.id ?? "<unnamed>");
+      }
+    }
+    if (missingSnapshotInputs.length > 0) {
+      externalInputEvidence.bundlesMissingSnapshotDeclaration.push({
+        bundle,
+        inputs: missingSnapshotInputs,
+      });
+    }
+    const capabilities = Array.isArray(provenance.execution?.capabilities)
+      ? provenance.execution.capabilities
+      : [];
+    if (capabilities.some((capability) => typeof capability === "string" && capability.startsWith("filesystem.read:"))) {
+      externalInputEvidence.bundlesWithFilesystemReadCapability++;
+    }
     if (provenance.execution?.status === "verified-in-ci") reproducibility.ciVerifiedExecutionBundles++;
     if (provenance.replay?.status === "verified") reproducibility.recordedVerifiedReplayBundles++;
     const numericPolicy = provenance.runtime?.platform_policy?.numeric;
@@ -446,6 +490,13 @@ function buildGapDiagnostics(records) {
     reproducibilityEvidence: {
       ...reproducibility,
       interpretation: "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels and recorded replay statuses are not re-executed by this diagnostic; mentioning numeric tolerances does not mean they were assessed or scientifically justified.",
+    },
+    externalInputEvidence: {
+      ...externalInputEvidence,
+      inputKinds: Object.fromEntries([...externalInputEvidence.inputKinds].sort(([left], [right]) => left.localeCompare(right))),
+      bundlesMissingSnapshotDeclaration: externalInputEvidence.bundlesMissingSnapshotDeclaration
+        .sort((left, right) => left.bundle.localeCompare(right.bundle)),
+      interpretation: "Counts describe declared provenance inputs, runtime snapshot references and execution capabilities. A path/hash match is structural consistency only; it does not prove that every external input is declared or read, and this report does not re-execute the bundle to verify snapshot bytes.",
     },
     notAssessed: [
       "Whether an operation resolves to a typed function or intrinsic",

@@ -394,6 +394,20 @@
       "numericPolicyToleranceMentionBundles": 29,
       "interpretation": "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels and recorded replay statuses are not re-executed by this diagnostic; mentioning numeric tolerances does not mean they were assessed or scientifically justified."
     },
+    "externalInputEvidence": {
+      "declaredInputRecords": 29,
+      "externalSnapshotInputRecords": 11,
+      "bundlesWithExternalSnapshotInputs": 11,
+      "externalSnapshotInputsWithMatchingEmbeddedDeclaration": 11,
+      "externalSnapshotInputsMissingMatchingEmbeddedDeclaration": 0,
+      "bundlesWithFilesystemReadCapability": 11,
+      "inputKinds": {
+        "external-snapshot": 11,
+        "parameters": 18
+      },
+      "bundlesMissingSnapshotDeclaration": [],
+      "interpretation": "Counts describe declared provenance inputs, runtime snapshot references and execution capabilities. A path/hash match is structural consistency only; it does not prove that every external input is declared or read, and this report does not re-execute the bundle to verify snapshot bytes."
+    },
     "notAssessed": [
       "Whether an operation resolves to a typed function or intrinsic",
       "Whether external inputs are fully captured and privacy-safe",

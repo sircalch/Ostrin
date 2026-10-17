@@ -85,3 +85,10 @@ numéricas que expresamente no afirman comparación multiplataforma. Estos conta
 ejecutar esos replays ni prueban que se hayan enumerado todas las entradas externas. La cantidad de
 políticas que mencionan tolerancias solo mide esa mención: no indica que las tolerancias hayan sido
 evaluadas. La justificación científica aún requiere métricas, unidades, método de referencia y dominio.
+
+`gapDiagnostics.externalInputEvidence` separa las entradas declaradas como `parameters` de las
+declaradas como `external-snapshot`, y cruza ruta/hash de estas últimas con `runtime.input_snapshots`.
+El cruce verifica consistencia estructural del manifiesto. No prueba que no existan otras entradas
+externas ni que el contenido real coincida; esa verificación corresponde al replay que consume el
+snapshot. En el snapshot local hay 11 entradas externas con referencia embebida coincidente y
+capacidad `filesystem.read`, y 18 entradas de parámetros; esos números tampoco cierran R3.

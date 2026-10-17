@@ -492,7 +492,7 @@ test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostri
 
 test("R3 gap summary reconciles with per-bundle missing fields and effect coverage", () => {
   const report = buildReadiness();
-  const { captureGaps, effectInventory, notAssessed, reproducibilityEvidence } = report.gapDiagnostics;
+  const { captureGaps, effectInventory, notAssessed, reproducibilityEvidence, externalInputEvidence } = report.gapDiagnostics;
   const hostGap = captureGaps.missingExtensionFields.find(({ field }) => field === "provenance.runtime.host");
   const effectGap = captureGaps.incompleteExtensionFields.find(({ field }) => field === "provenance.effects.effect_coverage");
 
@@ -535,4 +535,12 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(reproducibilityEvidence.numericComparisonNotClaimedBundles, 29);
   assert.equal(reproducibilityEvidence.numericPolicyToleranceMentionBundles, report.bundleCount);
   assert.match(reproducibilityEvidence.interpretation, /do not establish completeness/i);
+  assert.equal(externalInputEvidence.declaredInputRecords, report.bundleCount);
+  assert.equal(externalInputEvidence.externalSnapshotInputRecords, 11);
+  assert.equal(externalInputEvidence.bundlesWithExternalSnapshotInputs, 11);
+  assert.equal(externalInputEvidence.externalSnapshotInputsWithMatchingEmbeddedDeclaration, 11);
+  assert.equal(externalInputEvidence.externalSnapshotInputsMissingMatchingEmbeddedDeclaration, 0);
+  assert.equal(externalInputEvidence.bundlesWithFilesystemReadCapability, 11);
+  assert.deepEqual(externalInputEvidence.inputKinds, { "external-snapshot": 11, parameters: 18 });
+  assert.match(externalInputEvidence.interpretation, /does not prove that every external input is declared/i);
 });
