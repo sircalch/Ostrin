@@ -5,7 +5,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
-  "workingTreeDirty": false,
+  "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
@@ -31,11 +31,13 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "numericalValidation": {
     "local": "verified",
     "platform": "win32",
-    "comparedValues": 60,
+    "comparedValues": 70,
+    "fftCases": 2,
+    "fftReference": "direct O(n^2) DFT in JavaScript; independent of Ostrin's radix-2 and fallback implementations",
     "maximumAbsoluteDifference": 0,
     "leakCheck": "live_allocations=0",
-    "ci": "verified",
-    "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38681256328"
+    "ci": "pending",
+    "ciRunUrl": null
   },
   "effectCoverage": {
     "knownCalls": 20589,

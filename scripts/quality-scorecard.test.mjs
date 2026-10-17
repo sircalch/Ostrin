@@ -36,4 +36,10 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
   assert.equal(scorecard.effectCoverage.bundleCount, scorecard.r3.bundleCount);
   assert.equal(scorecard.effectCoverage.scope, `registered experiment bundles (${scorecard.r3.bundleCount})`);
   assert.equal(scorecard.effectCoverage.complete, true);
+  assert.equal(scorecard.numericalValidation.local, "verified");
+  assert.equal(scorecard.numericalValidation.comparedValues, 70);
+  assert.equal(scorecard.numericalValidation.fftCases, 2);
+  assert.match(scorecard.numericalValidation.fftReference, /direct O\(n\^2\) DFT/i);
+  assert.equal(scorecard.numericalValidation.ci, "pending");
+  assert.equal(scorecard.numericalValidation.ciRunUrl, null);
 });

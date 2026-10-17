@@ -126,21 +126,51 @@ function linguistStatus() {
   };
 }
 
-function numericalValidationStatus() {
+function countNumericLeaves(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? 1 : 0;
+  if (Array.isArray(value)) return value.reduce((total, item) => total + countNumericLeaves(item), 0);
+  if (value && typeof value === "object") {
+    return Object.values(value).reduce((total, item) => total + countNumericLeaves(item), 0);
+  }
+  return 0;
+}
+
+function numericalValidationStatus(sourceRevision) {
   const reportPath = path.join(repositoryRoot, "validation/numeric/windows-local.json");
   if (!existsSync(reportPath)) return { local: "missing", ci: "pending" };
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
+  const contract = JSON.parse(text("validation/numeric/matrix_algorithms.json"));
+  const expectedFftCases = Object.keys(contract.cases?.fft?.cases ?? {});
+  const interpreterFft = report.runs?.interpreter?.fft ?? {};
+  const nativeFft = report.runs?.native?.fft ?? {};
+  const fftCaseNames = Object.keys(interpreterFft);
+  const hasCompleteFftCases = (fftReport) => expectedFftCases.length > 0
+    && Object.keys(fftReport).length === expectedFftCases.length
+    && expectedFftCases.every((name) => {
+      const result = fftReport[name];
+      return result && ["spectralResidual", "maximumReconstructionError", "parsevalResidual"]
+        .every((metric) => Number.isFinite(result[metric]));
+    });
+  const fftCasesComplete = hasCompleteFftCases(interpreterFft) && hasCompleteFftCases(nativeFft);
+  const comparedValues = countNumericLeaves(report.runs?.interpreter);
   const localPass = report.leakCheck === "live_allocations=0"
-    && report.parity?.comparedValues === 60
-    && report.parity?.maximumAbsoluteDifference === 0;
+    && comparedValues > 0
+    && report.parity?.comparedValues === comparedValues
+    && report.parity?.maximumAbsoluteDifference === 0
+    && fftCasesComplete;
+  const ciMatchesEvidence = localPass
+    && typeof report.ci?.run_url === "string"
+    && report.ci.commit === sourceRevision;
   return {
     local: localPass ? "verified" : "invalid",
     platform: report.environment?.platform ?? "unknown",
     comparedValues: report.parity?.comparedValues ?? 0,
+    fftCases: fftCasesComplete ? expectedFftCases.length : fftCaseNames.length,
+    fftReference: contract.cases?.fft?.reference ?? "not declared",
     maximumAbsoluteDifference: report.parity?.maximumAbsoluteDifference ?? null,
     leakCheck: report.leakCheck ?? "missing",
-    ci: report.ci?.run_url ? "verified" : "pending",
-    ciRunUrl: report.ci?.run_url ?? null,
+    ci: ciMatchesEvidence ? "verified" : "pending",
+    ciRunUrl: ciMatchesEvidence ? report.ci.run_url : null,
   };
 }
 
@@ -182,7 +212,7 @@ export async function buildScorecard() {
     tests: { rustMarkedTests: countTests() },
     nativeBackend: native,
     ownership: ownershipCounts(),
-    numericalValidation: numericalValidationStatus(),
+    numericalValidation: numericalValidationStatus(candidateEvidence.sourceRevision),
     effectCoverage: effectCoverageStatus(),
     reproducibility: await reproducibilityCounts(),
     r3: (() => {
