@@ -1,0 +1,8 @@
+// Linear temperature workload: Quantity<Temperature> additions, with K as an interval.
+fn main() -> Void {
+    mut total = 0.0 K
+    for i in 1 to 50000 {
+        total = total + 1.0 K
+    }
+    print(total)
+}

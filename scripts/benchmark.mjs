@@ -23,6 +23,9 @@ const defaultWorkloads = [
   "examples/numeric_svd.ostrin",
   "examples/numeric_complex_linear_algebra.ostrin",
   "examples/viz_scatter_fit.ostrin",
+  "benchmarks/temperature-float.ostrin",
+  "benchmarks/temperature-interval.ostrin",
+  "benchmarks/temperature-point.ostrin",
 ];
 
 function option(name, fallback) {

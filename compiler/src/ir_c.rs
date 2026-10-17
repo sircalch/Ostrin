@@ -146,6 +146,7 @@ fn mangle_record_type(ty: &Ty, records: &RecordFields) -> String {
             mangle_record_type(ret, records)
         ),
         Ty::Quantity(_) => "Quantity".to_string(),
+        Ty::TemperaturePoint => "TemperaturePoint".to_string(),
         Ty::Dyn(name) => name.clone(),
         Ty::Generic(name) => name.clone(),
         Ty::Unknown => "Unknown".to_string(),
@@ -208,6 +209,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Bool => "bool".to_string(),
         Ty::String => "const char*".to_string(),
         Ty::Quantity(_) => "Qty".to_string(),
+        Ty::TemperaturePoint => "OstrinTemperaturePoint".to_string(),
         Ty::Named(name) if name == "Rng" => "OstrinRng*".to_string(),
         Ty::Named(name) if records.contains_key(&enum_marker(name)) => name.clone(),
         Ty::Applied(_, _) if is_plain_enum(ty, records) => enum_name(ty, records).ok_or(())?,
@@ -669,6 +671,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
     *ty == Ty::Unknown
         || scalar(ty)
         || quantity(ty)
+        || *ty == Ty::TemperaturePoint
         || array_supported(ty)
         || matches!(ty, Ty::Named(name) if name == "Rng")
         // By-value enums are IR-safe only when every payload is genuinely
@@ -1308,6 +1311,54 @@ fn binary_code(
     ty: &Ty,
     equality: &mut HelperGenerator<'_>,
 ) -> Bail<String> {
+    if *left_ty == Ty::TemperaturePoint || *right_ty == Ty::TemperaturePoint {
+        let comparison = match op {
+            BinOp::Eq => Some("== 0"),
+            BinOp::NotEq => Some("!= 0"),
+            BinOp::Lt => Some("< 0"),
+            BinOp::Gt => Some("> 0"),
+            BinOp::LtEq => Some("<= 0"),
+            BinOp::GtEq => Some(">= 0"),
+            _ => None,
+        };
+        if let (Some(comparison), Ty::TemperaturePoint, Ty::TemperaturePoint) =
+            (comparison, left_ty, right_ty)
+        {
+            if *ty != Ty::Bool {
+                return Err(());
+            }
+            return Ok(format!(
+                "(ostrin_temperature_point_cmp({left}, {right}) {comparison})"
+            ));
+        }
+        match (left_ty, right_ty, op) {
+            (Ty::TemperaturePoint, Ty::TemperaturePoint, BinOp::Sub)
+                if *ty == Ty::Quantity(crate::types::dim_single("Temperature")) =>
+            {
+                return Ok(format!(
+                    "ostrin_qty_from_borrowed(ostrin_temperature_point_difference({left}, {right}), \"K\")"
+                ));
+            }
+            (Ty::TemperaturePoint, Ty::Quantity(dimension), BinOp::Add | BinOp::Sub)
+                if *dimension == crate::types::dim_single("Temperature")
+                    && *ty == Ty::TemperaturePoint =>
+            {
+                return Ok(format!(
+                    "ostrin_temperature_point_shift({left}, {right}, {})",
+                    if op == BinOp::Add { 1 } else { -1 }
+                ));
+            }
+            (Ty::Quantity(dimension), Ty::TemperaturePoint, BinOp::Add)
+                if *dimension == crate::types::dim_single("Temperature")
+                    && *ty == Ty::TemperaturePoint =>
+            {
+                return Ok(format!(
+                    "ostrin_temperature_point_shift({right}, {left}, 1)"
+                ));
+            }
+            _ => return Err(()),
+        }
+    }
     if quantity(left_ty) || quantity(right_ty) {
         let scalar_code = |code: &str, ty: &Ty| {
             matches!(ty, Ty::Int | Ty::Float).then(|| format!("(double)({code})"))
@@ -1804,6 +1855,7 @@ fn print_code(value: &str, ty: &Ty) -> Bail<String> {
         Ty::Bool => format!("printf(\"%s\\n\", (({value}) ? \"true\" : \"false\"))"),
         Ty::String => format!("printf(\"%s\\n\", {value})"),
         Ty::Quantity(_) => format!("ostrin_print_qty({value})"),
+        Ty::TemperaturePoint => format!("ostrin_print_temperature_point({value})"),
         _ => return Err(()),
     })
 }
@@ -2389,7 +2441,7 @@ fn emit_instruction(
                     }
                 }
             }
-            if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
+            if (!scalar(ty) && !quantity(ty) && *ty != Ty::TemperaturePoint) || *ty == Ty::Void {
                 return Err(());
             }
             let structural_equality = matches!(op, BinOp::Eq | BinOp::NotEq)
@@ -2399,8 +2451,8 @@ fn emit_instruction(
                 matches!(op, BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq)
                     && left_ty == right_ty
                     && supported(&left_ty, records);
-            if (!scalar(&left_ty) && !quantity(&left_ty)
-                || !scalar(&right_ty) && !quantity(&right_ty))
+            if (!scalar(&left_ty) && !quantity(&left_ty) && left_ty != Ty::TemperaturePoint
+                || !scalar(&right_ty) && !quantity(&right_ty) && right_ty != Ty::TemperaturePoint)
                 && !structural_equality
                 && !structural_ordering
             {
@@ -3605,6 +3657,26 @@ fn emit_instruction(
                 } else {
                     "(void)0".to_string()
                 }
+            } else if callee == "temperature_point"
+                && args.len() == 2
+                && *ty == Ty::TemperaturePoint
+                && matches!(
+                    value_ty(values, args[0])?,
+                    Ty::Int | Ty::Float | Ty::Float32
+                )
+                && value_ty(values, args[1])? == Ty::String
+            {
+                format!(
+                    "ostrin_temperature_point_new((double)({}), {})",
+                    codes[0], codes[1]
+                )
+            } else if callee == "temperature_point_to"
+                && args.len() == 2
+                && *ty == Ty::TemperaturePoint
+                && value_ty(values, args[0])? == Ty::TemperaturePoint
+                && value_ty(values, args[1])? == Ty::String
+            {
+                format!("ostrin_temperature_point_to({}, {})", codes[0], codes[1])
             } else if callee == "panic"
                 && args.len() == 1
                 && *ty == Ty::Void
@@ -4259,7 +4331,7 @@ fn emit_instruction(
                         "({{ Array_Float* __ostrin_q_show = {}; const char* __ostrin_q_text = ostrin_qa_show(__ostrin_q_show, {shown}); printf(\"%s\\n\", __ostrin_q_text); ostrin_release((void*)__ostrin_q_text); }})",
                         codes[0]
                     )
-                } else if scalar(&arg_ty) || quantity(&arg_ty) {
+                } else if scalar(&arg_ty) || quantity(&arg_ty) || arg_ty == Ty::TemperaturePoint {
                     print_code(&codes[0], &arg_ty)?
                 } else if supported(&arg_ty, records) {
                     // Collections, options and records print through the generated

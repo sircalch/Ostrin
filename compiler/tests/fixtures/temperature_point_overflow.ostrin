@@ -1,0 +1,5 @@
+fn main() -> Void {
+    left = temperature_point(1.7e308, "K")
+    right = temperature_point(-1.7e308, "K")
+    print(left - right)
+}
