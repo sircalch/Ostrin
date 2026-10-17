@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
 import { runtimeSnapshotFor } from "./experiment-bundle.mjs";
-import { buildReadiness, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
+import { buildReadiness, diagnoseEffectCalls, diagnoseEntryEffectClosure, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
 
 const originalCaptureHost = process.env.OSTRIN_CAPTURE_HOST;
 delete process.env.OSTRIN_CAPTURE_HOST;
@@ -14,11 +14,26 @@ after(() => {
 const validFile = (name) => ({ path: name, sha256: `sha256:${"a".repeat(64)}` });
 const validRuntime = () => ({
   schema: "ostrin.runtime/v1",
+  status: "partial",
   target: "wasm32-wasip1",
+  wasi: "preview1",
+  runner: "WASI host",
   compiler_lockfile: validFile("compiler/Cargo.lock"),
   host: {
     schema: "ostrin.host/v1",
     source: "github-actions",
+    ci_run: {
+      schema: "ostrin.ci-run/v1",
+      repository: "sircalch/Ostrin",
+      workflow: "Ostrin CI",
+      run_id: "1234",
+      run_attempt: "1",
+      event: "pull_request",
+      ref: "refs/pull/193/merge",
+      head_sha: "a".repeat(40),
+      tested_sha: "b".repeat(40),
+      url: "https://github.com/sircalch/Ostrin/actions/runs/1234",
+    },
     runner_os: "Linux",
     runner_arch: "X64",
     runner_environment: "github-hosted",
@@ -125,8 +140,12 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
   assert.equal(inspectBundle(bundle, "fixture.json").status, "OPEN");
 });
 
-test("R3 accepts the host and dependency capture emitted by the bundle generator", () => {
-  const names = ["OSTRIN_CAPTURE_HOST", "RUNNER_OS", "RUNNER_ARCH", "RUNNER_ENVIRONMENT", "ImageOS", "ImageVersion"];
+test("R3 accepts the host and CI run capture emitted by the bundle generator", () => {
+  const names = [
+    "OSTRIN_CAPTURE_HOST", "RUNNER_OS", "RUNNER_ARCH", "RUNNER_ENVIRONMENT", "ImageOS", "ImageVersion",
+    "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_EVENT_NAME",
+    "GITHUB_REF", "GITHUB_SHA", "OSTRIN_EVIDENCE_HEAD_SHA",
+  ];
   const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
   Object.assign(process.env, {
     OSTRIN_CAPTURE_HOST: "1",
@@ -135,6 +154,14 @@ test("R3 accepts the host and dependency capture emitted by the bundle generator
     RUNNER_ENVIRONMENT: "github-hosted",
     ImageOS: "ubuntu24",
     ImageVersion: "20261001.1.0",
+    GITHUB_REPOSITORY: "sircalch/Ostrin",
+    GITHUB_WORKFLOW: "Ostrin CI",
+    GITHUB_RUN_ID: "1234",
+    GITHUB_RUN_ATTEMPT: "1",
+    GITHUB_EVENT_NAME: "pull_request",
+    GITHUB_REF: "refs/pull/193/merge",
+    GITHUB_SHA: "b".repeat(40),
+    OSTRIN_EVIDENCE_HEAD_SHA: "a".repeat(40),
   });
   try {
     const bundle = {
@@ -176,6 +203,20 @@ test("R3 capture rejects present but malformed host, dependency and scheduler me
   assert.ok(requiredCaptureErrors({ entries: [report] }).length > 0);
 });
 
+test("R3 capture requires a traceable workflow run and tested source revision", () => {
+  const runtime = validRuntime();
+  delete runtime.host.ci_run.tested_sha;
+  const report = inspectBundle({ provenance: { runtime, effects: validEffects() } }, "missing-tested-sha.json");
+  assert.equal(report.status, "OPEN");
+  assert.ok(report.r3Extensions.missing.includes("provenance.runtime.host"));
+
+  const malformed = validRuntime();
+  malformed.host.ci_run.url = "https://example.invalid/run";
+  const invalid = inspectBundle({ provenance: { runtime: malformed, effects: validEffects() } }, "invalid-ci-run.json");
+  assert.equal(invalid.status, "OPEN");
+  assert.ok(invalid.r3Extensions.missing.includes("provenance.runtime.host"));
+});
+
 test("R3 capture rejects invalid dependency hashes and unknown runner metadata", () => {
   const runtime = validRuntime();
   runtime.compiler_lockfile.sha256 = "sha256:not-a-hash";
@@ -186,6 +227,18 @@ test("R3 capture rejects invalid dependency hashes and unknown runner metadata",
     "provenance.runtime.compiler_lockfile",
     "provenance.runtime.host",
     "provenance.runtime.dependencies",
+  ]);
+});
+
+test("R3 capture rejects a mismatched runtime contract and non-CI host source", () => {
+  const runtime = validRuntime();
+  runtime.runner = "local process";
+  runtime.host.source = "developer workstation";
+  const report = inspectBundle({ provenance: { runtime, effects: validEffects() } }, "wrong-origin.json");
+  assert.equal(report.status, "OPEN");
+  assert.deepEqual(report.r3Extensions.missing, [
+    "provenance.runtime.contract",
+    "provenance.runtime.host",
   ]);
 });
 
@@ -273,6 +326,16 @@ test("R3 stays open when an otherwise complete effect inventory has symbolic cal
   assert.equal(report.effectCoverage.symbolic_calls, 1);
   assert.equal(report.status, "OPEN");
   assert.deepEqual(report.r3Extensions.incomplete, ["provenance.effects.entry_effect_signature"]);
+
+  delete effects.effect_coverage.symbolic_calls;
+  const countOmitted = inspectBundle(bundle, "symbolic-callback.json");
+  assert.equal(countOmitted.status, "OPEN");
+  assert.deepEqual(countOmitted.r3Extensions.missing, ["provenance.effects.effect_coverage"]);
+
+  effects.effect_coverage.symbolic_calls = -1;
+  const malformed = inspectBundle(bundle, "symbolic-callback.json");
+  assert.equal(malformed.status, "OPEN");
+  assert.deepEqual(malformed.r3Extensions.missing, ["provenance.effects.effect_coverage"]);
 });
 
 test("readiness reports module-wide callbacks separately from entry effect closure", () => {
@@ -317,4 +380,205 @@ test("readiness totals and status match the inspected bundles", () => {
   assert.equal(report.extensionReadyCount,
     report.entries.filter((entry) =>
       entry.r3Extensions.missing.length === 0 && entry.r3Extensions.incomplete.length === 0).length);
+});
+
+test("effect-gap diagnostics group operation syntax without inferring resolution or purity", () => {
+  const diagnostics = diagnoseEffectCalls({
+    unresolved_calls: {
+      main: ["array", "data.max", "std::math::exp", "host?"],
+      wrapper: ["array", "callback"],
+    },
+  });
+
+  assert.equal(diagnostics.referenceCount, 6);
+  assert.equal(diagnostics.uniqueOperationNames, 5);
+  assert.deepEqual(diagnostics.bySyntax, {
+    identifier: 3,
+    memberPath: 1,
+    qualifiedPath: 1,
+    other: 1,
+  });
+  assert.equal(diagnostics.operations.get("array"), 2);
+  assert.equal(diagnostics.symbolicCallbackReferenceCount, 0);
+  assert.equal(diagnostics.uniqueSymbolicCallbacks, 0);
+});
+
+test("entry closure diagnostics separate the root row from module-wide effect rows", () => {
+  const closure = diagnoseEntryEffectClosure({
+    entry: "main",
+    functions: { main: ["io"] },
+    unresolved_calls: { main: [], library_helper: ["host_effect"] },
+    symbolic_effect_calls: { main: [], generic_library_helper: ["callback"] },
+  });
+  assert.deepEqual(closure, {
+    entry: "main",
+    status: "closed",
+    unresolvedCalls: [],
+    symbolicCallbacks: [],
+  });
+
+  const open = diagnoseEntryEffectClosure({
+    entry: "main",
+    functions: { main: [] },
+    unresolved_calls: { main: ["host_effect"] },
+    symbolic_effect_calls: { main: ["callback"] },
+  });
+  assert.equal(open.status, "open");
+  assert.deepEqual(open.unresolvedCalls, ["host_effect"]);
+  assert.deepEqual(open.symbolicCallbacks, ["callback"]);
+
+  const unavailable = diagnoseEntryEffectClosure({
+    entry: "main",
+    functions: { main: [] },
+    unresolved_calls: { main: [] },
+  });
+  assert.deepEqual(unavailable, {
+    entry: "main",
+    status: "unavailable",
+    unresolvedCalls: null,
+    symbolicCallbacks: null,
+  });
+
+  const missingEntry = diagnoseEntryEffectClosure({
+    entry: "main",
+    functions: { helper: [] },
+    unresolved_calls: {},
+    symbolic_effect_calls: {},
+  });
+  assert.equal(missingEntry.status, "unavailable");
+});
+
+test("effect-gap diagnostics report symbolic callbacks separately from unresolved calls", () => {
+  const diagnostics = diagnoseEffectCalls({
+    unresolved_calls: { main: [] },
+    symbolic_effect_calls: {
+      "std.viz::grid_of": ["f"],
+      "std.numeric::rk45": ["f", "jacobian"],
+    },
+  });
+  assert.equal(diagnostics.referenceCount, 0);
+  assert.equal(diagnostics.symbolicCallbackReferenceCount, 3);
+  assert.equal(diagnostics.uniqueSymbolicCallbacks, 3);
+  assert.equal(diagnostics.symbolicCallbacks.get("std.viz::grid_of.f"), 1);
+});
+
+test("effect-gap diagnostics distinguish unavailable symbolic inventory from an empty one", () => {
+  const unavailable = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [] },
+    function_calls: { main: ["helper"], helper: [] },
+  });
+  assert.equal(unavailable.symbolicInventoryAvailable, false);
+  assert.equal(unavailable.directlyReachableFunctionCount, null);
+  assert.equal(unavailable.directlyReachableSymbolicCallbacks, null);
+
+  const available = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [] },
+    function_calls: { main: ["helper"], helper: [] },
+    symbolic_effect_calls: {},
+  });
+  assert.equal(available.symbolicInventoryAvailable, true);
+  assert.equal(available.directlyReachableFunctionCount, 2);
+  assert.equal(available.directlyReachableSymbolicCallbacks.size, 0);
+
+  const missingReachableRow = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [] },
+    function_calls: { main: ["helper"] },
+    symbolic_effect_calls: {},
+  });
+  assert.equal(missingReachableRow.directlyReachableFunctionCount, null);
+  assert.equal(missingReachableRow.directlyReachableSymbolicCallbacks, null);
+});
+
+test("direct reachability follows only exact recorded function edges", () => {
+  const diagnostics = diagnoseEffectCalls({
+    entry: "main",
+    functions: { main: [], helper: [], "std.viz::grid_of": [] },
+    function_calls: {
+      main: ["helper", "callback", "std.viz::grid_of.f"],
+      helper: ["main"],
+      "std.viz::grid_of": [],
+    },
+    symbolic_effect_calls: {
+      helper: ["callback"],
+      "std.viz::grid_of": ["f"],
+    },
+  });
+  assert.equal(diagnostics.directlyReachableFunctionCount, 2);
+  assert.equal(diagnostics.directlyReachableSymbolicCallbacks.get("helper.callback"), 1);
+  assert.equal(diagnostics.directlyReachableSymbolicCallbacks.has("std.viz::grid_of.f"), false);
+});
+
+test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostrin lexer", () => {
+  const diagnostics = diagnoseEffectCalls({
+    unresolved_calls: {
+      main: ["λ", "变量", "callback٢", "_callback1", "host?"],
+    },
+  });
+
+  assert.equal(diagnostics.referenceCount, 5);
+  assert.equal(diagnostics.uniqueOperationNames, 5);
+  assert.deepEqual(diagnostics.bySyntax, {
+    identifier: 4,
+    memberPath: 0,
+    qualifiedPath: 0,
+    other: 1,
+  });
+});
+
+test("R3 gap summary reconciles with per-bundle missing fields and effect coverage", () => {
+  const report = buildReadiness();
+  const { captureGaps, effectInventory, notAssessed, reproducibilityEvidence, externalInputEvidence } = report.gapDiagnostics;
+  const hostGap = captureGaps.missingExtensionFields.find(({ field }) => field === "provenance.runtime.host");
+  const effectGap = captureGaps.incompleteExtensionFields.find(({ field }) => field === "provenance.effects.effect_coverage");
+
+  assert.equal(hostGap?.bundleCount ?? 0, report.captureOpenCount);
+  assert.equal(effectGap?.bundleCount ?? 0, report.incompleteEffectBundleCount);
+  assert.equal(effectInventory.operationReferences, report.unresolvedEffectCallCount);
+  assert.equal(Object.values(effectInventory.bySyntax).reduce((sum, count) => sum + count, 0),
+    effectInventory.operationReferences);
+  assert.equal(effectInventory.uniqueOperationNames > 0, report.unresolvedEffectCallCount > 0);
+  assert.equal(effectInventory.topOperations.length > 0, report.unresolvedEffectCallCount > 0);
+  if (effectInventory.symbolicInventoryStatus === "available") {
+    assert.equal(effectInventory.symbolicCallbackReferences,
+      report.entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0));
+  } else {
+    assert.equal(effectInventory.symbolicCallbackReferences, null);
+    assert.equal(effectInventory.uniqueSymbolicCallbacks, null);
+  }
+  assert.equal(effectInventory.symbolicInventoryStatus,
+    effectInventory.symbolicInventoryUnavailableBundleCount === 0 ? "available"
+      : effectInventory.symbolicInventoryBundleCount === 0 ? "unavailable" : "partial");
+  assert.equal(effectInventory.directReachability.availableBundleCount
+    + effectInventory.directReachability.unavailableBundleCount, report.bundleCount);
+  if (effectInventory.directReachability.status !== "available") {
+    assert.equal(effectInventory.directReachability.symbolicCallbackReferences, null);
+    assert.equal(effectInventory.directReachability.uniqueSymbolicCallbacks, null);
+  }
+  const entrypoint = report.gapDiagnostics.entrypointEffects;
+  assert.equal(entrypoint.closedBundleCount + entrypoint.openBundleCount + entrypoint.unavailableBundleCount,
+    report.bundleCount);
+  assert.equal(entrypoint.closedBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "closed").length);
+  assert.equal(entrypoint.openBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "open").length);
+  assert.equal(entrypoint.unavailableBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "unavailable").length);
+  assert.match(effectInventory.interpretation, /does not determine type resolution or prove purity/i);
+  assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
+  assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles > 0);
+  assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles <= report.bundleCount);
+  assert.ok(reproducibilityEvidence.declaredEmbeddedInputSnapshotCount > 0);
+  assert.equal(reproducibilityEvidence.ciVerifiedExecutionBundles, 29);
+  assert.equal(reproducibilityEvidence.recordedVerifiedReplayBundles, report.bundleCount);
+  assert.equal(reproducibilityEvidence.numericComparisonNotClaimedBundles, 29);
+  assert.equal(reproducibilityEvidence.numericPolicyToleranceMentionBundles, report.bundleCount);
+  assert.match(reproducibilityEvidence.interpretation, /do not establish completeness/i);
+  assert.equal(externalInputEvidence.declaredInputRecords, report.bundleCount);
+  assert.equal(externalInputEvidence.externalSnapshotInputRecords, 11);
+  assert.equal(externalInputEvidence.bundlesWithExternalSnapshotInputs, 11);
+  assert.equal(externalInputEvidence.externalSnapshotInputsWithMatchingEmbeddedDeclaration, 11);
+  assert.equal(externalInputEvidence.externalSnapshotInputsMissingMatchingEmbeddedDeclaration, 0);
+  assert.equal(externalInputEvidence.bundlesWithFilesystemReadCapability, 11);
+  assert.deepEqual(externalInputEvidence.inputKinds, { "external-snapshot": 11, parameters: 18 });
+  assert.match(externalInputEvidence.interpretation, /does not prove that every external input is declared/i);
 });

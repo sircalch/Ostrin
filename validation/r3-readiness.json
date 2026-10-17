@@ -26,6 +26,394 @@
   "knownEffectCallCount": 20589,
   "symbolicEffectCallCount": 74,
   "unresolvedEffectCallCount": 0,
+  "gapDiagnostics": {
+    "captureGaps": {
+      "missingExtensionFields": [
+        {
+          "field": "provenance.runtime.host",
+          "bundleCount": 29,
+          "bundles": [
+            "animation",
+            "bars",
+            "boxplot",
+            "contourf",
+            "dashboard",
+            "double-pendulum",
+            "fft",
+            "heatmap",
+            "hexbin",
+            "histogram",
+            "isosurface",
+            "lines",
+            "linked-data",
+            "lorenz",
+            "ode",
+            "orbits",
+            "point-cloud",
+            "provenance",
+            "quiver",
+            "scatter-fit",
+            "spline",
+            "streamplot",
+            "string",
+            "surface",
+            "table",
+            "units",
+            "vector-field",
+            "violin",
+            "volume-slices"
+          ]
+        }
+      ],
+      "incompleteExtensionFields": []
+    },
+    "effectInventory": {
+      "countUnit": "recorded function-operation references in unresolved_calls; not source invocation count",
+      "operationReferences": 0,
+      "uniqueOperationNames": 0,
+      "bySyntax": {
+        "identifier": 0,
+        "memberPath": 0,
+        "qualifiedPath": 0,
+        "other": 0
+      },
+      "topOperations": [],
+      "symbolicInventoryStatus": "available",
+      "symbolicInventoryBundleCount": 29,
+      "symbolicInventoryUnavailableBundleCount": 0,
+      "symbolicCallbackReferences": 74,
+      "uniqueSymbolicCallbacks": 10,
+      "observedSymbolicCallbackReferences": 74,
+      "topSymbolicCallbacks": [
+        {
+          "operation": "std.viz::grid_of.f",
+          "references": 29,
+          "bundleCount": 29
+        },
+        {
+          "operation": "std.numeric::bisect.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::derivative.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::golden_min.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::newton.df",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::newton.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::rk4.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::rk45.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::secant.f",
+          "references": 5,
+          "bundleCount": 5
+        },
+        {
+          "operation": "std.numeric::simpson.f",
+          "references": 5,
+          "bundleCount": 5
+        }
+      ],
+      "directReachability": {
+        "method": "follow function_calls edges only when the operation exactly matches a function key",
+        "status": "available",
+        "availableBundleCount": 29,
+        "unavailableBundleCount": 0,
+        "symbolicCallbackReferences": 7,
+        "uniqueSymbolicCallbacks": 2,
+        "topSymbolicCallbacks": [
+          {
+            "operation": "std.viz::grid_of.f",
+            "references": 4,
+            "bundleCount": 4,
+            "bundles": [
+              "contourf",
+              "dashboard",
+              "heatmap",
+              "surface"
+            ]
+          },
+          {
+            "operation": "std.numeric::rk45.f",
+            "references": 3,
+            "bundleCount": 3,
+            "bundles": [
+              "double-pendulum",
+              "ode",
+              "orbits"
+            ]
+          }
+        ],
+        "interpretation": "A missing or dynamic call edge can make this direct graph incomplete. Top callbacks summarize available graphs only; numeric totals are null unless every bundle has graph evidence. This is diagnostic, never a substitute for the conservative entry effect row or R3 gate."
+      },
+      "interpretation": "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity."
+    },
+    "entrypointEffects": {
+      "countUnit": "one recorded entry function per experiment bundle",
+      "availableBundleCount": 29,
+      "closedBundleCount": 29,
+      "openBundleCount": 0,
+      "unavailableBundleCount": 0,
+      "unresolvedCallReferences": 0,
+      "symbolicCallbackReferences": 0,
+      "bundles": [
+        {
+          "bundle": "animation",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "bars",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "boxplot",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "contourf",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "dashboard",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "double-pendulum",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "fft",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "heatmap",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "hexbin",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "histogram",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "isosurface",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "lines",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "linked-data",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "lorenz",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "ode",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "orbits",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "point-cloud",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "provenance",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "quiver",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "scatter-fit",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "spline",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "streamplot",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "string",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "surface",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "table",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "units",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "vector-field",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "violin",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
+          "bundle": "volume-slices",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        }
+      ],
+      "interpretation": "This reports the recorded entry function row separately from module-wide inventory. It is diagnostic only and does not prove complete runtime reachability, host capture or R3 readiness."
+    },
+    "reproducibilityEvidence": {
+      "embeddedInputSnapshotBundles": 11,
+      "declaredEmbeddedInputSnapshotCount": 11,
+      "ciVerifiedExecutionBundles": 29,
+      "recordedVerifiedReplayBundles": 29,
+      "numericComparisonNotClaimedBundles": 29,
+      "numericPolicyToleranceMentionBundles": 29,
+      "interpretation": "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels and recorded replay statuses are not re-executed by this diagnostic; mentioning numeric tolerances does not mean they were assessed or scientifically justified."
+    },
+    "externalInputEvidence": {
+      "declaredInputRecords": 29,
+      "externalSnapshotInputRecords": 11,
+      "bundlesWithExternalSnapshotInputs": 11,
+      "externalSnapshotInputsWithMatchingEmbeddedDeclaration": 11,
+      "externalSnapshotInputsMissingMatchingEmbeddedDeclaration": 0,
+      "bundlesWithFilesystemReadCapability": 11,
+      "inputKinds": {
+        "external-snapshot": 11,
+        "parameters": 18
+      },
+      "bundlesMissingSnapshotDeclaration": [],
+      "interpretation": "Counts describe declared provenance inputs, runtime snapshot references and execution capabilities. A path/hash match is structural consistency only; it does not prove that every external input is declared or read, and this report does not re-execute the bundle to verify snapshot bytes."
+    },
+    "notAssessed": [
+      "Whether an operation resolves to a typed function or intrinsic",
+      "Whether external inputs are fully captured and privacy-safe",
+      "Whether numerical tolerances are scientifically justified"
+    ]
+  },
   "effectCoverageCountUnit": "distinct_function_operation_edges",
   "entries": [
     {
@@ -59,6 +447,12 @@
         "known_calls": 614,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -95,6 +489,12 @@
         "known_calls": 810,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -130,6 +530,12 @@
         "known_calls": 740,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -163,6 +569,12 @@
         "known_calls": 607,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -198,6 +610,12 @@
         "known_calls": 752,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -231,6 +649,12 @@
         "known_calls": 886,
         "symbolic_calls": 10,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -266,6 +690,12 @@
         "known_calls": 1032,
         "symbolic_calls": 10,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -299,6 +729,12 @@
         "known_calls": 610,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -334,6 +770,12 @@
         "known_calls": 745,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -369,6 +811,12 @@
         "known_calls": 749,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -402,6 +850,12 @@
         "known_calls": 609,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -436,6 +890,12 @@
         "known_calls": 728,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -469,6 +929,12 @@
         "known_calls": 608,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -502,6 +968,12 @@
         "known_calls": 609,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -535,6 +1007,12 @@
         "known_calls": 881,
         "symbolic_calls": 10,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -568,6 +1046,12 @@
         "known_calls": 887,
         "symbolic_calls": 10,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -603,6 +1087,12 @@
         "known_calls": 745,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -636,6 +1126,12 @@
         "known_calls": 610,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -669,6 +1165,12 @@
         "known_calls": 613,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -704,6 +1206,12 @@
         "known_calls": 743,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -737,6 +1245,12 @@
         "known_calls": 877,
         "symbolic_calls": 10,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -770,6 +1284,12 @@
         "known_calls": 616,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -803,6 +1323,12 @@
         "known_calls": 613,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -837,6 +1363,12 @@
         "known_calls": 730,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -869,6 +1401,12 @@
         "known_calls": 603,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -902,6 +1440,12 @@
         "known_calls": 608,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -935,6 +1479,12 @@
         "known_calls": 611,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -970,6 +1520,12 @@
         "known_calls": 742,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     },
     {
@@ -1003,6 +1559,12 @@
         "known_calls": 611,
         "symbolic_calls": 1,
         "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
       }
     }
   ]
