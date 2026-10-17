@@ -153,10 +153,13 @@ function numericalValidationStatus(sourceRevision) {
     });
   const fftCasesComplete = hasCompleteFftCases(interpreterFft) && hasCompleteFftCases(nativeFft);
   const comparedValues = countNumericLeaves(report.runs?.interpreter);
+  const emittedValuesCompared = report.emittedOutputParity?.comparedValues ?? 0;
   const localPass = report.leakCheck === "live_allocations=0"
     && comparedValues > 0
     && report.parity?.comparedValues === comparedValues
     && report.parity?.maximumAbsoluteDifference === 0
+    && emittedValuesCompared > 0
+    && report.emittedOutputParity?.maximumAbsoluteDifference === 0
     && fftCasesComplete;
   const ciMatchesEvidence = localPass
     && typeof report.ci?.run_url === "string"
@@ -165,6 +168,7 @@ function numericalValidationStatus(sourceRevision) {
     local: localPass ? "verified" : "invalid",
     platform: report.environment?.platform ?? "unknown",
     comparedValues: report.parity?.comparedValues ?? 0,
+    emittedValuesCompared,
     fftCases: fftCasesComplete ? expectedFftCases.length : fftCaseNames.length,
     fftReference: contract.cases?.fft?.reference ?? "not declared",
     maximumAbsoluteDifference: report.parity?.maximumAbsoluteDifference ?? null,

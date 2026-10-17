@@ -14,7 +14,13 @@
   "leakCheck": "live_allocations=0",
   "nativeCompileDiagnostics": "",
   "parity": {
-    "comparedValues": 70,
+    "comparedValues": 80,
+    "maximumAbsoluteDifference": 0,
+    "absolute": 1e-13,
+    "relative": 1e-12
+  },
+  "emittedOutputParity": {
+    "comparedValues": 136,
     "maximumAbsoluteDifference": 0,
     "absolute": 1e-13,
     "relative": 1e-12
@@ -145,6 +151,20 @@
           "parsevalResidual": 3.552713678800501e-15,
           "inputEnergy": 17.125,
           "spectralEnergy": 119.87500000000001
+        },
+        "radix2_n1_singleton": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 6.25,
+          "spectralEnergy": 6.25
+        },
+        "radix2_n8_zero": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 0,
+          "spectralEnergy": 0
         }
       }
     },
@@ -273,6 +293,20 @@
           "parsevalResidual": 3.552713678800501e-15,
           "inputEnergy": 17.125,
           "spectralEnergy": 119.87500000000001
+        },
+        "radix2_n1_singleton": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 6.25,
+          "spectralEnergy": 6.25
+        },
+        "radix2_n8_zero": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 0,
+          "spectralEnergy": 0
         }
       }
     }
