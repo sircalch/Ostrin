@@ -31,6 +31,12 @@ const programs = [
     expected: "10 degC (absolute)\n10 K\n0 K\n10 degC (absolute)\n0 degC (absolute)\n310 K\n",
   },
   {
+    name: "temperature_point_overflow",
+    source: "compiler/tests/fixtures/temperature_point_overflow.ostrin",
+    args: ["temperature_point_overflow.wasm"],
+    expectedError: "absolute temperature arithmetic overflowed",
+  },
+  {
     name: "pkg_project",
     project: "examples/pkg_project/main_app",
     args: ["pkg_project.wasm"],
@@ -241,6 +247,12 @@ async function runWasi(program) {
     stderrFd = undefined;
     const output = readFileSync(stdoutPath, "utf8").replaceAll("\r\n", "\n");
     const error = readFileSync(stderrPath, "utf8").replaceAll("\r\n", "\n");
+    if (program.expectedError) {
+      if (exitCode === 0 || !error.includes(program.expectedError)) {
+        fail(`${program.name} expected runtime failure containing '${program.expectedError}', got exit ${exitCode}: ${error}`);
+      }
+      return;
+    }
     if (exitCode !== 0) fail(`${program.name} exited with ${exitCode}: ${error}`);
     if (output !== program.expected) {
       fail(`${program.name} output mismatch\nexpected:\n${program.expected}\nactual:\n${output}\nstderr:\n${error}`);

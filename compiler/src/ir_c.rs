@@ -1336,7 +1336,7 @@ fn binary_code(
                 if *ty == Ty::Quantity(crate::types::dim_single("Temperature")) =>
             {
                 return Ok(format!(
-                    "ostrin_qty_from_borrowed(ostrin_temperature_point_to_kelvin({left}) - ostrin_temperature_point_to_kelvin({right}), \"K\")"
+                    "ostrin_qty_from_borrowed(ostrin_temperature_point_difference({left}, {right}), \"K\")"
                 ));
             }
             (Ty::TemperaturePoint, Ty::Quantity(dimension), BinOp::Add | BinOp::Sub)

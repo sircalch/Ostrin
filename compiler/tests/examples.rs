@@ -12248,6 +12248,62 @@ fn temperature_point_constructor_keeps_kelvin_intervals_linear() {
 }
 
 #[test]
+fn temperature_point_arithmetic_rejects_overflow_in_interpreter_and_native() {
+    for (name, body) in [
+        (
+            "temperature_point_difference_overflow",
+            "left = temperature_point(1.7e308, \"K\")\n\
+             right = temperature_point(-1.7e308, \"K\")\n\
+             print(left - right)\n",
+        ),
+        (
+            "temperature_point_shift_overflow",
+            "point = temperature_point(1.7e308, \"K\")\n\
+             print(point + 1.7e308 K)\n",
+        ),
+    ] {
+        let source = temp_source(name, &format!("fn main() -> Void {{\n{body}}}\n"));
+        let interpreted = run(&["--run", &source]);
+        assert!(!interpreted.status.success(), "interpreter accepted {name}");
+        assert!(
+            stderr(&interpreted).contains("absolute temperature arithmetic overflowed"),
+            "unexpected interpreter diagnostic for {name}: {}",
+            stderr(&interpreted)
+        );
+
+        for (backend, ast_fallback) in [("IR", false), ("AST fallback", true)] {
+            let exe = temp_artifact(&format!("{name}_{backend}.exe"));
+            let compile_args = ["--compile", "--out", &exe, &source];
+            let compiled = if ast_fallback {
+                run_with_env(&compile_args, "OSTRIN_NO_IR_CODEGEN", "1")
+            } else {
+                run(&compile_args)
+            };
+            assert!(
+                compiled.status.success(),
+                "{backend} compile failed for {name}: {}",
+                stderr(&compiled)
+            );
+            let native = Command::new(&exe)
+                .output()
+                .expect("run native overflow case");
+            let _ = fs::remove_file(&exe);
+            assert!(
+                !native.status.success(),
+                "{backend} backend accepted {name}"
+            );
+            assert!(
+                String::from_utf8_lossy(&native.stderr)
+                    .contains("absolute temperature arithmetic overflowed"),
+                "unexpected {backend} diagnostic for {name}: {}",
+                String::from_utf8_lossy(&native.stderr)
+            );
+        }
+        let _ = fs::remove_file(&source);
+    }
+}
+
+#[test]
 fn measurement_array_boundary_has_actionable_diagnostic() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);

@@ -4296,6 +4296,11 @@ fn affine_temperature_binary(op: BinOp, left: &Value, right: &Value) -> EvalResu
                 .map_err(RuntimeError::Error)?;
             match result.role {
                 QuantityRole::Point(_) => {
+                    if !result.value.is_finite() {
+                        return Err(RuntimeError::Error(
+                            "absolute temperature arithmetic overflowed".to_string(),
+                        ));
+                    }
                     let unit = match (left, right) {
                         (Value::TemperaturePoint(_, unit), _) => unit,
                         (_, Value::TemperaturePoint(_, unit)) => unit,
@@ -4306,8 +4311,14 @@ fn affine_temperature_binary(op: BinOp, left: &Value, right: &Value) -> EvalResu
                 QuantityRole::Linear => {
                     // Point differences are returned in coherent kelvins so
                     // the ordinary linear Quantity runtime can represent them.
+                    let difference = result.value * result.unit.scale;
+                    if !difference.is_finite() {
+                        return Err(RuntimeError::Error(
+                            "absolute temperature arithmetic overflowed".to_string(),
+                        ));
+                    }
                     Ok(Value::Quantity(
-                        result.value * result.unit.scale,
+                        difference,
                         result.unit.dimension,
                         "K".to_string(),
                     ))

@@ -6506,7 +6506,7 @@ impl<'a> Codegen<'a> {
                 (CType::TemperaturePoint, CType::TemperaturePoint, BinOp::Sub) => {
                     return Ok((
                         format!(
-                            "ostrin_qty_from_borrowed(ostrin_temperature_point_to_kelvin({lc}) - ostrin_temperature_point_to_kelvin({rc}), \"K\")"
+                            "ostrin_qty_from_borrowed(ostrin_temperature_point_difference({lc}, {rc}), \"K\")"
                         ),
                         CType::Quantity(crate::types::dim_single("Temperature")),
                     ));

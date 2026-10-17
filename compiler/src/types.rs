@@ -343,6 +343,9 @@ pub fn convert_value_with_role(
     match role {
         QuantityRole::Linear => Ok(value * from.scale / to.scale),
         QuantityRole::Point(space) => {
+            if !value.is_finite() {
+                return Err("absolute temperature arithmetic overflowed".to_string());
+            }
             let expected_dimension = dimension_from_name(space);
             if from.dimension != expected_dimension {
                 return Err(format!(
@@ -359,7 +362,11 @@ pub fn convert_value_with_role(
                 }
             }
             let coherent = value.mul_add(from.scale, from.offset);
-            Ok((coherent - to.offset) / to.scale)
+            let converted = (coherent - to.offset) / to.scale;
+            if !coherent.is_finite() || !converted.is_finite() {
+                return Err("absolute temperature arithmetic overflowed".to_string());
+            }
+            Ok(converted)
         }
     }
 }
@@ -367,8 +374,9 @@ pub fn convert_value_with_role(
 /// Add or subtract quantities without erasing whether an affine value is a
 /// point or an interval. Point shifts preserve the point operand's scale;
 /// point differences return coherent linear units. Invalid affine operations
-/// return an error.
-#[allow(dead_code)] // Called by the interpreter; native/WASI lowering is pending.
+/// return an error. Native/WASI lowering uses the corresponding checked runtime
+/// operations.
+#[allow(dead_code)] // Called by the interpreter and semantic tests.
 pub fn combine_quantities_with_role(
     left: &RoleAwareQuantity,
     right: &RoleAwareQuantity,
@@ -402,8 +410,12 @@ pub fn combine_quantities_with_role(
             };
             let left_coherent = left.value.mul_add(left.unit.scale, left.unit.offset);
             let right_coherent = right.value.mul_add(right.unit.scale, right.unit.offset);
+            let difference = left_coherent - right_coherent;
+            if !difference.is_finite() {
+                return Err("absolute temperature arithmetic overflowed".to_string());
+            }
             Ok(RoleAwareQuantity {
-                value: left_coherent - right_coherent,
+                value: difference,
                 unit: UnitDefinition::linear(left.unit.dimension.clone(), 1.0),
                 role: result_role.clone(),
             })
@@ -415,11 +427,15 @@ pub fn combine_quantities_with_role(
                 &left.unit,
                 &QuantityRole::Linear,
             )?;
+            let shifted = match operation {
+                QuantityArithmetic::Add => left.value + interval,
+                QuantityArithmetic::Subtract => left.value - interval,
+            };
+            if !shifted.is_finite() {
+                return Err("absolute temperature arithmetic overflowed".to_string());
+            }
             Ok(RoleAwareQuantity {
-                value: match operation {
-                    QuantityArithmetic::Add => left.value + interval,
-                    QuantityArithmetic::Subtract => left.value - interval,
-                },
+                value: shifted,
                 unit: left.unit.clone(),
                 role: result_role.clone(),
             })
@@ -431,8 +447,12 @@ pub fn combine_quantities_with_role(
                 &right.unit,
                 &QuantityRole::Linear,
             )?;
+            let shifted = interval + right.value;
+            if !shifted.is_finite() {
+                return Err("absolute temperature arithmetic overflowed".to_string());
+            }
             Ok(RoleAwareQuantity {
-                value: interval + right.value,
+                value: shifted,
                 unit: right.unit.clone(),
                 role: result_role.clone(),
             })
@@ -457,8 +477,9 @@ pub fn combine_quantities_with_role(
 }
 
 /// Compare two values only when both have the same semantic role. Absolute
-/// points are normalized with offsets; linear intervals use scale only.
-#[allow(dead_code)] // Called by the interpreter; native/WASI comparison is pending.
+/// points are normalized with offsets; linear intervals use scale only. Native/WASI
+/// lowering performs the equivalent comparison in the runtime.
+#[allow(dead_code)] // Called by the interpreter and semantic tests.
 pub fn compare_quantities_with_role(
     left: &RoleAwareQuantity,
     right: &RoleAwareQuantity,
@@ -1102,6 +1123,41 @@ mod affine_unit_tests {
         );
         assert!(UnitDefinition::affine(temperature, 1.0, f64::NAN, "Temperature").is_err());
         assert!(UnitDefinition::affine(dim_single("Temperature"), 1.0, 0.0, "").is_err());
+    }
+
+    #[test]
+    fn affine_point_arithmetic_rejects_non_finite_results() {
+        let kelvin = builtin_temperature_point_unit("K").unwrap();
+        let point = |value| RoleAwareQuantity {
+            value,
+            unit: kelvin.clone(),
+            role: QuantityRole::Point("Temperature".to_string()),
+        };
+        let interval = |value| RoleAwareQuantity {
+            value,
+            unit: UnitDefinition::linear(dim_single("Temperature"), 1.0),
+            role: QuantityRole::Linear,
+        };
+
+        assert!(convert_value_with_role(
+            f64::INFINITY,
+            &kelvin,
+            &kelvin,
+            &QuantityRole::Point("Temperature".to_string()),
+        )
+        .is_err());
+        assert!(combine_quantities_with_role(
+            &point(f64::MAX),
+            &point(-f64::MAX),
+            QuantityArithmetic::Subtract,
+        )
+        .is_err());
+        assert!(combine_quantities_with_role(
+            &point(f64::MAX),
+            &interval(f64::MAX),
+            QuantityArithmetic::Add,
+        )
+        .is_err());
     }
 
     #[test]

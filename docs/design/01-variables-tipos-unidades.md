@@ -335,11 +335,13 @@ La semántica distingue estos roles en metadatos internos y el type checker dist
 intervalo lineal. Los puntos se pueden comparar, desplazar por intervalos de temperatura y restar
 entre sí; la diferencia resultante es un intervalo Kelvin. El constructor rechaza escalas distintas
 de las tres permitidas y valores no finitos. El intérprete y los backends nativos IR y AST ejecutan
-el tipo escalar; WASI también compila y ejecuta el caso en Node WASI Preview 1, incluido en la matriz
-de 29 programas de `scripts/wasi-program-check.mjs`. No hay soporte de arrays ni de
+el tipo escalar; WASI también compila y ejecuta el caso en Node WASI Preview 1. Su matriz de
+30 programas comprueba además un desbordamiento de resta de puntos. No hay soporte de arrays ni de
 `Measurement<TemperaturePoint>`. El diseño separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
-reglas algebraicas distintas:
+reglas algebraicas distintas. Las sumas y diferencias de puntos también comprueban el resultado:
+si el cálculo produce un valor no finito, intérprete y backend nativo fallan con un diagnóstico de
+desbordamiento en vez de devolver `inf` o `NaN`.
 
 | Operación | Resultado | Regla |
 | --- | --- | --- |

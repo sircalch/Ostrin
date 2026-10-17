@@ -218,6 +218,7 @@ static double ostrin_temperature_point_to_kelvin(OstrinTemperaturePoint point) {
 }
 
 static OstrinTemperaturePoint ostrin_temperature_point_from_kelvin(double value, int scale) {
+    if (!isfinite(value)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
     OstrinTemperaturePoint point = { value, scale };
     switch (scale) {
         case OSTRIN_TEMP_K: point.value = value; break;
@@ -225,6 +226,7 @@ static OstrinTemperaturePoint ostrin_temperature_point_from_kelvin(double value,
         case OSTRIN_TEMP_F: point.value = (value - OSTRIN_TEMP_F_OFFSET) / OSTRIN_TEMP_F_SCALE; break;
         default: OSTRIN_FAIL("invalid absolute temperature scale tag");
     }
+    if (!isfinite(point.value)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
     return point;
 }
 
@@ -248,10 +250,20 @@ static int ostrin_temperature_point_cmp(OstrinTemperaturePoint left, OstrinTempe
     return (a > b) - (a < b);
 }
 
+static double ostrin_temperature_point_difference(
+    OstrinTemperaturePoint left, OstrinTemperaturePoint right
+) {
+    double difference = ostrin_temperature_point_to_kelvin(left) -
+        ostrin_temperature_point_to_kelvin(right);
+    if (!isfinite(difference)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
+    return difference;
+}
+
 static OstrinTemperaturePoint ostrin_temperature_point_shift(
     OstrinTemperaturePoint point, Qty interval, int direction
 ) {
     double delta = ostrin_convert(interval.v, interval.u, "K");
+    if (!isfinite(delta)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
     return ostrin_temperature_point_from_kelvin(
         ostrin_temperature_point_to_kelvin(point) + direction * delta,
         point.scale
