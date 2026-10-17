@@ -239,6 +239,56 @@ function validateEigen(values, id, contract) {
   };
 }
 
+export function directDft(signal) {
+  const re = [];
+  const im = [];
+  for (let k = 0; k < signal.length; k++) {
+    let real = 0;
+    let imaginary = 0;
+    for (let j = 0; j < signal.length; j++) {
+      const angle = -2 * Math.PI * ((k * j) % signal.length) / signal.length;
+      real += signal[j] * Math.cos(angle);
+      imaginary += signal[j] * Math.sin(angle);
+    }
+    re.push(real);
+    im.push(imaginary);
+  }
+  return { re, im };
+}
+
+export function validateFft(values, contract) {
+  const reports = {};
+  for (const [id, testCase] of Object.entries(contract.cases)) {
+    const n = testCase.signal.length;
+    const re = takeVector(values, `${id} real spectrum`, n);
+    const im = takeVector(values, `${id} imaginary spectrum`, n);
+    const reconstructed = takeVector(values, `${id} inverse transform`, n);
+    const reference = directDft(testCase.signal);
+    let spectralResidual = 0;
+    for (let k = 0; k < n; k++) {
+      const realDifference = Math.abs(re[k] - reference.re[k]);
+      const imaginaryDifference = Math.abs(im[k] - reference.im[k]);
+      checkTolerance(`${id} real DFT bin ${k}`, realDifference, Math.abs(reference.re[k]), testCase.absolute, testCase.relative);
+      checkTolerance(`${id} imaginary DFT bin ${k}`, imaginaryDifference, Math.abs(reference.im[k]), testCase.absolute, testCase.relative);
+      spectralResidual = Math.max(spectralResidual, realDifference, imaginaryDifference);
+    }
+    let inputEnergy = 0;
+    let spectralEnergy = 0;
+    let maximumReconstructionError = 0;
+    for (let i = 0; i < n; i++) {
+      inputEnergy += testCase.signal[i] ** 2;
+      spectralEnergy += re[i] ** 2 + im[i] ** 2;
+      const difference = Math.abs(reconstructed[i] - testCase.signal[i]);
+      checkTolerance(`${id} inverse reconstruction sample ${i}`, difference, Math.abs(testCase.signal[i]), testCase.absolute, testCase.relative);
+      maximumReconstructionError = Math.max(maximumReconstructionError, difference);
+    }
+    const parsevalResidual = Math.abs(spectralEnergy / n - inputEnergy);
+    checkTolerance(`${id} Parseval energy`, parsevalResidual, inputEnergy, testCase.absolute, testCase.relative);
+    reports[id] = { spectralResidual, maximumReconstructionError, parsevalResidual, inputEnergy, spectralEnergy };
+  }
+  return reports;
+}
+
 export function validateRun(output, contract) {
   const parsed = parseEmittedNumbers(output);
   const values = { numbers: parsed, offset: 0 };
@@ -250,6 +300,7 @@ export function validateRun(output, contract) {
   reports.qr = validateQr(values, "qr", contract.cases.qr);
   reports.svd = validateSvd(values, "svd", contract.cases.svd);
   reports.eigen = validateEigen(values, "eigen", contract.cases.eigen);
+  reports.fft = validateFft(values, contract.cases.fft);
   if (values.offset !== values.numbers.length) {
     throw new Error(`numeric validation emitted ${values.numbers.length - values.offset} unexpected trailing values`);
   }
@@ -270,7 +321,7 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
   }
 
   mkdirSync(outputDirectory, { recursive: true });
-  const executable = path.join(outputDirectory, `matrix-algorithms${process.platform === "win32" ? ".exe" : ""}`);
+  const executable = path.join(outputDirectory, `numeric-validation${process.platform === "win32" ? ".exe" : ""}`);
   rmSync(executable, { force: true });
   const interpreter = run(compiler, ["--run", source], "interpreter numerical fixture");
   const compile = run(compiler, ["--compile", "--leak-check", "--out", executable, source], "native numerical fixture compile");

@@ -41,6 +41,21 @@
       "eigenvalues": [1.0, 3.0],
       "absolute": 1e-13,
       "relative": 1e-12
+    },
+    "fft": {
+      "reference": "direct O(n^2) DFT in JavaScript; independent of Ostrin's radix-2 and fallback implementations",
+      "cases": {
+        "radix2_n8": {
+          "signal": [1.5, -2.0, 0.25, 3.0, -0.5, 1.0, 2.25, -1.25],
+          "absolute": 1e-12,
+          "relative": 1e-12
+        },
+        "direct_dft_n7": {
+          "signal": [0.5, -1.0, 2.0, 0.25, -0.75, 1.5, 3.0],
+          "absolute": 1e-12,
+          "relative": 1e-12
+        }
+      }
     }
   }
 }
