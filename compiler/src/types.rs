@@ -910,9 +910,9 @@ pub enum Ty {
     String,
     Void,
     Quantity(Dimension),
-    /// Absolute temperature reading. This is an internal typed representation;
-    /// source construction remains disabled until runtime and backend lowering
-    /// preserve the role end to end.
+    /// Absolute temperature reading, distinct from a linear `Quantity<Temperature>`.
+    /// The explicit source constructor and scalar operations preserve this role
+    /// through the interpreter and scalar backend lowering; arrays remain unsupported.
     TemperaturePoint,
     List(Box<Ty>),
     Map(Box<Ty>, Box<Ty>),
