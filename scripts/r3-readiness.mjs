@@ -46,20 +46,28 @@ function validFileReference(value) {
 
 function captureExtensionErrors(runtime) {
   const errors = [];
+  if (!isObject(runtime)
+    || runtime.schema !== "ostrin.runtime/v1"
+    || runtime.status !== "partial"
+    || runtime.target !== "wasm32-wasip1"
+    || runtime.wasi !== "preview1"
+    || runtime.runner !== "WASI host") {
+    errors.push("provenance.runtime.contract");
+  }
   if (!validFileReference(runtime?.compiler_lockfile)) {
     errors.push("provenance.runtime.compiler_lockfile");
   }
   const host = runtime?.host;
   if (!isObject(host)
     || host.schema !== "ostrin.host/v1"
-    || typeof host.source !== "string" || host.source.length === 0
-    || typeof host.runner_os !== "string" || host.runner_os === "unknown"
-    || typeof host.runner_arch !== "string" || host.runner_arch === "unknown"
-    || typeof host.runner_environment !== "string" || host.runner_environment === "unknown"
-    || !isObject(host.image) || typeof host.image.os !== "string" || host.image.os === "unknown"
-    || typeof host.image.version !== "string" || host.image.version === "unknown"
+    || host.source !== "github-actions"
+    || typeof host.runner_os !== "string" || host.runner_os.length === 0 || host.runner_os === "unknown"
+    || typeof host.runner_arch !== "string" || host.runner_arch.length === 0 || host.runner_arch === "unknown"
+    || typeof host.runner_environment !== "string" || host.runner_environment.length === 0 || host.runner_environment === "unknown"
+    || !isObject(host.image) || typeof host.image.os !== "string" || host.image.os.length === 0 || host.image.os === "unknown"
+    || typeof host.image.version !== "string" || host.image.version.length === 0 || host.image.version === "unknown"
     || typeof host.node !== "string" || host.node.length === 0
-    || !isObject(host.hardware) || typeof host.hardware.arch !== "string"
+    || !isObject(host.hardware) || typeof host.hardware.arch !== "string" || host.hardware.arch.length === 0
     || !Number.isInteger(host.hardware.cpu_count) || host.hardware.cpu_count < 1
     || !["LE", "BE"].includes(host.hardware.endianness)
     || host.wasi !== "preview1" || host.captured !== true) {

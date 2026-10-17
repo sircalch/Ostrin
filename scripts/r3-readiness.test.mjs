@@ -14,7 +14,10 @@ after(() => {
 const validFile = (name) => ({ path: name, sha256: `sha256:${"a".repeat(64)}` });
 const validRuntime = () => ({
   schema: "ostrin.runtime/v1",
+  status: "partial",
   target: "wasm32-wasip1",
+  wasi: "preview1",
+  runner: "WASI host",
   compiler_lockfile: validFile("compiler/Cargo.lock"),
   host: {
     schema: "ostrin.host/v1",
@@ -186,6 +189,18 @@ test("R3 capture rejects invalid dependency hashes and unknown runner metadata",
     "provenance.runtime.compiler_lockfile",
     "provenance.runtime.host",
     "provenance.runtime.dependencies",
+  ]);
+});
+
+test("R3 capture rejects a mismatched runtime contract and non-CI host source", () => {
+  const runtime = validRuntime();
+  runtime.runner = "local process";
+  runtime.host.source = "developer workstation";
+  const report = inspectBundle({ provenance: { runtime, effects: validEffects() } }, "wrong-origin.json");
+  assert.equal(report.status, "OPEN");
+  assert.deepEqual(report.r3Extensions.missing, [
+    "provenance.runtime.contract",
+    "provenance.runtime.host",
   ]);
 });
 
