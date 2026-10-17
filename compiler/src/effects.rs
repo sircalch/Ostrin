@@ -581,6 +581,7 @@ fn drop_effect_for_type(
         | Ty::String
         | Ty::Void
         | Ty::Quantity(_)
+        | Ty::TemperaturePoint
         | Ty::Sized(_) => DropEffect::NoHostEffect,
         Ty::Fn(..) | Ty::Generic(_) | Ty::Dyn(_) | Ty::Unknown => DropEffect::Unknown,
     };
@@ -2314,6 +2315,8 @@ fn is_known_effect_free_global(operation: &str) -> bool {
             | "sqrt"
             | "tan"
             | "tanh"
+            | "temperature_point"
+            | "temperature_point_to"
             | "trace"
             | "where"
             | "zeros"

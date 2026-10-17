@@ -1,0 +1,4 @@
+fn main() -> Void {
+    point = temperature_point(1.7e308, "K")
+    print(temperature_point_to(point, "degF"))
+}
