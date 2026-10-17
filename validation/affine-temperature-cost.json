@@ -1,0 +1,202 @@
+{
+  "schema": 3,
+  "workloads": [
+    {
+      "index": 0,
+      "workload": "benchmarks/temperature-float.ostrin",
+      "sourceBytes": 191,
+      "sourceSha256": "12857af0a32c9c7b971aa2dee6ce9148497ffdc803bdbaadcca047a242916ea7",
+      "outputBytes": 5,
+      "outputSha256": "60734f174b2035e5b2ba85fef8c648cc0cb18c5995b419d3cd1c025c5b09d0c7",
+      "nativeCompileMs": 560.303,
+      "interpreterMs": [
+        46.683,
+        43.251,
+        50.917,
+        46.198,
+        46.485,
+        45.099,
+        46.115
+      ],
+      "nativeMs": [
+        15.547,
+        15.102,
+        17.26,
+        44.342,
+        15.891,
+        15.461,
+        16.113
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 43.251,
+          "maxMs": 50.917,
+          "meanMs": 46.393,
+          "medianMs": 46.198,
+          "p95Ms": 49.647,
+          "stdevMs": 2.146
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 15.102,
+          "maxMs": 44.342,
+          "meanMs": 19.959,
+          "medianMs": 15.891,
+          "p95Ms": 36.218,
+          "stdevMs": 9.975
+        }
+      },
+      "interpreterMedianMs": 46.198,
+      "nativeMedianMs": 15.891,
+      "interpreterToNativeMedianRatio": 2.907
+    },
+    {
+      "index": 1,
+      "workload": "benchmarks/temperature-interval.ostrin",
+      "sourceBytes": 211,
+      "sourceSha256": "0fa0fecf25138d87fcef57d63712abc72970ef0bca17059c00cb63bc1d9c43d2",
+      "outputBytes": 7,
+      "outputSha256": "1c38139853adc4fc87d67509a49dcc328066676433b22fbd0629ff1063e0afe3",
+      "nativeCompileMs": 416.161,
+      "interpreterMs": [
+        90.654,
+        102.281,
+        94.891,
+        96.195,
+        101.685,
+        90.014,
+        89.462
+      ],
+      "nativeMs": [
+        16.399,
+        17.519,
+        16.781,
+        15.724,
+        42.796,
+        15.437,
+        16.401
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 89.462,
+          "maxMs": 102.281,
+          "meanMs": 95.026,
+          "medianMs": 94.891,
+          "p95Ms": 102.102,
+          "stdevMs": 4.979
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 15.437,
+          "maxMs": 42.796,
+          "meanMs": 20.151,
+          "medianMs": 16.401,
+          "p95Ms": 35.213,
+          "stdevMs": 9.266
+        }
+      },
+      "interpreterMedianMs": 94.891,
+      "nativeMedianMs": 16.401,
+      "interpreterToNativeMedianRatio": 5.786
+    },
+    {
+      "index": 2,
+      "workload": "benchmarks/temperature-point.ostrin",
+      "sourceBytes": 227,
+      "sourceSha256": "f52d862dabf9a03ba12ed8e8244343b7b208bcbc7a9527ff97487ab2292ae304",
+      "outputBytes": 21,
+      "outputSha256": "abcde6ea2948c089211e4eb5f804d3db90cccba38078a807de92027f0ca5fc0c",
+      "nativeCompileMs": 454.66,
+      "interpreterMs": [
+        212.611,
+        204.263,
+        208.141,
+        197.105,
+        233.78,
+        207.143,
+        203.981
+      ],
+      "nativeMs": [
+        15.938,
+        19.501,
+        18.791,
+        15.82,
+        16.441,
+        16.03,
+        16.067
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 197.105,
+          "maxMs": 233.78,
+          "meanMs": 209.575,
+          "medianMs": 207.143,
+          "p95Ms": 227.43,
+          "stdevMs": 10.811
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 15.82,
+          "maxMs": 19.501,
+          "meanMs": 16.941,
+          "medianMs": 16.067,
+          "p95Ms": 19.288,
+          "stdevMs": 1.418
+        }
+      },
+      "interpreterMedianMs": 207.143,
+      "nativeMedianMs": 16.067,
+      "interpreterToNativeMedianRatio": 12.893
+    }
+  ],
+  "commit": "53db2946bd33d731a6d855906e58d512132bd0a3",
+  "git": {
+    "commit": "53db2946bd33d731a6d855906e58d512132bd0a3",
+    "clean": true
+  },
+  "compiler": "compiler/target/release/ostrinc.exe",
+  "compilerVersion": "ostrinc 0.2.0",
+  "node": "v24.19.0",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "os": {
+      "type": "Windows_NT",
+      "release": "10.0.26200",
+      "version": "Windows 11 Pro"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 5700X 8-Core Processor             ",
+      "logicalCores": 16
+    },
+    "memoryBytes": 34278834176
+  },
+  "platform": "win32",
+  "arch": "x64",
+  "nativeCompile": {
+    "target": "native",
+    "cCompiler": {
+      "command": "gcc",
+      "version": "gcc (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r8) 13.2.0"
+    },
+    "compilerManagedDefaults": [
+      "-O2",
+      "-ffp-contract=off"
+    ],
+    "argvCapture": "not intercepted; see compiler/src/main.rs",
+    "environment": {
+      "OSTRIN_CC": null,
+      "OSTRIN_CFLAGS": null
+    }
+  },
+  "methodology": {
+    "clock": "node:perf_hooks performance.now wall-clock process duration",
+    "outputCheck": "normalized UTF-8 stdout must match interpreter and native output exactly",
+    "memory": "not captured; peak child RSS and allocation counters are a planned metric"
+  },
+  "iterations": 7,
+  "warmups": 1
+}

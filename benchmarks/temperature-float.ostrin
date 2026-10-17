@@ -1,0 +1,8 @@
+// Control workload: scalar Float addition with no scientific metadata.
+fn main() -> Void {
+    mut total = 0.0
+    for i in 1 to 50000 {
+        total = total + 1.0
+    }
+    print(total)
+}

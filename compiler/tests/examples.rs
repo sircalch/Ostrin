@@ -12093,6 +12093,335 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
+    let source = temp_source(
+        "temperature_point_measurement_boundary",
+        "import std.measurements\n\
+         fn main() -> Void {\n\
+         point = temperature_point(20.0, \"degC\")\n\
+         measured = Measurement { value: point, sources: [], known: true, reason: \"\" }\n\
+         print(measured.value)\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter generic-record probe failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "20 degC (absolute)\n"
+    );
+
+    let native = run(&["--native-type-report", &source]);
+    assert!(
+        !native.status.success(),
+        "Measurement<TemperaturePoint> escaped through native AST fallback"
+    );
+    assert!(
+        stderr(&native).contains(
+            "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
+        ),
+        "native measurement boundary diagnostic was unclear: {}",
+        stderr(&native)
+    );
+    let _ = fs::remove_file(source);
+}
+
+#[test]
+fn temperature_point_native_backend_matches_interpreter() {
+    let file_arg = fixture_path("temperature_point_affine.ostrin.txt");
+    let interpreted = run(&["--run", &file_arg]);
+    assert!(
+        interpreted.status.success(),
+        "TemperaturePoint interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let exe = temp_artifact("temperature_point_native.exe");
+    let native = run(&["--compile", "--out", &exe, &file_arg]);
+    assert!(
+        native.status.success(),
+        "native TemperaturePoint compile failed: {}",
+        stderr(&native)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native TemperaturePoint program");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native TemperaturePoint program failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file_arg]);
+    assert!(
+        wasi.status.success(),
+        "WASI TemperaturePoint C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "typedef struct { double value; int scale; } OstrinTemperaturePoint;",
+        "ostrin_temperature_point_new",
+        "ostrin_temperature_point_cmp",
+        "ostrin_temperature_point_shift",
+        "ostrin_print_temperature_point",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "WASI TemperaturePoint C omitted `{marker}`"
+        );
+    }
+    assert!(
+        !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI TemperaturePoint C enabled native threads"
+    );
+
+    let fallback_exe = temp_artifact("temperature_point_ast_fallback.exe");
+    let fallback_compile = run_with_env(
+        &["--compile", "--out", &fallback_exe, &file_arg],
+        "OSTRIN_NO_IR_CODEGEN",
+        "1",
+    );
+    assert!(
+        fallback_compile.status.success(),
+        "AST fallback compilation of TemperaturePoint failed: {}",
+        stderr(&fallback_compile)
+    );
+    let fallback_native = Command::new(&fallback_exe)
+        .output()
+        .expect("run TemperaturePoint AST fallback binary");
+    let _ = fs::remove_file(&fallback_exe);
+    assert!(
+        fallback_native.status.success(),
+        "TemperaturePoint AST fallback binary failed: {}",
+        String::from_utf8_lossy(&fallback_native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&fallback_native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    let bad_conversion = temp_source(
+        "temperature_point_native_bad_conversion_scale",
+        "fn main() -> Void {\n\
+         point = temperature_point(0.0, \"degC\")\n\
+         print(temperature_point_to(point, \"degR\"))\n\
+         }\n",
+    );
+    let interpreted_bad_conversion = run(&["--run", &bad_conversion]);
+    assert!(!interpreted_bad_conversion.status.success());
+    assert!(stderr(&interpreted_bad_conversion).contains("scale must be 'K', 'degC' or 'degF'"));
+    let bad_conversion_exe = temp_artifact("temperature_point_bad_conversion_scale.exe");
+    let bad_conversion_compile = run(&["--compile", "--out", &bad_conversion_exe, &bad_conversion]);
+    assert!(
+        bad_conversion_compile.status.success(),
+        "native invalid conversion scale did not compile: {}",
+        stderr(&bad_conversion_compile)
+    );
+    let native_bad_conversion = Command::new(&bad_conversion_exe)
+        .output()
+        .expect("run native invalid point conversion");
+    let _ = fs::remove_file(&bad_conversion_exe);
+    let _ = fs::remove_file(&bad_conversion);
+    assert!(!native_bad_conversion.status.success());
+    assert!(
+        String::from_utf8_lossy(&native_bad_conversion.stderr)
+            .contains("scale must be 'K', 'degC' or 'degF'"),
+        "native invalid conversion scale diagnostic was unclear: {}",
+        String::from_utf8_lossy(&native_bad_conversion.stderr)
+    );
+    let bad_scale = temp_source(
+        "temperature_point_native_bad_scale",
+        "fn main() -> Void { print(temperature_point(20.0, \"degR\")) }\n",
+    );
+    let interpreted_bad_scale = run(&["--run", &bad_scale]);
+    assert!(!interpreted_bad_scale.status.success());
+    let bad_exe = temp_artifact("temperature_point_bad_scale.exe");
+    let bad_compile = run(&["--compile", "--out", &bad_exe, &bad_scale]);
+    assert!(
+        bad_compile.status.success(),
+        "native invalid-scale fixture failed to compile: {}",
+        stderr(&bad_compile)
+    );
+    let native_bad_scale = Command::new(&bad_exe)
+        .output()
+        .expect("run native invalid temperature scale case");
+    let _ = fs::remove_file(bad_exe);
+    let _ = fs::remove_file(bad_scale);
+    assert!(!native_bad_scale.status.success());
+    assert!(
+        String::from_utf8_lossy(&native_bad_scale.stderr)
+            .contains("scale must be 'K', 'degC' or 'degF'"),
+        "native invalid-scale diagnostic was unclear: {}",
+        String::from_utf8_lossy(&native_bad_scale.stderr)
+    );
+}
+
+#[test]
+fn temperature_point_constructor_keeps_kelvin_intervals_linear() {
+    let file = temp_source(
+        "temperature_point_constructor",
+        "fn make_point(value: Float, scale: String) -> TemperaturePoint {\n\
+         temperature_point(value, scale)\n\
+         }\n\
+         fn main() -> Void {\n\
+             c = make_point(0.0, \"degC\")\n\
+             f = make_point(32.0, \"degF\")\n\
+             k = make_point(273.15, \"K\")\n\
+             assert(c == f)\n\
+             assert(c == k)\n\
+             shifted = c + (10.0 K)\n\
+             print(shifted)\n\
+             print(shifted - c)\n\
+             assert(temperature_point_to(shifted, \"degF\") == make_point(50.0, \"degF\"))\n\
+             print(temperature_point_to(c, \"degF\"))\n\
+             print(310 K)\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(
+        interpreted.status.success(),
+        "explicit temperature point constructor failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "10 degC (absolute)\n10 K\n32 degF (absolute)\n310 K\n"
+    );
+
+    let invalid = temp_source(
+        "temperature_point_invalid_scale",
+        "fn main() -> Void { print(temperature_point(20.0, \"degR\")) }\n",
+    );
+    let rejected = run(&["--run", &invalid]);
+    let _ = fs::remove_file(invalid);
+    assert!(
+        !rejected.status.success(),
+        "unknown point scale was accepted"
+    );
+    assert!(
+        stderr(&rejected).contains("scale must be 'K', 'degC' or 'degF'"),
+        "invalid point scale should have an actionable runtime diagnostic: {}",
+        stderr(&rejected)
+    );
+}
+
+#[test]
+fn temperature_point_arithmetic_rejects_overflow_in_interpreter_and_native() {
+    for (name, body) in [
+        (
+            "temperature_point_difference_overflow",
+            "left = temperature_point(1.7e308, \"K\")\n\
+             right = temperature_point(-1.7e308, \"K\")\n\
+             print(left - right)\n",
+        ),
+        (
+            "temperature_point_shift_overflow",
+            "point = temperature_point(1.7e308, \"K\")\n\
+             print(point + 1.7e308 K)\n",
+        ),
+    ] {
+        let source = temp_source(name, &format!("fn main() -> Void {{\n{body}}}\n"));
+        let interpreted = run(&["--run", &source]);
+        assert!(!interpreted.status.success(), "interpreter accepted {name}");
+        assert!(
+            stderr(&interpreted).contains("absolute temperature arithmetic overflowed"),
+            "unexpected interpreter diagnostic for {name}: {}",
+            stderr(&interpreted)
+        );
+
+        for (backend, ast_fallback) in [("IR", false), ("AST fallback", true)] {
+            let exe = temp_artifact(&format!("{name}_{backend}.exe"));
+            let compile_args = ["--compile", "--out", &exe, &source];
+            let compiled = if ast_fallback {
+                run_with_env(&compile_args, "OSTRIN_NO_IR_CODEGEN", "1")
+            } else {
+                run(&compile_args)
+            };
+            assert!(
+                compiled.status.success(),
+                "{backend} compile failed for {name}: {}",
+                stderr(&compiled)
+            );
+            let native = Command::new(&exe)
+                .output()
+                .expect("run native overflow case");
+            let _ = fs::remove_file(&exe);
+            assert!(
+                !native.status.success(),
+                "{backend} backend accepted {name}"
+            );
+            assert!(
+                String::from_utf8_lossy(&native.stderr)
+                    .contains("absolute temperature arithmetic overflowed"),
+                "unexpected {backend} diagnostic for {name}: {}",
+                String::from_utf8_lossy(&native.stderr)
+            );
+        }
+        let _ = fs::remove_file(&source);
+    }
+}
+
+#[test]
+fn temperature_point_conversion_rejects_overflow_in_interpreter_and_native() {
+    let source = temp_source(
+        "temperature_point_conversion_overflow",
+        "fn main() -> Void {\n\
+         point = temperature_point(1.7e308, \"K\")\n\
+         print(temperature_point_to(point, \"degF\"))\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &source]);
+    assert!(!interpreted.status.success());
+    assert!(
+        stderr(&interpreted).contains("absolute temperature arithmetic overflowed"),
+        "unexpected interpreter diagnostic: {}",
+        stderr(&interpreted)
+    );
+
+    for (backend, ast_fallback) in [("IR", false), ("AST fallback", true)] {
+        let exe = temp_artifact(&format!(
+            "temperature_point_conversion_overflow_{backend}.exe"
+        ));
+        let compile_args = ["--compile", "--out", &exe, &source];
+        let compiled = if ast_fallback {
+            run_with_env(&compile_args, "OSTRIN_NO_IR_CODEGEN", "1")
+        } else {
+            run(&compile_args)
+        };
+        assert!(
+            compiled.status.success(),
+            "{backend} compile failed: {}",
+            stderr(&compiled)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run native conversion overflow case");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            !native.status.success(),
+            "{backend} accepted conversion overflow"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr)
+                .contains("absolute temperature arithmetic overflowed"),
+            "unexpected {backend} diagnostic: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+    let _ = fs::remove_file(source);
+}
+
+#[test]
 fn measurement_array_boundary_has_actionable_diagnostic() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);

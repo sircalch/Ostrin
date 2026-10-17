@@ -1,0 +1,8 @@
+// Affine temperature workload: absolute point shifted by a Kelvin interval.
+fn main() -> Void {
+    mut point = temperature_point(0.0, "degC")
+    for i in 1 to 50000 {
+        point = point + (1.0 K)
+    }
+    print(point)
+}
