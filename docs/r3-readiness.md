@@ -78,3 +78,10 @@ capturas sin `provenance.runtime.host`. El recorrido directo encuentra siete ref
 callbacks en siete bundles. Esos contadores describen vistas distintas del análisis; no prueban
 pureza ni sustituyen la captura de host. Por ello el reporte local continúa **OPEN**, con 0/29
 bundles R3 listos.
+
+`gapDiagnostics.reproducibilityEvidence` cuenta las declaraciones encontradas en los bundles:
+snapshots embebidos con ruta/hash, etiquetas `verified-in-ci` de ejecución y replay, y políticas
+numéricas que expresamente no afirman comparación multiplataforma. Estos contadores no vuelven a
+ejecutar esos replays ni prueban que se hayan enumerado todas las entradas externas. La cantidad de
+políticas con evaluación de tolerancias reconocida es cero; la declaración de una política tampoco
+sustituye la justificación científica por métrica, unidades, método de referencia y dominio.

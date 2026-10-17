@@ -492,7 +492,7 @@ test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostri
 
 test("R3 gap summary reconciles with per-bundle missing fields and effect coverage", () => {
   const report = buildReadiness();
-  const { captureGaps, effectInventory, notAssessed } = report.gapDiagnostics;
+  const { captureGaps, effectInventory, notAssessed, reproducibilityEvidence } = report.gapDiagnostics;
   const hostGap = captureGaps.missingExtensionFields.find(({ field }) => field === "provenance.runtime.host");
   const effectGap = captureGaps.incompleteExtensionFields.find(({ field }) => field === "provenance.effects.effect_coverage");
 
@@ -527,4 +527,12 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(entrypoint.unavailableBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "unavailable").length);
   assert.match(effectInventory.interpretation, /does not determine type resolution or prove purity/i);
   assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
+  assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles > 0);
+  assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles <= report.bundleCount);
+  assert.ok(reproducibilityEvidence.declaredEmbeddedInputSnapshotCount > 0);
+  assert.equal(reproducibilityEvidence.ciVerifiedExecutionBundles, 29);
+  assert.equal(reproducibilityEvidence.ciVerifiedReplayBundles, 29);
+  assert.equal(reproducibilityEvidence.numericComparisonNotClaimedBundles, 29);
+  assert.equal(reproducibilityEvidence.numericToleranceAssessmentBundles, 0);
+  assert.match(reproducibilityEvidence.interpretation, /do not establish completeness/i);
 });

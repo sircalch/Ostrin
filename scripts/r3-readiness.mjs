@@ -283,9 +283,33 @@ function buildGapDiagnostics(records) {
   let directlyReachableSymbolicReferenceCount = 0;
   let reachableGraphBundleCount = 0;
   const entrypointBundles = [];
+  const reproducibility = {
+    embeddedInputSnapshotBundles: 0,
+    declaredEmbeddedInputSnapshotCount: 0,
+    ciVerifiedExecutionBundles: 0,
+    ciVerifiedReplayBundles: 0,
+    numericComparisonNotClaimedBundles: 0,
+    numericToleranceAssessmentBundles: 0,
+  };
 
-  for (const { entry, effectCalls } of records) {
+  for (const { entry, effectCalls, bundle: sourceBundle } of records) {
     const bundle = entry.id ?? entry.file;
+    const provenance = sourceBundle?.provenance ?? {};
+    const declaredSnapshots = Array.isArray(provenance.runtime?.input_snapshots)
+      ? provenance.runtime.input_snapshots.filter((snapshot) =>
+        snapshot?.embedded === true && typeof snapshot.path === "string" && typeof snapshot.sha256 === "string")
+      : [];
+    if (declaredSnapshots.length > 0) reproducibility.embeddedInputSnapshotBundles++;
+    reproducibility.declaredEmbeddedInputSnapshotCount += declaredSnapshots.length;
+    if (provenance.execution?.status === "verified-in-ci") reproducibility.ciVerifiedExecutionBundles++;
+    if (provenance.replay?.status === "verified") reproducibility.ciVerifiedReplayBundles++;
+    const numericPolicy = provenance.runtime?.platform_policy?.numeric;
+    if (typeof numericPolicy === "string" && /not performed or claimed/i.test(numericPolicy)) {
+      reproducibility.numericComparisonNotClaimedBundles++;
+    }
+    if (typeof numericPolicy === "string" && /tolerances?\s+(?:are\s+)?(?:declared|specified|defined)/i.test(numericPolicy)) {
+      reproducibility.numericToleranceAssessmentBundles++;
+    }
     for (const field of entry.r3Extensions.missing) {
       if (!missingFields.has(field)) missingFields.set(field, new Set());
       missingFields.get(field).add(bundle);
@@ -418,6 +442,10 @@ function buildGapDiagnostics(records) {
       interpretation: "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity.",
     },
     entrypointEffects,
+    reproducibilityEvidence: {
+      ...reproducibility,
+      interpretation: "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels are recorded evidence and are not re-executed by this diagnostic; numeric tolerance assessment requires metric-specific scientific review.",
+    },
     notAssessed: [
       "Whether an operation resolves to a typed function or intrinsic",
       "Whether external inputs are fully captured and privacy-safe",
@@ -433,7 +461,7 @@ export function buildReadiness(root = repositoryRoot) {
     const absolute = path.join(directory, file);
     const bundle = JSON.parse(readFileSync(absolute, "utf8"));
     const entry = inspectBundle(bundle, path.relative(root, absolute).replaceAll("\\", "/"));
-    return { entry, effectCalls: diagnoseEffectCalls(bundle?.provenance?.effects) };
+    return { entry, effectCalls: diagnoseEffectCalls(bundle?.provenance?.effects), bundle };
   });
   const entries = records.map(({ entry }) => entry);
   return {

@@ -385,6 +385,15 @@
       ],
       "interpretation": "This reports the recorded entry function row separately from module-wide inventory. It is diagnostic only and does not prove complete runtime reachability, host capture or R3 readiness."
     },
+    "reproducibilityEvidence": {
+      "embeddedInputSnapshotBundles": 11,
+      "declaredEmbeddedInputSnapshotCount": 11,
+      "ciVerifiedExecutionBundles": 29,
+      "ciVerifiedReplayBundles": 29,
+      "numericComparisonNotClaimedBundles": 29,
+      "numericToleranceAssessmentBundles": 0,
+      "interpretation": "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels are recorded evidence and are not re-executed by this diagnostic; numeric tolerance assessment requires metric-specific scientific review."
+    },
     "notAssessed": [
       "Whether an operation resolves to a typed function or intrinsic",
       "Whether external inputs are fully captured and privacy-safe",
