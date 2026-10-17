@@ -12093,6 +12093,43 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
+    let source = temp_source(
+        "temperature_point_measurement_boundary",
+        "import std.measurements\n\
+         fn main() -> Void {\n\
+         point = temperature_point(20.0, \"degC\")\n\
+         measured = Measurement { value: point, sources: [], known: true, reason: \"\" }\n\
+         print(measured.value)\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter generic-record probe failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "20 degC (absolute)\n"
+    );
+
+    let native = run(&["--native-type-report", &source]);
+    assert!(
+        !native.status.success(),
+        "Measurement<TemperaturePoint> escaped through native AST fallback"
+    );
+    assert!(
+        stderr(&native).contains(
+            "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
+        ),
+        "native measurement boundary diagnostic was unclear: {}",
+        stderr(&native)
+    );
+    let _ = fs::remove_file(source);
+}
+
+#[test]
 fn temperature_point_native_backend_matches_interpreter() {
     let file_arg = fixture_path("temperature_point_affine.ostrin.txt");
     let interpreted = run(&["--run", &file_arg]);
@@ -12332,6 +12369,56 @@ fn temperature_point_arithmetic_rejects_overflow_in_interpreter_and_native() {
         }
         let _ = fs::remove_file(&source);
     }
+}
+
+#[test]
+fn temperature_point_conversion_rejects_overflow_in_interpreter_and_native() {
+    let source = temp_source(
+        "temperature_point_conversion_overflow",
+        "fn main() -> Void {\n\
+         point = temperature_point(1.7e308, \"K\")\n\
+         print(temperature_point_to(point, \"degF\"))\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &source]);
+    assert!(!interpreted.status.success());
+    assert!(
+        stderr(&interpreted).contains("absolute temperature arithmetic overflowed"),
+        "unexpected interpreter diagnostic: {}",
+        stderr(&interpreted)
+    );
+
+    for (backend, ast_fallback) in [("IR", false), ("AST fallback", true)] {
+        let exe = temp_artifact(&format!(
+            "temperature_point_conversion_overflow_{backend}.exe"
+        ));
+        let compile_args = ["--compile", "--out", &exe, &source];
+        let compiled = if ast_fallback {
+            run_with_env(&compile_args, "OSTRIN_NO_IR_CODEGEN", "1")
+        } else {
+            run(&compile_args)
+        };
+        assert!(
+            compiled.status.success(),
+            "{backend} compile failed: {}",
+            stderr(&compiled)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run native conversion overflow case");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            !native.status.success(),
+            "{backend} accepted conversion overflow"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr)
+                .contains("absolute temperature arithmetic overflowed"),
+            "unexpected {backend} diagnostic: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+    let _ = fs::remove_file(source);
 }
 
 #[test]

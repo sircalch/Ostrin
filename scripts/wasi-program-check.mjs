@@ -37,6 +37,12 @@ const programs = [
     expectedError: "absolute temperature arithmetic overflowed",
   },
   {
+    name: "temperature_point_conversion_overflow",
+    source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
+    args: ["temperature_point_conversion_overflow.wasm"],
+    expectedError: "absolute temperature arithmetic overflowed",
+  },
+  {
     name: "pkg_project",
     project: "examples/pkg_project/main_app",
     args: ["pkg_project.wasm"],

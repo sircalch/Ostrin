@@ -140,6 +140,15 @@ La incertidumbre debe tener la misma dimensión que el valor. `2 m ± 0.1 s` deb
 tipos. Las operaciones combinan dimensiones con las reglas existentes de `Quantity` y combinan
 la incertidumbre con la regla matemática correspondiente.
 
+`TemperaturePoint` es una excepción de rol, no una `Quantity<Temperature>` lineal. Si se habilita
+una medición de punto absoluto, su valor nominal pertenecerá al espacio afín y la incertidumbre
+pertenecerá al intervalo lineal `Quantity<Temperature>`. En una conversión Celsius/Fahrenheit, el
+valor nominal aplica escala y offset; la incertidumbre aplica sólo el factor de escala. El modelo
+actual `Sensitivity { coefficient: Float, sigma: Float }` no guarda unidad ni dimensión de fuente,
+por lo que no puede expresar este contrato. El backend nativo rechaza actualmente
+`Measurement<TemperaturePoint>`; el almacenamiento genérico en el intérprete no habilita
+propagación, conversión ni salida científica para ese tipo.
+
 ### 5.2 Estados de conocimiento
 
 El diseño distingue explícitamente tres estados:

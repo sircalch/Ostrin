@@ -554,13 +554,22 @@ fn map_type_with_subst(
                 .iter()
                 .map(|a| map_type_with_subst(a, types, subst))
                 .collect::<Result<Vec<_>, _>>()?;
-            if (name == "Measurement" || name.ends_with("::Measurement"))
-                && concrete.iter().any(|arg| matches!(arg, CType::Quantity(_)))
-            {
-                return Err(
-                    "type 'Measurement<Quantity<D>>' is not supported by the native backend yet"
-                        .to_string(),
-                );
+            if name == "Measurement" || name.ends_with("::Measurement") {
+                if concrete.iter().any(|arg| matches!(arg, CType::Quantity(_))) {
+                    return Err(
+                        "type 'Measurement<Quantity<D>>' is not supported by the native backend yet"
+                            .to_string(),
+                    );
+                }
+                if concrete
+                    .iter()
+                    .any(|arg| matches!(arg, CType::TemperaturePoint))
+                {
+                    return Err(
+                        "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
+                            .to_string(),
+                    );
+                }
             }
             let mangled = instance_name(name, &concrete);
             types.seen.borrow_mut().push((name.clone(), concrete));
@@ -2336,6 +2345,23 @@ impl<'a> Codegen<'a> {
     }
 
     fn register_instance(&mut self, base: &str, args: &[CType]) -> Result<(), String> {
+        if base == "Measurement" || base.ends_with("::Measurement") {
+            if args.iter().any(|arg| matches!(arg, CType::Quantity(_))) {
+                return Err(
+                    "type 'Measurement<Quantity<D>>' is not supported by the native backend yet"
+                        .to_string(),
+                );
+            }
+            if args
+                .iter()
+                .any(|arg| matches!(arg, CType::TemperaturePoint))
+            {
+                return Err(
+                    "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
+                        .to_string(),
+                );
+            }
+        }
         let mangled = instance_name(base, args);
         if !self.instances_done.insert(mangled.clone()) {
             return Ok(());

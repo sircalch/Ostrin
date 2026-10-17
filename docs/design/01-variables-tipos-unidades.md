@@ -337,12 +337,12 @@ rol absoluto. Los puntos se pueden comparar, desplazar por intervalos de tempera
 entre sí; la diferencia resultante es un intervalo Kelvin. Ambos builtins rechazan escalas distintas
 de las tres permitidas; el constructor también rechaza valores no finitos. El intérprete y los backends nativos IR y AST ejecutan
 el tipo escalar; WASI también compila y ejecuta el caso en Node WASI Preview 1. Su matriz de
-30 programas comprueba además un desbordamiento de resta de puntos. No hay soporte de arrays ni de
+31 programas comprueba además desbordamientos de conversión y aritmética de puntos. No hay soporte de arrays ni de
 `Measurement<TemperaturePoint>`. El diseño separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
 reglas algebraicas distintas. Las sumas y diferencias de puntos también comprueban el resultado:
-si el cálculo produce un valor no finito, intérprete y backend nativo fallan con un diagnóstico de
-desbordamiento en vez de devolver `inf` o `NaN`.
+si el cálculo o la conversión produce un valor no finito, intérprete, backend nativo y WASI fallan
+con un diagnóstico de desbordamiento en vez de devolver `inf` o `NaN`.
 
 | Operación | Resultado | Regla |
 | --- | --- | --- |
@@ -402,13 +402,18 @@ ni de mediciones:
 | Construcción y unidades | `temperature_point(valor, escala)` crea explícitamente un punto finito y `temperature_point_to(punto, escala)` lo convierte preservando el rol. `n K` continúa siendo un intervalo. | Unidades afines definidas por el usuario; sólo están habilitadas las escalas K, degC y degF. |
 | Backends escalares | Paridad de salida entre intérprete, backend nativo IR y fallback AST; el programa también se ejecuta en WASI Preview 1. | No se infiere a partir de estas pruebas la seguridad universal de memoria ni el soporte de otros tipos de payload. |
 | Arrays | La conversión actual de `Array<Quantity<Temperature>>` conserva la semántica lineal y aplica solo factores. | Los arrays de `TemperaturePoint`, conversión de offset elemento a elemento y preservación del rol en arrays aún no están implementados. |
-| Medición y persistencia | No habilitado para puntos absolutos. | `Measurement<TemperaturePoint>`, propagación de incertidumbre, serialización y persistencia de puntos requieren diseño y pruebas propios. |
+| Medición y persistencia | El intérprete puede almacenar un `Measurement<TemperaturePoint>` como record genérico; el backend nativo ahora lo rechaza explícitamente. | La propagación de incertidumbre, la conversión y la persistencia requieren definir la dimensión de la incertidumbre como intervalo y probarla en todos los backends. |
 
 La matriz no habilita `Measurement<TemperaturePoint>` automáticamente: ese tipo seguirá bloqueado
 hasta que el modelo de `Measurement` y sus fuentes de incertidumbre lo soporte en intérprete, IR,
 backends y pruebas analíticas. Los casos de ownership gestionado, `Phi`, reemplazo de campos y
 destrucción deberán incluir `live_allocations=0` además de ASan/UBSan; los checks de tipo por sí
 solos no demuestran ese contrato.
+Para un punto absoluto, el valor medido usa el espacio afín mientras su incertidumbre tiene que
+usar el intervalo lineal `Quantity<Temperature>`: al convertir escalas, el valor recibe el offset y
+la incertidumbre sólo el factor. El modelo actual de `Sensitivity` no guarda unidades de fuente y
+no puede demostrar esta regla; por eso una construcción genérica que el intérprete almacena no se
+considera soporte científico del backend.
 
 La compatibilidad conserva `n K` como el `Quantity<Temperature>` lineal que ya existe, con su
 aritmética y conversiones actuales. El catálogo marca K como perteneciente al espacio afín
