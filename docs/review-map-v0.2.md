@@ -1,8 +1,8 @@
 # v0.2 foundation review map
 
-This map divides the draft integration PR into reviewable subsystems. It records
-the current claims and their evidence; it is not a substitute for the final
-head's CI or a release approval.
+This map divides the v0.2.0 implementation and release evidence into reviewable
+subsystems. It records the current claims and their evidence; it is not a
+substitute for the final source revision's CI or a release approval.
 
 | Subsystem | Main files | Primary claim | Validation | Review risk / open boundary |
 |---|---|---|---|---|
