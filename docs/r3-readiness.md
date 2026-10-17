@@ -47,8 +47,11 @@ regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públ
 del runner (`RUNNER_OS`, arquitectura, imagen, Node, WASI y hardware visible del proceso);
 no se guardan hostname, usuario ni rutas privadas. La acción conserva además el reporte
 R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
-`ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
-campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.
+`ostrin-r3-host-evidence-<run_id>` durante 90 días, y lo sube solo después de que terminen
+correctamente los replays, las comprobaciones web y los demás gates de distribución de ese job.
+Si una de esas comprobaciones falla, no se publica el paquete como evidencia verificada. La
+verificación local mantiene el campo ausente para que un checkout de desarrollador no se presente
+como una ejecución CI.
 
 La ejecución CI del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d` completó el mismo gate con
 captura auténtica: **29/29 READY**, 29/29 capturas de host válidas, 29/29 filas de entrada cerradas,
