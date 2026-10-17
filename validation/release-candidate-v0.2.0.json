@@ -4,10 +4,10 @@
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
   "candidateIdentifier": "v0.2.0-rc.d0abbad",
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
-  "evidenceRevisionMeaning": "Fixed post-merge evidence base: this main commit contains the reviewed publication procedure, release notes, release workflow and structural R3 capture validation. The RC binaries remain sourced only from sourceRevision. Generated candidate metadata records this evidence revision afterward, avoiding self-reference.",
-  "releaseTag": null,
-  "finalReleaseSourceRevision": null,
-  "releaseProvenancePolicy": "The RC artifacts below were built from sourceRevision only. A final release must be rebuilt from the exact authorized v0.2.0 tag; its artifacts and SHA-256 values must be recorded from that tag workflow and must not reuse these RC hashes.",
+  "evidenceRevisionMeaning": "Fixed pre-publication evidence base for readiness checks. The post-tag release workflow outputs are recorded separately below, avoiding self-referential metadata.",
+  "releaseTag": "v0.2.0",
+  "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
+  "releaseProvenancePolicy": "RC artifacts below remain scoped to sourceRevision. Final assets were freshly built from the exact v0.2.0 tag pointing to finalReleaseSourceRevision; the final checksums below identify only the published assets.",
   "preparedAt": "2026-10-15T04:33:49Z",
   "nativeWorkflow": {
     "runId": 38681320600,
@@ -116,6 +116,25 @@
     "wasiRun": "https://github.com/sircalch/Ostrin/actions/runs/38681318079",
     "releaseBuildRun": "https://github.com/sircalch/Ostrin/actions/runs/38681320600"
   },
-  "tagCreated": false,
-  "published": false
+  "finalReleaseEvidence": {
+    "tagObjectSha": "5bcdb290104dfa37a8e3655c8c2550af6e643983",
+    "peeledTagCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
+    "releaseUrl": "https://github.com/sircalch/Ostrin/releases/tag/v0.2.0",
+    "publishedAt": "2026-10-15T22:15:21Z",
+    "workflowRunId": 38815035506,
+    "workflowRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38815035506",
+    "workflowConclusion": "success",
+    "downloadedAssetsAndSidecarsVerified": true,
+    "allRunnerExtractionAndSmokeTestsPassed": true,
+    "wasiProgramMatrixCount": 28,
+    "wasiModuleCount": 29,
+    "assets": [
+      { "target": "x86_64-unknown-linux-gnu", "archive": "ostrinc-v0.2.0-x86_64-unknown-linux-gnu.tar.gz", "sha256": "bd08a86d012beec3226fb9049e75bdf0b5e5e9e7e4e4a9d3623ace29870353f2", "sidecar": "ostrinc-v0.2.0-x86_64-unknown-linux-gnu.tar.gz.sha256", "sidecarSha256": "a160782d881d4590b5e61073e5a45bf55a72b4d8cb1e11affabe4fb1481f1a04" },
+      { "target": "aarch64-apple-darwin", "archive": "ostrinc-v0.2.0-aarch64-apple-darwin.tar.gz", "sha256": "5448bf8b11293957123014553ccaa795f4c9737a40f47a7290269e4d8c41a5df", "sidecar": "ostrinc-v0.2.0-aarch64-apple-darwin.tar.gz.sha256", "sidecarSha256": "13fe17bc888c21957e3cd14972c8a2a780a8996cb7cfc738ca6b29540affde30" },
+      { "target": "x86_64-pc-windows-msvc", "archive": "ostrinc-v0.2.0-x86_64-pc-windows-msvc.zip", "sha256": "1547b324f66bf871e215c192742fdb45971561d02ed68bc3c3f95c83a6576a3b", "sidecar": "ostrinc-v0.2.0-x86_64-pc-windows-msvc.zip.sha256", "sidecarSha256": "df20d71cfd0f1620c26eb5663c4f1803d3e5daa6b3d7599a612e36a98ea3b92d" },
+      { "target": "wasm32-wasip1", "archive": "ostrinc-v0.2.0-wasm32-wasip1.tar.gz", "sha256": "09aa3ee310134395bf42cf9cc8f1dcf4947fecdfeb53a2ec9e0ee7c51004c6f8", "sidecar": "ostrinc-v0.2.0-wasm32-wasip1.tar.gz.sha256", "sidecarSha256": "ff787d3d61ecd5bc7697144e652b5ad86bd937ceedbc391b0b60dbf736e7ff34" }
+    ]
+  },
+  "tagCreated": true,
+  "published": true
 }

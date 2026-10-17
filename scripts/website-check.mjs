@@ -176,6 +176,7 @@ for (const page of [...publicPages.map((name) => `website/${name}`), "README.md"
   }
   if (released) {
     check(!/not (?:yet )?published|not published yet|prepared, not yet/i.test(text), `${page}: says the release is unpublished, but v${facts.version} is recorded as published`);
+    check(!/is a release candidate in preparation|is in candidate preparation/i.test(text), `${page}: still describes v${facts.version} as a release candidate in preparation`);
   }
 }
 

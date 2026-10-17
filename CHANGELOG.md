@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (candidate)
+## 0.2.0 (2026-10-15)
 
 ### Release summary
 
@@ -29,7 +29,7 @@
 
 ### Compatibility and known limitations
 
-- This candidate builds on the experimental v0.1.0 compiler/runtime line. The
+- This release builds on the experimental v0.1.0 compiler/runtime line. The
   0.x compatibility policy permits diagnostics, generated IR details and
   experimental APIs to change before a stable 1.0 contract.
 - Dynamic trait ownership is verified only for the combinations listed in
@@ -37,11 +37,11 @@
   are not implied to work through IR/C. `Measurement<Quantity<D>>` and
   `Array<Measurement<T>>` remain explicitly guarded. Static effect semantics,
   complete R3 provenance and cross-platform numerical equivalence are not
-  delivered by this candidate.
-- This is a release candidate description, not a published release. The v0.2
-  candidate is versioned `0.2.0`; readiness depends on its checksummed,
-  extracted and smoke-tested platform artifacts. The final release tag and
-  publication remain deferred for explicit owner authorization.
+  delivered by this release.
+- The published `v0.2.0` release was built from its exact annotated tag. Linux,
+  macOS ARM64, Windows x64 and WASI Preview 1 artifacts passed checksum,
+  extraction and smoke verification. Their final hashes are recorded in
+  `validation/release-candidate-v0.2.0.json` and are distinct from RC hashes.
 
 ### Scientific measurement ownership
 
