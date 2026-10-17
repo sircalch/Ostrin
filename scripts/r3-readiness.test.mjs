@@ -531,8 +531,8 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles <= report.bundleCount);
   assert.ok(reproducibilityEvidence.declaredEmbeddedInputSnapshotCount > 0);
   assert.equal(reproducibilityEvidence.ciVerifiedExecutionBundles, 29);
-  assert.equal(reproducibilityEvidence.ciVerifiedReplayBundles, 29);
+  assert.equal(reproducibilityEvidence.recordedVerifiedReplayBundles, report.bundleCount);
   assert.equal(reproducibilityEvidence.numericComparisonNotClaimedBundles, 29);
-  assert.equal(reproducibilityEvidence.numericToleranceAssessmentBundles, 0);
+  assert.equal(reproducibilityEvidence.numericPolicyToleranceMentionBundles, report.bundleCount);
   assert.match(reproducibilityEvidence.interpretation, /do not establish completeness/i);
 });

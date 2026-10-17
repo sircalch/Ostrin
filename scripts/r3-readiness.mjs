@@ -287,9 +287,9 @@ function buildGapDiagnostics(records) {
     embeddedInputSnapshotBundles: 0,
     declaredEmbeddedInputSnapshotCount: 0,
     ciVerifiedExecutionBundles: 0,
-    ciVerifiedReplayBundles: 0,
+    recordedVerifiedReplayBundles: 0,
     numericComparisonNotClaimedBundles: 0,
-    numericToleranceAssessmentBundles: 0,
+    numericPolicyToleranceMentionBundles: 0,
   };
 
   for (const { entry, effectCalls, bundle: sourceBundle } of records) {
@@ -297,18 +297,19 @@ function buildGapDiagnostics(records) {
     const provenance = sourceBundle?.provenance ?? {};
     const declaredSnapshots = Array.isArray(provenance.runtime?.input_snapshots)
       ? provenance.runtime.input_snapshots.filter((snapshot) =>
-        snapshot?.embedded === true && typeof snapshot.path === "string" && typeof snapshot.sha256 === "string")
+        snapshot?.embedded === true && typeof snapshot.path === "string"
+          && /^sha256:[a-f0-9]{64}$/.test(snapshot.sha256 ?? ""))
       : [];
     if (declaredSnapshots.length > 0) reproducibility.embeddedInputSnapshotBundles++;
     reproducibility.declaredEmbeddedInputSnapshotCount += declaredSnapshots.length;
     if (provenance.execution?.status === "verified-in-ci") reproducibility.ciVerifiedExecutionBundles++;
-    if (provenance.replay?.status === "verified") reproducibility.ciVerifiedReplayBundles++;
+    if (provenance.replay?.status === "verified") reproducibility.recordedVerifiedReplayBundles++;
     const numericPolicy = provenance.runtime?.platform_policy?.numeric;
     if (typeof numericPolicy === "string" && /not performed or claimed/i.test(numericPolicy)) {
       reproducibility.numericComparisonNotClaimedBundles++;
     }
-    if (typeof numericPolicy === "string" && /tolerances?\s+(?:are\s+)?(?:declared|specified|defined)/i.test(numericPolicy)) {
-      reproducibility.numericToleranceAssessmentBundles++;
+    if (typeof numericPolicy === "string" && /tolerances?/i.test(numericPolicy)) {
+      reproducibility.numericPolicyToleranceMentionBundles++;
     }
     for (const field of entry.r3Extensions.missing) {
       if (!missingFields.has(field)) missingFields.set(field, new Set());
@@ -444,7 +445,7 @@ function buildGapDiagnostics(records) {
     entrypointEffects,
     reproducibilityEvidence: {
       ...reproducibility,
-      interpretation: "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels are recorded evidence and are not re-executed by this diagnostic; numeric tolerance assessment requires metric-specific scientific review.",
+      interpretation: "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels and recorded replay statuses are not re-executed by this diagnostic; mentioning numeric tolerances does not mean they were assessed or scientifically justified.",
     },
     notAssessed: [
       "Whether an operation resolves to a typed function or intrinsic",
