@@ -20,6 +20,9 @@ test("source edits and unrelated generated files remain visible as dirty", () =>
 
 test("scorecard separates closed entry rows from module-wide symbolic effect inventory", async () => {
   const scorecard = await buildScorecard();
+  assert.equal(scorecard.metricsScope, "current-repository-evidence");
+  assert.equal(scorecard.sourceRevisionScope, "v0.2-release-candidate-artifacts");
+  assert.equal(scorecard.sources.numericalValidation, "validation/numeric/windows-local.json");
   assert.equal(scorecard.r3.readyCount + scorecard.r3.openCount, scorecard.r3.bundleCount);
   assert.equal(scorecard.r3.status,
     scorecard.r3.readyCount === scorecard.r3.bundleCount ? "READY" : "OPEN");
@@ -41,6 +44,6 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
   assert.equal(scorecard.numericalValidation.emittedValuesCompared, 136);
   assert.equal(scorecard.numericalValidation.fftCases, 4);
   assert.match(scorecard.numericalValidation.fftReference, /direct O\(n\^2\) DFT/i);
-  assert.equal(scorecard.numericalValidation.ci, "pending");
+  assert.equal(scorecard.numericalValidation.ci, "unattributed");
   assert.equal(scorecard.numericalValidation.ciRunUrl, null);
 });

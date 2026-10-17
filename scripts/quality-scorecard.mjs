@@ -173,7 +173,7 @@ function numericalValidationStatus(sourceRevision) {
     fftReference: contract.cases?.fft?.reference ?? "not declared",
     maximumAbsoluteDifference: report.parity?.maximumAbsoluteDifference ?? null,
     leakCheck: report.leakCheck ?? "missing",
-    ci: ciMatchesEvidence ? "verified" : "pending",
+    ci: ciMatchesEvidence ? "verified" : "unattributed",
     ciRunUrl: ciMatchesEvidence ? report.ci.run_url : null,
   };
 }
@@ -201,7 +201,9 @@ export async function buildScorecard() {
   const workingTreeDirty = hasDirtySourceChanges(workingTreeSourcePaths());
   return {
     schema: "ostrin.quality-scorecard/v1",
+    metricsScope: "current-repository-evidence",
     sourceRevision: candidateEvidence.sourceRevision,
+    sourceRevisionScope: "v0.2-release-candidate-artifacts",
     evidenceRevision: candidateEvidence.evidenceRevision,
     releaseTag: candidateEvidence.releaseTag,
     finalReleaseSourceRevision: candidateEvidence.finalReleaseSourceRevision,
@@ -211,6 +213,7 @@ export async function buildScorecard() {
       ownership: "docs/ownership-matrix.md",
       readiness: readinessPath,
       reproducibility: "scripts/experiment-bundle.mjs",
+      numericalValidation: "validation/numeric/windows-local.json",
       tests: "compiler/tests",
     },
     tests: { rustMarkedTests: countTests() },

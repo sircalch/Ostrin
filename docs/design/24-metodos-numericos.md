@@ -154,7 +154,7 @@ Las tolerancias están acotadas a estos casos pequeños y bien condicionados: no
 garantía universal ni sustituyen pruebas de convergencia o análisis de condicionamiento para problemas
 grandes. Además de validar cada backend contra la referencia analítica o la DFT directa independiente,
 la compuerta compara las hojas numéricas de los informes de intérprete y nativo con una tolerancia
-explícita independiente; la ejecución actual compara 70 valores y obtiene diferencia máxima cero.
+explícita independiente; la ejecución actual compara 80 valores resumidos y 136 valores emitidos, con diferencia máxima cero en ambos conjuntos.
 La compuerta también exige
 `live_allocations=0` en el ejecutable nativo. CI la ejecuta en
 Linux, macOS y Windows, y conserva `numeric-validation-report.json` como artefacto por plataforma;
