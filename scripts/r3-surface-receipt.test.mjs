@@ -12,6 +12,17 @@ const canonicalJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const expectedRun = { runId: "1234", testedSha: "b".repeat(40) };
 const fakeWasm = Buffer.from("test-only WASM bytes");
 
+test("Pages deploys when any surface replay evidence producer changes", () => {
+  const workflow = readFileSync(path.join(repositoryRoot, ".github/workflows/pages.yml"), "utf8");
+  for (const source of [
+    "scripts/r3-surface-receipt.mjs",
+    "scripts/experiment-replay.mjs",
+    "scripts/lab-data.mjs",
+  ]) {
+    assert.ok(workflow.split(/\r?\n/).includes(`      - '${source}'`), `${source} is missing from Pages push paths`);
+  }
+});
+
 function capturedSurface() {
   const bundle = JSON.parse(readFileSync(bundlePath, "utf8"));
   bundle.provenance.runtime.host = {
