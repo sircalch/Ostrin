@@ -35,6 +35,9 @@ El estado local sólo es `verified` si los hashes SHA-256 del contrato y el fixt
 coinciden con los archivos actuales, el binario utilizado tiene un hash registrado,
 y cada resumen FFT queda dentro de las tolerancias declaradas. El hash del binario
 identifica la ejecución local; no acredita por sí solo qué commit lo compiló.
+Los hashes de los dos archivos de texto se calculan con saltos de línea LF
+normalizados para que el mismo contenido coincida en Windows, Linux y macOS;
+el hash del compilador corresponde a sus bytes originales.
 
 El archivo incluye el commit fuente para que un informe histórico pueda
 reproducirse. No presenta como verdes los criterios que siguen abiertos en el

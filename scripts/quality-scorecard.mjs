@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { repositoryRoot } from "./experiment-bundle.mjs";
 import { buildReadiness as buildR3Readiness } from "./r3-readiness.mjs";
 import { readinessPath } from "./v0.2-readiness-check.mjs";
-import { checkTolerance, directDft } from "./numeric-validation.mjs";
+import { canonicalTextSha256, checkTolerance, directDft } from "./numeric-validation.mjs";
 
 function text(file) {
   return readFileSync(path.join(repositoryRoot, file), "utf8");
@@ -137,15 +136,11 @@ function countNumericLeaves(value) {
   return 0;
 }
 
-function sha256(file) {
-  return createHash("sha256").update(readFileSync(file)).digest("hex");
-}
-
 export function hasMatchingNumericInputs(report, root = repositoryRoot) {
   const contractFile = path.join(root, "validation/numeric/matrix_algorithms.json");
   const fixtureFile = path.join(root, "validation/numeric/matrix_algorithms.ostrin");
-  return report.inputs?.contractSha256 === sha256(contractFile)
-    && report.inputs?.fixtureSha256 === sha256(fixtureFile)
+  return report.inputs?.contractSha256 === canonicalTextSha256(readFileSync(contractFile, "utf8"))
+    && report.inputs?.fixtureSha256 === canonicalTextSha256(readFileSync(fixtureFile, "utf8"))
     && /^[0-9a-f]{64}$/.test(report.inputs?.compilerSha256 ?? "");
 }
 

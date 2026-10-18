@@ -7,8 +7,8 @@
   },
   "fixture": "validation/numeric/matrix_algorithms.ostrin",
   "inputs": {
-    "contractSha256": "6620eb5ecd20862b3385cb8dc8469d9247051a1315303c38f9c858a1dee0989d",
-    "fixtureSha256": "cbde35f0f504272200a718e9b9a5301e57cd2823a5a76cad78e71055273726ce",
+    "contractSha256": "dd81369eb3df243c728a738e39a1c92b9c26963d7c0d603b89d796657b0018d4",
+    "fixtureSha256": "55b46ea3ce062a6307b515ae41f89ee4809d2e57bd59647bc74b3277c80b258a",
     "compilerSha256": "12fa596b4d24c2b822b21302a36a25f2054ba69793ac9b81edcc9d7029cbd692"
   },
   "environment": {

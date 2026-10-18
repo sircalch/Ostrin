@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkTolerance, compareNumericOutputs, compareReports, directDft, parseEmittedNumbers, validateFft } from "./numeric-validation.mjs";
+import { canonicalTextSha256, checkTolerance, compareNumericOutputs, compareReports, directDft, parseEmittedNumbers, validateFft } from "./numeric-validation.mjs";
+
+test("text provenance hashes are stable across LF and CRLF checkouts", () => {
+  assert.equal(canonicalTextSha256("signal\nprint 1\n"), canonicalTextSha256("signal\r\nprint 1\r\n"));
+  assert.notEqual(canonicalTextSha256("signal\nprint 1\n"), canonicalTextSha256("signal\nprint 2\n"));
+});
 
 test("CI provenance is only emitted when GitHub Actions identifies a run", () => {
   const previous = {

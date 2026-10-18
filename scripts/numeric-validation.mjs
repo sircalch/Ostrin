@@ -18,6 +18,10 @@ function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
 
+export function canonicalTextSha256(content) {
+  return createHash("sha256").update(content.replaceAll("\r\n", "\n"), "utf8").digest("hex");
+}
+
 function run(command, args, label) {
   const result = spawnSync(command, args, { cwd: repositoryRoot, encoding: "utf8", timeout: 120_000 });
   if (result.error) throw new Error(`${label}: ${result.error.message}`);
@@ -392,8 +396,8 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
     reference: contract.reference,
     fixture: contract.fixture,
     inputs: {
-      contractSha256: sha256(path.join(root, "validation/numeric/matrix_algorithms.json")),
-      fixtureSha256: sha256(source),
+      contractSha256: canonicalTextSha256(readFileSync(path.join(root, "validation/numeric/matrix_algorithms.json"), "utf8")),
+      fixtureSha256: canonicalTextSha256(readFileSync(source, "utf8")),
       compilerSha256: sha256(compiler),
     },
     environment: {
