@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildScorecard, hasCompleteFftCases, hasDirtySourceChanges, hasMatchingNumericInputs } from "./quality-scorecard.mjs";
+import { buildScorecard, hasCompleteFftCases, hasCompleteNumericRuns, hasDirtySourceChanges, hasMatchingNumericCi, hasMatchingNumericInputs } from "./quality-scorecard.mjs";
 
 const contract = JSON.parse(readFileSync(new URL("../validation/numeric/matrix_algorithms.json", import.meta.url), "utf8"));
 const numericReport = JSON.parse(readFileSync(new URL("../validation/numeric/windows-local.json", import.meta.url), "utf8"));
@@ -21,6 +21,42 @@ test("numeric scorecard ties the local report to the current contract and fixtur
   const altered = structuredClone(numericReport);
   altered.inputs.fixtureSha256 = "0".repeat(64);
   assert.equal(hasMatchingNumericInputs(altered), false);
+});
+
+test("numeric scorecard rejects missing matrix sections and truncated output counts", () => {
+  assert.equal(hasCompleteNumericRuns(numericReport, contract), true);
+  for (const backend of ["interpreter", "native"]) {
+    for (const name of ["lu", "cholesky", "qr", "svd", "eigen"]) {
+      const altered = structuredClone(numericReport);
+      delete altered.runs[backend][name];
+      altered.parity.comparedValues -= 1;
+      assert.equal(hasCompleteNumericRuns(altered, contract), false, `${backend}.${name}`);
+    }
+  }
+  const missingResidual = structuredClone(numericReport);
+  delete missingResidual.runs.native.lu.absoluteResidual;
+  assert.equal(hasCompleteNumericRuns(missingResidual, contract), false);
+  const outOfTolerance = structuredClone(numericReport);
+  outOfTolerance.runs.interpreter.qr.orthogonalityResidual.value = 1e9;
+  assert.equal(hasCompleteNumericRuns(outOfTolerance, contract), false);
+  const truncatedOutput = structuredClone(numericReport);
+  truncatedOutput.emittedOutputParity.comparedValues -= 1;
+  assert.equal(hasCompleteNumericRuns(truncatedOutput, contract), false);
+});
+
+test("numeric CI attribution uses the current tested revision, never the historical RC revision", () => {
+  const currentRevision = "f".repeat(40);
+  const attributed = structuredClone(numericReport);
+  attributed.ci = {
+    provider: "github-actions",
+    commit: currentRevision,
+    run_id: "39100071045",
+    run_url: "https://github.com/sircalch/Ostrin/actions/runs/39100071045",
+  };
+  assert.equal(hasMatchingNumericCi(attributed, currentRevision), true);
+  assert.equal(hasMatchingNumericCi(attributed, "d0abbad0f674317c95c389b953507365f3fd1a59"), false);
+  attributed.ci.run_url = "https://github.com/sircalch/Ostrin/actions/runs/other";
+  assert.equal(hasMatchingNumericCi(attributed, currentRevision), false);
 });
 
 test("generated website evidence does not mark a clean source snapshot dirty", () => {

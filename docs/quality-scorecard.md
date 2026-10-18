@@ -33,11 +33,21 @@ Ese archivo documenta una ejecución reproducible local; no sustituye el enlace
 de CI exigido por el gate de release.
 El estado local sólo es `verified` si los hashes SHA-256 del contrato y el fixture
 coinciden con los archivos actuales, el binario utilizado tiene un hash registrado,
-y cada resumen FFT queda dentro de las tolerancias declaradas. El hash del binario
-identifica la ejecución local; no acredita por sí solo qué commit lo compiló.
+los seis informes LU/Cholesky/QR/SVD/autovalores/FFT están completos en ambos
+backends, los residuales quedan dentro de las tolerancias declaradas y los conteos
+de 80 valores resumidos y 136 emitidos coinciden con el contrato. Reducir el conteo
+de paridad dentro del propio reporte no puede convertir un informe truncado en verde.
+El hash del binario identifica la ejecución local; no acredita por sí solo qué
+commit lo compiló.
 Los hashes de los dos archivos de texto se calculan con saltos de línea LF
 normalizados para que el mismo contenido coincida en Windows, Linux y macOS;
 el hash del compilador corresponde a sus bytes originales.
+
+La atribución `ci=verified` exige que el commit y la URL de GitHub Actions del
+reporte coincidan con la revisión actual que ejecuta el scorecard. La revisión
+fuente del candidato v0.2 permanece separada en `sourceRevision`; no se usa para
+atribuir validaciones numéricas posteriores. Un reporte local sin procedencia CI
+permanece `unattributed` aunque pase la validación numérica.
 
 El archivo incluye el commit fuente para que un informe histórico pueda
 reproducirse. No presenta como verdes los criterios que siguen abiertos en el

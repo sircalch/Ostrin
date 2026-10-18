@@ -136,6 +136,77 @@ function countNumericLeaves(value) {
   return 0;
 }
 
+function hasExactKeys(value, names) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === names.length
+    && names.every((name) => Object.hasOwn(value, name));
+}
+
+function finiteArray(value, length) {
+  return Array.isArray(value) && value.length === length
+    && value.every((item) => typeof item === "number" && Number.isFinite(item));
+}
+
+function completeResidual(value, testCase, field) {
+  if (!hasExactKeys(value, ["value", "limit", "scale"])) return false;
+  if (![value.value, value.limit, value.scale].every((item) => typeof item === "number" && Number.isFinite(item) && item >= 0)) return false;
+  const expectedLimit = field === "relativeBackwardError"
+    ? testCase.relative
+    : testCase.absolute + testCase.relative * value.scale;
+  return value.limit === expectedLimit && value.value <= expectedLimit;
+}
+
+const matrixSummaryFields = Object.freeze({
+  lu: ["solution", "absoluteResidual", "relativeBackwardError", "maximumForwardError", "relativeFactorizationResidual", "triangularStructureResidual"],
+  cholesky: ["solution", "absoluteResidual", "relativeBackwardError", "maximumForwardError", "relativeFactorizationResidual", "triangularStructureResidual"],
+  qr: ["relativeReconstructionResidual", "orthogonalityResidual", "triangularStructureResidual"],
+  svd: ["relativeReconstructionResidual", "uOrthogonalityResidual", "vOrthogonalityResidual", "singularValues"],
+  eigen: ["relativeEigenResidual", "orthogonalityResidual", "eigenvalues"],
+});
+
+function completeMatrixSummary(name, summary, testCase) {
+  const fields = matrixSummaryFields[name];
+  if (!fields || !hasExactKeys(summary, fields)) return false;
+  for (const field of fields) {
+    if (field === "solution") {
+      if (!finiteArray(summary.solution, testCase.solution?.length)) return false;
+    } else if (field === "singularValues") {
+      if (!finiteArray(summary.singularValues, testCase.singular_values?.length)) return false;
+    } else if (field === "eigenvalues") {
+      if (!finiteArray(summary.eigenvalues, testCase.eigenvalues?.length)) return false;
+    } else if (field === "maximumForwardError") {
+      if (typeof summary.maximumForwardError !== "number" || !Number.isFinite(summary.maximumForwardError)
+        || summary.maximumForwardError < 0) return false;
+    } else if (!completeResidual(summary[field], testCase, field)) return false;
+  }
+  return true;
+}
+
+export function hasCompleteNumericRuns(report, contract) {
+  const cases = contract?.cases;
+  const caseNames = [...Object.keys(matrixSummaryFields), "fft"];
+  if (!hasExactKeys(cases, caseNames)
+    || !Number.isSafeInteger(contract.expected_report_values) || contract.expected_report_values <= 0
+    || !Number.isSafeInteger(contract.expected_emitted_values) || contract.expected_emitted_values <= 0
+    || report.parity?.comparedValues !== contract.expected_report_values
+    || report.emittedOutputParity?.comparedValues !== contract.expected_emitted_values) return false;
+  return ["interpreter", "native"].every((backend) => {
+    const run = report.runs?.[backend];
+    return hasExactKeys(run, caseNames)
+      && Object.keys(matrixSummaryFields).every((name) => completeMatrixSummary(name, run[name], cases[name]))
+      && hasCompleteFftCases(run.fft, cases.fft)
+      && countNumericLeaves(run) === contract.expected_report_values;
+  });
+}
+
+export function hasMatchingNumericCi(report, currentRevision) {
+  return report.ci?.provider === "github-actions"
+    && report.ci.commit === currentRevision
+    && /^[0-9a-f]{40}$/.test(currentRevision)
+    && /^\d+$/.test(String(report.ci.run_id ?? ""))
+    && report.ci.run_url === `https://github.com/sircalch/Ostrin/actions/runs/${report.ci.run_id}`;
+}
+
 export function hasMatchingNumericInputs(report, root = repositoryRoot) {
   const contractFile = path.join(root, "validation/numeric/matrix_algorithms.json");
   const fixtureFile = path.join(root, "validation/numeric/matrix_algorithms.ostrin");
@@ -152,7 +223,8 @@ export function hasCompleteFftCases(fftReport, fftContract) {
     return names.every((name) => {
       const testCase = cases[name];
       const result = fftReport[name];
-      if (!result || !Array.isArray(testCase.signal) || testCase.signal.length === 0) return false;
+      if (!hasExactKeys(result, ["spectralResidual", "maximumReconstructionError", "parsevalResidual", "inputEnergy", "spectralEnergy"])
+        || !Array.isArray(testCase.signal) || testCase.signal.length === 0) return false;
       const reference = directDft(testCase.signal);
       const spectralScale = Math.max(0, ...reference.re.map(Math.abs), ...reference.im.map(Math.abs));
       const reconstructionScale = Math.max(0, ...testCase.signal.map(Math.abs));
@@ -173,7 +245,7 @@ export function hasCompleteFftCases(fftReport, fftContract) {
   }
 }
 
-function numericalValidationStatus(sourceRevision) {
+function numericalValidationStatus(currentRevision) {
   const reportPath = path.join(repositoryRoot, "validation/numeric/windows-local.json");
   if (!existsSync(reportPath)) return { local: "missing", ci: "pending" };
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
@@ -185,19 +257,15 @@ function numericalValidationStatus(sourceRevision) {
   const fftCasesComplete = hasCompleteFftCases(interpreterFft, contract.cases?.fft)
     && hasCompleteFftCases(nativeFft, contract.cases?.fft);
   const inputIntegrity = hasMatchingNumericInputs(report);
-  const comparedValues = countNumericLeaves(report.runs?.interpreter);
+  const comparedValues = report.parity?.comparedValues ?? 0;
   const emittedValuesCompared = report.emittedOutputParity?.comparedValues ?? 0;
   const localPass = report.leakCheck === "live_allocations=0"
-    && comparedValues > 0
-    && report.parity?.comparedValues === comparedValues
+    && hasCompleteNumericRuns(report, contract)
     && report.parity?.maximumAbsoluteDifference === 0
-    && emittedValuesCompared > 0
     && report.emittedOutputParity?.maximumAbsoluteDifference === 0
     && inputIntegrity
     && fftCasesComplete;
-  const ciMatchesEvidence = localPass
-    && typeof report.ci?.run_url === "string"
-    && report.ci.commit === sourceRevision;
+  const ciMatchesEvidence = localPass && hasMatchingNumericCi(report, currentRevision);
   return {
     local: localPass ? "verified" : "invalid",
     platform: report.environment?.platform ?? "unknown",
@@ -254,7 +322,7 @@ export async function buildScorecard() {
     tests: { rustMarkedTests: countTests() },
     nativeBackend: native,
     ownership: ownershipCounts(),
-    numericalValidation: numericalValidationStatus(candidateEvidence.sourceRevision),
+    numericalValidation: numericalValidationStatus(git(["rev-parse", "HEAD"])),
     effectCoverage: effectCoverageStatus(),
     reproducibility: await reproducibilityCounts(),
     r3: (() => {
