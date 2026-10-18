@@ -173,23 +173,48 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
   return errors;
 }
 
-function main() {
-  if (!process.argv.includes("--verify")) {
-    throw new Error("usage: node scripts/r3-surface-receipt.mjs --verify");
+function verifyFiles(bundleFile, receiptFile, wasmFile, expectedRun, { requireFreshBundle = true } = {}) {
+  for (const file of [bundleFile, receiptFile, wasmFile]) {
+    if (!existsSync(file)) throw new Error(`missing ${file}`);
   }
-  if (!existsSync(receiptPath)) throw new Error(`missing ${path.relative(repositoryRoot, receiptPath)}`);
-  if (!existsSync(wasmPath)) throw new Error("website/ostrinc.wasm is missing");
-  const checked = verifyBundleFile(bundlePath, "surface");
-  if (!checked.ok) throw new Error(`source-backed surface bundle failed: ${checked.errors.join("; ")}`);
-  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  // CI can regenerate its own host capture and reject stale generated files.
+  // An archived capture belongs to a different host, so offline verification
+  // uses the source revision and file hashes checked by verifySurfaceReceipt.
+  if (requireFreshBundle) {
+    const checked = verifyBundleFile(bundleFile, "surface");
+    if (!checked.ok) throw new Error(`source-backed surface bundle failed: ${checked.errors.join("; ")}`);
+  }
+  const receipt = JSON.parse(readFileSync(receiptFile, "utf8"));
   const errors = verifySurfaceReceipt(
     receipt,
-    readFileSync(bundlePath, "utf8"),
-    readFileSync(wasmPath),
-    { runId: process.env.GITHUB_RUN_ID, testedSha: process.env.GITHUB_SHA },
+    readFileSync(bundleFile, "utf8"),
+    readFileSync(wasmFile),
+    expectedRun,
   );
   if (errors.length) throw new Error(errors.join("; "));
   console.log(`r3-surface-receipt: verified surface replay in CI run ${receipt.ciRun.run_id} at ${receipt.ciRun.tested_sha}`);
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  if (args.length === 1 && args[0] === "--verify") {
+    verifyFiles(bundlePath, receiptPath, wasmPath,
+      { runId: process.env.GITHUB_RUN_ID, testedSha: process.env.GITHUB_SHA });
+    return;
+  }
+  const [mode, directory, runFlag, runId, shaFlag, testedSha] = args;
+  if (args.length !== 6 || mode !== "--verify-artifact" || runFlag !== "--run-id"
+    || shaFlag !== "--tested-sha" || !/^\d+$/.test(runId ?? "") || !/^[a-f0-9]{40}$/.test(testedSha ?? "")) {
+    throw new Error("usage: node scripts/r3-surface-receipt.mjs --verify | --verify-artifact <directory> --run-id <id> --tested-sha <sha>");
+  }
+  const root = path.resolve(directory);
+  verifyFiles(
+    path.join(root, "website/assets/experiments/surface.ostrin-experiment.json"),
+    path.join(root, "target/r3-ci/surface-replay-receipt.json"),
+    path.join(root, "website/ostrinc.wasm"),
+    { runId, testedSha },
+    { requireFreshBundle: false },
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

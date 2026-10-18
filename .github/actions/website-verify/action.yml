@@ -93,6 +93,7 @@ runs:
           validation/r3-readiness.json
           validation/quality-scorecard.json
           website/status-data.js
+          website/ostrinc.wasm
           website/assets/experiments/*.ostrin-experiment.json
           target/r3-ci/surface-replay-receipt.json
         if-no-files-found: error

@@ -58,6 +58,13 @@ node scripts/r3-surface-receipt.mjs --verify
 
 Estos comandos requieren el bundle host-bound y las variables de la ejecución de GitHub Actions;
 un checkout local ordinario no debe inventarlas.
+El artefacto del run también conserva `website/ostrinc.wasm`, los bundles y el recibo. Tras
+descargarlo, se puede verificar sin reconstruir el binario local (sustituye los valores por los
+del run y su `tested_sha` publicados en GitHub Actions):
+
+```text
+node scripts/r3-surface-receipt.mjs --verify-artifact <directorio-descargado> --run-id <id> --tested-sha <sha>
+```
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:
 

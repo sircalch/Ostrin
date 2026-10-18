@@ -116,7 +116,9 @@ la figura. Sólo después de ese replay emite `target/r3-ci/surface-replay-recei
 recibo liga los hashes de los cuatro archivos embebidos, el bundle completo, la fila de efectos
 cerrada de `main`, el SHA de los bytes WASM cargados por cada proceso hijo y el `run_id`/`tested_sha`
 capturados por el mismo job. El verificador vuelve a contrastarlos con el bundle, el binario
-WASM presente y el checkout que está ejecutando CI. El artefacto host-bound incluye el recibo;
+WASM presente y el checkout que está ejecutando CI. El artefacto host-bound incluye el recibo y
+los bytes WASM construidos por ese run, para verificar el paquete descargado sin sustituirlos
+por un binario local potencialmente distinto;
 el archivo se genera en una ruta ignorada y no se versiona.
 
 `fixtureSourceRevision` identifica el commit del programa fuente `examples/viz_surface.ostrin`;
