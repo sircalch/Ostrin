@@ -113,11 +113,10 @@ proposal. The
 native release workflow targets Linux x86_64, macOS arm64 and Windows x64; before upload it checks
 the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ostrin`, verifies the
 archive checksum, and runs both the extracted example and the packaged path-dependency project.
-The prepared compiler candidate version is `0.2.0`, an experimental developer release for Linux
-x86_64, macOS arm64 and Windows x64 archives with SHA-256 checksums ([candidate release notes](docs/releases/v0.2.0.md)).
-**Release status:** published as [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0)
-(2026-09-24); both installers have been verified against it on clean Linux, macOS and Windows
-runners by `.github/workflows/install-check.yml`. The public package registry
+Ostrin `0.2.0` is published as an experimental developer release for Linux x86_64, macOS ARM64,
+Windows x64 and WASI Preview 1, with SHA-256 verified archives ([release notes](docs/releases/v0.2.0.md),
+[GitHub release](https://github.com/sircalch/Ostrin/releases/tag/v0.2.0)). The installers resolve
+this version by default and verify the archive checksum before installation. The public package registry
 and additional distribution channels (Homebrew, winget, Scoop, Chocolatey, AUR) remain future
 work.
 
@@ -161,7 +160,7 @@ Unix (Linux x86_64 or macOS arm64):
 ```sh
 curl --fail --location https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.sh \
   --output /tmp/ostrinc-install.sh
-sh /tmp/ostrinc-install.sh --version 0.1.0
+sh /tmp/ostrinc-install.sh --version 0.2.0
 ```
 
 Windows PowerShell:
@@ -169,7 +168,7 @@ Windows PowerShell:
 ```powershell
 $installer = Join-Path $env:TEMP 'ostrinc-install.ps1'
 Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.ps1 -OutFile $installer
-powershell -ExecutionPolicy Bypass -File $installer -Version 0.1.0 -AddToPath
+powershell -ExecutionPolicy Bypass -File $installer -Version 0.2.0 -AddToPath
 ```
 
 Use `--install-dir` on Unix or `-InstallDir` on Windows to choose another destination. The

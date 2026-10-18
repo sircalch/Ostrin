@@ -57,6 +57,15 @@ test("the current v0.2 gate is ready with candidate release artifact evidence", 
   assert.equal(result.errors.length, 0);
 });
 
+test("published release instructions support macOS checksums and do not claim it is unpublished", () => {
+  const publication = readFileSync(path.join(repositoryRoot, "docs/releases/v0.2.0-publication.md"), "utf8");
+  const reviewMap = readFileSync(path.join(repositoryRoot, "docs/review-map-v0.2.md"), "utf8");
+  assert.match(publication, /command -v sha256sum[\s\S]*?command -v shasum[\s\S]*?shasum -a 256 --check/);
+  assert.match(reviewMap, /Release `v0\.2\.0` is now public/);
+  assert.doesNotMatch(reviewMap, /unpublished and untagged pending explicit owner authorization/i);
+  assert.doesNotMatch(reviewMap, /draft integration PR/i);
+});
+
 test("the gate rejects READY claims without evidence files", () => {
   const { root, manifest } = readyFixture();
   try {
