@@ -38,6 +38,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "emittedValuesCompared": 136,
     "fftCases": 4,
     "fftReference": "direct O(n^2) DFT in JavaScript; independent of Ostrin's radix-2 and fallback implementations",
+    "inputIntegrity": "verified",
     "maximumAbsoluteDifference": 0,
     "leakCheck": "live_allocations=0",
     "ci": "unattributed",
