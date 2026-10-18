@@ -65,7 +65,7 @@ verificación local mantiene el campo ausente para que un checkout de desarrolla
 como una ejecución CI.
 
 La ejecución CI del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d` completó el mismo gate con
-captura auténtica: **29/29 READY**, 29/29 capturas de host válidas, 29/29 filas de entrada cerradas,
+captura auténtica: **29/29 estructuralmente READY**, 29/29 capturas de host válidas, 29/29 filas de entrada cerradas,
 74 bordes simbólicos en el inventario global y cero bordes sin resolver. El workflow pasó la
 verificación `--require-capture` y las pruebas de readiness/scorecard. El paquete de evidencia de
 90 días está disponible como [artefacto de la ejecución 38859292510](https://github.com/sircalch/Ostrin/actions/runs/38859292510/artifacts/12028054775).
@@ -106,3 +106,34 @@ El cruce verifica consistencia estructural del manifiesto. No prueba que no exis
 externas ni que el contenido real coincida; esa verificación corresponde al replay que consume el
 snapshot. En el snapshot local hay 11 entradas externas con referencia embebida coincidente y
 capacidad `filesystem.read`, y 18 entradas de parámetros; esos números tampoco cierran R3.
+
+## Primer recibo de replay ligado a una ejecución
+
+El fixture `surface` es el primer corte de evidencia **adicional** a la captura estructural.
+Website CI ejecuta su replay R2 dentro de un directorio WASI aislado con `main.ostrin` y
+`data.json`, compara el SVG completo, y comprueba que cambiar el parámetro declarado modifica
+la figura. Sólo después de ese replay emite `target/r3-ci/surface-replay-receipt.json`. El
+recibo liga los hashes de los cuatro archivos embebidos, el bundle completo, la fila de efectos
+cerrada de `main`, el SHA de los bytes WASM cargados por cada proceso hijo y el `run_id`/`tested_sha`
+capturados por el mismo job. El verificador vuelve a contrastarlos con el bundle, el binario
+WASM presente y el checkout que está ejecutando CI. El artefacto host-bound incluye el recibo;
+el archivo se genera en una ruta ignorada y no se versiona.
+
+`fixtureSourceRevision` identifica el commit del programa fuente `examples/viz_surface.ostrin`;
+el verificador contrasta sus bytes con ese commit. `data.json` y `figure.svg` se identifican por
+sus hashes actuales en el bundle y el recibo, no se atribuyen a ese commit histórico.
+`ciRun.tested_sha` identifica el commit que ejecutó el workflow; en un PR puede ser el merge
+sintético. `compilerWasmSha256` identifica los bytes ejecutados. Son identidades distintas: el
+SHA del binario no demuestra por sí solo desde qué commit se construyó y el commit del fixture
+no es la revisión de construcción del compilador.
+
+El hijo WASI carga el binario por su cuenta. Por ello el digest se calcula **dentro del hijo**
+sobre los bytes que compila, y el replay rechaza cualquier cambio de módulo entre la ejecución
+base y la de sensibilidad. Un hash calculado sólo en el proceso padre no acreditaría ese enlace.
+
+Este recibo prueba el replay y la integridad para esa ejecución, en Node WASI Preview 1 y su
+host declarado. La captura de CI no es una atestación criptográfica independiente, el analizador
+de efectos sigue siendo experimental, y el recibo no demuestra equivalencia numérica entre
+plataformas ni completitud formal de entradas dinámicas. El scorecard público conserva **R3=0**
+y los 29 bundles versionados mantienen R0/R2; este corte no promociona automáticamente `surface`
+ni el inventario completo a R3.

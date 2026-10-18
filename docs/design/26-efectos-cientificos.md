@@ -213,11 +213,12 @@ equivalente.
 
 Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI y el soporte de
 tolerancias cruzadas sigue abierto. La ejecución CI `38860279280`, en el head
-`a1eb79bfde4782b82b96a1a1c7357332979a0893`, produjo evidencia host-bound con R3 `READY` para
+`a1eb79bfde4782b82b96a1a1c7357332979a0893`, produjo evidencia host-bound estructuralmente `READY` para
 29/29 bundles: 29 capturas auténticas, 29 filas de entrada cerradas, 74 bordes simbólicos globales
 y cero bordes sin resolver ([artefacto](https://github.com/sircalch/Ostrin/actions/runs/38860279280/artifacts/12028498290)).
-Ese estado acredita la ejecución capturada. El reporte local versionado sigue `OPEN` porque no
-incluye metadatos de host, y no se afirma equivalencia numérica entre plataformas. La release
+Ese estado acredita la captura estructural de esa ejecución y no promociona los bundles a R3.
+El reporte local versionado sigue `OPEN` porque no incluye metadatos de host, y no se afirma
+equivalencia numérica entre plataformas. La release
 `v0.2.0` ya fue publicada; su gate de release es distinto del nivel R3 de cada ejecución.
 
 ## 8. Inferencia y reglas del checker

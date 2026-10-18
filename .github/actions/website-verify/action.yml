@@ -73,13 +73,19 @@ runs:
         node --test scripts/lab-data-replay.test.mjs
         node scripts/experiment-replay.mjs --all
         node --test scripts/experiment-replay.test.mjs
+        node scripts/experiment-replay.mjs --fixture surface --write-r3-receipt
+        node scripts/r3-surface-receipt.mjs --verify
+        node --test scripts/r3-surface-receipt.test.mjs
+        node scripts/r3-readiness.mjs --require-ready
+        node scripts/quality-scorecard.mjs --write
+        node scripts/status-page.mjs --write
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs
         node --test scripts/experiment-bundle.test.mjs
         node scripts/provenance-page.mjs --check
         node scripts/website-check.mjs --wasm
         node scripts/distribution-check.mjs
-    - name: Upload verified host-bound R3 evidence
+    - name: Upload host capture and the verified surface replay receipt
       uses: actions/upload-artifact@v4
       with:
         name: ostrin-r3-host-evidence-${{ github.run_id }}
@@ -88,5 +94,6 @@ runs:
           validation/quality-scorecard.json
           website/status-data.js
           website/assets/experiments/*.ostrin-experiment.json
+          target/r3-ci/surface-replay-receipt.json
         if-no-files-found: error
         retention-days: 90

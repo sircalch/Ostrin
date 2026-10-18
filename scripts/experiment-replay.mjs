@@ -8,11 +8,12 @@
 // changes the rendered figure. It deliberately does not claim the
 // seeded-randomness R1 guarantee for fixtures that have not opted in.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildExperimentBundle, experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
-import { runWasm } from "./lab-data.mjs";
+import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
+import { createSurfaceReceipt, receiptPath } from "./r3-surface-receipt.mjs";
 
 const schema = "ostrin.experiment/v0";
 
@@ -178,12 +179,13 @@ function alternateInput(bundle, id) {
   return canonicalJson(alternate);
 }
 
-async function replay(id) {
+async function replay(id, { bindWasm = false, bundleText: suppliedBundleText } = {}) {
   const fixture = experimentFixtures[id];
   if (!fixture) throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
   const bundlePath = outputPathFor(id);
   if (!existsSync(bundlePath)) throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
-  const bundle = JSON.parse(readFileSync(bundlePath, "utf8"));
+  const bundleText = suppliedBundleText ?? readFileSync(bundlePath, "utf8");
+  const bundle = JSON.parse(bundleText);
   const errors = bundleErrors(bundle, id);
   if (errors.length) throw new Error(errors.join("\n"));
 
@@ -195,9 +197,22 @@ async function replay(id) {
 
   const modulePath = path.join(repositoryRoot, "website", "ostrinc.wasm");
   if (!existsSync(modulePath)) throw new Error(`${id}: website/ostrinc.wasm is missing`);
-  const module = await WebAssembly.compile(readFileSync(modulePath));
+  const module = bindWasm ? null : await WebAssembly.compile(readFileSync(modulePath));
+  let wasmSha256;
+  const execute = async (files) => {
+    if (!bindWasm) return runWasm(module, files, ["--run", "main.ostrin"]);
+    const observed = await runWasmWithEvidence(files, ["--run", "main.ostrin"]);
+    if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
+      throw new Error(`${id}: WASI child did not return a valid module execution digest`);
+    }
+    if (wasmSha256 && observed.wasmSha256 !== wasmSha256) {
+      throw new Error(`${id}: WASM module changed between replay executions`);
+    }
+    wasmSha256 = observed.wasmSha256;
+    return observed.lines;
+  };
   const files = { "main.ostrin": source, [inputFile]: input };
-  const output = await runWasm(module, files, ["--run", "main.ostrin"]);
+  const output = await execute(files);
   const recorded = bundle.provenance.figure_metadata;
   const metadata = {
     sourceHash: recorded.source_hash,
@@ -210,7 +225,7 @@ async function replay(id) {
   const seeded = bundle.reproducibility?.level === "R1"
     || bundle.provenance?.randomness?.status === "input-driven-r1";
   if (seeded) {
-    const repeatedOutput = await runWasm(module, files, ["--run", "main.ostrin"]);
+    const repeatedOutput = await execute(files);
     const repeated = normalizeFigureMetadata(extractSvg(repeatedOutput, id), metadata);
     if (repeated !== rendered) {
       throw new Error(`${id}: same input and seed produced different SVG output on replay`);
@@ -222,7 +237,7 @@ async function replay(id) {
   }
 
   const changedInput = alternateInput(bundle, id);
-  const changedOutput = await runWasm(module, { "main.ostrin": source, [inputFile]: changedInput }, ["--run", "main.ostrin"]);
+  const changedOutput = await execute({ "main.ostrin": source, [inputFile]: changedInput });
   const changedSvg = normalizeFigureMetadata(extractSvg(changedOutput, id), metadata);
   if (changedSvg === rendered) throw new Error(`${id}: changing a declared input did not change the rendered figure`);
 
@@ -233,6 +248,12 @@ async function replay(id) {
     baseline: "match",
     sensitivity: "changed-output",
     ...(seeded ? { seeded: "same-seed-and-changed-output" } : {}),
+    ...(bindWasm ? {
+      wasmSha256,
+      bundleSha256: sha256(bundleText),
+      fileHashes: Object.fromEntries(["source.ostrin", "data.json", "figure.svg", "provenance.json"]
+        .map((name) => [name, sha256(bundle.files[name])])),
+    } : {}),
   };
 }
 
@@ -247,6 +268,7 @@ export async function replayAll() {
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes("--all")) {
+    if (args.includes("--write-r3-receipt")) throw new Error("--write-r3-receipt requires --fixture surface");
     if (args.some((argument) => argument === "--fixture" || argument.startsWith("--fixture="))) {
       throw new Error("--all cannot be combined with --fixture");
     }
@@ -262,7 +284,15 @@ async function main() {
   if (!args.includes("--fixture") && !args.some((argument) => argument.startsWith("--fixture="))) {
     throw new Error("usage: node scripts/experiment-replay.mjs --fixture <id> | --all");
   }
-  const result = await replay(id);
+  const writeR3Receipt = args.includes("--write-r3-receipt");
+  if (writeR3Receipt && id !== "surface") throw new Error("--write-r3-receipt is supported only for surface");
+  const result = await replay(id, { bindWasm: writeR3Receipt });
+  if (writeR3Receipt) {
+    const receipt = createSurfaceReceipt(readFileSync(outputPathFor(id), "utf8"), result);
+    mkdirSync(path.dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+    console.log(`experiment-replay: wrote ${path.relative(repositoryRoot, receiptPath)}`);
+  }
   const seeded = result.seeded ? `; ${result.seeded}` : "";
   console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity}${seeded})`);
 }
