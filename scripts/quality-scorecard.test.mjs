@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildScorecard, hasDirtySourceChanges } from "./quality-scorecard.mjs";
+import { readFileSync } from "node:fs";
+import { buildScorecard, hasCompleteFftCases, hasDirtySourceChanges, hasMatchingNumericInputs } from "./quality-scorecard.mjs";
+
+const contract = JSON.parse(readFileSync(new URL("../validation/numeric/matrix_algorithms.json", import.meta.url), "utf8"));
+const numericReport = JSON.parse(readFileSync(new URL("../validation/numeric/windows-local.json", import.meta.url), "utf8"));
+
+test("FFT scorecard requires each residual within its declared tolerance", () => {
+  const fft = structuredClone(numericReport.runs.interpreter.fft);
+  assert.equal(hasCompleteFftCases(fft, contract.cases.fft), true);
+  fft.radix2_n8.spectralResidual = 1e9;
+  assert.equal(hasCompleteFftCases(fft, contract.cases.fft), false);
+  fft.radix2_n8.spectralResidual = numericReport.runs.interpreter.fft.radix2_n8.spectralResidual;
+  fft.radix2_n8.spectralEnergy += 1;
+  assert.equal(hasCompleteFftCases(fft, contract.cases.fft), false);
+});
+
+test("numeric scorecard ties the local report to the current contract and fixture", () => {
+  assert.equal(hasMatchingNumericInputs(numericReport), true);
+  const altered = structuredClone(numericReport);
+  altered.inputs.fixtureSha256 = "0".repeat(64);
+  assert.equal(hasMatchingNumericInputs(altered), false);
+});
 
 test("generated website evidence does not mark a clean source snapshot dirty", () => {
   assert.equal(hasDirtySourceChanges([
@@ -43,6 +64,7 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
   assert.equal(scorecard.numericalValidation.comparedValues, 80);
   assert.equal(scorecard.numericalValidation.emittedValuesCompared, 136);
   assert.equal(scorecard.numericalValidation.fftCases, 4);
+  assert.equal(scorecard.numericalValidation.inputIntegrity, "verified");
   assert.match(scorecard.numericalValidation.fftReference, /direct O\(n\^2\) DFT/i);
   assert.equal(scorecard.numericalValidation.ci, "unattributed");
   assert.equal(scorecard.numericalValidation.ciRunUrl, null);

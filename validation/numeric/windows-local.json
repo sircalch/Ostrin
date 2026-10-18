@@ -6,6 +6,11 @@
     "runtime_dependency": "none"
   },
   "fixture": "validation/numeric/matrix_algorithms.ostrin",
+  "inputs": {
+    "contractSha256": "6620eb5ecd20862b3385cb8dc8469d9247051a1315303c38f9c858a1dee0989d",
+    "fixtureSha256": "cbde35f0f504272200a718e9b9a5301e57cd2823a5a76cad78e71055273726ce",
+    "compilerSha256": "12fa596b4d24c2b822b21302a36a25f2054ba69793ac9b81edcc9d7029cbd692"
+  },
   "environment": {
     "platform": "win32",
     "architecture": "x64",

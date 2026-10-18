@@ -40,11 +40,14 @@ test("the numeric-output reader accepts full-precision finite values", () => {
     -0.7500000000000001,
     3.2e-14,
   ]);
+  assert.deepEqual(parseEmittedNumbers("   \r\n\t\n  -2.5  \n"), [-2.5]);
 });
 
 test("the numeric-output reader rejects NaN and unrelated text", () => {
   assert.throws(() => parseEmittedNumbers("NaN\n"), /non-finite/);
   assert.throws(() => parseEmittedNumbers("residual=0\n"), /non-finite/);
+  assert.throws(() => parseEmittedNumbers("0x10\n"), /non-decimal/);
+  assert.throws(() => parseEmittedNumbers("Infinity\n"), /non-finite/);
 });
 
 test("absolute and relative tolerances scale with the declared reference magnitude", () => {
@@ -53,6 +56,11 @@ test("absolute and relative tolerances scale with the declared reference magnitu
   assert.ok(Math.abs(accepted.limit - 3e-8) < 1e-23);
   assert.equal(accepted.scale, 10);
   assert.throws(() => checkTolerance("residual", 3.1e-8, 10, 1e-8, 2e-9), /exceeds abs/);
+  assert.throws(() => checkTolerance("residual", 0, 1, undefined, 1e-12), /finite nonnegative/);
+  assert.throws(() => checkTolerance("residual", 0, 1, 1e-12, -1), /finite nonnegative/);
+  assert.throws(() => checkTolerance("residual", 0, Number.NaN, 1e-12, 1e-12), /finite nonnegative/);
+  assert.throws(() => checkTolerance("residual", -1, 1, 1e-12, 1e-12), /finite and nonnegative/);
+  assert.throws(() => checkTolerance("residual", Number.POSITIVE_INFINITY, 1, 1e-12, 1e-12), /finite and nonnegative/);
 });
 
 test("interpreter and native reports require matching numeric leaves", () => {

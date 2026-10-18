@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { repositoryRoot } from "./experiment-bundle.mjs";
 import { buildReadiness as buildR3Readiness } from "./r3-readiness.mjs";
 import { readinessPath } from "./v0.2-readiness-check.mjs";
+import { checkTolerance, directDft } from "./numeric-validation.mjs";
 
 function text(file) {
   return readFileSync(path.join(repositoryRoot, file), "utf8");
@@ -135,6 +137,47 @@ function countNumericLeaves(value) {
   return 0;
 }
 
+function sha256(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+export function hasMatchingNumericInputs(report, root = repositoryRoot) {
+  const contractFile = path.join(root, "validation/numeric/matrix_algorithms.json");
+  const fixtureFile = path.join(root, "validation/numeric/matrix_algorithms.ostrin");
+  return report.inputs?.contractSha256 === sha256(contractFile)
+    && report.inputs?.fixtureSha256 === sha256(fixtureFile)
+    && /^[0-9a-f]{64}$/.test(report.inputs?.compilerSha256 ?? "");
+}
+
+export function hasCompleteFftCases(fftReport, fftContract) {
+  const cases = fftContract?.cases ?? {};
+  const names = Object.keys(cases);
+  if (!fftReport || names.length === 0 || Object.keys(fftReport).length !== names.length) return false;
+  try {
+    return names.every((name) => {
+      const testCase = cases[name];
+      const result = fftReport[name];
+      if (!result || !Array.isArray(testCase.signal) || testCase.signal.length === 0) return false;
+      const reference = directDft(testCase.signal);
+      const spectralScale = Math.max(0, ...reference.re.map(Math.abs), ...reference.im.map(Math.abs));
+      const reconstructionScale = Math.max(0, ...testCase.signal.map(Math.abs));
+      const inputEnergy = testCase.signal.reduce((sum, value) => sum + value ** 2, 0);
+      if (result.inputEnergy !== inputEnergy
+        || !Number.isFinite(result.spectralEnergy) || result.spectralEnergy < 0
+        || result.parsevalResidual !== Math.abs(result.spectralEnergy / testCase.signal.length - inputEnergy)) return false;
+      checkTolerance(`${name} spectral summary`, result.spectralResidual,
+        spectralScale, testCase.absolute, testCase.relative);
+      checkTolerance(`${name} reconstruction summary`, result.maximumReconstructionError,
+        reconstructionScale, testCase.absolute, testCase.relative);
+      checkTolerance(`${name} Parseval summary`, result.parsevalResidual,
+        inputEnergy, testCase.absolute, testCase.relative);
+      return true;
+    });
+  } catch {
+    return false;
+  }
+}
+
 function numericalValidationStatus(sourceRevision) {
   const reportPath = path.join(repositoryRoot, "validation/numeric/windows-local.json");
   if (!existsSync(reportPath)) return { local: "missing", ci: "pending" };
@@ -144,14 +187,9 @@ function numericalValidationStatus(sourceRevision) {
   const interpreterFft = report.runs?.interpreter?.fft ?? {};
   const nativeFft = report.runs?.native?.fft ?? {};
   const fftCaseNames = Object.keys(interpreterFft);
-  const hasCompleteFftCases = (fftReport) => expectedFftCases.length > 0
-    && Object.keys(fftReport).length === expectedFftCases.length
-    && expectedFftCases.every((name) => {
-      const result = fftReport[name];
-      return result && ["spectralResidual", "maximumReconstructionError", "parsevalResidual"]
-        .every((metric) => Number.isFinite(result[metric]));
-    });
-  const fftCasesComplete = hasCompleteFftCases(interpreterFft) && hasCompleteFftCases(nativeFft);
+  const fftCasesComplete = hasCompleteFftCases(interpreterFft, contract.cases?.fft)
+    && hasCompleteFftCases(nativeFft, contract.cases?.fft);
+  const inputIntegrity = hasMatchingNumericInputs(report);
   const comparedValues = countNumericLeaves(report.runs?.interpreter);
   const emittedValuesCompared = report.emittedOutputParity?.comparedValues ?? 0;
   const localPass = report.leakCheck === "live_allocations=0"
@@ -160,6 +198,7 @@ function numericalValidationStatus(sourceRevision) {
     && report.parity?.maximumAbsoluteDifference === 0
     && emittedValuesCompared > 0
     && report.emittedOutputParity?.maximumAbsoluteDifference === 0
+    && inputIntegrity
     && fftCasesComplete;
   const ciMatchesEvidence = localPass
     && typeof report.ci?.run_url === "string"
@@ -171,6 +210,7 @@ function numericalValidationStatus(sourceRevision) {
     emittedValuesCompared,
     fftCases: fftCasesComplete ? expectedFftCases.length : fftCaseNames.length,
     fftReference: contract.cases?.fft?.reference ?? "not declared",
+    inputIntegrity: inputIntegrity ? "verified" : "invalid",
     maximumAbsoluteDifference: report.parity?.maximumAbsoluteDifference ?? null,
     leakCheck: report.leakCheck ?? "missing",
     ci: ciMatchesEvidence ? "verified" : "unattributed",

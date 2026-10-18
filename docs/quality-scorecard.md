@@ -31,6 +31,10 @@ El repositorio conserva además el último resultado local de Windows en
 [`validation/numeric/windows-local.json`](../validation/numeric/windows-local.json).
 Ese archivo documenta una ejecución reproducible local; no sustituye el enlace
 de CI exigido por el gate de release.
+El estado local sólo es `verified` si los hashes SHA-256 del contrato y el fixture
+coinciden con los archivos actuales, el binario utilizado tiene un hash registrado,
+y cada resumen FFT queda dentro de las tolerancias declaradas. El hash del binario
+identifica la ejecución local; no acredita por sí solo qué commit lo compiló.
 
 El archivo incluye el commit fuente para que un informe histórico pueda
 reproducirse. No presenta como verdes los criterios que siguen abiertos en el

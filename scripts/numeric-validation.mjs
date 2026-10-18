@@ -3,6 +3,7 @@
 // Validate scientific matrix algorithms using independent residual calculations.
 // This tooling is intentionally outside the Ostrin runtime and has no production dependencies.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +13,10 @@ export const contractPath = path.join(repositoryRoot, "validation/numeric/matrix
 const outputDirectory = path.join(repositoryRoot, "target/numeric-validation");
 const parityAbsolute = 1e-13;
 const parityRelative = 1e-12;
+
+function sha256(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
 
 function run(command, args, label) {
   const result = spawnSync(command, args, { cwd: repositoryRoot, encoding: "utf8", timeout: 120_000 });
@@ -23,8 +28,15 @@ function run(command, args, label) {
 export function parseEmittedNumbers(output) {
   const values = [];
   for (const line of output.replaceAll("\r\n", "\n").split("\n")) {
-    if (!line) continue;
-    const value = Number(line.trim());
+    const numericText = line.trim();
+    if (!numericText) continue;
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(numericText)) {
+      if (!Number.isFinite(Number(numericText))) {
+        throw new Error(`numeric output contains a non-finite value: ${line}`);
+      }
+      throw new Error(`numeric output contains a non-decimal value: ${line}`);
+    }
+    const value = Number(numericText);
     if (!Number.isFinite(value)) throw new Error(`numeric output contains a non-finite value: ${line}`);
     values.push(value);
   }
@@ -132,8 +144,17 @@ export function compareNumericOutputs(interpreter, native) {
 }
 
 export function checkTolerance(label, observed, scale, absolute, relative) {
+  if (![scale, absolute, relative].every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0)) {
+    throw new Error(`${label}: tolerance contract requires finite nonnegative scale, absolute and relative values`);
+  }
+  if (!Number.isFinite(observed) || observed < 0) {
+    throw new Error(`${label}: observed residual must be finite and nonnegative`);
+  }
   const limit = absolute + relative * scale;
-  if (!Number.isFinite(observed) || observed > limit) {
+  if (!Number.isFinite(limit)) {
+    throw new Error(`${label}: tolerance limit is non-finite`);
+  }
+  if (observed > limit) {
     throw new Error(`${label} residual ${observed} exceeds abs ${absolute} + rel ${relative} × scale ${scale} = ${limit}`);
   }
   return { value: observed, limit, scale };
@@ -370,6 +391,11 @@ export function validateNumerics({ root = repositoryRoot, compiler, contract } =
     schema: contract.schema,
     reference: contract.reference,
     fixture: contract.fixture,
+    inputs: {
+      contractSha256: sha256(path.join(root, "validation/numeric/matrix_algorithms.json")),
+      fixtureSha256: sha256(source),
+      compilerSha256: sha256(compiler),
+    },
     environment: {
       platform: process.platform,
       architecture: process.arch,
