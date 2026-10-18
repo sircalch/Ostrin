@@ -43,27 +43,17 @@ runs:
       shell: bash
       env:
         OSTRIN_CAPTURE_HOST: "1"
+        OSTRIN_EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         node scripts/experiment-bundle.mjs --write-all
         node scripts/r3-readiness.mjs --write --require-capture
         node scripts/quality-scorecard.mjs --write
         node scripts/status-page.mjs --write
-    - name: Upload host-bound R3 evidence
-      if: ${{ always() }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: ostrin-r3-host-evidence-${{ github.run_id }}
-        path: |
-          validation/r3-readiness.json
-          validation/quality-scorecard.json
-          website/status-data.js
-          website/assets/experiments/*.ostrin-experiment.json
-        if-no-files-found: error
-        retention-days: 90
     - name: Validate website, WASM and distribution contracts
       shell: bash
       env:
         OSTRIN_CAPTURE_HOST: "1"
+        OSTRIN_EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         node scripts/linguist-check.mjs
         node --test scripts/linguist-check.test.mjs
@@ -89,3 +79,14 @@ runs:
         node scripts/provenance-page.mjs --check
         node scripts/website-check.mjs --wasm
         node scripts/distribution-check.mjs
+    - name: Upload verified host-bound R3 evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: ostrin-r3-host-evidence-${{ github.run_id }}
+        path: |
+          validation/r3-readiness.json
+          validation/quality-scorecard.json
+          website/status-data.js
+          website/assets/experiments/*.ostrin-experiment.json
+        if-no-files-found: error
+        retention-days: 90

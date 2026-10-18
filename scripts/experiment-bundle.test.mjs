@@ -181,26 +181,51 @@ test("the runtime snapshot follows the source project boundary", () => {
 });
 
 test("CI host capture is explicit and excludes private machine identity", () => {
-  const previous = process.env.OSTRIN_CAPTURE_HOST;
-  const previousOs = process.env.RUNNER_OS;
-  process.env.OSTRIN_CAPTURE_HOST = "1";
-  process.env.RUNNER_OS = "Linux";
+  const names = [
+    "OSTRIN_CAPTURE_HOST", "RUNNER_OS", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_RUN_ID",
+    "GITHUB_RUN_ATTEMPT", "GITHUB_EVENT_NAME", "GITHUB_REF", "GITHUB_SHA", "OSTRIN_EVIDENCE_HEAD_SHA",
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  Object.assign(process.env, {
+    OSTRIN_CAPTURE_HOST: "1",
+    RUNNER_OS: "Linux",
+    GITHUB_REPOSITORY: "sircalch/Ostrin",
+    GITHUB_WORKFLOW: "Ostrin CI",
+    GITHUB_RUN_ID: "1234",
+    GITHUB_RUN_ATTEMPT: "1",
+    GITHUB_EVENT_NAME: "pull_request",
+    GITHUB_REF: "refs/pull/193/merge",
+    GITHUB_SHA: "b".repeat(40),
+    OSTRIN_EVIDENCE_HEAD_SHA: "a".repeat(40),
+  });
   try {
     const host = buildExperimentBundle("provenance").provenance.runtime.host;
     assert.equal(host.schema, "ostrin.host/v1");
     assert.equal(host.source, "github-actions");
     assert.equal(host.runner_os, "Linux");
     assert.equal(host.captured, true);
+    assert.deepEqual(host.ci_run, {
+      schema: "ostrin.ci-run/v1",
+      repository: "sircalch/Ostrin",
+      workflow: "Ostrin CI",
+      run_id: "1234",
+      run_attempt: "1",
+      event: "pull_request",
+      ref: "refs/pull/193/merge",
+      head_sha: "a".repeat(40),
+      tested_sha: "b".repeat(40),
+      url: "https://github.com/sircalch/Ostrin/actions/runs/1234",
+    });
     assert.equal(host.hardware.arch, process.arch);
     assert.ok(Number.isInteger(host.hardware.cpu_count) && host.hardware.cpu_count > 0);
     assert.match(host.hardware.endianness, /^(LE|BE)$/);
     assert.equal(Object.hasOwn(host, "hostname"), false);
     assert.equal(Object.hasOwn(host, "username"), false);
   } finally {
-    if (previous === undefined) delete process.env.OSTRIN_CAPTURE_HOST;
-    else process.env.OSTRIN_CAPTURE_HOST = previous;
-    if (previousOs === undefined) delete process.env.RUNNER_OS;
-    else process.env.RUNNER_OS = previousOs;
+    for (const name of names) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
   }
 });
 
