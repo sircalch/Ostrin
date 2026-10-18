@@ -33,5 +33,7 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Verify static site and all browser engines
         uses: ./.github/actions/website-verify

@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Build and verify the website/playground
         uses: ./.github/actions/website-verify
       - name: Configure Pages
