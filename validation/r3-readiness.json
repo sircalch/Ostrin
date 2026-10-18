@@ -1,6 +1,13 @@
 {
   "schema": "ostrin.r3-readiness/v1",
   "status": "OPEN",
+  "inventory": {
+    "expectedCount": 29,
+    "discoveredCount": 29,
+    "missing": [],
+    "unexpected": [],
+    "status": "READY"
+  },
   "requiredFields": [
     "provenance.commit",
     "provenance.compiler",

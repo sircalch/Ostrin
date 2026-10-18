@@ -13,6 +13,10 @@ Pages CI captura metadatos del runner y usa `node scripts/r3-readiness.mjs
 --require-capture`; este modo valida que la captura esté completa y
 estructuralmente válida. Los metadatos de host por sí solos no bastan: R3 también
 requiere el contrato completo del bundle y una fila de efectos cerrada para el entrypoint.
+El auditor compara además el inventario encontrado con los fixtures registrados en
+`scripts/experiment-bundle.mjs`. Un directorio vacío, un bundle faltante o uno no
+registrado hace fallar tanto `--require-capture` como `--require-ready`; el conteo
+por sí solo no acredita que estén los archivos correctos.
 El gate estructural comprueba los valores declarados del contrato WASI (`schema`, estado
 parcial, target, Preview 1 y runner) y exige `host.source = github-actions`, además de
 campos públicos no vacíos del runner. Esto valida consistencia con el esquema de captura;

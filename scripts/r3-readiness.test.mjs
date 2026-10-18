@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
-import { runtimeSnapshotFor } from "./experiment-bundle.mjs";
-import { buildReadiness, diagnoseEffectCalls, diagnoseEntryEffectClosure, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { experimentFixtures, runtimeSnapshotFor } from "./experiment-bundle.mjs";
+import { buildReadiness, diagnoseEffectCalls, diagnoseEntryEffectClosure, inspectBundle, repositoryRoot, requiredCaptureErrors } from "./r3-readiness.mjs";
 
 const originalCaptureHost = process.env.OSTRIN_CAPTURE_HOST;
 delete process.env.OSTRIN_CAPTURE_HOST;
@@ -69,6 +72,52 @@ const validEffects = () => ({
     function: "main", effects: [], variables: [], open_calls: [], row_closed: true, purity_proven: false,
   },
   effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
+});
+
+test("R3 gates reject an empty, incomplete or unregistered bundle inventory", (t) => {
+  const tempParent = path.resolve(os.tmpdir());
+  const root = mkdtempSync(path.join(tempParent, "ostrin-r3-inventory-"));
+  t.after(() => {
+    assert.equal(path.dirname(root), tempParent);
+    assert.match(path.basename(root), /^ostrin-r3-inventory-/);
+    rmSync(root, { recursive: true, force: true });
+  });
+  const directory = path.join(root, "website/assets/experiments");
+  mkdirSync(directory, { recursive: true });
+  const fixtures = Object.values(experimentFixtures);
+  const first = fixtures[0];
+  const firstFile = path.basename(first.outputPath);
+
+  const empty = buildReadiness(root);
+  assert.equal(empty.status, "OPEN");
+  assert.equal(empty.bundleCount, 0);
+  assert.equal(empty.inventory.expectedCount, fixtures.length);
+  assert.equal(empty.inventory.missing.length, fixtures.length);
+  assert.equal(requiredCaptureErrors(empty).length, fixtures.length);
+  assert.deepEqual(requiredCaptureErrors({
+    entries: [], inventory: { expectedCount: 0, missing: [], unexpected: [] },
+  }), ["scripts/experiment-bundle.mjs: no registered experiment fixtures"]);
+
+  for (const fixture of fixtures.slice(1)) {
+    cpSync(path.join(repositoryRoot, fixture.outputPath), path.join(directory, path.basename(fixture.outputPath)));
+  }
+  const incomplete = buildReadiness(root);
+  assert.equal(incomplete.status, "OPEN");
+  assert.equal(incomplete.bundleCount, fixtures.length - 1);
+  assert.deepEqual(incomplete.inventory.missing, [firstFile]);
+  assert.match(requiredCaptureErrors(incomplete)[0], /registered bundle is missing/);
+
+  cpSync(path.join(repositoryRoot, first.outputPath), path.join(directory, firstFile));
+  const complete = buildReadiness(root);
+  assert.equal(complete.inventory.status, "READY");
+  assert.deepEqual(complete.inventory.missing, []);
+  assert.deepEqual(complete.inventory.unexpected, []);
+
+  cpSync(path.join(repositoryRoot, first.outputPath), path.join(directory, "unregistered.ostrin-experiment.json"));
+  const unexpected = buildReadiness(root);
+  assert.equal(unexpected.status, "OPEN");
+  assert.deepEqual(unexpected.inventory.unexpected, ["unregistered.ostrin-experiment.json"]);
+  assert.match(requiredCaptureErrors(unexpected)[0], /bundle is not registered/);
 });
 
 test("R3 readiness requires host, dependencies, scheduler and effects", () => {

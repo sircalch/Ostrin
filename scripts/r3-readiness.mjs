@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
+import { experimentFixtures, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const bundlesDirectory = path.join(repositoryRoot, "website/assets/experiments");
@@ -524,6 +524,17 @@ function buildGapDiagnostics(records) {
 export function buildReadiness(root = repositoryRoot) {
   const directory = path.join(root, "website/assets/experiments");
   const files = readdirSync(directory).filter((file) => file.endsWith(".ostrin-experiment.json")).sort();
+  const expectedFiles = Object.values(experimentFixtures).map((fixture) => path.basename(fixture.outputPath)).sort();
+  const discovered = new Set(files);
+  const expected = new Set(expectedFiles);
+  const inventory = {
+    expectedCount: expectedFiles.length,
+    discoveredCount: files.length,
+    missing: expectedFiles.filter((file) => !discovered.has(file)),
+    unexpected: files.filter((file) => !expected.has(file)),
+  };
+  inventory.status = expectedFiles.length > 0
+    && inventory.missing.length === 0 && inventory.unexpected.length === 0 ? "READY" : "OPEN";
   const records = files.map((file) => {
     const absolute = path.join(directory, file);
     const bundle = JSON.parse(readFileSync(absolute, "utf8"));
@@ -533,7 +544,8 @@ export function buildReadiness(root = repositoryRoot) {
   const entries = records.map(({ entry }) => entry);
   return {
     schema: "ostrin.r3-readiness/v1",
-    status: entries.every((entry) => entry.status === "READY") ? "READY" : "OPEN",
+    status: inventory.status === "READY" && entries.every((entry) => entry.status === "READY") ? "READY" : "OPEN",
+    inventory,
     requiredFields: requiredPaths,
     bundleCount: entries.length,
     baseReadyCount: entries.filter((entry) => entry.requiredFields.missing.length === 0).length,
@@ -557,7 +569,12 @@ export function buildReadiness(root = repositoryRoot) {
 }
 
 export function requiredCaptureErrors(report) {
-  return report.entries.flatMap((entry) => {
+  const inventoryErrors = [
+    ...(report.inventory?.expectedCount === 0 ? ["scripts/experiment-bundle.mjs: no registered experiment fixtures"] : []),
+    ...(report.inventory?.missing ?? []).map((file) => `website/assets/experiments/${file}: registered bundle is missing`),
+    ...(report.inventory?.unexpected ?? []).map((file) => `website/assets/experiments/${file}: bundle is not registered`),
+  ];
+  const entryErrors = report.entries.flatMap((entry) => {
     const errors = [];
     if (entry.requiredFields.missing.length > 0) {
       errors.push(`${entry.file}: missing required fields: ${entry.requiredFields.missing.join(", ")}`);
@@ -567,6 +584,7 @@ export function requiredCaptureErrors(report) {
     }
     return errors;
   });
+  return [...inventoryErrors, ...entryErrors];
 }
 
 async function main() {
