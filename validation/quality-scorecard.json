@@ -1,6 +1,8 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
+  "metricsScope": "current-repository-evidence",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
+  "sourceRevisionScope": "v0.2-release-candidate-artifacts",
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
   "releaseTag": "v0.2.0",
   "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
@@ -10,6 +12,7 @@
     "ownership": "docs/ownership-matrix.md",
     "readiness": "docs/release-readiness-v0.2.json",
     "reproducibility": "scripts/experiment-bundle.mjs",
+    "numericalValidation": "validation/numeric/windows-local.json",
     "tests": "compiler/tests"
   },
   "tests": {
@@ -30,11 +33,15 @@
   "numericalValidation": {
     "local": "verified",
     "platform": "win32",
-    "comparedValues": 60,
+    "comparedValues": 80,
+    "emittedValuesCompared": 136,
+    "fftCases": 4,
+    "fftReference": "direct O(n^2) DFT in JavaScript; independent of Ostrin's radix-2 and fallback implementations",
+    "inputIntegrity": "verified",
     "maximumAbsoluteDifference": 0,
     "leakCheck": "live_allocations=0",
-    "ci": "verified",
-    "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38681256328"
+    "ci": "unattributed",
+    "ciRunUrl": null
   },
   "effectCoverage": {
     "knownCalls": 20589,

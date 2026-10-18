@@ -1045,4 +1045,10 @@ test("public status dashboard exposes separate evidence dimensions", async ({ pa
   await expect(page.locator(".status-release strong")).toHaveText("READY");
   await expect(page.locator(".status-criterion")).toHaveCount(12);
   await expect(page.locator(".status-criterion.open")).toHaveCount(0);
+  const scorecard = await page.evaluate(() => globalThis.OSTRIN_STATUS);
+  await expect(page.locator("[data-status-metadata]")).toContainText("Dashboard metrics: repository evidence");
+  await expect(page.locator("[data-status-metadata]")).toContainText(`v0.2 RC binary source: ${scorecard.sourceRevision.slice(0, 12)}`);
+  await expect(page.locator("[data-status-numeric] .status-metric").last()).toContainText("UNATTRIBUTED");
+  await expect(page.locator("[data-status-numeric] .status-metric").nth(2)).toHaveClass(/ready/);
+  await expect(page.locator("[data-status-numeric] .status-metric").nth(2)).toContainText("FFT references");
 });

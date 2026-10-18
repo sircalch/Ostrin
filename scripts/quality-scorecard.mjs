@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { repositoryRoot } from "./experiment-bundle.mjs";
 import { buildReadiness as buildR3Readiness } from "./r3-readiness.mjs";
 import { readinessPath } from "./v0.2-readiness-check.mjs";
+import { canonicalTextSha256, checkTolerance, directDft } from "./numeric-validation.mjs";
 
 function text(file) {
   return readFileSync(path.join(repositoryRoot, file), "utf8");
@@ -126,21 +127,157 @@ function linguistStatus() {
   };
 }
 
-function numericalValidationStatus() {
+function countNumericLeaves(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? 1 : 0;
+  if (Array.isArray(value)) return value.reduce((total, item) => total + countNumericLeaves(item), 0);
+  if (value && typeof value === "object") {
+    return Object.values(value).reduce((total, item) => total + countNumericLeaves(item), 0);
+  }
+  return 0;
+}
+
+function hasExactKeys(value, names) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === names.length
+    && names.every((name) => Object.hasOwn(value, name));
+}
+
+function finiteArray(value, length) {
+  return Array.isArray(value) && value.length === length
+    && value.every((item) => typeof item === "number" && Number.isFinite(item));
+}
+
+function completeResidual(value, testCase, field) {
+  if (!hasExactKeys(value, ["value", "limit", "scale"])) return false;
+  if (![value.value, value.limit, value.scale].every((item) => typeof item === "number" && Number.isFinite(item) && item >= 0)) return false;
+  const expectedLimit = field === "relativeBackwardError"
+    ? testCase.relative
+    : testCase.absolute + testCase.relative * value.scale;
+  return value.limit === expectedLimit && value.value <= expectedLimit;
+}
+
+const matrixSummaryFields = Object.freeze({
+  lu: ["solution", "absoluteResidual", "relativeBackwardError", "maximumForwardError", "relativeFactorizationResidual", "triangularStructureResidual"],
+  cholesky: ["solution", "absoluteResidual", "relativeBackwardError", "maximumForwardError", "relativeFactorizationResidual", "triangularStructureResidual"],
+  qr: ["relativeReconstructionResidual", "orthogonalityResidual", "triangularStructureResidual"],
+  svd: ["relativeReconstructionResidual", "uOrthogonalityResidual", "vOrthogonalityResidual", "singularValues"],
+  eigen: ["relativeEigenResidual", "orthogonalityResidual", "eigenvalues"],
+});
+
+function completeMatrixSummary(name, summary, testCase) {
+  const fields = matrixSummaryFields[name];
+  if (!fields || !hasExactKeys(summary, fields)) return false;
+  for (const field of fields) {
+    if (field === "solution") {
+      if (!finiteArray(summary.solution, testCase.solution?.length)) return false;
+    } else if (field === "singularValues") {
+      if (!finiteArray(summary.singularValues, testCase.singular_values?.length)) return false;
+    } else if (field === "eigenvalues") {
+      if (!finiteArray(summary.eigenvalues, testCase.eigenvalues?.length)) return false;
+    } else if (field === "maximumForwardError") {
+      if (typeof summary.maximumForwardError !== "number" || !Number.isFinite(summary.maximumForwardError)
+        || summary.maximumForwardError < 0) return false;
+    } else if (!completeResidual(summary[field], testCase, field)) return false;
+  }
+  return true;
+}
+
+export function hasCompleteNumericRuns(report, contract) {
+  const cases = contract?.cases;
+  const caseNames = [...Object.keys(matrixSummaryFields), "fft"];
+  if (!hasExactKeys(cases, caseNames)
+    || !Number.isSafeInteger(contract.expected_report_values) || contract.expected_report_values <= 0
+    || !Number.isSafeInteger(contract.expected_emitted_values) || contract.expected_emitted_values <= 0
+    || report.parity?.comparedValues !== contract.expected_report_values
+    || report.emittedOutputParity?.comparedValues !== contract.expected_emitted_values) return false;
+  return ["interpreter", "native"].every((backend) => {
+    const run = report.runs?.[backend];
+    return hasExactKeys(run, caseNames)
+      && Object.keys(matrixSummaryFields).every((name) => completeMatrixSummary(name, run[name], cases[name]))
+      && hasCompleteFftCases(run.fft, cases.fft)
+      && countNumericLeaves(run) === contract.expected_report_values;
+  });
+}
+
+export function hasMatchingNumericCi(report, currentRevision) {
+  return report.ci?.provider === "github-actions"
+    && report.ci.commit === currentRevision
+    && /^[0-9a-f]{40}$/.test(currentRevision)
+    && /^\d+$/.test(String(report.ci.run_id ?? ""))
+    && report.ci.run_url === `https://github.com/sircalch/Ostrin/actions/runs/${report.ci.run_id}`;
+}
+
+export function hasMatchingNumericInputs(report, root = repositoryRoot) {
+  const contractFile = path.join(root, "validation/numeric/matrix_algorithms.json");
+  const fixtureFile = path.join(root, "validation/numeric/matrix_algorithms.ostrin");
+  return report.inputs?.contractSha256 === canonicalTextSha256(readFileSync(contractFile, "utf8"))
+    && report.inputs?.fixtureSha256 === canonicalTextSha256(readFileSync(fixtureFile, "utf8"))
+    && /^[0-9a-f]{64}$/.test(report.inputs?.compilerSha256 ?? "");
+}
+
+export function hasCompleteFftCases(fftReport, fftContract) {
+  const cases = fftContract?.cases ?? {};
+  const names = Object.keys(cases);
+  if (!fftReport || names.length === 0 || Object.keys(fftReport).length !== names.length) return false;
+  try {
+    return names.every((name) => {
+      const testCase = cases[name];
+      const result = fftReport[name];
+      if (!hasExactKeys(result, ["spectralResidual", "maximumReconstructionError", "parsevalResidual", "inputEnergy", "spectralEnergy"])
+        || !Array.isArray(testCase.signal) || testCase.signal.length === 0) return false;
+      const reference = directDft(testCase.signal);
+      const spectralScale = Math.max(0, ...reference.re.map(Math.abs), ...reference.im.map(Math.abs));
+      const reconstructionScale = Math.max(0, ...testCase.signal.map(Math.abs));
+      const inputEnergy = testCase.signal.reduce((sum, value) => sum + value ** 2, 0);
+      if (result.inputEnergy !== inputEnergy
+        || !Number.isFinite(result.spectralEnergy) || result.spectralEnergy < 0
+        || result.parsevalResidual !== Math.abs(result.spectralEnergy / testCase.signal.length - inputEnergy)) return false;
+      checkTolerance(`${name} spectral summary`, result.spectralResidual,
+        spectralScale, testCase.absolute, testCase.relative);
+      checkTolerance(`${name} reconstruction summary`, result.maximumReconstructionError,
+        reconstructionScale, testCase.absolute, testCase.relative);
+      checkTolerance(`${name} Parseval summary`, result.parsevalResidual,
+        inputEnergy, testCase.absolute, testCase.relative);
+      return true;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function numericalValidationStatus(currentRevision) {
   const reportPath = path.join(repositoryRoot, "validation/numeric/windows-local.json");
   if (!existsSync(reportPath)) return { local: "missing", ci: "pending" };
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
+  const contract = JSON.parse(text("validation/numeric/matrix_algorithms.json"));
+  const expectedFftCases = Object.keys(contract.cases?.fft?.cases ?? {});
+  const interpreterFft = report.runs?.interpreter?.fft ?? {};
+  const nativeFft = report.runs?.native?.fft ?? {};
+  const fftCaseNames = Object.keys(interpreterFft);
+  const fftCasesComplete = hasCompleteFftCases(interpreterFft, contract.cases?.fft)
+    && hasCompleteFftCases(nativeFft, contract.cases?.fft);
+  const inputIntegrity = hasMatchingNumericInputs(report);
+  const comparedValues = report.parity?.comparedValues ?? 0;
+  const emittedValuesCompared = report.emittedOutputParity?.comparedValues ?? 0;
   const localPass = report.leakCheck === "live_allocations=0"
-    && report.parity?.comparedValues === 60
-    && report.parity?.maximumAbsoluteDifference === 0;
+    && hasCompleteNumericRuns(report, contract)
+    && report.parity?.maximumAbsoluteDifference === 0
+    && report.emittedOutputParity?.maximumAbsoluteDifference === 0
+    && inputIntegrity
+    && fftCasesComplete;
+  const ciMatchesEvidence = localPass && hasMatchingNumericCi(report, currentRevision);
   return {
     local: localPass ? "verified" : "invalid",
     platform: report.environment?.platform ?? "unknown",
     comparedValues: report.parity?.comparedValues ?? 0,
+    emittedValuesCompared,
+    fftCases: fftCasesComplete ? expectedFftCases.length : fftCaseNames.length,
+    fftReference: contract.cases?.fft?.reference ?? "not declared",
+    inputIntegrity: inputIntegrity ? "verified" : "invalid",
     maximumAbsoluteDifference: report.parity?.maximumAbsoluteDifference ?? null,
     leakCheck: report.leakCheck ?? "missing",
-    ci: report.ci?.run_url ? "verified" : "pending",
-    ciRunUrl: report.ci?.run_url ?? null,
+    ci: ciMatchesEvidence ? "verified" : "unattributed",
+    ciRunUrl: ciMatchesEvidence ? report.ci.run_url : null,
   };
 }
 
@@ -167,7 +304,9 @@ export async function buildScorecard() {
   const workingTreeDirty = hasDirtySourceChanges(workingTreeSourcePaths());
   return {
     schema: "ostrin.quality-scorecard/v1",
+    metricsScope: "current-repository-evidence",
     sourceRevision: candidateEvidence.sourceRevision,
+    sourceRevisionScope: "v0.2-release-candidate-artifacts",
     evidenceRevision: candidateEvidence.evidenceRevision,
     releaseTag: candidateEvidence.releaseTag,
     finalReleaseSourceRevision: candidateEvidence.finalReleaseSourceRevision,
@@ -177,12 +316,13 @@ export async function buildScorecard() {
       ownership: "docs/ownership-matrix.md",
       readiness: readinessPath,
       reproducibility: "scripts/experiment-bundle.mjs",
+      numericalValidation: "validation/numeric/windows-local.json",
       tests: "compiler/tests",
     },
     tests: { rustMarkedTests: countTests() },
     nativeBackend: native,
     ownership: ownershipCounts(),
-    numericalValidation: numericalValidationStatus(),
+    numericalValidation: numericalValidationStatus(git(["rev-parse", "HEAD"])),
     effectCoverage: effectCoverageStatus(),
     reproducibility: await reproducibilityCounts(),
     r3: (() => {

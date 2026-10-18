@@ -49,8 +49,9 @@ function render() {
     numeric.replaceChildren(
       valueCard("Local", validation.local, `${validation.platform ?? "unknown"} report`, validation.local === "verified" ? "ready" : "open"),
       valueCard("Parity", String(validation.comparedValues ?? 0), `max Δ ${validation.maximumAbsoluteDifference ?? "—"}`, validation.local === "verified" ? "ready" : "open"),
-      valueCard("Leaks", validation.leakCheck, "native executable", validation.leakCheck === "live_allocations=0" ? "ready" : "open"),
-      valueCard("CI run", validation.ci === "verified" ? "VERIFIED" : "PENDING", "platform evidence", validation.ci === "verified" ? "ready" : "open"),
+      valueCard("FFT references", String(validation.fftCases ?? 0), "radix-2 and direct DFT cases", validation.local === "verified" && validation.fftCases > 0 ? "ready" : "open"),
+      valueCard("Leaks", validation.leakCheck, "native executable", validation.local === "verified" && validation.leakCheck === "live_allocations=0" ? "ready" : "open"),
+      valueCard("CI attribution", validation.ci === "verified" ? "VERIFIED" : "UNATTRIBUTED", validation.ci === "verified" ? "source-matched report" : "local report has no matching CI provenance", validation.ci === "verified" ? "ready" : "neutral"),
     );
   }
   if (effects && status.effectCoverage) {
@@ -87,10 +88,13 @@ function render() {
     ]),
     el("ul", { className: "status-criteria" }, criteria),
   );
-  const revision = status.sourceRevision?.slice(0, 12) ?? "unknown";
+  const rcRevision = status.sourceRevision?.slice(0, 12) ?? "unknown";
+  const releaseRevision = status.finalReleaseSourceRevision?.slice(0, 12);
   metadata.replaceChildren(
-    el("span", { text: `Scorecard source: ${revision}` }),
-    el("span", { text: status.workingTreeDirty ? "working tree has local changes" : "clean source snapshot" }),
+    el("span", { text: "Dashboard metrics: repository evidence" }),
+    el("span", { text: `v0.2 RC binary source: ${rcRevision}` }),
+    ...(releaseRevision ? [el("span", { text: `Published v0.2 binary source: ${releaseRevision}` })] : []),
+    el("span", { text: status.workingTreeDirty ? "repository source changed at generation" : "repository source clean at generation" }),
   );
 }
 

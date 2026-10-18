@@ -137,7 +137,7 @@ numérica se añade una compuerta separada en [`validation/numeric/matrix_algori
 factores y soluciones a precisión completa; JavaScript calcula los residuales de forma independiente,
 sin ser una dependencia del compilador ni del runtime.
 
-La matriz inicial cubre cinco algoritmos en el intérprete y en C nativo:
+La matriz inicial cubre seis algoritmos en el intérprete y en C nativo:
 
 | Algoritmo | Referencia | Métricas independientes |
 | --- | --- | --- |
@@ -146,14 +146,18 @@ La matriz inicial cubre cinco algoritmos en el intérprete y en C nativo:
 | QR fino | matriz rectangular de rango completo | `A − Q R`, `QᵀQ − I`, `R` triangular superior |
 | SVD fina | valores singulares analíticos de una matriz pequeña | `A − UΣVᵀ`, ortogonalidad de `U`/`V`, orden y valores singulares |
 | Autovalores simétricos | autovalores analíticos `1` y `3` | `A V − V Λ`, ortogonalidad y orden ascendente |
+| FFT | DFT directa independiente `O(n²)` sobre señales deterministas: longitudes 8 (radix-2) y 7 (ruta directa), singleton de longitud 1 y señal nula de longitud 8 | bins reales/imaginarios, reconstrucción IFFT e identidad de Parseval; cubre ambas rutas, el caso no vacío mínimo y energía cero |
 
 Cada caso declara tolerancias absoluta y relativa; para los sistemas lineales se normaliza el residuo
 con `||A||F ||x||2 + ||b||2`, y para factorizaciones se usa la norma Frobenius relativa a `||A||F`.
 Las tolerancias están acotadas a estos casos pequeños y bien condicionados: no constituyen una
 garantía universal ni sustituyen pruebas de convergencia o análisis de condicionamiento para problemas
-grandes. Además de validar cada backend contra la referencia analítica, la compuerta compara las
-hojas numéricas de los informes de intérprete y nativo con una tolerancia explícita independiente;
-la ejecución actual compara 60 valores y obtiene diferencia máxima cero. La compuerta también exige
+grandes. Además de validar cada backend contra la referencia analítica o la DFT directa independiente,
+la compuerta compara las hojas numéricas de los informes de intérprete y nativo con una tolerancia
+explícita independiente; el contrato declara 80 valores resumidos y 136 valores emitidos, y el scorecard
+rechaza secciones faltantes o conteos reducidos antes de presentar la validación como verificada.
+La ejecución actual obtiene diferencia máxima cero en ambos conjuntos.
+La compuerta también exige
 `live_allocations=0` en el ejecutable nativo. CI la ejecuta en
 Linux, macOS y Windows, y conserva `numeric-validation-report.json` como artefacto por plataforma;
 los resultados por plataforma no deben compararse como bitwise. Cuando corre en GitHub Actions,

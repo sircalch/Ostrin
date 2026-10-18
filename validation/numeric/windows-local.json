@@ -6,15 +6,26 @@
     "runtime_dependency": "none"
   },
   "fixture": "validation/numeric/matrix_algorithms.ostrin",
+  "inputs": {
+    "contractSha256": "149e5f467447e2f98439b66daec7fad30f05d5ebbfefe9d20d1699aa4af8537b",
+    "fixtureSha256": "55b46ea3ce062a6307b515ae41f89ee4809d2e57bd59647bc74b3277c80b258a",
+    "compilerSha256": "12fa596b4d24c2b822b21302a36a25f2054ba69793ac9b81edcc9d7029cbd692"
+  },
   "environment": {
     "platform": "win32",
     "architecture": "x64",
-    "node": "v24.21.0"
+    "node": "v24.19.0"
   },
   "leakCheck": "live_allocations=0",
   "nativeCompileDiagnostics": "",
   "parity": {
-    "comparedValues": 60,
+    "comparedValues": 80,
+    "maximumAbsoluteDifference": 0,
+    "absolute": 1e-13,
+    "relative": 1e-12
+  },
+  "emittedOutputParity": {
+    "comparedValues": 136,
     "maximumAbsoluteDifference": 0,
     "absolute": 1e-13,
     "relative": 1e-12
@@ -130,6 +141,36 @@
           0.9999999999999998,
           2.9999999999999996
         ]
+      },
+      "fft": {
+        "radix2_n8": {
+          "spectralResidual": 1.7763568394002505e-15,
+          "maximumReconstructionError": 8.881784197001252e-16,
+          "parsevalResidual": 3.552713678800501e-15,
+          "inputEnergy": 23.1875,
+          "spectralEnergy": 185.49999999999997
+        },
+        "direct_dft_n7": {
+          "spectralResidual": 8.881784197001252e-16,
+          "maximumReconstructionError": 4.440892098500626e-16,
+          "parsevalResidual": 3.552713678800501e-15,
+          "inputEnergy": 17.125,
+          "spectralEnergy": 119.87500000000001
+        },
+        "radix2_n1_singleton": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 6.25,
+          "spectralEnergy": 6.25
+        },
+        "radix2_n8_zero": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 0,
+          "spectralEnergy": 0
+        }
       }
     },
     "native": {
@@ -242,14 +283,37 @@
           0.9999999999999998,
           2.9999999999999996
         ]
+      },
+      "fft": {
+        "radix2_n8": {
+          "spectralResidual": 1.7763568394002505e-15,
+          "maximumReconstructionError": 8.881784197001252e-16,
+          "parsevalResidual": 3.552713678800501e-15,
+          "inputEnergy": 23.1875,
+          "spectralEnergy": 185.49999999999997
+        },
+        "direct_dft_n7": {
+          "spectralResidual": 8.881784197001252e-16,
+          "maximumReconstructionError": 4.440892098500626e-16,
+          "parsevalResidual": 3.552713678800501e-15,
+          "inputEnergy": 17.125,
+          "spectralEnergy": 119.87500000000001
+        },
+        "radix2_n1_singleton": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 6.25,
+          "spectralEnergy": 6.25
+        },
+        "radix2_n8_zero": {
+          "spectralResidual": 0,
+          "maximumReconstructionError": 0,
+          "parsevalResidual": 0,
+          "inputEnergy": 0,
+          "spectralEnergy": 0
+        }
       }
     }
-  },
-  "ci": {
-    "provider": "github-actions",
-    "run_id": "38681256328",
-    "run_url": "https://github.com/sircalch/Ostrin/actions/runs/38681256328",
-    "commit": "d0abbad0f674317c95c389b953507365f3fd1a59",
-    "workflow": "Ostrin CI"
   }
 }

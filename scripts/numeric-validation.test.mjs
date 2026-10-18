@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkTolerance, compareReports, parseEmittedNumbers } from "./numeric-validation.mjs";
+import { canonicalTextSha256, checkTolerance, compareNumericOutputs, compareReports, directDft, parseEmittedNumbers, validateFft } from "./numeric-validation.mjs";
+
+test("text provenance hashes are stable across LF and CRLF checkouts", () => {
+  assert.equal(canonicalTextSha256("signal\nprint 1\n"), canonicalTextSha256("signal\r\nprint 1\r\n"));
+  assert.notEqual(canonicalTextSha256("signal\nprint 1\n"), canonicalTextSha256("signal\nprint 2\n"));
+});
 
 test("CI provenance is only emitted when GitHub Actions identifies a run", () => {
   const previous = {
@@ -40,11 +45,14 @@ test("the numeric-output reader accepts full-precision finite values", () => {
     -0.7500000000000001,
     3.2e-14,
   ]);
+  assert.deepEqual(parseEmittedNumbers("   \r\n\t\n  -2.5  \n"), [-2.5]);
 });
 
 test("the numeric-output reader rejects NaN and unrelated text", () => {
   assert.throws(() => parseEmittedNumbers("NaN\n"), /non-finite/);
   assert.throws(() => parseEmittedNumbers("residual=0\n"), /non-finite/);
+  assert.throws(() => parseEmittedNumbers("0x10\n"), /non-decimal/);
+  assert.throws(() => parseEmittedNumbers("Infinity\n"), /non-finite/);
 });
 
 test("absolute and relative tolerances scale with the declared reference magnitude", () => {
@@ -53,6 +61,11 @@ test("absolute and relative tolerances scale with the declared reference magnitu
   assert.ok(Math.abs(accepted.limit - 3e-8) < 1e-23);
   assert.equal(accepted.scale, 10);
   assert.throws(() => checkTolerance("residual", 3.1e-8, 10, 1e-8, 2e-9), /exceeds abs/);
+  assert.throws(() => checkTolerance("residual", 0, 1, undefined, 1e-12), /finite nonnegative/);
+  assert.throws(() => checkTolerance("residual", 0, 1, 1e-12, -1), /finite nonnegative/);
+  assert.throws(() => checkTolerance("residual", 0, Number.NaN, 1e-12, 1e-12), /finite nonnegative/);
+  assert.throws(() => checkTolerance("residual", -1, 1, 1e-12, 1e-12), /finite and nonnegative/);
+  assert.throws(() => checkTolerance("residual", Number.POSITIVE_INFINITY, 1, 1e-12, 1e-12), /finite and nonnegative/);
 });
 
 test("interpreter and native reports require matching numeric leaves", () => {
@@ -65,4 +78,41 @@ test("interpreter and native reports require matching numeric leaves", () => {
     () => compareReports(left, { solution: [1.01, -2], residual: { value: 1e-15 } }),
     /interpreter\/native parity/
   );
+});
+
+test("interpreter and native outputs compare every emitted numeric value", () => {
+  const report = compareNumericOutputs([10, 0, -2], [10 + 5e-14, 0, -2]);
+  assert.equal(report.comparedValues, 3);
+  assert.ok(Math.abs(report.maximumAbsoluteDifference - 5e-14) < 1e-15);
+  assert.throws(() => compareNumericOutputs([1, 2], [1]), /output length differs/);
+  assert.throws(() => compareNumericOutputs([1], [1.01]), /emitted value 0/);
+});
+
+test("FFT validation checks a nontrivial power-of-two DFT, inverse, and Parseval energy", () => {
+  const signal = [1, 2, 3, 4];
+  const spectrum = directDft(signal);
+  assert.equal(spectrum.re[0], 10);
+  for (const value of spectrum.re.slice(1)) assert.ok(Math.abs(value + 2) < 1e-12);
+  assert.ok(Math.abs(spectrum.im[1] - 2) < 1e-12);
+  assert.ok(Math.abs(spectrum.im[3] + 2) < 1e-12);
+  const values = {
+    numbers: [...spectrum.re, ...spectrum.im, ...signal],
+    offset: 0,
+  };
+  const report = validateFft(values, {
+    cases: { radix2: { signal, absolute: 1e-12, relative: 1e-12 } },
+  });
+  assert.ok(report.radix2.spectralResidual < 1e-12);
+  assert.ok(report.radix2.maximumReconstructionError < 1e-12);
+  assert.equal(report.radix2.inputEnergy, 30);
+  assert.ok(Math.abs(report.radix2.spectralEnergy - 120) < 1e-12);
+  assert.ok(report.radix2.parsevalResidual < 1e-12);
+  assert.equal(values.offset, 12);
+});
+
+test("FFT validation rejects a spectrum that violates the independent DFT reference", () => {
+  const values = { numbers: [10, -2, -2, -2, 0, 2.5, 0, -2, 1, 2, 3, 4], offset: 0 };
+  assert.throws(() => validateFft(values, {
+    cases: { radix2: { signal: [1, 2, 3, 4], absolute: 1e-12, relative: 1e-12 } },
+  }), /imaginary DFT bin 1/);
 });
