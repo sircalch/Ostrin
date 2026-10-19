@@ -25,6 +25,8 @@ test("Pages deploys when any surface replay evidence producer changes", () => {
   const upload = readFileSync(path.join(repositoryRoot, ".github/actions/website-verify/action.yml"), "utf8");
   assert.ok(upload.split(/\r?\n/).includes("          website/ostrinc.wasm"),
     "the archived receipt needs the exact CI-built WASM bytes");
+  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"'),
+    "CI must execute the downloaded-package replay contract before uploading evidence");
 });
 
 test("a downloaded evidence package can be verified with its archived WASM", () => {
@@ -47,6 +49,53 @@ test("a downloaded evidence package can be verified with its archived WASM", () 
     const altered = spawnSync(process.execPath, command, { cwd: repositoryRoot, encoding: "utf8" });
     assert.notEqual(altered.status, 0);
     assert.match(altered.stderr, /WASM bytes differ/);
+    writeFileSync(receiptFile, "x".repeat(64 * 1024 + 1));
+    const oversized = spawnSync(process.execPath, command, { cwd: repositoryRoot, encoding: "utf8" });
+    assert.notEqual(oversized.status, 0);
+    assert.match(oversized.stderr, /regular file within the size limit/);
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-receipt-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("offline replay rejects a self-consistent receipt with a forged figure", () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-receipt-artifact-"));
+  try {
+    const wasmBytes = readFileSync(path.join(repositoryRoot, "website/ostrinc.wasm"));
+    const bundleFile = path.join(root, "website/assets/experiments/surface.ostrin-experiment.json");
+    const receiptFile = path.join(root, "target/r3-ci/surface-replay-receipt.json");
+    const wasmFile = path.join(root, "website/ostrinc.wasm");
+    for (const file of [bundleFile, receiptFile, wasmFile]) mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(wasmFile, wasmBytes);
+    const verify = [path.join(repositoryRoot, "scripts/r3-surface-receipt.mjs"),
+      "--verify-artifact", root, "--run-id", expectedRun.runId, "--tested-sha", expectedRun.testedSha];
+    const execute = [path.join(repositoryRoot, "scripts/experiment-replay.mjs"),
+      "--replay-artifact", root, "--run-id", expectedRun.runId, "--tested-sha", expectedRun.testedSha];
+    const original = capturedSurface();
+    const originalText = canonicalJson(original);
+    writeFileSync(bundleFile, originalText);
+    writeFileSync(receiptFile, canonicalJson(createSurfaceReceipt(originalText, replayProof(originalText, wasmBytes))));
+    const realReplay = spawnSync(process.execPath, execute, { cwd: repositoryRoot, encoding: "utf8" });
+    assert.equal(realReplay.status, 0, realReplay.stderr);
+
+    const forged = capturedSurface();
+    forged.files["figure.svg"] = forged.files["figure.svg"].replace("</svg>", "<!-- forged output -->\n</svg>");
+    const figure = forged.manifest.files.find((entry) => entry.path === "figure.svg");
+    figure.bytes = Buffer.byteLength(forged.files["figure.svg"], "utf8");
+    figure.sha256 = sha256(Buffer.from(forged.files["figure.svg"], "utf8"));
+    const recorded = forged.provenance.runtime.invocation.outputs.find((entry) => entry.path === "figure.svg");
+    recorded.bytes = figure.bytes;
+    recorded.sha256 = figure.sha256;
+    refreshProvenance(forged);
+    const forgedText = canonicalJson(forged);
+    writeFileSync(bundleFile, forgedText);
+    writeFileSync(receiptFile, canonicalJson(createSurfaceReceipt(forgedText, replayProof(forgedText, wasmBytes))));
+    const integrity = spawnSync(process.execPath, verify, { cwd: repositoryRoot, encoding: "utf8" });
+    assert.equal(integrity.status, 0, integrity.stderr);
+    const falseReplay = spawnSync(process.execPath, execute, { cwd: repositoryRoot, encoding: "utf8" });
+    assert.notEqual(falseReplay.status, 0);
+    assert.match(falseReplay.stderr, /input-driven replay SVG differs from the published bundle/);
   } finally {
     assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-receipt-artifact-")));
     rmSync(root, { recursive: true, force: true });
@@ -92,13 +141,13 @@ function refreshProvenance(bundle) {
   record.sha256 = sha256(Buffer.from(bundle.files["provenance.json"], "utf8"));
 }
 
-function replayProof(bundleText) {
+function replayProof(bundleText, wasmBytes = fakeWasm) {
   const bundle = JSON.parse(bundleText);
   return {
     id: "surface",
     baseline: "match",
     sensitivity: "changed-output",
-    wasmSha256: sha256(fakeWasm),
+    wasmSha256: sha256(wasmBytes),
     bundleSha256: sha256(Buffer.from(bundleText, "utf8")),
     fileHashes: Object.fromEntries(["source.ostrin", "data.json", "figure.svg", "provenance.json"]
       .map((name) => [name, sha256(Buffer.from(bundle.files[name], "utf8"))])),

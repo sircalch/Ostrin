@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildExperimentBundle, experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
 import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
-import { createSurfaceReceipt, receiptPath } from "./r3-surface-receipt.mjs";
+import { createSurfaceReceipt, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
 
 const schema = "ostrin.experiment/v0";
 
@@ -179,11 +179,13 @@ function alternateInput(bundle, id) {
   return canonicalJson(alternate);
 }
 
-async function replay(id, { bindWasm = false, bundleText: suppliedBundleText } = {}) {
+async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, compilerWasmPath } = {}) {
   const fixture = experimentFixtures[id];
   if (!fixture) throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
   const bundlePath = outputPathFor(id);
-  if (!existsSync(bundlePath)) throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
+  if (suppliedBundleText === undefined && !existsSync(bundlePath)) {
+    throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
+  }
   const bundleText = suppliedBundleText ?? readFileSync(bundlePath, "utf8");
   const bundle = JSON.parse(bundleText);
   const errors = bundleErrors(bundle, id);
@@ -195,13 +197,14 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText } =
   const readPattern = new RegExp(`read_file\\(\\s*"${inputFile.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}"\\s*\\)`);
   if (!readPattern.test(source)) throw new Error(`${id}: source does not read ${inputFile}`);
 
-  const modulePath = path.join(repositoryRoot, "website", "ostrinc.wasm");
-  if (!existsSync(modulePath)) throw new Error(`${id}: website/ostrinc.wasm is missing`);
+  const modulePath = compilerWasmPath ?? path.join(repositoryRoot, "website", "ostrinc.wasm");
+  if (!existsSync(modulePath)) throw new Error(`${id}: compiler WASM is missing at ${modulePath}`);
+  if (compilerWasmPath && !bindWasm) throw new Error(`${id}: an archived compiler requires a bound replay`);
   const module = bindWasm ? null : await WebAssembly.compile(readFileSync(modulePath));
   let wasmSha256;
   const execute = async (files) => {
     if (!bindWasm) return runWasm(module, files, ["--run", "main.ostrin"]);
-    const observed = await runWasmWithEvidence(files, ["--run", "main.ostrin"]);
+    const observed = await runWasmWithEvidence(files, ["--run", "main.ostrin"], modulePath);
     if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
       throw new Error(`${id}: WASI child did not return a valid module execution digest`);
     }
@@ -267,6 +270,24 @@ export async function replayAll() {
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args[0] === "--replay-artifact") {
+    const [mode, directory, runFlag, runId, shaFlag, testedSha] = args;
+    if (args.length !== 6 || mode !== "--replay-artifact" || runFlag !== "--run-id"
+      || shaFlag !== "--tested-sha" || !/^\d+$/.test(runId ?? "") || !/^[a-f0-9]{40}$/.test(testedSha ?? "")) {
+      throw new Error("usage: node scripts/experiment-replay.mjs --replay-artifact <directory> --run-id <id> --tested-sha <sha>");
+    }
+    const artifact = verifySurfaceArtifact(directory, { runId, testedSha });
+    const replayed = await replay("surface", {
+      bindWasm: true,
+      bundleText: artifact.bundleText,
+      compilerWasmPath: artifact.wasmPath,
+    });
+    if (JSON.stringify(createSurfaceReceipt(artifact.bundleText, replayed)) !== JSON.stringify(artifact.receipt)) {
+      throw new Error("surface: fresh replay differs from the archived receipt");
+    }
+    console.log(`experiment-replay: independently replayed surface from archived WASM in CI run ${runId} (${replayed.baseline}; ${replayed.sensitivity})`);
+    return;
+  }
   if (args.includes("--all")) {
     if (args.includes("--write-r3-receipt")) throw new Error("--write-r3-receipt requires --fixture surface");
     if (args.some((argument) => argument === "--fixture" || argument.startsWith("--fixture="))) {

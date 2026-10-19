@@ -6,7 +6,7 @@
 // loaded by the child process. It is never checked into the repository.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { experimentFixtures, validateEffectCapture, validateEntryEffectSignature, verifyBundleFile } from "./experiment-bundle.mjs";
@@ -173,17 +173,12 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
   return errors;
 }
 
-function verifyFiles(bundleFile, receiptFile, wasmFile, expectedRun, { requireFreshBundle = true } = {}) {
+function verifyFiles(bundleFile, receiptFile, wasmFile, expectedRun) {
   for (const file of [bundleFile, receiptFile, wasmFile]) {
     if (!existsSync(file)) throw new Error(`missing ${file}`);
   }
-  // CI can regenerate its own host capture and reject stale generated files.
-  // An archived capture belongs to a different host, so offline verification
-  // uses the source revision and file hashes checked by verifySurfaceReceipt.
-  if (requireFreshBundle) {
-    const checked = verifyBundleFile(bundleFile, "surface");
-    if (!checked.ok) throw new Error(`source-backed surface bundle failed: ${checked.errors.join("; ")}`);
-  }
+  const checked = verifyBundleFile(bundleFile, "surface");
+  if (!checked.ok) throw new Error(`source-backed surface bundle failed: ${checked.errors.join("; ")}`);
   const receipt = JSON.parse(readFileSync(receiptFile, "utf8"));
   const errors = verifySurfaceReceipt(
     receipt,
@@ -193,6 +188,35 @@ function verifyFiles(bundleFile, receiptFile, wasmFile, expectedRun, { requireFr
   );
   if (errors.length) throw new Error(errors.join("; "));
   console.log(`r3-surface-receipt: verified surface replay in CI run ${receipt.ciRun.run_id} at ${receipt.ciRun.tested_sha}`);
+}
+
+function readArchivedFile(root, relativePath, maximumBytes) {
+  const location = path.join(root, relativePath);
+  if (!existsSync(location)) throw new Error(`missing archived ${relativePath}`);
+  const resolved = realpathSync(location);
+  const relative = path.relative(root, resolved);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`archived ${relativePath} escapes the artifact directory`);
+  }
+  const file = statSync(resolved);
+  if (!file.isFile() || file.size < 1 || file.size > maximumBytes) {
+    throw new Error(`archived ${relativePath} is not a regular file within the size limit`);
+  }
+  return { path: resolved, bytes: readFileSync(resolved) };
+}
+
+// This checks archived bytes without regenerating CI host metadata on the
+// verifier's machine. It proves integrity, not a fresh execution of the program.
+export function verifySurfaceArtifact(directory, expectedRun) {
+  const root = realpathSync(directory);
+  const bundle = readArchivedFile(root, "website/assets/experiments/surface.ostrin-experiment.json", 16 * 1024 * 1024);
+  const receiptFile = readArchivedFile(root, "target/r3-ci/surface-replay-receipt.json", 64 * 1024);
+  const wasm = readArchivedFile(root, "website/ostrinc.wasm", 64 * 1024 * 1024);
+  const bundleText = bundle.bytes.toString("utf8");
+  const receipt = JSON.parse(receiptFile.bytes.toString("utf8"));
+  const errors = verifySurfaceReceipt(receipt, bundleText, wasm.bytes, expectedRun);
+  if (errors.length) throw new Error(errors.join("; "));
+  return { bundleText, receipt, wasmPath: wasm.path };
 }
 
 function main() {
@@ -207,14 +231,8 @@ function main() {
     || shaFlag !== "--tested-sha" || !/^\d+$/.test(runId ?? "") || !/^[a-f0-9]{40}$/.test(testedSha ?? "")) {
     throw new Error("usage: node scripts/r3-surface-receipt.mjs --verify | --verify-artifact <directory> --run-id <id> --tested-sha <sha>");
   }
-  const root = path.resolve(directory);
-  verifyFiles(
-    path.join(root, "website/assets/experiments/surface.ostrin-experiment.json"),
-    path.join(root, "target/r3-ci/surface-replay-receipt.json"),
-    path.join(root, "website/ostrinc.wasm"),
-    { runId, testedSha },
-    { requireFreshBundle: false },
-  );
+  const { receipt } = verifySurfaceArtifact(directory, { runId, testedSha });
+  console.log(`r3-surface-receipt: verified surface replay in CI run ${receipt.ciRun.run_id} at ${receipt.ciRun.tested_sha}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
