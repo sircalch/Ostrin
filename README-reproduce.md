@@ -42,10 +42,28 @@ node --test scripts/experiment-bundle.test.mjs
 - **R0:** fuente, entrada y salida registradas; el replay exacto está limitado a la configuración de CI declarada.
 - **R1:** R0 más semilla, algoritmo y sensibilidad de azar verificadas.
 - **R2:** R0/R1 más snapshot de entrada embebido, capacidades declaradas y sensibilidad de parámetros verificada.
-- **R3:** artefacto auditable con host, dependencias, scheduler y efectos. El checkout local permanece abierto porque no debe inventar host metadata; la ejecución CI `38162721694` produjo un artefacto host-bound verificable con 29/29 bundles listos.
+- **R3:** artefacto auditable con host, dependencias, scheduler, efectos y evidencia ejecutable. La CI genera 29/29 capturas estructurales en su host; ese conteo no promociona los bundles a R3. El primer corte adicional es un recibo de replay WASI para `surface`, ligado al run, al binario ejecutado y a los hashes del bundle. El scorecard conserva R3=0.
 
 ```text
 node scripts/r3-readiness.mjs --write
+```
+
+En Website CI, después del replay general de las figuras, `surface` genera un recibo efímero
+y el verificador exige que pertenezca al mismo `tested_sha`/run y a los mismos bytes:
+
+```text
+node scripts/experiment-replay.mjs --fixture surface --write-r3-receipt
+node scripts/r3-surface-receipt.mjs --verify
+```
+
+Estos comandos requieren el bundle host-bound y las variables de la ejecución de GitHub Actions;
+un checkout local ordinario no debe inventarlas.
+El artefacto del run también conserva `website/ostrinc.wasm`, los bundles y el recibo. Tras
+descargarlo, se puede verificar sin reconstruir el binario local (sustituye los valores por los
+del run y su `tested_sha` publicados en GitHub Actions):
+
+```text
+node scripts/r3-surface-receipt.mjs --verify-artifact <directorio-descargado> --run-id <id> --tested-sha <sha>
 ```
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:

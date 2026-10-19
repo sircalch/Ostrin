@@ -9,6 +9,7 @@
 //   node scripts/lab-data.mjs --write   regenerate website/lab-data.js
 //   node scripts/lab-data.mjs           check that website/lab-data.js is current
 import { WASI } from "node:wasi";
+import { createHash } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -320,14 +321,24 @@ function sourceAssignmentPattern(name) {
 // Runs ostrinc.wasm on `files` in a child Node process and returns its stdout lines. Each run
 // gets a fresh process: WebAssembly memories of finished instances are not reliably released
 // within one process, and a few dozen heavy Viz programs used to crash Node.
-export async function runWasm(module, files, args) {
+function spawnWasmChild(files, args, withEvidence = false) {
   const child = spawnSync(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
-    input: JSON.stringify({ files, args }),
+    input: JSON.stringify({ files, args, withEvidence }),
     maxBuffer: 256 * 1024 * 1024,
     encoding: "utf8",
   });
   if (child.status !== 0) throw new Error(child.stderr || `ostrinc ${args.join(" ")} crashed (signal ${child.signal})`);
   return JSON.parse(child.stdout);
+}
+
+export async function runWasm(module, files, args) {
+  return spawnWasmChild(files, args);
+}
+
+// The child returns the digest of the exact WASM bytes it compiled. Hashing a
+// parent-side module would not bind the receipt to the separately loaded child.
+export async function runWasmWithEvidence(files, args) {
+  return spawnWasmChild(files, args, true);
 }
 
 // Runs ostrinc.wasm under Node WASI in a scratch copy of `files`; returns stdout lines.
@@ -618,9 +629,12 @@ async function main() {
 }
 
 async function wasmChild() {
-  const { files, args } = JSON.parse(readFileSync(0, "utf8"));
-  const module = await WebAssembly.compile(readFileSync(wasmPath));
-  process.stdout.write(JSON.stringify(await runWasmHere(module, files, args)));
+  const { files, args, withEvidence } = JSON.parse(readFileSync(0, "utf8"));
+  const wasmBytes = readFileSync(wasmPath);
+  const wasmSha256 = `sha256:${createHash("sha256").update(wasmBytes).digest("hex")}`;
+  const module = await WebAssembly.compile(wasmBytes);
+  const lines = await runWasmHere(module, files, args);
+  process.stdout.write(JSON.stringify(withEvidence ? { lines, wasmSha256 } : lines));
 }
 
 if (process.argv.includes("--wasm-child")) {
