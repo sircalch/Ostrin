@@ -190,7 +190,7 @@ function verifyFiles(bundleFile, receiptFile, wasmFile, expectedRun) {
   console.log(`r3-surface-receipt: verified surface replay in CI run ${receipt.ciRun.run_id} at ${receipt.ciRun.tested_sha}`);
 }
 
-function readArchivedFile(root, relativePath, maximumBytes) {
+export function readArchivedFile(root, relativePath, maximumBytes) {
   const location = path.join(root, relativePath);
   if (!existsSync(location)) throw new Error(`missing archived ${relativePath}`);
   const resolved = realpathSync(location);

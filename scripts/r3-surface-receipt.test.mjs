@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { replay } from "./experiment-replay.mjs";
+import { readArchivedReplayBundle, replay } from "./experiment-replay.mjs";
 import { bundlePath, createSurfaceReceipt, verifySurfaceReceipt } from "./r3-surface-receipt.mjs";
 import { buildExperimentBundle, repositoryRoot, verifyExperimentBundle } from "./experiment-bundle.mjs";
 
@@ -25,8 +25,37 @@ test("Pages deploys when any surface replay evidence producer changes", () => {
   const upload = readFileSync(path.join(repositoryRoot, ".github/actions/website-verify/action.yml"), "utf8");
   assert.ok(upload.split(/\r?\n/).includes("          website/ostrinc.wasm"),
     "the archived receipt needs the exact CI-built WASM bytes");
-  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"'),
-    "CI must execute the downloaded-package replay contract before uploading evidence");
+  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"'),
+    "CI must independently execute every archived R1/R2 package before uploading evidence");
+});
+
+test("offline artifact bundle replay requires a matching host capture and a closed entry row", () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-replay-artifact-"));
+  try {
+    const bundle = capturedSurface();
+    const file = path.join(root, "website/assets/experiments/surface.ostrin-experiment.json");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, canonicalJson(bundle));
+    const accepted = readArchivedReplayBundle(root, "surface", expectedRun);
+    assert.equal(JSON.parse(accepted.bundleText).id, "surface");
+    assert.match(accepted.path, /surface\.ostrin-experiment\.json$/);
+
+    const wrongRun = structuredClone(bundle);
+    wrongRun.provenance.runtime.host.ci_run.run_id = "9876";
+    refreshProvenance(wrongRun);
+    writeFileSync(file, canonicalJson(wrongRun));
+    assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /requested CI run and tested SHA/);
+
+    const openRow = structuredClone(bundle);
+    openRow.provenance.effects.entry_effect_signature.row_closed = false;
+    openRow.provenance.effects.entry_effect_signature.open_calls = ["unknown_callback"];
+    refreshProvenance(openRow);
+    writeFileSync(file, canonicalJson(openRow));
+    assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /structural capture is OPEN/);
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("a downloaded evidence package can be verified with its archived WASM", () => {
