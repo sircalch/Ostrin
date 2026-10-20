@@ -207,27 +207,31 @@ lleve una estructura pesada cuando el usuario no la solicita.
 
 ### 5.5 Contrato propuesto para identidad de fuentes y composición
 
-Esta sección fija una decisión de diseño para la siguiente fase; no describe una capacidad ya
-implementada. La implementación escalar actual usa `Sensitivity.label` como clave de correlación:
-dos elementos con la misma etiqueta se combinan y una etiqueta reutilizada con otra `sigma` produce
-un error. La prueba `std_measurements_scalar_matches_interpreter_and_native` y
-`examples/measurement_scalar.ostrin` respaldan esa semántica provisional, pero una etiqueta humana
-no es una identidad suficiente para una API vectorial.
+Esta sección fija el contrato de identidad de fuentes. La implementación escalar ofrece
+`from_source(value, sigma, source_id, label)`: `source_id` es una clave explícita suministrada por
+el usuario y `label` es sólo texto visible. Reutilizar el mismo ID correlaciona las contribuciones;
+usar IDs distintos las mantiene independientes aunque compartan etiqueta. Un ID reutilizado con
+otra `sigma` produce un error. `standard(value, sigma, label)` se conserva por compatibilidad y usa
+la etiqueta también como ID, por lo que mantiene la semántica provisional antigua. La prueba
+`std_measurements_scalar_matches_interpreter_and_native` cubre ambas reglas. El motor trata el ID
+como clave opaca; su unicidad y reutilización correcta dentro del grafo quedan a cargo del usuario.
+Por compatibilidad, un `source_id` explícito que coincida con la etiqueta de una fuente creada con
+`standard` la correlaciona con esa fuente; el código que migra a `from_source` debe reservar IDs que
+no colisionen accidentalmente con etiquetas históricas.
 
 La representación futura debe separar tres conceptos:
 
 | Concepto | Contrato propuesto |
 | --- | --- |
-| Identidad de fuente | Referencia opaca, estable dentro de una evaluación y preservada al copiar, mover, cortar o derivar una medición. No depende de una dirección de memoria, un timestamp ni del orden accidental de un recorrido. |
+| Identidad de fuente | `source_id` explícito, estable dentro del grafo y preservado al derivar una medición. En esta fase es una cadena suministrada por el usuario; no depende de una dirección de memoria, un timestamp ni del orden accidental de un recorrido. |
 | Etiqueta | Texto opcional para mostrar el instrumento o el dato. Dos fuentes pueden compartir etiqueta sin quedar correlacionadas. |
 | Nodo derivado | Expresión que conserva las referencias de fuente y sus sensibilidades; no duplica la identidad al hacer una copia del valor. |
 
-La construcción de una fuente debe declarar si crea una fuente nueva o reutiliza una referencia
-existente. Una etiqueta repetida no debe crear alias implícitos en la API final. Durante la migración,
-`standard(value, sigma, label)` conserva la regla escalar vigente y seguirá documentada como una
-conveniencia experimental; el constructor explícito de fuentes será el requisito para arrays y
-covarianzas. La serialización de una evaluación podrá incluir una clave estable suministrada por el
-usuario, pero no expondrá punteros ni convertirá una etiqueta en identidad global entre ejecuciones.
+`from_source` crea o reutiliza la fuente según el `source_id` que entregue el usuario; repetirlo es
+una declaración explícita de correlación y requiere conservar la misma `sigma`. Una etiqueta
+repetida no crea alias con este constructor. `standard(value, sigma, label)` conserva la regla
+escalar vigente como conveniencia experimental; arrays y covarianzas siguen pendientes. La clave
+estable suministrada por el usuario no se interpreta como identidad global entre ejecuciones.
 
 Para `Array<Measurement<T>>` se adopta el siguiente contrato de composición:
 
@@ -282,17 +286,18 @@ usa las derivadas disponibles y conserva las dependencias de fuente.
 El contrato escalar actual usa la ley de propagación de incertidumbre de primer orden: si una
 salida `y = f(x)` depende de fuentes con sensibilidades `cᵢ` y desviaciones estándar `σᵢ`, su
 varianza es `Σᵢ (cᵢ σᵢ)²`. La fórmula general añade términos de covarianza; esta fase aún no acepta
-una matriz de covarianza. Una etiqueta de fuente identifica provisionalmente una misma variable:
-las contribuciones con esa etiqueta se combinan antes de elevar al cuadrado, mientras que etiquetas
-distintas se tratan como fuentes independientes. La etiqueta como identidad es una limitación
-experimental, no el contrato final de identidad opaca de §5.5.
+una matriz de covarianza. `from_source` usa el `source_id` explícito para identificar una variable:
+las contribuciones con el mismo ID se combinan antes de elevar al cuadrado, mientras que IDs
+distintos se tratan como fuentes independientes. `standard` sigue usando la etiqueta como identidad
+por compatibilidad experimental.
 
 | Operación | Valor nominal | Sensibilidad de cada fuente `s` | Supuesto y límite |
 | --- | --- | --- | --- |
 | `exact(x)` | `x` | Ninguna; varianza cero | `x` debe ser finito. |
-| `standard(x, σ, label)` | `x` | `c_label = 1` | `x` y `σ` deben ser finitos; `σ ≥ 0`; cada etiqueta conserva un único `σ`. |
+| `standard(x, σ, label)` | `x` | `c_label = 1` | Compatibilidad experimental: usa `label` como ID; `x` y `σ` finitos, `σ ≥ 0`, mismo ID con una sola `σ`. |
+| `from_source(x, σ, id, label)` | `x` | `c_id = 1` | `id` no vacío; la etiqueta es sólo descriptiva; el mismo ID requiere una única `σ`. |
 | `scale(a, k)` | `k·a` | `k·cₐ,s` | Lineal y exacta respecto a `k`; el valor desconocido sigue siendo desconocido. |
-| `add(a,b)` / `sub(a,b)` | `a ± b` | `cₐ,s ± c_b,s` | Fuentes de igual etiqueta son correlacionadas y se combinan con signo antes de calcular varianza. |
+| `add(a,b)` / `sub(a,b)` | `a ± b` | `cₐ,s ± c_b,s` | Fuentes de igual ID son correlacionadas y se combinan con signo antes de calcular varianza. |
 | `mul(a,b)` | `a·b` | `b·cₐ,s + a·c_b,s` | Aproximación de Taylor de primer orden alrededor de los valores nominales; se omiten términos de orden superior. |
 | `div(a,b)` | `a/b` | `cₐ,s/b − a·c_b,s/b²` | Igual aproximación local; `b ≠ 0`; no cubre denominadores cercanos a cero ni distribuciones fuertemente no lineales. |
 
@@ -416,8 +421,9 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
 1. Revisar este documento contra `Quantity`, arrays y el modelo de efectos.
 2. Implementar `Exact` y `Standard` para escalares en el intérprete con operaciones básicas. **En
    curso:** `std.measurements` experimental cubre también `Unknown`.
-3. Añadir fuentes correlacionadas y pruebas de cancelación. **Disponible para escalares:** las
-   fuentes se combinan por etiqueta y conservan la correlación en intérprete/native/WASM.
+3. Añadir fuentes correlacionadas y pruebas de cancelación. **Disponible para escalares:**
+   `from_source` combina por ID explícito y `standard` conserva la semántica histórica por etiqueta;
+   intérprete/nativo/WASM tienen pruebas de paridad.
 4. Integrar `Measurement<Quantity<Dim>>` y conversiones de unidades.
 5. Llevar la representación al HIR/IR y comprobar ownership en nativo.
 6. **En curso:** proyectar series escalares a valores e incertidumbres para error bars; añadir

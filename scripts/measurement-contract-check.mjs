@@ -40,7 +40,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     ["scripts/lab-data.mjs", lab],
   ]) check(errors, source.length > 0, `${name}: missing or empty`);
 
-  for (const symbol of ["record Sensitivity", "record Measurement<T>", "exact(", "standard(", "unknown(", "uncertainty(", "values(", "uncertainties(", "sum(", "mean(", "summary("]) {
+  for (const symbol of ["record Sensitivity", "record Measurement<T>", "exact(", "standard(", "from_source(", "unknown(", "uncertainty(", "values(", "uncertainties(", "sum(", "mean(", "summary("]) {
     check(errors, std.includes(symbol), `compiler/std/measurements.ostrin: missing scalar API ${symbol}`);
   }
   check(errors, !/fn finite\(/.test(std) && /is_finite\(value\)/.test(std) && /is_finite\(sigma\)/.test(std),
@@ -49,6 +49,11 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/std/measurements.ostrin: finite input validation is missing");
   for (const marker of [
     "measurements.standard",
+    "measurements.from_source",
+    "same id, different labels",
+    "different ids, same label",
+    "source sigma mismatch",
+    "legacy and explicit id",
     "measurements.exact",
     "measurements.unknown",
     "measurements.uncertainties",
@@ -64,7 +69,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: scalar Measurement parity test is missing");
   check(errors, tests.includes("std_measurements_series_feeds_reproducible_error_bars"),
     "compiler/tests/examples.rs: Measurement-to-error-bars parity test is missing");
-  check(errors, /measurement_source\.contains\([\s\S]*ir=21[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
+  check(errors, /measurement_source\.contains\([\s\S]*ir=22[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
     "compiler/tests/examples.rs: scalar Measurement IR ratchet is missing");
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),

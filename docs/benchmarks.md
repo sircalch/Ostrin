@@ -23,6 +23,13 @@ estándar). El gate [`benchmark-contract-check.mjs`](../scripts/benchmark-contra
 rechaza informes incompletos o inconsistentes. La memoria pico del proceso hijo y
 los contadores de asignaciones aún se declaran como no medidos.
 
+La batería incluye también un control escalar de 50,000 sumas y una carga de
+50,000 sumas de una `Measurement<Float>` con una fuente compartida. Esta segunda
+carga comprueba que el coeficiente correlacionado se acumule correctamente y da
+una referencia gruesa del costo en la misma máquina; incluye arranque de procesos,
+envoltorios `Result`, ownership y gestión de mediciones, por lo que no aísla el
+costo del campo de identidad.
+
 El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
 manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
 mediciones son evidencia de una carga concreta; no representan por sí solas el

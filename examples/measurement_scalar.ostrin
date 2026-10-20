@@ -41,6 +41,24 @@ fn main() -> Void {
         Err(message) => print("infinite sigma = " + message),
     }
     print("non-finite exact = " + measurements.summary(measurements.exact(sqrt(-1.0))))
+    source_a = measurements.from_source(3.0, 0.1, "run-7:sample-1", "thermometer")
+    source_b = measurements.from_source(4.0, 0.1, "run-7:sample-1", "reference thermometer")
+    print("same id, different labels = " + measurements.summary(measurements.sub(source_a.unwrap(), source_b.unwrap()).unwrap()))
+    independent_a = measurements.from_source(3.0, 0.1, "run-7:channel-a", "same label")
+    independent_b = measurements.from_source(4.0, 0.1, "run-7:channel-b", "same label")
+    print("different ids, same label = " + measurements.summary(measurements.add(independent_a.unwrap(), independent_b.unwrap()).unwrap()))
+    mismatch = measurements.from_source(4.0, 0.2, "run-7:sample-1", "new label")
+    match measurements.add(source_a.unwrap(), mismatch.unwrap()) {
+        Ok(_) => print("source sigma mismatch accepted"),
+        Err(message) => print("source sigma mismatch = " + message),
+    }
+    match measurements.from_source(1.0, 0.1, "", "label") {
+        Ok(_) => print("empty source id accepted"),
+        Err(message) => print("empty source id = " + message),
+    }
+    legacy = measurements.standard(5.0, 0.1, "legacy-source")
+    explicit_legacy = measurements.from_source(6.0, 0.1, "legacy-source", "renamed label")
+    print("legacy and explicit id = " + measurements.summary(measurements.sub(legacy.unwrap(), explicit_legacy.unwrap()).unwrap()))
     match measurements.uncertainties([measurements.unknown(4.0, "series offline")]) {
         Ok(_) => print("unknown series accepted"),
         Err(message) => print("unknown series = " + message),

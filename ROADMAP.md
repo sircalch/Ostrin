@@ -206,7 +206,8 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    `std.measurements` ya tiene paridad intérprete/native, `live_allocations=0` y una comprobación
    de destructores recursivos en C para WASI; `sanitizers.yml` incluye esta prueba, pendiente de
    resultado para esta rama. La proyección de series `List<Measurement<Float>>` alimenta
-   `std.viz.errorbars`. El siguiente bloque es integrar `Quantity<T>`,
+   `std.viz.errorbars`. `from_source` ya separa la identidad explícita de la etiqueta; `standard`
+   mantiene compatibilidad usando la etiqueta como ID. El siguiente bloque es integrar `Quantity<T>`,
    `Array<Measurement<T>>` y covarianza antes de añadir Monte Carlo, intervalos de cobertura o
    semántica de operadores.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)

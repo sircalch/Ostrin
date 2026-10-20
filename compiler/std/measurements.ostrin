@@ -2,11 +2,12 @@
 //
 // This is phase 1 of docs/design/25-mediciones-e-incertidumbre.md. It deliberately
 // exposes functions instead of operator overloading while the generic scientific
-// type contract is reviewed. Each standard measurement must name its independent
-// source; derived values retain the source coefficients so correlated cancellation
-// is exact when the same source is reused.
+// type contract is reviewed. `from_source` makes correlation identity explicit;
+// `standard` remains compatible by using its label as the identity. Derived values
+// retain source coefficients so correlated cancellation is exact.
 
 pub record Sensitivity {
+    source_id: String
     label: String
     coefficient: Float
     sigma: Float
@@ -46,7 +47,30 @@ pub fn standard(value: Float, sigma: Float, label: String) -> Result<Measurement
     }
     Ok(Measurement {
         value: value,
-        sources: [Sensitivity { label: label, coefficient: 1.0, sigma: sigma }],
+        sources: [Sensitivity { source_id: label, label: label, coefficient: 1.0, sigma: sigma }],
+        known: true,
+        reason: "",
+    })
+}
+
+// Explicit identity keeps correlation separate from the human-readable label.
+// Reusing a source_id intentionally reuses the same random variable.
+pub fn from_source(value: Float, sigma: Float, source_id: String, label: String) -> Result<Measurement<Float>, String> {
+    if not is_finite(value) {
+        return Err("measurement value must be finite")
+    }
+    if not is_finite(sigma) {
+        return Err("measurement sigma must be finite")
+    }
+    if sigma < 0.0 {
+        return Err("measurement sigma must be non-negative")
+    }
+    if source_id.length() == 0 {
+        return Err("measurement source id must not be empty")
+    }
+    Ok(Measurement {
+        value: value,
+        sources: [Sensitivity { source_id: source_id, label: label, coefficient: 1.0, sigma: sigma }],
         known: true,
         reason: "",
     })
@@ -102,7 +126,7 @@ pub fn uncertainties(measurements: List<Measurement<Float>>) -> Result<List<Floa
 }
 
 // Sum a finite series while retaining source correlation. Reusing the same
-// source label therefore contributes once with the accumulated coefficient.
+// source identity therefore contributes once with the accumulated coefficient.
 pub fn sum(measurements: List<Measurement<Float>>) -> Result<Measurement<Float>, String> {
     if measurements.length() == 0 {
         return Err("measurement sum needs at least one item")
@@ -178,19 +202,19 @@ fn variance(sources: List<Sensitivity>) -> Result<Float, String> {
     Ok(sqrt(total))
 }
 
-// Add a scaled sensitivity list, merging equal source labels. A label represents
-// one independent source and must keep one standard deviation throughout a graph.
+// Add a scaled sensitivity list, merging equal explicit source identities.
 fn merge_scaled(result: List<Sensitivity>, input: List<Sensitivity>, factor: Float) -> Result<List<Sensitivity>, String> {
     mut output: List<Sensitivity> = result
     for item in input {
         mut merged: List<Sensitivity> = []
         mut found = false
         for current in output {
-            if current.label == item.label {
+            if current.source_id == item.source_id {
                 if current.sigma != item.sigma {
-                    return Err("measurement source label was reused with a different sigma")
+                    return Err("measurement source id was reused with a different sigma")
                 }
                 merged.push(Sensitivity {
+                    source_id: current.source_id,
                     label: current.label,
                     coefficient: current.coefficient + factor * item.coefficient,
                     sigma: current.sigma,
@@ -202,6 +226,7 @@ fn merge_scaled(result: List<Sensitivity>, input: List<Sensitivity>, factor: Flo
         }
         if not found {
             merged.push(Sensitivity {
+                source_id: item.source_id,
                 label: item.label,
                 coefficient: factor * item.coefficient,
                 sigma: item.sigma,
