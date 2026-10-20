@@ -26,6 +26,7 @@ const defaultWorkloads = [
   "benchmarks/temperature-float.ostrin",
   "benchmarks/temperature-interval.ostrin",
   "benchmarks/temperature-point.ostrin",
+  "benchmarks/measurement-source-identity.ostrin",
 ];
 
 function option(name, fallback) {

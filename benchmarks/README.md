@@ -36,6 +36,14 @@ unmeasured and remain a future benchmark metric.
 | `temperature-float.ostrin` | scalar `Float` addition control |
 | `temperature-interval.ostrin` | linear `Quantity<Temperature>` additions in K |
 | `temperature-point.ostrin` | absolute Celsius point shifted by Kelvin intervals |
+| `measurement-source-identity.ostrin` | repeated scalar measurement addition with one shared source ID; checks correlation-preserving coefficient accumulation |
+
+The measurement workload performs 50,000 additions of the same source to exercise
+correlation-aware coefficient merging. Compare it only with the scalar workload as
+a coarse same-host control: process startup, `Result` handling, ownership and
+measurement bookkeeping are included, so the ratio does not isolate the cost of
+the source ID field or predict application performance. Peak memory and allocation
+counts remain unmeasured.
 
 The temperature workloads use the same 50,000-iteration loop and let the
 report compare `Float`, linear interval and affine point costs on one host. The

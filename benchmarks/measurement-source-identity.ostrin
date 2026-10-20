@@ -1,0 +1,13 @@
+// Experimental workload: repeatedly combine a measurement with one shared source.
+// The shared calibration represents a systematic uncertainty, so its coefficient
+// grows linearly instead of being treated as 50,000 independent observations.
+import std.measurements
+
+fn main() -> Void {
+    source = measurements.from_source(1.0, 0.001, "sensor-42:calibration", "shared calibration").unwrap()
+    mut total = measurements.exact(0.0)
+    for i in 1 to 50000 {
+        total = measurements.add(total, source).unwrap()
+    }
+    print(measurements.summary(total))
+}
