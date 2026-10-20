@@ -150,13 +150,13 @@ export const LAB = [
   {
     id: "measurements",
     title: "Measurements",
-    headline: "Carry standard uncertainty and source correlation through scalar arithmetic.",
-    file: "examples/measurement_scalar.ostrin",
+    headline: "Track correlated uncertainty through scalar and dimensioned arithmetic.",
+    file: "examples/measurement_lab.ostrin",
     render: "text",
     params: [],
-    how: "std.measurements keeps a value, explicit source identities and an uncertainty-known state together. Reusing a source ID preserves correlation (`x - x = 0 ± 0`), while labels are descriptive; independent IDs combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
+    how: "std.measurements keeps explicit source identities with values and their uncertainty state. Shared IDs preserve correlation through sums, products and same-dimension ratios; independent IDs combine through the linearized variance rule. The dimensional API runs here through ostrinc.wasm and remains interpreter-only; the scalar API separately has interpreter/native parity.",
     docs: { label: "measurement design", href: `${repository}/blob/main/docs/design/25-mediciones-e-incertidumbre.md` },
-    limits: "This experimental API now projects a List<Measurement<Float>> into nominal values and standard uncertainties for std.viz.errorbars; Quantity integration, Array<Measurement>, covariance blocks, Monte Carlo and coverage intervals remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
+    limits: "The dimensioned Measurement prototype supports source construction, sums, products, coherent standard uncertainty and ratios between equal dimensions in the interpreter/WASM path. Native support, Array<Measurement>, covariance, Monte Carlo and coverage intervals remain planned. Ratios between different dimensions are not implemented; unknown uncertainty is never treated as zero.",
   },
   {
     id: "data",

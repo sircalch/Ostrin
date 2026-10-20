@@ -28,6 +28,27 @@ test("the scalar Measurement contract is aligned with source and parity evidence
   assert.deepEqual(validateMeasurementContract(repositoryRoot).errors, []);
 });
 
+test("the gate requires accurate dimensional web scope and experimental boundaries", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "scripts/lab-data.mjs");
+    const original = readFileSync(file, "utf8");
+    writeFileSync(file, original.replace("interpreter/WASM path", "native path"));
+    let result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("interpreter/WASM dimensional Measurement scope")));
+
+    writeFileSync(file, original.replace("Array<Measurement>, covariance, Monte Carlo", "native support"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
+
+    writeFileSync(file, original.replace("Native support", "Native parity"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("native dimensional Measurement boundary")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects an example that silently drops unknown uncertainty", () => {
   const root = fixtureRoot();
   try {

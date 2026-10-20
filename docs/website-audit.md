@@ -50,7 +50,7 @@ Firefox launch limitation remains documented as a tooling note and does not repl
 
 ## Verified inventory
 
-- **302** `.ostrin` source files under `examples/`, including package-project sources and
+- **303** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **27** Markdown design documents under `docs/design/`.
 - Compiler suite: **361 integration**, **6 differential** and **27 unit** tests.

@@ -690,48 +690,35 @@ globalThis.OSTRIN_LAB = Object.freeze({
     {
       "id": "measurements",
       "title": "Measurements",
-      "headline": "Carry standard uncertainty and source correlation through scalar arithmetic.",
-      "file": "examples/measurement_scalar.ostrin",
+      "headline": "Track correlated uncertainty through scalar and dimensioned arithmetic.",
+      "file": "examples/measurement_lab.ostrin",
       "render": "text",
       "params": [],
-      "how": "std.measurements keeps a value, explicit source identities and an uncertainty-known state together. Reusing a source ID preserves correlation (`x - x = 0 ± 0`), while labels are descriptive; independent IDs combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
+      "how": "std.measurements keeps explicit source identities with values and their uncertainty state. Shared IDs preserve correlation through sums, products and same-dimension ratios; independent IDs combine through the linearized variance rule. The dimensional API runs here through ostrinc.wasm and remains interpreter-only; the scalar API separately has interpreter/native parity.",
       "docs": {
         "label": "measurement design",
         "href": "https://github.com/sircalch/Ostrin/blob/main/docs/design/25-mediciones-e-incertidumbre.md"
       },
-      "limits": "This experimental API now projects a List<Measurement<Float>> into nominal values and standard uncertainties for std.viz.errorbars; Quantity integration, Array<Measurement>, covariance blocks, Monte Carlo and coverage intervals remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
+      "limits": "The dimensioned Measurement prototype supports source construction, sums, products, coherent standard uncertainty and ratios between equal dimensions in the interpreter/WASM path. Native support, Array<Measurement>, covariance, Monte Carlo and coverage intervals remain planned. Ratios between different dimensions are not implemented; unknown uncertainty is never treated as zero.",
       "files": {
-        "main.ostrin": "// Experimental std.measurements scalar API: explicit sources preserve correlation.\nimport std.measurements\n\nfn main() -> Void {\n    match measurements.standard(12.30, 0.02, \"caliper\") {\n        Ok(x) => match measurements.standard(1.50, 0.03, \"reference\") {\n            Ok(y) => {\n                print(\"x = \" + measurements.summary(x))\n                print(\"x + x = \" + measurements.summary(measurements.add(x, x).unwrap()))\n                print(\"x - x = \" + measurements.summary(measurements.sub(x, x).unwrap()))\n                print(\"x + y = \" + measurements.summary(measurements.add(x, y).unwrap()))\n                print(\"2x = \" + measurements.summary(measurements.mul(x, measurements.exact(2.0)).unwrap()))\n                print(\"x * x = \" + measurements.summary(measurements.mul(x, x).unwrap()))\n                print(\"x * y = \" + measurements.summary(measurements.mul(x, y).unwrap()))\n                print(\"x / x = \" + measurements.summary(measurements.div(x, x).unwrap()))\n                print(\"unknown = \" + measurements.summary(measurements.scale(measurements.unknown(4.0, \"sensor offline\"), 2.0)))\n            },\n            Err(message) => print(\"reference error: \" + message),\n        },\n        Err(message) => print(\"caliper error: \" + message),\n    }\n\n    match measurements.standard(1.0, -0.1, \"bad\") {\n        Ok(_) => print(\"invalid sigma accepted\"),\n        Err(message) => print(\"invalid sigma = \" + message),\n    }\n    match measurements.standard(1.0, 0.1, \"\") {\n        Ok(_) => print(\"empty source accepted\"),\n        Err(message) => print(\"empty source = \" + message),\n    }\n    match measurements.standard(sqrt(-1.0), 0.1, \"nan value\") {\n        Ok(_) => print(\"non-finite value accepted\"),\n        Err(message) => print(\"non-finite value = \" + message),\n    }\n    match measurements.standard(1.0, sqrt(-1.0), \"nan sigma\") {\n        Ok(_) => print(\"non-finite sigma accepted\"),\n        Err(message) => print(\"non-finite sigma = \" + message),\n    }\n    match measurements.standard(1.0, 1.0 / 0.0, \"infinite sigma\") {\n        Ok(_) => print(\"infinite sigma accepted\"),\n        Err(message) => print(\"infinite sigma = \" + message),\n    }\n    print(\"non-finite exact = \" + measurements.summary(measurements.exact(sqrt(-1.0))))\n    source_a = measurements.from_source(3.0, 0.1, \"run-7:sample-1\", \"thermometer\")\n    source_b = measurements.from_source(4.0, 0.1, \"run-7:sample-1\", \"reference thermometer\")\n    print(\"same id, different labels = \" + measurements.summary(measurements.sub(source_a.unwrap(), source_b.unwrap()).unwrap()))\n    independent_a = measurements.from_source(3.0, 0.1, \"run-7:channel-a\", \"same label\")\n    independent_b = measurements.from_source(4.0, 0.1, \"run-7:channel-b\", \"same label\")\n    print(\"different ids, same label = \" + measurements.summary(measurements.add(independent_a.unwrap(), independent_b.unwrap()).unwrap()))\n    mismatch = measurements.from_source(4.0, 0.2, \"run-7:sample-1\", \"new label\")\n    match measurements.add(source_a.unwrap(), mismatch.unwrap()) {\n        Ok(_) => print(\"source sigma mismatch accepted\"),\n        Err(message) => print(\"source sigma mismatch = \" + message),\n    }\n    match measurements.from_source(1.0, 0.1, \"\", \"label\") {\n        Ok(_) => print(\"empty source id accepted\"),\n        Err(message) => print(\"empty source id = \" + message),\n    }\n    legacy = measurements.standard(5.0, 0.1, \"legacy-source\")\n    explicit_legacy = measurements.from_source(6.0, 0.1, \"legacy-source\", \"renamed label\")\n    print(\"legacy and explicit id = \" + measurements.summary(measurements.sub(legacy.unwrap(), explicit_legacy.unwrap()).unwrap()))\n    match measurements.uncertainties([measurements.unknown(4.0, \"series offline\")]) {\n        Ok(_) => print(\"unknown series accepted\"),\n        Err(message) => print(\"unknown series = \" + message),\n    }\n}\n"
+        "main.ostrin": "// Scientific Lab · Measurements\n// Source identity carries correlation through dimensional products and ratios.\nimport std.measurements\n\nfn main() -> Void {\n    ruler_a = measurements.from_quantity_source(4 m, 10 cm, \"shared-ruler\", \"ruler reading A\").unwrap()\n    ruler_b = measurements.from_quantity_source(4 m, 10 cm, \"shared-ruler\", \"ruler reading B\").unwrap()\n\n    combined = measurements.add_quantity(ruler_a, ruler_b).unwrap()\n    combined_u = measurements.quantity_uncertainty(combined).unwrap()\n    print(\"shared readings\")\n    print(combined.value)\n    print(\"standard uncertainty (m) = \" + combined_u.value.to_string())\n\n    area = measurements.mul_quantity(ruler_a, ruler_b).unwrap()\n    area_u = measurements.quantity_uncertainty(area).unwrap()\n    print(\"product dimension = \" + area.value.dimension_key())\n    print(\"product contribution\")\n    print(area.sources[0].contribution)\n    print(\"product standard uncertainty = \" + area_u.value.to_string())\n\n    ratio = measurements.div_quantity_same(ruler_a, ruler_b).unwrap()\n    print(\"same-source ratio = \" + measurements.summary(ratio))\n}\n"
       },
       "main": "main.ostrin",
       "args": [
         "--run",
         "main.ostrin"
       ],
-      "source": "examples/measurement_scalar.ostrin",
-      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/measurement_scalar.ostrin",
+      "source": "examples/measurement_lab.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/measurement_lab.ostrin",
       "output": [
-        "x = 12.3 ± 0.02",
-        "x + x = 24.6 ± 0.04",
-        "x - x = 0 ± 0",
-        "x + y = 13.8 ± 0.03605551275463989",
-        "2x = 24.6 ± 0.04",
-        "x * x = 151.29000000000002 ± 0.49200000000000005",
-        "x * y = 18.450000000000003 ± 0.3702175036380641",
-        "x / x = 1 ± 0",
-        "unknown = unknown: scale received a measurement with unknown uncertainty",
-        "invalid sigma = measurement sigma must be non-negative",
-        "empty source = measurement source label must not be empty",
-        "non-finite value = measurement value must be finite",
-        "non-finite sigma = measurement sigma must be finite",
-        "infinite sigma = measurement sigma must be finite",
-        "non-finite exact = unknown: exact measurement value must be finite",
-        "same id, different labels = -1 ± 0",
-        "different ids, same label = 7 ± 0.14142135623730953",
-        "source sigma mismatch = measurement source id was reused with a different sigma",
-        "empty source id = measurement source id must not be empty",
-        "legacy and explicit id = -1 ± 0",
-        "unknown series = series offline"
+        "shared readings",
+        "8 m",
+        "standard uncertainty (m) = 0.2",
+        "product dimension = Length^2",
+        "product contribution",
+        "8000 cm^2",
+        "product standard uncertainty = 0.8",
+        "same-source ratio = 1 ± 0"
       ]
     },
     {

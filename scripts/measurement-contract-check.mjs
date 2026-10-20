@@ -18,7 +18,7 @@ function check(errors, condition, message) {
 /**
  * Check that the experimental scalar Measurement contract is still source-backed.
  * This gate intentionally verifies evidence and boundaries; it does not enable
- * Array<Measurement>, Quantity integration, covariance, or Monte Carlo.
+ * Array<Measurement>, native dimensional support, covariance, or Monte Carlo.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
@@ -80,8 +80,12 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
-  check(errors, /Quantity integration[\s\S]{0,220}(?:remain|pending|siguen pendientes)/i.test(lab),
-    "scripts/lab-data.mjs: experimental Measurement boundary is missing");
+  check(errors, /dimensioned Measurement prototype[\s\S]{0,260}interpreter\/WASM path/i.test(lab),
+    "scripts/lab-data.mjs: interpreter/WASM dimensional Measurement scope is missing");
+  check(errors, /Native support[\s\S]{0,180}remain planned/i.test(lab),
+    "scripts/lab-data.mjs: native dimensional Measurement boundary is missing");
+  check(errors, /Array<Measurement>[\s\S]{0,100}covariance[\s\S]{0,100}Monte Carlo/i.test(lab),
+    "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
   check(errors, testsWithQuantityBoundary,
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native boundary test is missing");
   check(errors, testsWithDirectQuantityBoundary,
