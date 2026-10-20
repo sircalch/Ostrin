@@ -71,6 +71,9 @@ const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[(
 ), (
     "measurement_quantity_direct_shape.ostrin",
     "direct Measurement<Quantity<D>> remains interpreter-only while the native representation is designed",
+), (
+    "measurement_lab.ostrin",
+    "the dimensional Measurement Scientific Lab showcase remains interpreter/WASM-only",
 )];
 
 // These examples intentionally exercise an experimental type boundary that is
@@ -80,6 +83,7 @@ const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[(
 const NON_CORE_TYPED_FIXTURES: &[&str] = &[
     "measurement_quantity_shape.ostrin",
     "measurement_quantity_direct_shape.ostrin",
+    "measurement_lab.ostrin",
 ];
 
 /// Examples that compile natively but whose output legitimately differs
