@@ -183,13 +183,14 @@ function alternateInput(bundle, id) {
 }
 
 async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, compilerWasmPath } = {}) {
-  const fixture = experimentFixtures[id];
-  if (!fixture) throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
-  const bundlePath = outputPathFor(id);
-  if (suppliedBundleText === undefined && !existsSync(bundlePath)) {
-    throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`invalid executable replay fixture ID ${JSON.stringify(id)}`);
+  let bundleText = suppliedBundleText;
+  if (bundleText === undefined) {
+    if (!experimentFixtures[id]) throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
+    const bundlePath = outputPathFor(id);
+    if (!existsSync(bundlePath)) throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
+    bundleText = readFileSync(bundlePath, "utf8");
   }
-  const bundleText = suppliedBundleText ?? readFileSync(bundlePath, "utf8");
   const bundle = JSON.parse(bundleText);
   const errors = bundleErrors(bundle, id);
   if (errors.length) throw new Error(errors.join("\n"));
@@ -272,9 +273,7 @@ export async function replayAll() {
 }
 
 export function readArchivedReplayBundle(directory, id, expectedRun) {
-  if (!experimentFixtures[id]) {
-    throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
-  }
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`invalid archived replay fixture ID ${JSON.stringify(id)}`);
   const root = realpathSync(directory);
   const relativePath = `website/assets/experiments/${id}.ostrin-experiment.json`;
   const archived = readArchivedFile(root, relativePath, 16 * 1024 * 1024);
@@ -286,7 +285,6 @@ export function readArchivedReplayBundle(directory, id, expectedRun) {
     throw new Error(`${id}: archived bundle is invalid JSON: ${error.message}`);
   }
   const errors = bundleErrors(bundle, id);
-  const fixture = experimentFixtures[id];
   const inventory = expectedRun?.replayBundles?.[id];
   const expectedLevel = inventory?.level;
   if (!inventory || !["R1", "R2"].includes(expectedLevel)) {

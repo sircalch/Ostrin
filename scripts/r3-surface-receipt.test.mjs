@@ -119,6 +119,33 @@ test("archived replay maturity and membership are bound to the tested run invent
   }
 });
 
+test("an archived bundle can replay after its fixture is retired from the current registry", async () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-replay-artifact-"));
+  try {
+    const bundle = capturedSurface();
+    bundle.id = "retired-fixture";
+    refreshProvenance(bundle);
+    const text = canonicalJson(bundle);
+    const file = path.join(root, "website/assets/experiments/retired-fixture.ostrin-experiment.json");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, text);
+    const run = {
+      ...expectedRun,
+      replayBundles: {
+        "retired-fixture": { level: "R2", bundleSha256: sha256(Buffer.from(text, "utf8")) },
+      },
+    };
+    const archived = readArchivedReplayBundle(root, "retired-fixture", run);
+    const result = await replay("retired-fixture", { bundleText: archived.bundleText });
+    assert.equal(result.id, "retired-fixture");
+    assert.equal(result.baseline, "match");
+    assert.equal(result.sensitivity, "changed-output");
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a downloaded evidence package can be verified with its archived WASM", () => {
   const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-receipt-artifact-"));
   try {
