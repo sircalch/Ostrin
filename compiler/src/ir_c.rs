@@ -2869,6 +2869,8 @@ fn emit_instruction(
                         format!("({receiver}).v")
                     } else if method == "unit_scale" && args.is_empty() && *ty == Ty::Float {
                         format!("ostrin_unit_expr_factor(({receiver}).u)")
+                    } else if method == "dimension_key" && args.is_empty() && *ty == Ty::String {
+                        crate::codegen::c_string_literal(&dim_to_string(&dimension))
                     } else {
                         let key = mangle_quantity_type(&dimension);
                         let c_name = methods.get(&(key, method.clone())).ok_or(())?;

@@ -3723,13 +3723,16 @@ impl Checker {
             }
             if let Ty::Quantity(_) = receiver_ty {
                 if arg_types.is_empty()
-                    && (method == "value" || method == "unit" || method == "unit_scale")
+                    && (method == "value"
+                        || method == "unit"
+                        || method == "unit_scale"
+                        || method == "dimension_key")
                 {
                     // Introspection for unit-aware code (std.viz axis labels):
                     // the number in the quantity's own unit, and that unit.
                     return match method.as_str() {
                         "value" | "unit_scale" => Ty::Float,
-                        "unit" => Ty::String,
+                        "unit" | "dimension_key" => Ty::String,
                         _ => unreachable!(),
                     };
                 }

@@ -4,18 +4,19 @@
 // exposes functions instead of operator overloading while the generic scientific
 // type contract is reviewed. `from_source` makes correlation identity explicit;
 // `standard` remains compatible by using its label as the identity. Derived values
-// retain source coefficients so correlated cancellation is exact.
+// retain source contributions so correlated cancellation is exact.
 
-pub record Sensitivity {
+pub record Sensitivity<T> {
     source_id: String
     label: String
-    coefficient: Float
-    sigma: Float
+    source_dimension: String
+    source_sigma: Float
+    contribution: T
 }
 
 pub record Measurement<T> {
     value: T
-    sources: List<Sensitivity>
+    sources: List<Sensitivity<T>>
     known: Bool
     reason: String
 }
@@ -24,7 +25,7 @@ pub fn exact(value: Float) -> Measurement<Float> {
     if not is_finite(value) {
         return unknown(value, "exact measurement value must be finite")
     }
-    Measurement {
+    Measurement<Float> {
         value: value,
         sources: [],
         known: true,
@@ -45,9 +46,15 @@ pub fn standard(value: Float, sigma: Float, label: String) -> Result<Measurement
     if label.length() == 0 {
         return Err("measurement source label must not be empty")
     }
-    Ok(Measurement {
+    Ok(Measurement<Float> {
         value: value,
-        sources: [Sensitivity { source_id: label, label: label, coefficient: 1.0, sigma: sigma }],
+        sources: [Sensitivity<Float> {
+            source_id: label,
+            label: label,
+            source_dimension: "dimensionless",
+            source_sigma: sigma,
+            contribution: sigma,
+        }],
         known: true,
         reason: "",
     })
@@ -68,16 +75,62 @@ pub fn from_source(value: Float, sigma: Float, source_id: String, label: String)
     if source_id.length() == 0 {
         return Err("measurement source id must not be empty")
     }
-    Ok(Measurement {
+    Ok(Measurement<Float> {
         value: value,
-        sources: [Sensitivity { source_id: source_id, label: label, coefficient: 1.0, sigma: sigma }],
+        sources: [Sensitivity<Float> {
+            source_id: source_id,
+            label: label,
+            source_dimension: "dimensionless",
+            source_sigma: sigma,
+            contribution: sigma,
+        }],
+        known: true,
+        reason: "",
+    })
+}
+
+// Dimensional constructor prototype. `source_sigma` is stored in the coherent
+// reference unit, while `contribution` retains its Quantity unit for later
+// dimension-aware propagation. Native Measurement<Quantity<D>> remains gated.
+pub fn from_quantity_source<D: Dimension>(value: Quantity<D>, sigma: Quantity<D>, source_id: String, label: String) -> Result<Measurement<Quantity<D>>, String> {
+    nominal = value.value()
+    declared_sigma = sigma.value()
+    if not is_finite(nominal) {
+        return Err("measurement value must be finite")
+    }
+    if not is_finite(declared_sigma) {
+        return Err("measurement sigma must be finite")
+    }
+    if declared_sigma < 0.0 {
+        return Err("measurement sigma must be non-negative")
+    }
+    if source_id.length() == 0 {
+        return Err("measurement source id must not be empty")
+    }
+    canonical_sigma = declared_sigma * sigma.unit_scale()
+    if not is_finite(canonical_sigma) {
+        return Err("measurement sigma must be finite")
+    }
+    if canonical_sigma < 0.0 {
+        return Err("measurement sigma must be non-negative")
+    }
+    dimension_key_value = value.dimension_key()
+    Ok(Measurement<Quantity<D>> {
+        value: value,
+        sources: [Sensitivity<Quantity<D>> {
+            source_id: source_id,
+            label: label,
+            source_dimension: dimension_key_value,
+            source_sigma: canonical_sigma,
+            contribution: sigma,
+        }],
         known: true,
         reason: "",
     })
 }
 
 pub fn unknown(value: Float, reason: String) -> Measurement<Float> {
-    Measurement {
+    Measurement<Float> {
         value: value,
         sources: [],
         known: false,
@@ -174,23 +227,19 @@ pub fn summary(measurement: Measurement<Float>) -> String {
     }
 }
 
-fn variance(sources: List<Sensitivity>) -> Result<Float, String> {
+fn variance(sources: List<Sensitivity<Float>>) -> Result<Float, String> {
     mut total = 0.0
     for source in sources {
-        if not is_finite(source.coefficient) {
-            return Err("measurement sensitivity coefficient must be finite")
+        if not is_finite(source.contribution) {
+            return Err("measurement sensitivity contribution must be finite")
         }
-        if not is_finite(source.sigma) {
+        if not is_finite(source.source_sigma) {
             return Err("measurement source sigma must be finite")
         }
-        if source.sigma < 0.0 {
+        if source.source_sigma < 0.0 {
             return Err("measurement source sigma must be non-negative")
         }
-        weighted = source.coefficient * source.sigma
-        if not is_finite(weighted) {
-            return Err("measurement uncertainty overflowed")
-        }
-        contribution = weighted * weighted
+        contribution = source.contribution * source.contribution
         if not is_finite(contribution) {
             return Err("measurement uncertainty overflowed")
         }
@@ -203,21 +252,31 @@ fn variance(sources: List<Sensitivity>) -> Result<Float, String> {
 }
 
 // Add a scaled sensitivity list, merging equal explicit source identities.
-fn merge_scaled(result: List<Sensitivity>, input: List<Sensitivity>, factor: Float) -> Result<List<Sensitivity>, String> {
-    mut output: List<Sensitivity> = result
+fn merge_scaled(
+    result: List<Sensitivity<Float>>,
+    input: List<Sensitivity<Float>>,
+    factor: Float
+) -> Result<List<Sensitivity<Float>>, String> {
+    mut output: List<Sensitivity<Float>> = result
     for item in input {
-        mut merged: List<Sensitivity> = []
+        mut merged: List<Sensitivity<Float>> = []
         mut found = false
         for current in output {
             if current.source_id == item.source_id {
-                if current.sigma != item.sigma {
+                if current.source_dimension != item.source_dimension
+                    or current.source_sigma != item.source_sigma
+                {
+                    if current.source_dimension != item.source_dimension {
+                        return Err("measurement source id was reused with a different dimension or sigma")
+                    }
                     return Err("measurement source id was reused with a different sigma")
                 }
-                merged.push(Sensitivity {
+                merged.push(Sensitivity<Float> {
                     source_id: current.source_id,
                     label: current.label,
-                    coefficient: current.coefficient + factor * item.coefficient,
-                    sigma: current.sigma,
+                    source_dimension: current.source_dimension,
+                    source_sigma: current.source_sigma,
+                    contribution: current.contribution + factor * item.contribution,
                 })
                 found = true
             } else {
@@ -225,11 +284,12 @@ fn merge_scaled(result: List<Sensitivity>, input: List<Sensitivity>, factor: Flo
             }
         }
         if not found {
-            merged.push(Sensitivity {
+            merged.push(Sensitivity<Float> {
                 source_id: item.source_id,
                 label: item.label,
-                coefficient: factor * item.coefficient,
-                sigma: item.sigma,
+                source_dimension: item.source_dimension,
+                source_sigma: item.source_sigma,
+                contribution: factor * item.contribution,
             })
         }
         output = merged
@@ -246,7 +306,7 @@ pub fn scale(measurement: Measurement<Float>, factor: Float) -> Measurement<Floa
         return unknown_from("scale", measurement.value * factor)
     }
     match merge_scaled([], measurement.sources, factor) {
-        Ok(sources) => Measurement {
+        Ok(sources) => Measurement<Float> {
             value: measurement.value * factor,
             sources: sources,
             known: true,
@@ -265,7 +325,12 @@ pub fn add(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     }
     match merge_scaled([], a.sources, 1.0) {
         Ok(left) => match merge_scaled(left, b.sources, 1.0) {
-            Ok(sources) => Ok(Measurement { value: a.value + b.value, sources: sources, known: true, reason: "" }),
+            Ok(sources) => Ok(Measurement<Float> {
+                value: a.value + b.value,
+                sources: sources,
+                known: true,
+                reason: "",
+            }),
             Err(message) => Err(message),
         },
         Err(message) => Err(message),
@@ -281,7 +346,12 @@ pub fn sub(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     }
     match merge_scaled([], a.sources, 1.0) {
         Ok(left) => match merge_scaled(left, b.sources, -1.0) {
-            Ok(sources) => Ok(Measurement { value: a.value - b.value, sources: sources, known: true, reason: "" }),
+            Ok(sources) => Ok(Measurement<Float> {
+                value: a.value - b.value,
+                sources: sources,
+                known: true,
+                reason: "",
+            }),
             Err(message) => Err(message),
         },
         Err(message) => Err(message),
@@ -295,7 +365,12 @@ pub fn mul(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     }
     match merge_scaled([], a.sources, b.value) {
         Ok(left) => match merge_scaled(left, b.sources, a.value) {
-            Ok(sources) => Ok(Measurement { value: result, sources: sources, known: true, reason: "" }),
+            Ok(sources) => Ok(Measurement<Float> {
+                value: result,
+                sources: sources,
+                known: true,
+                reason: "",
+            }),
             Err(message) => Err(message),
         },
         Err(message) => Err(message),
@@ -314,7 +389,12 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     b_factor = 0.0 - a.value / (b.value * b.value)
     match merge_scaled([], a.sources, a_factor) {
         Ok(left) => match merge_scaled(left, b.sources, b_factor) {
-            Ok(sources) => Ok(Measurement { value: result, sources: sources, known: true, reason: "" }),
+            Ok(sources) => Ok(Measurement<Float> {
+                value: result,
+                sources: sources,
+                known: true,
+                reason: "",
+            }),
             Err(message) => Err(message),
         },
         Err(message) => Err(message),

@@ -1,12 +1,48 @@
 import std.measurements
 
 fn main() -> Void {
-    mut x: Measurement<Quantity<Length>> = Measurement {
+    mut x: Measurement<Quantity<Length>> = Measurement<Quantity<Length>> {
         value: 12 m,
-        sources: [],
+        sources: [Sensitivity<Quantity<Length>> {
+            source_id: "caliper-a",
+            label: "caliper",
+            source_dimension: "Length",
+            source_sigma: 0.02,
+            contribution: 0.02 m
+        }],
         known: true,
         reason: ""
     }
     print(x.value)
     drop(x)
+
+    match measurements.from_quantity_source(12 m, 20 cm, "caliper-a", "caliper") {
+        Ok(measured) => {
+            print(measured.sources[0].source_dimension)
+            print(measured.sources[0].source_sigma)
+            print(measured.sources[0].contribution)
+        },
+        Err(_) => print("invalid quantity measurement"),
+    }
+    match measurements.from_quantity_source(1200 cm, 0.2 m, "caliper-a", "same caliper") {
+        Ok(measured) => print(measured.sources[0].source_sigma),
+        Err(_) => print("invalid quantity measurement"),
+    }
+
+    match measurements.from_quantity_source(12 m, -20 cm, "bad-sigma", "caliper") {
+        Ok(_) => print("negative dimensional sigma accepted"),
+        Err(message) => print("negative dimensional sigma = " + message),
+    }
+    match measurements.from_quantity_source(12 m, 20 cm, "", "caliper") {
+        Ok(_) => print("empty dimensional source id accepted"),
+        Err(message) => print("empty dimensional source id = " + message),
+    }
+    match measurements.from_quantity_source(sqrt(-1.0) * 1 m, 20 cm, "nan-value", "caliper") {
+        Ok(_) => print("non-finite dimensional value accepted"),
+        Err(message) => print("non-finite dimensional value = " + message),
+    }
+    match measurements.from_quantity_source(12 m, sqrt(-1.0) * 1 cm, "nan-sigma", "caliper") {
+        Ok(_) => print("non-finite dimensional sigma accepted"),
+        Err(message) => print("non-finite dimensional sigma = " + message),
+    }
 }

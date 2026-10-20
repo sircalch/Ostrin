@@ -8,6 +8,7 @@ import { repositoryRoot, validateMeasurementContract } from "./measurement-contr
 const trackedFiles = [
   "compiler/std/measurements.ostrin",
   "examples/measurement_scalar.ostrin",
+  "examples/measurement_quantity_direct_shape.ostrin",
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
   "scripts/lab-data.mjs",
@@ -56,6 +57,32 @@ test("the gate requires non-finite input guards and analytical propagation examp
     assert.ok(result.errors.some((error) => error.includes("typed is_finite guards")));
     assert.ok(result.errors.some((error) => error.includes("x * x")));
     assert.ok(result.errors.some((error) => error.includes("analytical propagation model")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate requires dimensional sources to normalize sigma and retain the static dimension", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace("sigma.unit_scale()", "1.0");
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("canonicalized and keyed by the static dimension")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects dimensional constructors without sigma validation", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace("if declared_sigma < 0.0 {", "if false {");
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional constructor input and canonicalization guards")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -7705,7 +7705,10 @@ impl<'a> Codegen<'a> {
         }
         if matches!(obj_ty, CType::Quantity(_))
             && args.is_empty()
-            && (method_name == "value" || method_name == "unit" || method_name == "unit_scale")
+            && (method_name == "value"
+                || method_name == "unit"
+                || method_name == "unit_scale"
+                || method_name == "dimension_key")
         {
             let temp = self.next_temp();
             return Ok(if method_name == "value" {
@@ -7718,6 +7721,22 @@ impl<'a> Codegen<'a> {
                     format!(
                         "({{ Qty {temp} = {obj_code}; ostrin_unit_cat({temp}.u, \"\", \"\"); }})"
                     ),
+                    CType::Str,
+                )
+            } else if method_name == "dimension_key" {
+                let CType::Quantity(dimension) = &obj_ty else {
+                    unreachable!("quantity method dispatch already validated the receiver")
+                };
+                let key = c_string_literal(&dim_to_string(dimension));
+                let release_receiver = owned_call_argument(obj, &obj_ty)
+                    || matches!(obj.unlocated(), Expr::Binary(..));
+                let release = if release_receiver {
+                    format!(" ostrin_qty_release({temp});")
+                } else {
+                    String::new()
+                };
+                (
+                    format!("({{ Qty {temp} = {obj_code};{release} {key}; }})"),
                     CType::Str,
                 )
             } else {

@@ -267,9 +267,16 @@ runtime:
 - `Measurement<Quantity<D>>` no se convierte implícitamente a `Quantity<D>`; una proyección debe
   indicar que descarta la incertidumbre.
 
-Este contrato no habilita todavía `Array<Measurement<T>>`, covarianza ni `Measurement<Quantity<D>>`.
-El intérprete acepta la forma de representación, mientras el backend nativo la rechaza
-explícitamente hasta definir ownership, dimensión de incertidumbre y ABI.
+El prototipo `from_quantity_source` ya construye `Measurement<Quantity<D>>` en el intérprete:
+conserva la contribución como `Quantity<D>`, guarda la sigma de la fuente en la unidad coherente
+mediante `sigma.value() * sigma.unit_scale()` y registra la dimensión estática con
+`value.dimension_key()`. La evidencia cubre `20 cm` y `0.2 m` como sigmas coherentes equivalentes,
+además de rechazos para valores y sigmas no finitos, sigma negativa e identificador vacío.
+La propagación entre mediciones aún no está implementada y el backend nativo mantiene el rechazo
+explícito hasta cerrar ownership, dimensión de incertidumbre y ABI.
+
+Este contrato no habilita todavía `Array<Measurement<T>>` ni covarianza. La propagación deberá
+mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.
 Antes de implementar cualquiera de ellas se requieren pruebas de alias explícito, independencia de
 etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
 unidades y paridad intérprete/native/WASM. También se necesitan leak-check, ASan y UBSan para los

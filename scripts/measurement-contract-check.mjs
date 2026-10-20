@@ -24,6 +24,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
   const std = read("compiler/std/measurements.ostrin", root);
   const example = read("examples/measurement_scalar.ostrin", root);
+  const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
@@ -34,6 +35,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   for (const [name, source] of [
     ["compiler/std/measurements.ostrin", std],
     ["examples/measurement_scalar.ostrin", example],
+    ["examples/measurement_quantity_direct_shape.ostrin", directQuantityExample],
     ["compiler/tests/examples.rs", tests],
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
@@ -84,6 +86,19 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native boundary test is missing");
   check(errors, testsWithDirectQuantityBoundary,
     "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native boundary test is missing");
+  check(errors, /Sensitivity<Quantity<Length>>/.test(directQuantityExample)
+      && /from_quantity_source\(/.test(directQuantityExample)
+      && /20 cm[\s\S]*0\.2 m/.test(directQuantityExample),
+    "examples/measurement_quantity_direct_shape.ostrin: generic dimensional sensitivity shape is missing");
+  check(errors, /pub fn from_quantity_source<D: Dimension>[\s\S]*?sigma\.unit_scale\(\)[\s\S]*?value\.dimension_key\(\)/.test(std),
+    "compiler/std/measurements.ostrin: dimensional source sigma must be canonicalized and keyed by the static dimension");
+  const dimensionalConstructor = std.match(/pub fn from_quantity_source<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /is_finite\(nominal\)/.test(dimensionalConstructor)
+      && /is_finite\(declared_sigma\)/.test(dimensionalConstructor)
+      && /declared_sigma < 0\.0/.test(dimensionalConstructor)
+      && /source_id\.length\(\) == 0/.test(dimensionalConstructor)
+      && /is_finite\(canonical_sigma\)/.test(dimensionalConstructor),
+    "compiler/std/measurements.ostrin: dimensional constructor input and canonicalization guards are missing");
   check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
     "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
 
