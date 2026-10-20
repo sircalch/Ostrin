@@ -60,6 +60,24 @@ export function buildDevelopmentEvidence(environment = process.env) {
     || serverUrl.search || serverUrl.hash) return null;
 
   const runUrl = `${serverUrl.origin}/${repository}/actions/runs/${runId}`;
+  const artifactUrl = environment.OSTRIN_EVIDENCE_ARTIFACT_URL ?? null;
+  if (artifactUrl !== null) {
+    let parsedArtifactUrl;
+    try {
+      parsedArtifactUrl = new URL(artifactUrl);
+    } catch {
+      return null;
+    }
+    const expectedArtifactPath = `/${repository}/actions/runs/${runId}/artifacts/`;
+    const artifactId = parsedArtifactUrl.pathname.startsWith(expectedArtifactPath)
+      ? parsedArtifactUrl.pathname.slice(expectedArtifactPath.length)
+      : "";
+    if (parsedArtifactUrl.origin !== serverUrl.origin
+      || parsedArtifactUrl.username || parsedArtifactUrl.password
+      || parsedArtifactUrl.search || parsedArtifactUrl.hash
+      || !/^\d+$/.test(artifactId)
+      || parsedArtifactUrl.href !== artifactUrl) return null;
+  }
   return {
     schema: "ostrin.ci-evidence/v1",
     repository,
@@ -69,7 +87,7 @@ export function buildDevelopmentEvidence(environment = process.env) {
     headSha,
     testedSha,
     runUrl,
-    artifactUrl: `${runUrl}/artifacts`,
+    artifactUrl,
     artifactName: `ostrin-r3-host-evidence-${runId}`,
   };
 }

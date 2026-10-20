@@ -99,7 +99,7 @@ function render() {
         href: status.developmentEvidence.runUrl,
         text: `Development evidence: ${status.developmentEvidence.workflow} run ${status.developmentEvidence.runId} · tested ${status.developmentEvidence.testedSha.slice(0, 12)}`,
       }),
-      el("a", { href: status.developmentEvidence.artifactUrl, text: `Open ${status.developmentEvidence.artifactName}` }),
+      ...(status.developmentEvidence.artifactUrl ? [el("a", { href: status.developmentEvidence.artifactUrl, text: `Download ${status.developmentEvidence.artifactName}` })] : [el("span", { text: `Artifact: ${status.developmentEvidence.artifactName} (open the run to download)` })]),
     ] : [el("span", { text: "Development CI capture is not attached to this local scorecard." })]),
     el("span", { text: status.workingTreeDirty ? "repository source changed at generation" : "repository source clean at generation" }),
   );

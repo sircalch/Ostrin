@@ -86,6 +86,7 @@ test("development scorecard links the exact captured CI run and artifact", () =>
     GITHUB_REF: "refs/heads/main",
     GITHUB_WORKFLOW: "Deploy Ostrin website",
     GITHUB_SERVER_URL: "https://github.com",
+    OSTRIN_EVIDENCE_ARTIFACT_URL: "https://github.com/sircalch/Ostrin/actions/runs/39362875573/artifacts/123456789",
   });
   assert.deepEqual(evidence, {
     schema: "ostrin.ci-evidence/v1",
@@ -96,10 +97,19 @@ test("development scorecard links the exact captured CI run and artifact", () =>
     headSha: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
     testedSha: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
     runUrl: "https://github.com/sircalch/Ostrin/actions/runs/39362875573",
-    artifactUrl: "https://github.com/sircalch/Ostrin/actions/runs/39362875573/artifacts",
+    artifactUrl: "https://github.com/sircalch/Ostrin/actions/runs/39362875573/artifacts/123456789",
     artifactName: "ostrin-r3-host-evidence-39362875573",
   });
   assert.equal(buildDevelopmentEvidence({ OSTRIN_CAPTURE_HOST: "0" }), null);
+  assert.equal(buildDevelopmentEvidence({
+    OSTRIN_CAPTURE_HOST: "1",
+    GITHUB_REPOSITORY: "sircalch/Ostrin",
+    GITHUB_RUN_ID: "39362875573",
+    GITHUB_SHA: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
+    GITHUB_REF: "refs/heads/main",
+    GITHUB_WORKFLOW: "Deploy Ostrin website",
+    OSTRIN_EVIDENCE_ARTIFACT_URL: "https://github.com/sircalch/Ostrin/actions/runs/39362875573/artifacts",
+  }), null);
   assert.equal(buildDevelopmentEvidence({
     OSTRIN_CAPTURE_HOST: "1",
     GITHUB_REPOSITORY: "sircalch/Ostrin",

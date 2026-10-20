@@ -1,5 +1,9 @@
 name: Verify Ostrin website
 description: Build the real WASM compiler, run static checks and test the site across Chromium, Firefox and WebKit.
+outputs:
+  host-artifact-url:
+    description: Exact GitHub URL for the uploaded host evidence artifact.
+    value: ${{ steps.upload-host-evidence.outputs.artifact-url }}
 runs:
   using: composite
   steps:
@@ -87,6 +91,7 @@ runs:
         node scripts/website-check.mjs --wasm
         node scripts/distribution-check.mjs
     - name: Upload host capture and the verified surface replay receipt
+      id: upload-host-evidence
       uses: actions/upload-artifact@v4
       with:
         name: ostrin-r3-host-evidence-${{ github.run_id }}
