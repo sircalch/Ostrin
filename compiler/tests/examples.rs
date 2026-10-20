@@ -12102,7 +12102,7 @@ fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
         "import std.measurements\n\
          fn main() -> Void {\n\
          point = temperature_point(20.0, \"degC\")\n\
-         measured = Measurement { value: point, sources: [], known: true, reason: \"\" }\n\
+         measured = Measurement<TemperaturePoint> { value: point, sources: [], known: true, reason: \"\" }\n\
          print(measured.value)\n\
          }\n",
     );
