@@ -6,6 +6,7 @@
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
   "releaseTag": "v0.2.0",
   "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
+  "developmentEvidence": null,
   "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",

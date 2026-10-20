@@ -658,6 +658,7 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .status-criterion-state { color: var(--violet-2); }
 .status-criterion.ready .status-criterion-state { color: var(--green); }
 .status-metadata { display: grid; align-content: start; gap: 8px; color: var(--muted); font: .68rem/1.5 var(--mono); }
+.status-metadata a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .status-notes { padding-top: 72px; }
 .viz-gallery-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 30px 0 18px; }
 .viz-gallery-tools[hidden] { display: none; }

@@ -94,6 +94,13 @@ function render() {
     el("span", { text: "Dashboard metrics: repository evidence" }),
     el("span", { text: `v0.2 RC binary source: ${rcRevision}` }),
     ...(releaseRevision ? [el("span", { text: `Published v0.2 binary source: ${releaseRevision}` })] : []),
+    ...(status.developmentEvidence ? [
+      el("a", {
+        href: status.developmentEvidence.runUrl,
+        text: `Development evidence: ${status.developmentEvidence.workflow} run ${status.developmentEvidence.runId} · tested ${status.developmentEvidence.testedSha.slice(0, 12)}`,
+      }),
+      ...(status.developmentEvidence.artifactUrl ? [el("a", { href: status.developmentEvidence.artifactUrl, text: `Download ${status.developmentEvidence.artifactName}` })] : [el("span", { text: `Artifact: ${status.developmentEvidence.artifactName} (open the run to download)` })]),
+    ] : [el("span", { text: "Development CI capture is not attached to this local scorecard." })]),
     el("span", { text: status.workingTreeDirty ? "repository source changed at generation" : "repository source clean at generation" }),
   );
 }
