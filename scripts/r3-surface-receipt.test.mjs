@@ -288,6 +288,11 @@ test("a surface receipt binds one captured run, bundle, entry row and WASM bytes
   assert.deepEqual(replayedHistorical.replayBundles, historicalInventory,
     "offline surface replay must preserve the already verified historical inventory");
   assert.deepEqual(verifySurfaceReceipt(replayedHistorical, text, fakeWasm, expectedRun), []);
+
+  const legacyReceipt = structuredClone(receipt);
+  delete legacyReceipt.replayBundles;
+  assert.deepEqual(verifySurfaceReceipt(legacyReceipt, text, fakeWasm, expectedRun), [],
+    "surface-only verification remains compatible with v1 receipts created before bundle inventories");
 });
 
 test("a receipt cannot be issued before a successful replay of the exact bundle", () => {

@@ -170,14 +170,15 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
     errors.push("receipt fixture source path differs from the registered source");
   }
   const replayBundles = receipt.replayBundles;
-  if (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)
+  if (replayBundles !== undefined && (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)
     || !Object.hasOwn(replayBundles, "surface")
     || Object.entries(replayBundles).some(([id, item]) => !/^[a-z0-9][a-z0-9-]*$/.test(id)
       || !["R1", "R2"].includes(item?.level)
-      || !shaPattern.test(item?.bundleSha256 ?? ""))) {
+      || !shaPattern.test(item?.bundleSha256 ?? "")))) {
     errors.push("receipt executable replay inventory is missing or invalid");
-  } else if (replayBundles.surface?.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))
-    || replayBundles.surface?.level !== bundle?.reproducibility?.level) {
+  } else if (replayBundles !== undefined
+    && (replayBundles.surface?.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))
+      || replayBundles.surface?.level !== bundle?.reproducibility?.level)) {
     errors.push("surface bundle differs from the tested run replay inventory");
   }
   if (receipt.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))) errors.push("bundle bytes differ from the replayed bundle");
