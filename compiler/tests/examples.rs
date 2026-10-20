@@ -12079,7 +12079,7 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
     );
     assert_eq!(
         stdout(&interpreted).replace("\r\n", "\n"),
-        "12 m\nLength\n0.2\n20 cm\n0.2\nnegative dimensional sigma = measurement sigma must be non-negative\nempty dimensional source id = measurement source id must not be empty\nnon-finite dimensional value = measurement value must be finite\nnon-finite dimensional sigma = measurement sigma must be finite\n"
+        "12 m\nLength\n0.2\n20 cm\n0.2\n24 m\n40 cm\n1\n2\n0 m\n0 cm\nchanged dimensional source sigma = measurement source id was reused with a different dimension or sigma\nnegative dimensional sigma = measurement sigma must be non-negative\nempty dimensional source id = measurement source id must not be empty\nnon-finite dimensional value = measurement value must be finite\nnon-finite dimensional sigma = measurement sigma must be finite\n"
     );
 
     let native = run(&["--native-type-report", &file]);

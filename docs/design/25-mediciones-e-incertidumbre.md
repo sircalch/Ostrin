@@ -271,9 +271,15 @@ El prototipo `from_quantity_source` ya construye `Measurement<Quantity<D>>` en e
 conserva la contribución como `Quantity<D>`, guarda la sigma de la fuente en la unidad coherente
 mediante `sigma.value() * sigma.unit_scale()` y registra la dimensión estática con
 `value.dimension_key()`. La evidencia cubre `20 cm` y `0.2 m` como sigmas coherentes equivalentes,
-además de rechazos para valores y sigmas no finitos, sigma negativa e identificador vacío.
-La propagación entre mediciones aún no está implementada y el backend nativo mantiene el rechazo
-explícito hasta cerrar ownership, dimensión de incertidumbre y ABI.
+además de rechazos para valores y sigmas no finitos, sigma negativa e identificador vacío. La
+propagación de suma y resta también está disponible en el intérprete: `12 m ± 20 cm` y
+`1200 cm ± 0.2 m` con la misma identidad producen una contribución de `40 cm` al sumar y `0 cm`
+al restar. Reutilizar una identidad con otra sigma coherente produce un error; identificadores
+distintos permanecen como fuentes independientes aunque compartan etiqueta y sigma. Cada
+combinación valida la dimensión declarada y que el resultado siga siendo finito.
+Producto, cociente y proyección de incertidumbre todavía no están implementados para cantidades.
+El backend nativo mantiene el rechazo explícito hasta cerrar ownership, dimensión de incertidumbre
+y ABI.
 
 Este contrato no habilita todavía `Array<Measurement<T>>` ni covarianza. La propagación deberá
 mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.

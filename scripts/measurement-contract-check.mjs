@@ -102,7 +102,26 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
     "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
 
-  return { errors };
+  const quantityMerge = std.match(/fn merge_quantity_sources<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /record Sensitivity<T>/.test(std)
+      && /source_dimension: String/.test(std)
+      && /source_sigma: Float/.test(std)
+      && /contribution: T/.test(std),
+    "compiler/std/measurements.ostrin: typed dimensional source metadata is missing");
+  check(errors, /pub fn add_quantity<D: Dimension>/.test(std)
+      && /pub fn sub_quantity<D: Dimension>/.test(std)
+      && /current\.source_id == item\.source_id/.test(quantityMerge)
+      && /current\.source_sigma != item\.source_sigma/.test(quantityMerge)
+      && /factor \* item\.contribution/.test(quantityMerge)
+      && /measurement source id was reused with a different dimension or sigma/.test(quantityMerge)
+      && /validate_quantity_source/.test(quantityMerge),
+    "compiler/std/measurements.ostrin: dimensional add/sub must merge and validate shared source contributions");
+  check(errors, /add_quantity\(shared_a, shared_b\)/.test(directQuantityExample)
+      && /sub_quantity\(difference_a, difference_b\)/.test(directQuantityExample),
+    "examples/measurement_quantity_direct_shape.ostrin: correlated dimensional sum and difference examples are missing");
+  check(errors, /Length\\n0\.2\\n20 cm\\n0\.2\\n/.test(tests)
+      && /24 m\\n40 cm\\n1\\n2\\n0 m\\n0 cm\\nchanged dimensional source sigma/.test(tests),
+    "compiler/tests/examples.rs: shared dimensional source identity evidence is missing");  return { errors };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
