@@ -49,7 +49,7 @@ function executableReplayInventory(surfaceBundleText) {
   }));
 }
 
-export function createSurfaceReceipt(bundleText, replayResult) {
+export function createSurfaceReceipt(bundleText, replayResult, replayBundles = executableReplayInventory(bundleText)) {
   const bundle = parseBundle(bundleText);
   const errors = validateSurfaceEvidence(bundle);
   if (errors.length) throw new Error(`surface receipt cannot be issued: ${errors.join("; ")}`);
@@ -72,7 +72,7 @@ export function createSurfaceReceipt(bundleText, replayResult) {
     ciRun: { ...bundle.provenance.runtime.host.ci_run },
     fixtureSourceRevision: bundle.provenance.commit,
     fixtureSourcePath: experimentFixtures.surface.sourcePath,
-    replayBundles: executableReplayInventory(bundleText),
+    replayBundles,
     bundleSha256: replayResult.bundleSha256,
     files: hashes,
     compilerWasmSha256: replayResult.wasmSha256,
@@ -172,7 +172,7 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
   const replayBundles = receipt.replayBundles;
   if (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)
     || !Object.hasOwn(replayBundles, "surface")
-    || Object.entries(replayBundles).some(([id, item]) => !Object.hasOwn(experimentFixtures, id)
+    || Object.entries(replayBundles).some(([id, item]) => !/^[a-z0-9][a-z0-9-]*$/.test(id)
       || !["R1", "R2"].includes(item?.level)
       || !shaPattern.test(item?.bundleSha256 ?? ""))) {
     errors.push("receipt executable replay inventory is missing or invalid");

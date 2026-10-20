@@ -252,6 +252,15 @@ test("a surface receipt binds one captured run, bundle, entry row and WASM bytes
   assert.equal(receipt.compilerWasmSha256, sha256(fakeWasm));
   assert.equal(Object.keys(receipt.replayBundles).length, 11);
   assert.equal(receipt.replayBundles.surface.bundleSha256, receipt.bundleSha256);
+
+  const historicalInventory = {
+    surface: receipt.replayBundles.surface,
+    "retired-fixture": { level: "R1", bundleSha256: "sha256:" + "c".repeat(64) },
+  };
+  const replayedHistorical = createSurfaceReceipt(text, replayProof(text), historicalInventory);
+  assert.deepEqual(replayedHistorical.replayBundles, historicalInventory,
+    "offline surface replay must preserve the already verified historical inventory");
+  assert.deepEqual(verifySurfaceReceipt(replayedHistorical, text, fakeWasm, expectedRun), []);
 });
 
 test("a receipt cannot be issued before a successful replay of the exact bundle", () => {

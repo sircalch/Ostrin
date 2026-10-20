@@ -346,7 +346,8 @@ async function main() {
         throw new Error(`${id}: archived replay loaded WASM bytes that differ from the run-bound surface receipt`);
       }
       if (id === "surface"
-        && JSON.stringify(createSurfaceReceipt(artifact.bundleText, result)) !== JSON.stringify(surface.receipt)) {
+        && JSON.stringify(createSurfaceReceipt(artifact.bundleText, result, surface.receipt.replayBundles))
+          !== JSON.stringify(surface.receipt)) {
         throw new Error("surface: fresh replay differs from the archived receipt");
       }
       console.log(`experiment-replay: independently replayed ${id} from archived WASM in CI run ${runId} (${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""})`);
