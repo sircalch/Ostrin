@@ -65,12 +65,16 @@ local (sustituye los valores por los del run y su `tested_sha` registrados en Ac
 ```text
 node scripts/r3-surface-receipt.mjs --verify-artifact <directorio-descargado> --run-id <id> --tested-sha <sha>
 node scripts/experiment-replay.mjs --replay-artifact <directorio-descargado> --run-id <id> --tested-sha <sha>
+node scripts/experiment-replay.mjs --replay-artifact-all <directorio-descargado> --run-id <id> --tested-sha <sha>
 ```
 
 El primer comando sólo verifica estructura, revisiones y hashes. El segundo ejecuta el WASM
 archivado en procesos Node WASI nuevos, compara el SVG completo con el bundle, exige que el
 cambio de parámetro altere la figura y contrasta el hash del módulo cargado con el recibo.
-El resultado describe esa ejecución y su host; no establece equivalencia general entre plataformas.
+`--replay-artifact-all` aplica ese replay a los once bundles R1/R2 ejecutables del paquete; exige
+que cada captura pertenezca al run/SHA indicado y que todas las ejecuciones carguen el módulo
+identificado por el recibo de `surface`. El resultado describe cada replay en ese host; no establece
+equivalencia general entre plataformas. El replay ejecutable no promueve por sí solo ningún bundle a R3.
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:
 

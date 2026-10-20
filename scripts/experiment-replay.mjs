@@ -8,12 +8,13 @@
 // changes the rendered figure. It deliberately does not claim the
 // seeded-randomness R1 guarantee for fixtures that have not opted in.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { buildExperimentBundle, experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
+import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
 import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
-import { createSurfaceReceipt, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
+import { createSurfaceReceipt, readArchivedFile, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
+import { inspectBundle } from "./r3-readiness.mjs";
 
 const schema = "ostrin.experiment/v0";
 
@@ -39,7 +40,9 @@ function fixtureArgument(argv) {
 
 export function listExecutableReplayIds() {
   return Object.keys(experimentFixtures).filter((id) => {
-    const level = buildExperimentBundle(id).reproducibility.level;
+    const fixture = experimentFixtures[id];
+    const input = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
+    const level = input.reproducibility?.level ?? "R0";
     return level === "R1" || level === "R2";
   });
 }
@@ -180,13 +183,14 @@ function alternateInput(bundle, id) {
 }
 
 async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, compilerWasmPath } = {}) {
-  const fixture = experimentFixtures[id];
-  if (!fixture) throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
-  const bundlePath = outputPathFor(id);
-  if (suppliedBundleText === undefined && !existsSync(bundlePath)) {
-    throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`invalid executable replay fixture ID ${JSON.stringify(id)}`);
+  let bundleText = suppliedBundleText;
+  if (bundleText === undefined) {
+    if (!experimentFixtures[id]) throw new Error(`unknown executable replay fixture ${JSON.stringify(id)}; available: ${Object.keys(experimentFixtures).join(", ")}`);
+    const bundlePath = outputPathFor(id);
+    if (!existsSync(bundlePath)) throw new Error(`${id}: missing ${path.relative(repositoryRoot, bundlePath)}`);
+    bundleText = readFileSync(bundlePath, "utf8");
   }
-  const bundleText = suppliedBundleText ?? readFileSync(bundlePath, "utf8");
   const bundle = JSON.parse(bundleText);
   const errors = bundleErrors(bundle, id);
   if (errors.length) throw new Error(errors.join("\n"));
@@ -268,8 +272,87 @@ export async function replayAll() {
   return results;
 }
 
+export function readArchivedReplayBundle(directory, id, expectedRun) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`invalid archived replay fixture ID ${JSON.stringify(id)}`);
+  const root = realpathSync(directory);
+  const relativePath = `website/assets/experiments/${id}.ostrin-experiment.json`;
+  const archived = readArchivedFile(root, relativePath, 16 * 1024 * 1024);
+  const bundleText = archived.bytes.toString("utf8");
+  let bundle;
+  try {
+    bundle = JSON.parse(bundleText);
+  } catch (error) {
+    throw new Error(`${id}: archived bundle is invalid JSON: ${error.message}`);
+  }
+  const errors = bundleErrors(bundle, id);
+  const inventory = expectedRun?.replayBundles?.[id];
+  const expectedLevel = inventory?.level;
+  if (!inventory || !["R1", "R2"].includes(expectedLevel)) {
+    errors.push(`${id}: archived run does not register this fixture as executable R1/R2`);
+  }
+  if (bundle.reproducibility?.level !== expectedLevel
+    || bundle.provenance?.level !== expectedLevel
+    || bundle.provenance?.reproducibility?.level !== expectedLevel) {
+    errors.push(`${id}: archived reproducibility level differs from the tested run inventory`);
+  }
+  if (inventory?.bundleSha256 !== sha256(bundleText)) {
+    errors.push(`${id}: archived bundle bytes differ from the tested run inventory`);
+  }
+  const effects = bundle.provenance?.effects;
+  errors.push(...validateEffectCapture(effects).map((error) => `${id}: ${error}`));
+  errors.push(...validateEntryEffectSignature(effects?.entry_effect_signature, "main", effects).map((error) => `${id}: ${error}`));
+  if (effects?.entry_effect_signature?.row_closed !== true
+    || effects?.entry_effect_signature?.variables?.length !== 0
+    || effects?.entry_effect_signature?.open_calls?.length !== 0) {
+    errors.push(`${id}: main effect row is not closed`);
+  }
+  const readiness = inspectBundle(bundle, relativePath);
+  if (readiness.status !== "READY") {
+    errors.push(`${id}: archived bundle structural capture is ${readiness.status}`);
+  }
+  const ciRun = bundle.provenance?.runtime?.host?.ci_run;
+  if (ciRun?.run_id !== expectedRun?.runId || ciRun?.tested_sha !== expectedRun?.testedSha) {
+    errors.push(`${id}: host capture does not identify the requested CI run and tested SHA`);
+  }
+  if (errors.length) throw new Error(errors.join("; "));
+  return { bundleText, bundle, path: archived.path };
+}
+
 async function main() {
   const args = process.argv.slice(2);
+  if (args[0] === "--replay-artifact-all") {
+    const [mode, directory, runFlag, runId, shaFlag, testedSha] = args;
+    if (args.length !== 6 || mode !== "--replay-artifact-all" || runFlag !== "--run-id"
+      || shaFlag !== "--tested-sha" || !/^\d+$/.test(runId ?? "") || !/^[a-f0-9]{40}$/.test(testedSha ?? "")) {
+      throw new Error("usage: node scripts/experiment-replay.mjs --replay-artifact-all <directory> --run-id <id> --tested-sha <sha>");
+    }
+    const expectedRun = { runId, testedSha };
+    const surface = verifySurfaceArtifact(directory, expectedRun);
+    const ids = Object.keys(surface.receipt.replayBundles ?? {});
+    expectedRun.replayBundles = surface.receipt.replayBundles;
+    if (ids.length === 0) throw new Error("archived receipt is missing the tested run's executable replay inventory");
+    if (!ids.includes("surface")) throw new Error("surface must be in the executable replay registry to bind the archived WASM");
+    const moduleSha256 = surface.receipt.compilerWasmSha256;
+    for (const id of ids) {
+      const artifact = id === "surface" ? surface : readArchivedReplayBundle(directory, id, expectedRun);
+      const result = await replay(id, {
+        bindWasm: true,
+        bundleText: artifact.bundleText,
+        compilerWasmPath: surface.wasmPath,
+      });
+      if (result.wasmSha256 !== moduleSha256) {
+        throw new Error(`${id}: archived replay loaded WASM bytes that differ from the run-bound surface receipt`);
+      }
+      if (id === "surface"
+        && JSON.stringify(createSurfaceReceipt(artifact.bundleText, result, surface.receipt.replayBundles))
+          !== JSON.stringify(surface.receipt)) {
+        throw new Error("surface: fresh replay differs from the archived receipt");
+      }
+      console.log(`experiment-replay: independently replayed ${id} from archived WASM in CI run ${runId} (${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""})`);
+    }
+    console.log(`experiment-replay: independently replayed all ${ids.length} archived R1/R2 bundles`);
+    return;
+  }
   if (args[0] === "--replay-artifact") {
     const [mode, directory, runFlag, runId, shaFlag, testedSha] = args;
     if (args.length !== 6 || mode !== "--replay-artifact" || runFlag !== "--run-id"

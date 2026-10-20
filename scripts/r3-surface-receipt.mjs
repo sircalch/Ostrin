@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { experimentFixtures, validateEffectCapture, validateEntryEffectSignature, verifyBundleFile } from "./experiment-bundle.mjs";
+import { experimentFixtures, outputPathFor, validateEffectCapture, validateEntryEffectSignature, verifyBundleFile } from "./experiment-bundle.mjs";
 import { inspectBundle, repositoryRoot } from "./r3-readiness.mjs";
 
 export const receiptPath = path.join(repositoryRoot, "target/r3-ci/surface-replay-receipt.json");
@@ -39,7 +39,17 @@ function fileHashes(bundle) {
   return Object.fromEntries(fileNames.map((name) => [name, sha256(Buffer.from(bundle.files?.[name] ?? "", "utf8"))]));
 }
 
-export function createSurfaceReceipt(bundleText, replayResult) {
+function executableReplayInventory(surfaceBundleText) {
+  return Object.fromEntries(Object.entries(experimentFixtures).flatMap(([id, fixture]) => {
+    const input = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
+    const level = input.reproducibility?.level ?? "R0";
+    if (!(["R1", "R2"].includes(level))) return [];
+    const bundle = id === "surface" ? Buffer.from(surfaceBundleText, "utf8") : readFileSync(outputPathFor(id));
+    return [[id, { level, bundleSha256: sha256(bundle) }]];
+  }));
+}
+
+export function createSurfaceReceipt(bundleText, replayResult, replayBundles = executableReplayInventory(bundleText)) {
   const bundle = parseBundle(bundleText);
   const errors = validateSurfaceEvidence(bundle);
   if (errors.length) throw new Error(`surface receipt cannot be issued: ${errors.join("; ")}`);
@@ -62,6 +72,7 @@ export function createSurfaceReceipt(bundleText, replayResult) {
     ciRun: { ...bundle.provenance.runtime.host.ci_run },
     fixtureSourceRevision: bundle.provenance.commit,
     fixtureSourcePath: experimentFixtures.surface.sourcePath,
+    replayBundles,
     bundleSha256: replayResult.bundleSha256,
     files: hashes,
     compilerWasmSha256: replayResult.wasmSha256,
@@ -158,6 +169,18 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
   if (receipt.fixtureSourcePath !== experimentFixtures.surface.sourcePath) {
     errors.push("receipt fixture source path differs from the registered source");
   }
+  const replayBundles = receipt.replayBundles;
+  if (replayBundles !== undefined && (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)
+    || !Object.hasOwn(replayBundles, "surface")
+    || Object.entries(replayBundles).some(([id, item]) => !/^[a-z0-9][a-z0-9-]*$/.test(id)
+      || !["R1", "R2"].includes(item?.level)
+      || !shaPattern.test(item?.bundleSha256 ?? "")))) {
+    errors.push("receipt executable replay inventory is missing or invalid");
+  } else if (replayBundles !== undefined
+    && (replayBundles.surface?.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))
+      || replayBundles.surface?.level !== bundle?.reproducibility?.level)) {
+    errors.push("surface bundle differs from the tested run replay inventory");
+  }
   if (receipt.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))) errors.push("bundle bytes differ from the replayed bundle");
   const hashes = fileHashes(bundle);
   for (const name of fileNames) {
@@ -190,7 +213,7 @@ function verifyFiles(bundleFile, receiptFile, wasmFile, expectedRun) {
   console.log(`r3-surface-receipt: verified surface replay in CI run ${receipt.ciRun.run_id} at ${receipt.ciRun.tested_sha}`);
 }
 
-function readArchivedFile(root, relativePath, maximumBytes) {
+export function readArchivedFile(root, relativePath, maximumBytes) {
   const location = path.join(root, relativePath);
   if (!existsSync(location)) throw new Error(`missing archived ${relativePath}`);
   const resolved = realpathSync(location);
