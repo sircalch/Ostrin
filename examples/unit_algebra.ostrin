@@ -49,7 +49,9 @@ fn main() -> Void {
 
     speed = 1 km / 1 h
     print(speed.unit_scale())
+    print(speed.dimension_key())
     smoot_value = 2 smoot
     print(smoot_value.unit_scale())
     print(smoot_value.value() * smoot_value.unit_scale())
+    print(smoot_value.dimension_key())
 }

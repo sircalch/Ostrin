@@ -12077,7 +12077,10 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
         "direct Measurement<Quantity> interpreter failed: {}",
         stderr(&interpreted)
     );
-    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12 m\n");
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "12 m\nLength\n0.2\n20 cm\n0.2\nnegative dimensional sigma = measurement sigma must be non-negative\nempty dimensional source id = measurement source id must not be empty\nnon-finite dimensional value = measurement value must be finite\nnon-finite dimensional sigma = measurement sigma must be finite\n"
+    );
 
     let native = run(&["--native-type-report", &file]);
     assert!(
@@ -16006,8 +16009,10 @@ fn unit_algebra_simplifies_and_converts_compound_units() {
             "[0.0005, 0.001]",
             "2 m",
             "0.2777777777777778",
+            "Length*Time^-1",
             "1.7018",
             "3.4036",
+            "Length",
         ]
     );
 
@@ -17678,7 +17683,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
     for marker in [
         "ostrin_drop_std_measurements__Measurement__Float",
         "ostrin_drop_std_measurements__Sensitivity",
-        "List_std_measurements__Sensitivity_drop",
+        "List_std_measurements__Sensitivity__Float_drop",
         "for (int64_t i = 0; i < list->length; i++)",
         "ostrin_release((void*)(value->sources))",
         "ostrin_release((void*)(value->reason))",

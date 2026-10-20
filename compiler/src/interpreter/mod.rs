@@ -3243,7 +3243,7 @@ impl Interpreter {
             if method == "to_string" {
                 return Ok(Value::String(receiver.to_string()));
             }
-            if let Value::Quantity(v, _, unit) = &receiver {
+            if let Value::Quantity(v, dimension, unit) = &receiver {
                 if args.is_empty() && method == "value" {
                     return Ok(Value::Float(*v));
                 }
@@ -3253,6 +3253,9 @@ impl Interpreter {
                 if args.is_empty() && method == "unit_scale" {
                     let scale = crate::types::resolve_unit_factor(unit).map_err(unit_error)?;
                     return Ok(Value::Float(scale));
+                }
+                if args.is_empty() && method == "dimension_key" {
+                    return Ok(Value::String(dim_to_string(dimension)));
                 }
             }
             if method == "length" {
