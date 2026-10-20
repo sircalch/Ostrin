@@ -485,8 +485,10 @@ el panel público de benchmarks debe crecer con histórico por commit sin mezcla
 convertir ratios locales en comparaciones entre lenguajes. El explorador Viz ofrece además
 exportación MP4 cuando `MediaRecorder` expone un códec H.264 compatible; en navegadores WebM-only
 el control queda deshabilitado con un motivo explícito y se conserva WebM/GIF como ruta portable.
-La demo Measurements muestra el API escalar experimental de `std.measurements`: fuentes nombradas,
-cancelación correlacionada y propagación determinista en intérprete, nativo y WASM. La figura de
+La demo Measurements muestra el API escalar experimental de `std.measurements`: `from_source` separa
+la identidad estable de una fuente de su etiqueta descriptiva, con pruebas de fuentes correlacionadas
+e independientes y propagación determinista en intérprete, nativo y WASM. `standard` conserva la
+compatibilidad usando la etiqueta como identidad. La figura de
 barras de error de la galería proyecta cinco mediciones a `std.viz.errorbars`; `Quantity<T>`,
 `Array<Measurement<T>>`, covarianza, Monte Carlo y cobertura permanecen en el plan.
 La regresión visual automatizada ya cubre seis superficies públicas en desktop/tablet/móvil y siete
