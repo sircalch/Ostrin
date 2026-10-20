@@ -119,8 +119,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /add_quantity\(shared_a, shared_b\)/.test(directQuantityExample)
       && /sub_quantity\(difference_a, difference_b\)/.test(directQuantityExample),
     "examples/measurement_quantity_direct_shape.ostrin: correlated dimensional sum and difference examples are missing");
-    check(errors, /Length\\n0\.2\\n20 cm\\n0\.2\\n/.test(tests)
-        && /24 m\\n40 cm\\n1\\n2\\n0 m\\n0 cm\\nchanged dimensional source sigma/.test(tests),
+    check(errors, tests.includes("24 m\\n40 cm\\n1\\nLength\\n0.4\\n2\\n0.28284271247461906"),
       "compiler/tests/examples.rs: shared dimensional source identity evidence is missing");
     const quantityUncertainty = std.match(/pub fn quantity_uncertainty<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
     check(errors, /pub record CoherentUncertainty<D>/.test(std)
@@ -129,13 +128,16 @@ export function validateMeasurementContract(root = repositoryRoot) {
         && /canonical_contribution \* canonical_contribution/.test(quantityUncertainty)
         && /measurement uncertainty overflowed/.test(quantityUncertainty),
       "compiler/std/measurements.ostrin: quantity uncertainty must use coherent dimensioned contributions and detect overflow");
-    check(errors, /Length\\n0\\nunknown dimensional uncertainty = sensor offline[\\s\\S]*?Length\\n0\.4\\n2\\n0\.28284271247461906\\noverflowing dimensional uncertainty = measurement uncertainty overflowed/.test(tests),
+    check(errors, tests.includes("12 m\\nLength\\n0.02\\nLength\\n0\\nunknown dimensional uncertainty = sensor offline")
+        && tests.includes("0.28284271247461906\\noverflowing dimensional uncertainty = measurement uncertainty overflowed"),
       "compiler/tests/examples.rs: dimensional uncertainty must handle exact, unknown, correlated, independent, and overflow cases");
     check(errors, /quantity_uncertainty\(summed\)/.test(directQuantityExample)
         && /quantity_uncertainty\(independent_sum\)/.test(directQuantityExample),
       "examples/measurement_quantity_direct_shape.ostrin: dimensional uncertainty projections are missing");
     check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
       "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
+
+  return { errors };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
