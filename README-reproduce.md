@@ -59,12 +59,18 @@ node scripts/r3-surface-receipt.mjs --verify
 Estos comandos requieren el bundle host-bound y las variables de la ejecución de GitHub Actions;
 un checkout local ordinario no debe inventarlas.
 El artefacto del run también conserva `website/ostrinc.wasm`, los bundles y el recibo. Tras
-descargarlo, se puede verificar sin reconstruir el binario local (sustituye los valores por los
-del run y su `tested_sha` publicados en GitHub Actions):
+descargarlo, se puede verificar y **volver a ejecutar** `surface` sin reconstruir el binario
+local (sustituye los valores por los del run y su `tested_sha` registrados en Actions):
 
 ```text
 node scripts/r3-surface-receipt.mjs --verify-artifact <directorio-descargado> --run-id <id> --tested-sha <sha>
+node scripts/experiment-replay.mjs --replay-artifact <directorio-descargado> --run-id <id> --tested-sha <sha>
 ```
+
+El primer comando sólo verifica estructura, revisiones y hashes. El segundo ejecuta el WASM
+archivado en procesos Node WASI nuevos, compara el SVG completo con el bundle, exige que el
+cambio de parámetro altere la figura y contrasta el hash del módulo cargado con el recibo.
+El resultado describe esa ejecución y su host; no establece equivalencia general entre plataformas.
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:
 

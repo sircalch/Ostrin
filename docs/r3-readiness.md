@@ -118,8 +118,17 @@ cerrada de `main`, el SHA de los bytes WASM cargados por cada proceso hijo y el 
 capturados por el mismo job. El verificador vuelve a contrastarlos con el bundle, el binario
 WASM presente y el checkout que está ejecutando CI. El artefacto host-bound incluye el recibo y
 los bytes WASM construidos por ese run, para verificar el paquete descargado sin sustituirlos
-por un binario local potencialmente distinto;
-el archivo se genera en una ruta ignorada y no se versiona.
+por un binario local potencialmente distinto. El recibo se genera en una ruta ignorada y no se
+versiona.
+
+En un paquete descargado, `--verify-artifact` valida integridad y procedencia estructural;
+`node scripts/experiment-replay.mjs --replay-artifact <directorio> --run-id <id> --tested-sha <sha>`
+vuelve a ejecutar el fuente y el snapshot embebidos con el WASM archivado. Compara el SVG completo,
+la sensibilidad del parámetro y el hash del módulo realmente cargado por el proceso hijo. La
+lectura del paquete limita tamaños y rechaza archivos que escapen del directorio descargado.
+Website CI ejecuta también este comando contra su propio paquete antes de subirlo como evidencia.
+Este replay independiente puede fallar en otro host; un éxito sólo acredita el contrato
+observado en ese host, no equivalencia numérica universal.
 
 `fixtureSourceRevision` identifica el commit del programa fuente `examples/viz_surface.ostrin`;
 el verificador contrasta sus bytes con ese commit. `data.json` y `figure.svg` se identifican por

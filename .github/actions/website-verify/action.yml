@@ -75,6 +75,7 @@ runs:
         node --test scripts/experiment-replay.test.mjs
         node scripts/experiment-replay.mjs --fixture surface --write-r3-receipt
         node scripts/r3-surface-receipt.mjs --verify
+        node scripts/experiment-replay.mjs --replay-artifact . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"
         node --test scripts/r3-surface-receipt.test.mjs
         node scripts/r3-readiness.mjs --require-ready
         node scripts/quality-scorecard.mjs --write
