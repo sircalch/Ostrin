@@ -3250,6 +3250,10 @@ impl Interpreter {
                 if args.is_empty() && method == "unit" {
                     return Ok(Value::String(unit.clone()));
                 }
+                if args.is_empty() && method == "unit_scale" {
+                    let scale = crate::types::resolve_unit_factor(unit).map_err(unit_error)?;
+                    return Ok(Value::Float(scale));
+                }
             }
             if method == "length" {
                 if let Value::List(state) = &receiver {

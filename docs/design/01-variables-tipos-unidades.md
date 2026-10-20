@@ -252,6 +252,13 @@ La unidad de salida por defecto es la del operando izquierdo; se puede forzar co
 c = (a + b) as nm
 ```
 
+`Quantity<D>.unit_scale()` devuelve el factor multiplicativo de la unidad actual a la unidad de
+referencia coherente de su dimensión (SI para dimensiones SI; la unidad base declarada para una
+dimensión de usuario). Por tanto, `q.value() * q.unit_scale()` da el valor numérico en esa unidad
+de referencia; el método no altera el `Quantity` ni aplica offsets afines. Funciona también para
+expresiones compuestas y unidades declaradas por el usuario, y permite normalizar escalas antes de
+operar sobre metadatos científicos.
+
 ### 3.5 Unidades definidas por el usuario
 
 Para dominios fuera de física pura (finanzas, química con nombres locales, etc.):
@@ -298,8 +305,9 @@ Estado real del compilador, que concreta §3.1–§3.5:
   (`90 km/h * 30 min` → `45 km`). Si todo se cancela, el resultado es un número.
 - **`as` con unidades compuestas** (`v as km/h`) y comprobación de dimensión: `x as s` con `x` una
   longitud es E1026. Los mensajes muestran la dimensión legible: `Mass*Length^2/Time^2 (Energy)`.
-- **Introspección**: `q.value()` (número en su propia unidad) y `q.unit()` (texto de la unidad),
-  usados por `std.viz` para etiquetar ejes.
+- **Introspección**: `q.value()` (número en su propia unidad), `q.unit()` (texto de la unidad) y
+  `q.unit_scale()` (factor hacia la unidad de referencia coherente), usados por `std.viz` y para
+  normalizar magnitudes antes de combinarlas con metadatos científicos.
 
 - **Arrays de cantidades** (`Array<Quantity<D>>`, documento 19 §5): un array numérico más una unidad
   común. `array([1 m, 250 cm])` toma la unidad del primer elemento; `linspace(0.0, 4.0, 5) as s` da

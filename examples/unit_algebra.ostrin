@@ -1,6 +1,9 @@
 // Unit algebra: compound units are simplified (`kg*m^2/s^2`), same-dimension
 // units cancel (`km/h * min` → `km`), `as` accepts compound targets and named
 // derived dimensions (`Energy`, `Velocity`, `Pressure`) work in signatures.
+unit smoot : Length
+define 1 smoot = 1.7018 m
+
 fn kinetic(m: Quantity<Mass>, v: Quantity<Velocity>) -> Quantity<Energy> {
     0.5 * m * v * v
 }
@@ -43,4 +46,10 @@ fn main() -> Void {
     // A variable after `/` is still a division, not a unit.
     t = 4.0
     print(8 m / t)
+
+    speed = 1 km / 1 h
+    print(speed.unit_scale())
+    smoot_value = 2 smoot
+    print(smoot_value.unit_scale())
+    print(smoot_value.value() * smoot_value.unit_scale())
 }

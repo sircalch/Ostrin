@@ -16005,7 +16005,92 @@ fn unit_algebra_simplifies_and_converts_compound_units() {
             "0.0006666666666666666",
             "[0.0005, 0.001]",
             "2 m",
+            "0.2777777777777778",
+            "1.7018",
+            "3.4036",
         ]
+    );
+
+    let file = example_path("unit_algebra.ostrin");
+    let expected = format!("{}\n", lines.join("\n"));
+
+    let exe = temp_artifact("quantity-unit-scale-leak-check.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run unit scale binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "unit scale leaked a generated quantity unit label: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let converted = temp_source(
+        "quantity_unit_scale_converted_receiver",
+        "fn main() -> Void {\n\
+         q = (1 m * 2 s) as m*s\n\
+         print(q.unit_scale())\n\
+         }\n",
+    );
+    let converted_exe = temp_artifact("quantity-unit-scale-converted-leak-check.exe");
+    let converted_compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &converted_exe,
+        &converted,
+    ]);
+    if !skip_if_no_c_compiler(&converted_compile) {
+        assert!(
+            converted_compile.status.success(),
+            "converted quantity compile failed: {}",
+            stderr(&converted_compile)
+        );
+        let converted_native = Command::new(&converted_exe)
+            .output()
+            .expect("run converted quantity unit scale binary");
+        assert_eq!(
+            String::from_utf8_lossy(&converted_native.stdout).replace("\r\n", "\n"),
+            "1\n"
+        );
+        assert!(
+            String::from_utf8_lossy(&converted_native.stderr).contains("live_allocations=0"),
+            "converted quantity receiver leaked its source unit label: {}",
+            String::from_utf8_lossy(&converted_native.stderr)
+        );
+    }
+    let _ = fs::remove_file(&converted_exe);
+    let _ = fs::remove_file(&converted);
+
+    let closed_effects = run(&["--require-closed-effects", "--check", &file]);
+    assert!(
+        closed_effects.status.success(),
+        "unit_scale should remain effect-free: {}",
+        stderr(&closed_effects)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("ostrin_unit_expr_factor"),
+        "WASI C is missing the coherent-unit scale helper"
     );
 }
 

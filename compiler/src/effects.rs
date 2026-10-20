@@ -2405,7 +2405,10 @@ fn is_known_effect_free_method(owner: &str, method: &str) -> bool {
             method,
             "is_ok" | "is_err" | "unwrap" | "unwrap_or" | "map" | "map_err" | "and_then"
         ),
-        "@Quantity" => matches!(method, "value" | "unit" | "is_exact" | "is_known"),
+        "@Quantity" => matches!(
+            method,
+            "value" | "unit" | "unit_scale" | "is_exact" | "is_known"
+        ),
         _ => false,
     }
 }
