@@ -64,6 +64,12 @@ Si una de esas comprobaciones falla, no se publica el paquete como evidencia ver
 verificación local mantiene el campo ausente para que un checkout de desarrollador no se presente
 como una ejecución CI.
 
+El scorecard generado dentro de CI también publica un bloque `developmentEvidence` con el workflow,
+`run_id`, `head_sha`, `tested_sha` y las URLs del run y sus artefactos. Esto permite llegar desde el
+panel público al paquete host-bound que respalda sus métricas de desarrollo, sin cambiar las
+revisiones históricas del candidato ni la revisión fuente del tag publicado. En una ejecución local,
+el bloque queda en `null`.
+
 La ejecución CI del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d` completó el mismo gate con
 captura auténtica: **29/29 estructuralmente READY**, 29/29 capturas de host válidas, 29/29 filas de entrada cerradas,
 74 bordes simbólicos en el inventario global y cero bordes sin resolver. El workflow pasó la

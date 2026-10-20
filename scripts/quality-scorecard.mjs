@@ -33,6 +33,47 @@ export function hasDirtySourceChanges(changedPaths) {
   return changedPaths.some((filePath) => !generatedEvidencePath(filePath));
 }
 
+export function buildDevelopmentEvidence(environment = process.env) {
+  if (environment.OSTRIN_CAPTURE_HOST !== "1") return null;
+
+  const repository = environment.GITHUB_REPOSITORY ?? "";
+  const runId = environment.GITHUB_RUN_ID ?? "";
+  const testedSha = environment.GITHUB_SHA ?? "";
+  const headSha = environment.OSTRIN_EVIDENCE_HEAD_SHA ?? testedSha;
+  const ref = environment.GITHUB_REF ?? "";
+  const workflow = environment.GITHUB_WORKFLOW ?? "";
+  const server = environment.GITHUB_SERVER_URL ?? "https://github.com";
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
+    || !/^\d+$/.test(runId)
+    || !/^[a-f0-9]{40}$/.test(testedSha)
+    || !/^[a-f0-9]{40}$/.test(headSha)
+    || !/^refs\/.+/.test(ref)
+    || workflow.trim().length === 0) return null;
+
+  let serverUrl;
+  try {
+    serverUrl = new URL(server);
+  } catch {
+    return null;
+  }
+  if (serverUrl.protocol !== "https:" || serverUrl.username || serverUrl.password
+    || serverUrl.search || serverUrl.hash) return null;
+
+  const runUrl = `${serverUrl.origin}/${repository}/actions/runs/${runId}`;
+  return {
+    schema: "ostrin.ci-evidence/v1",
+    repository,
+    workflow,
+    runId,
+    ref,
+    headSha,
+    testedSha,
+    runUrl,
+    artifactUrl: `${runUrl}/artifacts`,
+    artifactName: `ostrin-r3-host-evidence-${runId}`,
+  };
+}
+
 function workingTreeSourcePaths() {
   const tracked = git(["diff", "--name-only", "HEAD"]).split(/\r?\n/).filter(Boolean);
   const untracked = git(["ls-files", "--others", "--exclude-standard"]).split(/\r?\n/).filter(Boolean);
@@ -310,6 +351,7 @@ export async function buildScorecard() {
     evidenceRevision: candidateEvidence.evidenceRevision,
     releaseTag: candidateEvidence.releaseTag,
     finalReleaseSourceRevision: candidateEvidence.finalReleaseSourceRevision,
+    developmentEvidence: buildDevelopmentEvidence(),
     workingTreeDirty,
     sources: {
       native: "compiler/tests/differential.rs",

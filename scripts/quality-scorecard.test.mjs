@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildScorecard, hasCompleteFftCases, hasCompleteNumericRuns, hasDirtySourceChanges, hasMatchingNumericCi, hasMatchingNumericInputs } from "./quality-scorecard.mjs";
+import { buildDevelopmentEvidence, buildScorecard, hasCompleteFftCases, hasCompleteNumericRuns, hasDirtySourceChanges, hasMatchingNumericCi, hasMatchingNumericInputs } from "./quality-scorecard.mjs";
 
 const contract = JSON.parse(readFileSync(new URL("../validation/numeric/matrix_algorithms.json", import.meta.url), "utf8"));
+const releaseEvidence = JSON.parse(readFileSync(new URL("../validation/release-candidate-v0.2.0.json", import.meta.url), "utf8"));
 const numericReport = JSON.parse(readFileSync(new URL("../validation/numeric/windows-local.json", import.meta.url), "utf8"));
 
 test("FFT scorecard requires each residual within its declared tolerance", () => {
@@ -75,10 +76,47 @@ test("source edits and unrelated generated files remain visible as dirty", () =>
   assert.equal(hasDirtySourceChanges(["list_phi_probe.ostrin"]), true);
 });
 
+test("development scorecard links the exact captured CI run and artifact", () => {
+  const evidence = buildDevelopmentEvidence({
+    OSTRIN_CAPTURE_HOST: "1",
+    GITHUB_REPOSITORY: "sircalch/Ostrin",
+    GITHUB_RUN_ID: "39362875573",
+    GITHUB_SHA: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
+    OSTRIN_EVIDENCE_HEAD_SHA: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
+    GITHUB_REF: "refs/heads/main",
+    GITHUB_WORKFLOW: "Deploy Ostrin website",
+    GITHUB_SERVER_URL: "https://github.com",
+  });
+  assert.deepEqual(evidence, {
+    schema: "ostrin.ci-evidence/v1",
+    repository: "sircalch/Ostrin",
+    workflow: "Deploy Ostrin website",
+    runId: "39362875573",
+    ref: "refs/heads/main",
+    headSha: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
+    testedSha: "69c53dad1ba0e5005ad4bf39ef2f4086682651b4",
+    runUrl: "https://github.com/sircalch/Ostrin/actions/runs/39362875573",
+    artifactUrl: "https://github.com/sircalch/Ostrin/actions/runs/39362875573/artifacts",
+    artifactName: "ostrin-r3-host-evidence-39362875573",
+  });
+  assert.equal(buildDevelopmentEvidence({ OSTRIN_CAPTURE_HOST: "0" }), null);
+  assert.equal(buildDevelopmentEvidence({
+    OSTRIN_CAPTURE_HOST: "1",
+    GITHUB_REPOSITORY: "sircalch/Ostrin",
+    GITHUB_RUN_ID: "39362875573",
+    GITHUB_SHA: "invalid",
+    GITHUB_REF: "refs/heads/main",
+    GITHUB_WORKFLOW: "Deploy Ostrin website",
+  }), null);
+});
+
 test("scorecard separates closed entry rows from module-wide symbolic effect inventory", async () => {
   const scorecard = await buildScorecard();
   assert.equal(scorecard.metricsScope, "current-repository-evidence");
   assert.equal(scorecard.sourceRevisionScope, "v0.2-release-candidate-artifacts");
+  assert.equal(scorecard.sourceRevision, releaseEvidence.sourceRevision);
+  assert.equal(scorecard.evidenceRevision, releaseEvidence.evidenceRevision);
+  assert.equal(scorecard.finalReleaseSourceRevision, releaseEvidence.finalReleaseSourceRevision);
   assert.equal(scorecard.sources.numericalValidation, "validation/numeric/windows-local.json");
   assert.equal(scorecard.r3.readyCount + scorecard.r3.openCount, scorecard.r3.bundleCount);
   assert.equal(scorecard.r3.status,
