@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { experimentFixtures, validateEffectCapture, validateEntryEffectSignature, verifyBundleFile } from "./experiment-bundle.mjs";
+import { experimentFixtures, outputPathFor, validateEffectCapture, validateEntryEffectSignature, verifyBundleFile } from "./experiment-bundle.mjs";
 import { inspectBundle, repositoryRoot } from "./r3-readiness.mjs";
 
 export const receiptPath = path.join(repositoryRoot, "target/r3-ci/surface-replay-receipt.json");
@@ -39,6 +39,16 @@ function fileHashes(bundle) {
   return Object.fromEntries(fileNames.map((name) => [name, sha256(Buffer.from(bundle.files?.[name] ?? "", "utf8"))]));
 }
 
+function executableReplayInventory(surfaceBundleText) {
+  return Object.fromEntries(Object.entries(experimentFixtures).flatMap(([id, fixture]) => {
+    const input = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
+    const level = input.reproducibility?.level ?? "R0";
+    if (!(["R1", "R2"].includes(level))) return [];
+    const bundle = id === "surface" ? Buffer.from(surfaceBundleText, "utf8") : readFileSync(outputPathFor(id));
+    return [[id, { level, bundleSha256: sha256(bundle) }]];
+  }));
+}
+
 export function createSurfaceReceipt(bundleText, replayResult) {
   const bundle = parseBundle(bundleText);
   const errors = validateSurfaceEvidence(bundle);
@@ -62,6 +72,7 @@ export function createSurfaceReceipt(bundleText, replayResult) {
     ciRun: { ...bundle.provenance.runtime.host.ci_run },
     fixtureSourceRevision: bundle.provenance.commit,
     fixtureSourcePath: experimentFixtures.surface.sourcePath,
+    replayBundles: executableReplayInventory(bundleText),
     bundleSha256: replayResult.bundleSha256,
     files: hashes,
     compilerWasmSha256: replayResult.wasmSha256,
@@ -157,6 +168,17 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
   }
   if (receipt.fixtureSourcePath !== experimentFixtures.surface.sourcePath) {
     errors.push("receipt fixture source path differs from the registered source");
+  }
+  const replayBundles = receipt.replayBundles;
+  if (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)
+    || !Object.hasOwn(replayBundles, "surface")
+    || Object.entries(replayBundles).some(([id, item]) => !Object.hasOwn(experimentFixtures, id)
+      || !["R1", "R2"].includes(item?.level)
+      || !shaPattern.test(item?.bundleSha256 ?? ""))) {
+    errors.push("receipt executable replay inventory is missing or invalid");
+  } else if (replayBundles.surface?.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))
+    || replayBundles.surface?.level !== bundle?.reproducibility?.level) {
+    errors.push("surface bundle differs from the tested run replay inventory");
   }
   if (receipt.bundleSha256 !== sha256(Buffer.from(bundleText, "utf8"))) errors.push("bundle bytes differ from the replayed bundle");
   const hashes = fileHashes(bundle);

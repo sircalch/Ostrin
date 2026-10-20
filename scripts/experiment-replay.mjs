@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
+import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
 import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
 import { createSurfaceReceipt, readArchivedFile, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
 import { inspectBundle } from "./r3-readiness.mjs";
@@ -287,15 +287,26 @@ export function readArchivedReplayBundle(directory, id, expectedRun) {
   }
   const errors = bundleErrors(bundle, id);
   const fixture = experimentFixtures[id];
-  const registeredInput = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
-  const expectedLevel = registeredInput.reproducibility?.level ?? "R0";
-  if (!["R1", "R2"].includes(expectedLevel)) {
-    errors.push(`${id}: registered fixture is not declared as executable R1/R2`);
+  const inventory = expectedRun?.replayBundles?.[id];
+  const expectedLevel = inventory?.level;
+  if (!inventory || !["R1", "R2"].includes(expectedLevel)) {
+    errors.push(`${id}: archived run does not register this fixture as executable R1/R2`);
   }
   if (bundle.reproducibility?.level !== expectedLevel
     || bundle.provenance?.level !== expectedLevel
     || bundle.provenance?.reproducibility?.level !== expectedLevel) {
-    errors.push(`${id}: archived reproducibility level differs from the registered fixture maturity`);
+    errors.push(`${id}: archived reproducibility level differs from the tested run inventory`);
+  }
+  if (inventory?.bundleSha256 !== sha256(bundleText)) {
+    errors.push(`${id}: archived bundle bytes differ from the tested run inventory`);
+  }
+  const effects = bundle.provenance?.effects;
+  errors.push(...validateEffectCapture(effects).map((error) => `${id}: ${error}`));
+  errors.push(...validateEntryEffectSignature(effects?.entry_effect_signature, "main", effects).map((error) => `${id}: ${error}`));
+  if (effects?.entry_effect_signature?.row_closed !== true
+    || effects?.entry_effect_signature?.variables?.length !== 0
+    || effects?.entry_effect_signature?.open_calls?.length !== 0) {
+    errors.push(`${id}: main effect row is not closed`);
   }
   const readiness = inspectBundle(bundle, relativePath);
   if (readiness.status !== "READY") {
@@ -319,7 +330,9 @@ async function main() {
     }
     const expectedRun = { runId, testedSha };
     const surface = verifySurfaceArtifact(directory, expectedRun);
-    const ids = listExecutableReplayIds();
+    const ids = Object.keys(surface.receipt.replayBundles ?? {});
+    expectedRun.replayBundles = surface.receipt.replayBundles;
+    if (ids.length === 0) throw new Error("archived receipt is missing the tested run's executable replay inventory");
     if (!ids.includes("surface")) throw new Error("surface must be in the executable replay registry to bind the archived WASM");
     const moduleSha256 = surface.receipt.compilerWasmSha256;
     for (const id of ids) {

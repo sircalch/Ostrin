@@ -13,6 +13,16 @@ const canonicalJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const expectedRun = { runId: "1234", testedSha: "b".repeat(40) };
 const fakeWasm = Buffer.from("test-only WASM bytes");
 
+function runFor(bundle) {
+  const text = canonicalJson(bundle);
+  return {
+    ...expectedRun,
+    replayBundles: {
+      surface: { level: "R2", bundleSha256: sha256(Buffer.from(text, "utf8")) },
+    },
+  };
+}
+
 test("Pages deploys when any surface replay evidence producer changes", () => {
   const workflow = readFileSync(path.join(repositoryRoot, ".github/workflows/pages.yml"), "utf8");
   for (const source of [
@@ -36,7 +46,7 @@ test("offline artifact bundle replay requires a matching host capture and a clos
     const file = path.join(root, "website/assets/experiments/surface.ostrin-experiment.json");
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, canonicalJson(bundle));
-    const accepted = readArchivedReplayBundle(root, "surface", expectedRun);
+    const accepted = readArchivedReplayBundle(root, "surface", runFor(bundle));
     assert.equal(JSON.parse(accepted.bundleText).id, "surface");
     assert.match(accepted.path, /surface\.ostrin-experiment\.json$/);
 
@@ -44,14 +54,14 @@ test("offline artifact bundle replay requires a matching host capture and a clos
     wrongRun.provenance.runtime.host.ci_run.run_id = "9876";
     refreshProvenance(wrongRun);
     writeFileSync(file, canonicalJson(wrongRun));
-    assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /requested CI run and tested SHA/);
+    assert.throws(() => readArchivedReplayBundle(root, "surface", runFor(bundle)), /requested CI run and tested SHA|tested run inventory/);
 
     const openRow = structuredClone(bundle);
     openRow.provenance.effects.entry_effect_signature.row_closed = false;
     openRow.provenance.effects.entry_effect_signature.open_calls = ["unknown_callback"];
     refreshProvenance(openRow);
     writeFileSync(file, canonicalJson(openRow));
-    assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /structural capture is OPEN/);
+    assert.throws(() => readArchivedReplayBundle(root, "surface", runFor(bundle)), /main effect row is not closed|structural capture is OPEN/);
 
     const downgraded = structuredClone(bundle);
     downgraded.reproducibility.level = "R0";
@@ -59,7 +69,14 @@ test("offline artifact bundle replay requires a matching host capture and a clos
     downgraded.provenance.reproducibility.level = "R0";
     refreshProvenance(downgraded);
     writeFileSync(file, canonicalJson(downgraded));
-    assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /differs from the registered fixture maturity/);
+    assert.throws(() => readArchivedReplayBundle(root, "surface", runFor(bundle)), /differs from the tested run inventory/);
+
+    const wrongEntry = capturedSurface();
+    wrongEntry.provenance.effects.entry = "callback";
+    wrongEntry.provenance.effects.entry_effect_signature.function = "callback";
+    refreshProvenance(wrongEntry);
+    writeFileSync(file, canonicalJson(wrongEntry));
+    assert.throws(() => readArchivedReplayBundle(root, "surface", runFor(bundle)), /main effect row|entry effect signature must name/);
   } finally {
     assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
     rmSync(root, { recursive: true, force: true });
@@ -71,6 +88,35 @@ test("offline replay registry reads fixture contracts without building the nativ
   assert.equal(ids.length, 11);
   assert.ok(ids.includes("surface"));
   assert.ok(ids.every((id) => ["lines", "surface", "histogram", "boxplot", "scatter-fit", "violin", "hexbin", "bars", "point-cloud", "fft", "dashboard"].includes(id)));
+});
+
+test("archived replay maturity and membership are bound to the tested run inventory", () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-replay-artifact-"));
+  try {
+    const bundle = capturedSurface();
+    const file = path.join(root, "website/assets/experiments/surface.ostrin-experiment.json");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, canonicalJson(bundle));
+    const run = runFor(bundle);
+    const accepted = readArchivedReplayBundle(root, "surface", run);
+    assert.equal(accepted.bundle.id, "surface");
+
+    const altered = structuredClone(bundle);
+    altered.reproducibility.level = "R0";
+    altered.provenance.level = "R0";
+    altered.provenance.reproducibility.level = "R0";
+    refreshProvenance(altered);
+    writeFileSync(file, canonicalJson(altered));
+    assert.throws(() => readArchivedReplayBundle(root, "surface", run), /tested run inventory|tested run inventory/);
+
+    assert.throws(() => readArchivedReplayBundle(root, "surface", {
+      ...run,
+      replayBundles: { "removed-in-current-checkout": { level: "R2", bundleSha256: "sha256:" + "a".repeat(64) } },
+    }), /does not register this fixture as executable R1\/R2/);
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("a downloaded evidence package can be verified with its archived WASM", () => {
@@ -204,6 +250,8 @@ test("a surface receipt binds one captured run, bundle, entry row and WASM bytes
   assert.deepEqual(verifySurfaceReceipt(receipt, text, fakeWasm, expectedRun), []);
   assert.equal(receipt.fixtureSourceRevision, JSON.parse(text).provenance.commit);
   assert.equal(receipt.compilerWasmSha256, sha256(fakeWasm));
+  assert.equal(Object.keys(receipt.replayBundles).length, 11);
+  assert.equal(receipt.replayBundles.surface.bundleSha256, receipt.bundleSha256);
 });
 
 test("a receipt cannot be issued before a successful replay of the exact bundle", () => {

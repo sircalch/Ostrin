@@ -123,11 +123,14 @@ versiona.
 
 En un paquete descargado, `--verify-artifact` valida integridad y procedencia estructural del
 recibo de `surface`; `node scripts/experiment-replay.mjs --replay-artifact-all <directorio>
---run-id <id> --tested-sha <sha>` vuelve a ejecutar los once bundles R1/R2 ejecutables con el
+--run-id <id> --tested-sha <sha>` vuelve a ejecutar los bundles R1/R2 registrados en ese run con el
 WASM archivado. En cada bundle compara el SVG completo con su resultado registrado y exige que
 el parámetro declarado cambie la figura; para R1 también repite la entrada/semilla. Cada captura
-debe identificar el mismo run/SHA y tener una fila de entrada cerrada. El recibo de `surface`
-ancla el hash del módulo que cargan los once replays. La lectura limita el tamaño de cada archivo
+debe identificar el mismo run/SHA y tener una fila de entrada cerrada. El recibo registra para
+cada bundle su ID, nivel y hash, de modo que selección y madurez no dependan del checkout desde el
+que se inspecciona un artefacto antiguo. Cada replay contrasta los bytes con ese inventario y
+verifica la fila de efectos cerrada de `main`, que es la función realmente ejecutada. El recibo de
+`surface` ancla el hash del módulo que cargan todos los replays. La lectura limita el tamaño de cada archivo
 y rechaza rutas que escapen del directorio descargado. Website CI ejecuta este replay completo
 antes de subir el paquete como evidencia. La captura de CI no es una atestación criptográfica:
 el éxito acredita las salidas bajo ese WASM y host, no equivalencia numérica universal.
