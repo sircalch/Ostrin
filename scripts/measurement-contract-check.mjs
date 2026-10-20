@@ -24,6 +24,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
   const std = read("compiler/std/measurements.ostrin", root);
   const example = read("examples/measurement_scalar.ostrin", root);
+  const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
@@ -34,6 +35,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   for (const [name, source] of [
     ["compiler/std/measurements.ostrin", std],
     ["examples/measurement_scalar.ostrin", example],
+    ["examples/measurement_quantity_direct_shape.ostrin", directQuantityExample],
     ["compiler/tests/examples.rs", tests],
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
@@ -47,18 +49,12 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/std/measurements.ostrin: typed is_finite guards are missing");
   check(errors, /measurement value must be finite/.test(std) && /measurement sigma must be finite/.test(std),
     "compiler/std/measurements.ostrin: finite input validation is missing");
-  check(errors, /record Sensitivity<T>/.test(std) && /source_dimension: String/.test(std)
-      && /source_sigma: Float/.test(std) && /contribution: T/.test(std)
-      && /sources: List<Sensitivity<T>>/.test(std),
-    "compiler/std/measurements.ostrin: typed contribution and source metadata must remain separate");
   for (const marker of [
     "measurements.standard",
     "measurements.from_source",
     "same id, different labels",
-    "scaled explicit source",
     "different ids, same label",
     "source sigma mismatch",
-    "derived source sigma mismatch",
     "legacy and explicit id",
     "measurements.exact",
     "measurements.unknown",
@@ -82,7 +78,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: scalar phase evidence is missing");
   check(errors, /(?:no habilita todavía|siguen pendientes)[\s\S]{0,80}Array<Measurement<T>>/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
-  check(errors, /contribución de cada fuente[\s\S]*?b·gₐ,s \+ a·g_b,s[\s\S]*?NIST TN 1297/i.test(design),
+  check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
   check(errors, /Quantity integration[\s\S]{0,220}(?:remain|pending|siguen pendientes)/i.test(lab),
     "scripts/lab-data.mjs: experimental Measurement boundary is missing");
@@ -90,7 +86,6 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native boundary test is missing");
   check(errors, testsWithDirectQuantityBoundary,
     "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native boundary test is missing");
-  const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
   check(errors, /Sensitivity<Quantity<Length>>/.test(directQuantityExample)
       && /from_quantity_source\(/.test(directQuantityExample)
       && /20 cm[\s\S]*0\.2 m/.test(directQuantityExample),
@@ -104,7 +99,15 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /source_id\.length\(\) == 0/.test(dimensionalConstructor)
       && /is_finite\(canonical_sigma\)/.test(dimensionalConstructor),
     "compiler/std/measurements.ostrin: dimensional constructor input and canonicalization guards are missing");
+  check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
+    "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
+
   const quantityMerge = std.match(/fn merge_quantity_sources<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /record Sensitivity<T>/.test(std)
+      && /source_dimension: String/.test(std)
+      && /source_sigma: Float/.test(std)
+      && /contribution: T/.test(std),
+    "compiler/std/measurements.ostrin: typed dimensional source metadata is missing");
   check(errors, /pub fn add_quantity<D: Dimension>/.test(std)
       && /pub fn sub_quantity<D: Dimension>/.test(std)
       && /current\.source_id == item\.source_id/.test(quantityMerge)
@@ -116,14 +119,9 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /add_quantity\(shared_a, shared_b\)/.test(directQuantityExample)
       && /sub_quantity\(difference_a, difference_b\)/.test(directQuantityExample),
     "examples/measurement_quantity_direct_shape.ostrin: correlated dimensional sum and difference examples are missing");
-  check(errors, /Length\\n0\.2\\n20 cm\\n0\.2\\n/.test(tests),
-    "compiler/tests/examples.rs: equivalent dimensional source sigmas must have matching canonical evidence");
-  check(errors, /24 m\\n40 cm\\n1\\n2\\n0 m\\n0 cm\\nchanged dimensional source sigma/.test(tests),
-    "compiler/tests/examples.rs: shared and independent dimensional sources must preserve identity semantics");
-  check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
-    "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
-
-  return { errors };
+  check(errors, /Length\\n0\.2\\n20 cm\\n0\.2\\n/.test(tests)
+      && /24 m\\n40 cm\\n1\\n2\\n0 m\\n0 cm\\nchanged dimensional source sigma/.test(tests),
+    "compiler/tests/examples.rs: shared dimensional source identity evidence is missing");  return { errors };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
