@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { readArchivedReplayBundle, replay } from "./experiment-replay.mjs";
+import { listExecutableReplayIds, readArchivedReplayBundle, replay } from "./experiment-replay.mjs";
 import { bundlePath, createSurfaceReceipt, verifySurfaceReceipt } from "./r3-surface-receipt.mjs";
 import { buildExperimentBundle, repositoryRoot, verifyExperimentBundle } from "./experiment-bundle.mjs";
 
@@ -52,10 +52,25 @@ test("offline artifact bundle replay requires a matching host capture and a clos
     refreshProvenance(openRow);
     writeFileSync(file, canonicalJson(openRow));
     assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /structural capture is OPEN/);
+
+    const downgraded = structuredClone(bundle);
+    downgraded.reproducibility.level = "R0";
+    downgraded.provenance.level = "R0";
+    downgraded.provenance.reproducibility.level = "R0";
+    refreshProvenance(downgraded);
+    writeFileSync(file, canonicalJson(downgraded));
+    assert.throws(() => readArchivedReplayBundle(root, "surface", expectedRun), /differs from the registered fixture maturity/);
   } finally {
     assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("offline replay registry reads fixture contracts without building the native compiler", () => {
+  const ids = listExecutableReplayIds();
+  assert.equal(ids.length, 11);
+  assert.ok(ids.includes("surface"));
+  assert.ok(ids.every((id) => ["lines", "surface", "histogram", "boxplot", "scatter-fit", "violin", "hexbin", "bars", "point-cloud", "fft", "dashboard"].includes(id)));
 });
 
 test("a downloaded evidence package can be verified with its archived WASM", () => {

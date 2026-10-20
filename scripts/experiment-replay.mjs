@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { buildExperimentBundle, experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
+import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
 import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
 import { createSurfaceReceipt, readArchivedFile, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
 import { inspectBundle } from "./r3-readiness.mjs";
@@ -40,7 +40,9 @@ function fixtureArgument(argv) {
 
 export function listExecutableReplayIds() {
   return Object.keys(experimentFixtures).filter((id) => {
-    const level = buildExperimentBundle(id).reproducibility.level;
+    const fixture = experimentFixtures[id];
+    const input = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
+    const level = input.reproducibility?.level ?? "R0";
     return level === "R1" || level === "R2";
   });
 }
@@ -284,6 +286,17 @@ export function readArchivedReplayBundle(directory, id, expectedRun) {
     throw new Error(`${id}: archived bundle is invalid JSON: ${error.message}`);
   }
   const errors = bundleErrors(bundle, id);
+  const fixture = experimentFixtures[id];
+  const registeredInput = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
+  const expectedLevel = registeredInput.reproducibility?.level ?? "R0";
+  if (!["R1", "R2"].includes(expectedLevel)) {
+    errors.push(`${id}: registered fixture is not declared as executable R1/R2`);
+  }
+  if (bundle.reproducibility?.level !== expectedLevel
+    || bundle.provenance?.level !== expectedLevel
+    || bundle.provenance?.reproducibility?.level !== expectedLevel) {
+    errors.push(`${id}: archived reproducibility level differs from the registered fixture maturity`);
+  }
   const readiness = inspectBundle(bundle, relativePath);
   if (readiness.status !== "READY") {
     errors.push(`${id}: archived bundle structural capture is ${readiness.status}`);
