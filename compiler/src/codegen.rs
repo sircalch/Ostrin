@@ -5036,8 +5036,14 @@ impl<'a> Codegen<'a> {
                 if matches!(ty, CType::Quantity(_)) {
                     // Convert the quantity's value into the target unit, as the interpreter does.
                     let temp = self.next_temp();
+                    // A fresh quantity expression transfers its unit-label reference
+                    // into this temporary.  The converted result uses the static
+                    // target literal, so release the source after reading it.
+                    let release = owned_call_argument(inner, &ty)
+                        .then(|| format!(" ostrin_qty_release({temp});"))
+                        .unwrap_or_default();
                     return Ok((
-                        format!("({{ Qty {temp} = {code}; (Qty){{ ostrin_convert({temp}.v, {temp}.u, {unit}), {unit} }}; }})"),
+                        format!("({{ Qty {temp} = {code}; Qty __converted = (Qty){{ ostrin_convert({temp}.v, {temp}.u, {unit}), {unit} }};{release} __converted; }})"),
                         CType::Quantity(dim),
                     ));
                 }
