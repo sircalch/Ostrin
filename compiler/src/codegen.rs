@@ -2093,7 +2093,8 @@ fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
             | Expr::EmptyCollection(..)
             | Expr::RecordLiteral(..)
             | Expr::GenericRecordLiteral(..)
-            | Expr::Binary(BinOp::Add, ..)
+            | Expr::As(..)
+            | Expr::Binary(..)
     )
 }
 
