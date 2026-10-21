@@ -18,7 +18,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 367
+    "rustMarkedTests": 369
   },
   "nativeBackend": {
     "ir": 7198,
@@ -46,7 +46,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "ciRunUrl": null
   },
   "effectCoverage": {
-    "knownCalls": 20589,
+    "knownCalls": 20593,
     "symbolicCalls": 74,
     "unresolvedCalls": 0,
     "countUnit": "distinct_function_operation_edges",
