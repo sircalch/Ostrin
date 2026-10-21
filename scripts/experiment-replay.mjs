@@ -272,6 +272,131 @@ export async function replayAll() {
   return results;
 }
 
+// R0 fixtures use recorded parameters compiled into source. Replaying them from
+// an archived bundle proves that the archived source and WASM reproduce the
+// recorded output under the same WASI host; it does not claim cross-platform
+// equivalence or scientific validity.
+export async function replayRecordedR0(id, { bundleText: suppliedBundleText, compilerWasmPath } = {}) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`invalid archived R0 fixture ID ${JSON.stringify(id)}`);
+  const bundleText = suppliedBundleText ?? readFileSync(outputPathFor(id), "utf8");
+  let bundle;
+  try {
+    bundle = JSON.parse(bundleText);
+  } catch (error) {
+    throw new Error(`${id}: archived bundle is invalid JSON: ${error.message}`);
+  }
+  if (bundle?.schema !== schema || bundle?.id !== id
+    || bundle?.reproducibility?.level !== "R0"
+    || bundle?.provenance?.level !== "R0"
+    || bundle?.provenance?.reproducibility?.level !== "R0") {
+    throw new Error(`${id}: archived fixture is not a consistent R0 bundle`);
+  }
+  const execution = bundle.provenance.execution;
+  const source = bundle.files?.["source.ostrin"];
+  const data = bundle.files?.["data.json"];
+  const recordedFigure = bundle.files?.["figure.svg"];
+  const sourceHash = sha256(source ?? "");
+  const dataHash = sha256(data ?? "");
+  const figureHash = sha256(recordedFigure ?? "");
+  const manifest = bundle.manifest?.files;
+  const expectedManifestPaths = ["data.json", "figure.svg", "provenance.json", "source.ostrin"];
+  const manifestPaths = Array.isArray(manifest)
+    ? manifest.map((entry) => entry.path).sort()
+    : [];
+  const manifestValid = Array.isArray(manifest) && manifest.length === expectedManifestPaths.length
+    && JSON.stringify(manifestPaths) === JSON.stringify(expectedManifestPaths);
+  const manifestHashesValid = manifestValid && manifest.every((entry) => {
+    const content = bundle.files?.[entry.path];
+    return typeof content === "string" && entry.bytes === bytes(content) && entry.sha256 === sha256(content);
+  });
+  const figureEntry = manifest?.find((entry) => entry.path === "figure.svg");
+  let embeddedProvenance;
+  try { embeddedProvenance = JSON.parse(bundle.files?.["provenance.json"] ?? "null"); }
+  catch { embeddedProvenance = null; }
+  const experiment = bundle.experiment;
+  const inputRecord = bundle.provenance.inputs?.find((entry) => entry.id === "data.json");
+  const outputRecord = bundle.provenance.outputs?.find((entry) => entry.id === "figure.svg");
+  const figureMetadata = bundle.provenance.figure_metadata;
+  const embeddedMetadataText = recordedFigure?.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
+  const embeddedMetadata = Object.fromEntries(
+    [...embeddedMetadataText.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]),
+  );
+  const invocationOutput = execution?.mode === "recorded-parameters"
+    ? bundle.provenance.runtime?.invocation?.outputs?.find((entry) => entry.path === "figure.svg")
+    : null;
+  if (execution?.mode !== "recorded-parameters"
+    || !Array.isArray(execution.capabilities) || execution.capabilities.length !== 0
+    || typeof source !== "string" || typeof data !== "string" || typeof recordedFigure !== "string"
+    || !manifestHashesValid
+    || JSON.stringify(embeddedProvenance) !== JSON.stringify(bundle.provenance)
+    || experiment?.source !== "source.ostrin" || experiment?.inputs !== "data.json"
+    || experiment?.figure !== "figure.svg" || experiment?.provenance !== "provenance.json"
+    || bundle.provenance.program?.source !== "source.ostrin" || bundle.provenance.program?.entry !== "main"
+    || /\bread_file\s*\(/.test(source)
+    || bundle.provenance.program?.source_hash !== sourceHash
+    || figureMetadata?.source_hash !== sourceHash
+    || inputRecord?.sha256 !== dataHash
+    || figureMetadata?.data_hash !== dataHash
+    || outputRecord?.sha256 !== figureHash
+    || embeddedMetadata["source-hash"] !== sourceHash
+    || embeddedMetadata["data-hash"] !== dataHash
+    || embeddedMetadata.seed !== figureMetadata?.seed
+    || embeddedMetadata.compiler !== figureMetadata?.compiler
+    || !invocationOutput || invocationOutput.sha256 !== figureEntry?.sha256
+    || invocationOutput.bytes !== figureEntry?.bytes) {
+    throw new Error(`${id}: R0 source, parameter-only execution or recorded output contract is incomplete`);
+  }
+  const effects = bundle.provenance.effects;
+  const entryEffects = effects?.entry_effect_signature?.effects;
+  const effectErrors = [
+    ...validateEffectCapture(effects),
+    ...validateEntryEffectSignature(effects?.entry_effect_signature, "main", effects),
+  ];
+  if (effectErrors.length || effects?.entry_effect_signature?.row_closed !== true
+    || effects.entry_effect_signature.variables?.length !== 0
+    || effects.entry_effect_signature.open_calls?.length !== 0
+    || !Array.isArray(entryEffects)
+    || entryEffects.some((effect) => !["io", "state(local)"].includes(effect))) {
+    throw new Error(`${id}: R0 replay requires a closed entry row with only output I/O and local state: ${effectErrors.join("; ")}`);
+  }
+  const modulePath = compilerWasmPath ?? path.join(repositoryRoot, "website", "ostrinc.wasm");
+  if (!existsSync(modulePath)) throw new Error(`${id}: compiler WASM is missing at ${modulePath}`);
+  const metadata = {
+    sourceHash: bundle.provenance.figure_metadata?.source_hash,
+    dataHash: bundle.provenance.figure_metadata?.data_hash,
+    seed: String(bundle.provenance.figure_metadata?.seed ?? "").replace(/^seed=/, ""),
+    compiler: bundle.provenance.figure_metadata?.compiler,
+  };
+  let wasmSha256;
+  const execute = async () => {
+    const observed = await runWasmWithEvidence({ "main.ostrin": source }, ["--run", "main.ostrin"], modulePath);
+    if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
+      throw new Error(`${id}: WASI child did not return a valid module execution digest`);
+    }
+    if (wasmSha256 && observed.wasmSha256 !== wasmSha256) {
+      throw new Error(`${id}: WASM module changed between R0 replay executions`);
+    }
+    wasmSha256 = observed.wasmSha256;
+    const rendered = normalizeFigureMetadata(extractSvg(observed.lines, id), metadata);
+    if (rendered !== recordedFigure) throw new Error(`${id}: archived R0 source replay differs from its recorded SVG`);
+    if (bytes(rendered) !== invocationOutput.bytes || sha256(rendered) !== invocationOutput.sha256) {
+      throw new Error(`${id}: replayed output hash differs from the archived invocation record`);
+    }
+    return rendered;
+  };
+  const first = await execute();
+  const second = await execute();
+  if (first !== second) throw new Error(`${id}: identical R0 inputs produced different outputs`);
+  return {
+    id,
+    level: "R0",
+    baseline: "match",
+    repeatability: "same-output",
+    wasmSha256,
+    bundleSha256: sha256(bundleText),
+  };
+}
+
 export function readArchivedReplayBundle(directory, id, expectedRun) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`invalid archived replay fixture ID ${JSON.stringify(id)}`);
   const root = realpathSync(directory);
@@ -284,11 +409,14 @@ export function readArchivedReplayBundle(directory, id, expectedRun) {
   } catch (error) {
     throw new Error(`${id}: archived bundle is invalid JSON: ${error.message}`);
   }
-  const errors = bundleErrors(bundle, id);
+  if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) {
+    throw new Error(`${id}: archived bundle is not an object`);
+  }
   const inventory = expectedRun?.replayBundles?.[id];
   const expectedLevel = inventory?.level;
-  if (!inventory || !["R1", "R2"].includes(expectedLevel)) {
-    errors.push(`${id}: archived run does not register this fixture as executable R1/R2`);
+  const errors = expectedLevel === "R0" ? [] : bundleErrors(bundle, id);
+  if (!inventory || !["R0", "R1", "R2"].includes(expectedLevel)) {
+    errors.push(`${id}: archived run does not register this fixture as an executable R0/R1/R2 bundle`);
   }
   if (bundle.reproducibility?.level !== expectedLevel
     || bundle.provenance?.level !== expectedLevel
@@ -297,6 +425,23 @@ export function readArchivedReplayBundle(directory, id, expectedRun) {
   }
   if (inventory?.bundleSha256 !== sha256(bundleText)) {
     errors.push(`${id}: archived bundle bytes differ from the tested run inventory`);
+  }
+  const manifest = bundle?.manifest?.files;
+  if (!Array.isArray(manifest) || manifest.length !== 4) {
+    errors.push(`${id}: archived manifest must contain exactly four files`);
+  } else {
+    for (const entry of manifest) {
+      const content = bundle.files?.[entry.path];
+      if (typeof content !== "string" || entry.bytes !== bytes(content) || entry.sha256 !== sha256(content)) {
+        errors.push(`${id}: archived ${entry.path} differs from its manifest`);
+      }
+    }
+  }
+  let embeddedProvenance;
+  try { embeddedProvenance = JSON.parse(bundle.files?.["provenance.json"] ?? "null"); }
+  catch { embeddedProvenance = null; }
+  if (JSON.stringify(embeddedProvenance) !== JSON.stringify(bundle.provenance)) {
+    errors.push(`${id}: embedded provenance differs from the archived bundle`);
   }
   const effects = bundle.provenance?.effects;
   errors.push(...validateEffectCapture(effects).map((error) => `${id}: ${error}`));
@@ -335,11 +480,17 @@ async function main() {
     const moduleSha256 = surface.receipt.compilerWasmSha256;
     for (const id of ids) {
       const artifact = id === "surface" ? surface : readArchivedReplayBundle(directory, id, expectedRun);
-      const result = await replay(id, {
-        bindWasm: true,
-        bundleText: artifact.bundleText,
-        compilerWasmPath: surface.wasmPath,
-      });
+      const level = expectedRun.replayBundles[id]?.level;
+      const result = level === "R0"
+        ? await replayRecordedR0(id, {
+          bundleText: artifact.bundleText,
+          compilerWasmPath: surface.wasmPath,
+        })
+        : await replay(id, {
+          bindWasm: true,
+          bundleText: artifact.bundleText,
+          compilerWasmPath: surface.wasmPath,
+        });
       if (result.wasmSha256 !== moduleSha256) {
         throw new Error(`${id}: archived replay loaded WASM bytes that differ from the run-bound surface receipt`);
       }
@@ -348,9 +499,12 @@ async function main() {
           !== JSON.stringify(surface.receipt)) {
         throw new Error("surface: fresh replay differs from the archived receipt");
       }
-      console.log(`experiment-replay: independently replayed ${id} from archived WASM in CI run ${runId} (${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""})`);
+      const replayDetails = level === "R0"
+        ? `${result.baseline}; ${result.repeatability}`
+        : `${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""}`;
+      console.log(`experiment-replay: independently replayed ${id} (${level}) from archived WASM in CI run ${runId} (${replayDetails})`);
     }
-    console.log(`experiment-replay: independently replayed all ${ids.length} archived R1/R2 bundles`);
+    console.log(`experiment-replay: independently replayed all ${ids.length} bundles in the archived R0/R1/R2 inventory`);
     return;
   }
   if (args[0] === "--replay-artifact") {

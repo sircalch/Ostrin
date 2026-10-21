@@ -75,8 +75,17 @@ captura auténtica: **29/29 estructuralmente READY**, 29/29 capturas de host vá
 74 bordes simbólicos en el inventario global y cero bordes sin resolver. El workflow pasó la
 verificación `--require-capture` y las pruebas de readiness/scorecard. El paquete de evidencia de
 90 días está disponible como [artefacto de la ejecución 38859292510](https://github.com/sircalch/Ostrin/actions/runs/38859292510/artifacts/12028054775).
-Este resultado acredita esa ejecución CI; el reporte local y el tablero estático versionado siguen
-`OPEN` hasta una ejecución de publicación desde `main` que regenere y despliegue la evidencia.
+Este resultado acredita esa ejecución CI. El reporte local sigue `OPEN` porque el checkout no
+debe sintetizar datos del host; el tablero publicado puede enlazar evidencia host-bound de CI, pero
+el nivel `reproducibility.R3` permanece en cero mientras no se satisfaga el contrato completo.
+
+El corte posterior de `main` en `bd6d80ebec2d53b4055e6e846609d90162ebc985` (Deploy Ostrin website,
+run [39555355723](https://github.com/sircalch/Ostrin/actions/runs/39555355723)) volvió a validar
+29/29 capturas estructurales, 29/29 filas cerradas, 74 bordes simbólicos globales y cero sin
+resolver. Su artefacto host-bound está disponible [aquí](https://github.com/sircalch/Ostrin/actions/runs/39555355723/artifacts/12325497039).
+Ese recibo todavía inventaría y reejecuta los 11 bundles R1/R2; los 18 R0 se verificaron desde el
+checkout del workflow, no desde el paquete descargado. Por eso el resultado no promociona R3; la
+extensión del replay R0 aún requiere sus propios checks de CI.
 
 Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles sin validar la
 captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado histórico no basta
@@ -129,9 +138,12 @@ versiona.
 
 En un paquete descargado, `--verify-artifact` valida integridad y procedencia estructural del
 recibo de `surface`; `node scripts/experiment-replay.mjs --replay-artifact-all <directorio>
---run-id <id> --tested-sha <sha>` vuelve a ejecutar los bundles R1/R2 registrados en ese run con el
-WASM archivado. En cada bundle compara el SVG completo con su resultado registrado y exige que
-el parámetro declarado cambie la figura; para R1 también repite la entrada/semilla. Cada captura
+--run-id <id> --tested-sha <sha>` vuelve a ejecutar el inventario R0/R1/R2 registrado en ese run con el
+WASM archivado. Cada ejecución WASI se aísla en un proceso hijo con un límite de 120 segundos.
+Los R0 ejecutan dos veces el `source.ostrin` archivado con sus parámetros registrados y comparan
+la salida SVG completa y su hash de invocación; no se les atribuye sensibilidad de entradas
+externas. Los R1/R2 comparan el SVG completo, prueban el cambio de
+parámetro y, para R1, repiten la semilla. Cada captura
 debe identificar el mismo run/SHA y tener una fila de entrada cerrada. El recibo registra para
 cada bundle su ID, nivel y hash, de modo que selección y madurez no dependan del checkout desde el
 que se inspecciona un artefacto antiguo. Cada replay contrasta los bytes con ese inventario y

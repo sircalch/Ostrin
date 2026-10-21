@@ -71,10 +71,12 @@ node scripts/experiment-replay.mjs --replay-artifact-all <directorio-descargado>
 El primer comando sólo verifica estructura, revisiones y hashes. El segundo ejecuta el WASM
 archivado en procesos Node WASI nuevos, compara el SVG completo con el bundle, exige que el
 cambio de parámetro altere la figura y contrasta el hash del módulo cargado con el recibo.
-`--replay-artifact-all` aplica ese replay a los once bundles R1/R2 ejecutables del paquete; exige
-que cada captura pertenezca al run/SHA indicado y que todas las ejecuciones carguen el módulo
-identificado por el recibo de `surface`. El resultado describe cada replay en ese host; no establece
-equivalencia general entre plataformas. El replay ejecutable no promueve por sí solo ningún bundle a R3.
+`--replay-artifact-all` aplica el replay a los **29 bundles R0/R1/R2** del inventario archivado
+(18 R0 y 11 R1/R2); exige que cada captura pertenezca al run/SHA indicado y que todas las
+ejecuciones carguen el módulo identificado por el recibo de `surface`. Los R0 se vuelven a ejecutar
+dos veces y se comparan sus salidas; los R1/R2 validan su evidencia de sensibilidad y semilla.
+El resultado describe cada replay en ese host; no establece equivalencia general entre plataformas.
+El replay ejecutable no promueve por sí solo ningún bundle a R3.
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:
 

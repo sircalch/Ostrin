@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-// A run-bound replay receipt for one R2 fixture. This is narrower than an R3
-// maturity claim: it ties an actual WASI replay to the captured CI host, the
-// bundled inputs and output, the closed entry effect row, and the WASM bytes
-// loaded by the child process. It is never checked into the repository.
+// A run-bound replay receipt for the surface fixture and archived bundle
+// inventory. This is narrower than an R3 maturity claim: it ties WASI replays
+// to the captured CI host, bundle inputs/outputs, closed entry effect rows, and
+// the WASM bytes loaded by each child process. It is never checked in.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -39,17 +39,17 @@ function fileHashes(bundle) {
   return Object.fromEntries(fileNames.map((name) => [name, sha256(Buffer.from(bundle.files?.[name] ?? "", "utf8"))]));
 }
 
-function executableReplayInventory(surfaceBundleText) {
-  return Object.fromEntries(Object.entries(experimentFixtures).flatMap(([id, fixture]) => {
+export function archivedReplayInventory(surfaceBundleText) {
+  return Object.fromEntries(Object.entries(experimentFixtures).map(([id, fixture]) => {
     const input = JSON.parse(readFileSync(path.join(repositoryRoot, fixture.inputPath), "utf8"));
     const level = input.reproducibility?.level ?? "R0";
-    if (!(["R1", "R2"].includes(level))) return [];
+    if (!(["R0", "R1", "R2"].includes(level))) throw new Error(`unsupported reproducibility level ${level} for ${id}`);
     const bundle = id === "surface" ? Buffer.from(surfaceBundleText, "utf8") : readFileSync(outputPathFor(id));
-    return [[id, { level, bundleSha256: sha256(bundle) }]];
+    return [id, { level, bundleSha256: sha256(bundle) }];
   }));
 }
 
-export function createSurfaceReceipt(bundleText, replayResult, replayBundles = executableReplayInventory(bundleText)) {
+export function createSurfaceReceipt(bundleText, replayResult, replayBundles = archivedReplayInventory(bundleText)) {
   const bundle = parseBundle(bundleText);
   const errors = validateSurfaceEvidence(bundle);
   if (errors.length) throw new Error(`surface receipt cannot be issued: ${errors.join("; ")}`);
@@ -173,7 +173,7 @@ export function verifySurfaceReceipt(receipt, bundleText, wasmBytes, expectedRun
   if (replayBundles !== undefined && (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)
     || !Object.hasOwn(replayBundles, "surface")
     || Object.entries(replayBundles).some(([id, item]) => !/^[a-z0-9][a-z0-9-]*$/.test(id)
-      || !["R1", "R2"].includes(item?.level)
+      || !["R0", "R1", "R2"].includes(item?.level)
       || !shaPattern.test(item?.bundleSha256 ?? "")))) {
     errors.push("receipt executable replay inventory is missing or invalid");
   } else if (replayBundles !== undefined

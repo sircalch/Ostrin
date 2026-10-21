@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareReplayFigure } from "./lab-data.mjs";
+import { compareReplayFigure, spawnBoundedChild } from "./lab-data.mjs";
+
+test("WASI child processes terminate when they exceed their timeout", () => {
+  assert.throws(
+    () => spawnBoundedChild(process.execPath, ["-e", "while (true) {}"], { encoding: "utf8" }, 100),
+    /timed out after 100 ms/,
+  );
+});
 
 function bundle(svg = "<svg/>") {
   return {
