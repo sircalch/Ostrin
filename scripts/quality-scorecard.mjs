@@ -409,6 +409,7 @@ export async function buildScorecard() {
             literalReadPathCallCount: audit.literalReadPathCallCount,
             dynamicReadCallCount: audit.dynamicReadCallCount,
             readFileReferenceCount: audit.readFileReferenceCount,
+            shadowedReadFileCallCount: audit.shadowedReadFileCallCount,
             undeclaredLiteralPathCount: audit.undeclaredLiteralReadPaths
               .reduce((total, entry) => total + entry.paths.length, 0),
             declaredSnapshotWithoutDirectReadCount: audit.declaredSnapshotsWithoutDirectRead

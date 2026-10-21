@@ -31,8 +31,12 @@ test("source read inventory distinguishes literal, dynamic and aliased file read
   ].join("\n");
   assert.deepEqual(scanReadFileCalls(source), [
     { kind: "literal", path: "data.json", line: 4 },
-    { kind: "dynamic", path: null, line: 5 },
-    { kind: "reference", path: null, line: 6 },
+    { kind: "shadowed", path: null, line: 5 },
+    { kind: "shadowed", path: null, line: 6 },
+  ]);
+  assert.deepEqual(scanReadFileCalls('literal = read_file("data.json")\ndynamic = read_file(path)'), [
+    { kind: "literal", path: "data.json", line: 1 },
+    { kind: "dynamic", path: null, line: 2 },
   ]);
   assert.deepEqual(scanReadFileCalls(undefined), []);
 });

@@ -367,11 +367,32 @@ export function scanReadFileCalls(source) {
     index++;
   }
 
+  let braceDepth = 0;
+  let localReadFile = false;
+  for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+    const token = tokens[tokenIndex];
+    if (token.value === "}" && braceDepth > 0) braceDepth--;
+    if (braceDepth === 0 && token.kind === "identifier" && token.value === "fn"
+      && tokens[tokenIndex + 1]?.kind === "identifier"
+      && tokens[tokenIndex + 1]?.value === "read_file") {
+      localReadFile = true;
+    }
+    if (token.value === "{") braceDepth++;
+  }
   const reads = [];
   for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
     const current = tokens[tokenIndex];
     if (current.kind !== "identifier" || current.value !== "read_file") continue;
     if (tokens[tokenIndex - 1]?.kind === "identifier" && tokens[tokenIndex - 1]?.value === "fn") continue;
+    const qualified = tokens[tokenIndex - 1]?.kind === "punctuation"
+      && tokens[tokenIndex - 1]?.value === ":";
+    const memberCall = tokens[tokenIndex - 1]?.kind === "punctuation"
+      && tokens[tokenIndex - 1]?.value === ".";
+    if (!qualified && memberCall) continue;
+    if (localReadFile && !qualified) {
+      reads.push({ kind: "shadowed", path: null, line: current.line });
+      continue;
+    }
     if (tokens[tokenIndex + 1]?.kind !== "punctuation" || tokens[tokenIndex + 1]?.value !== "(") {
       reads.push({ kind: "reference", path: null, line: current.line });
       continue;

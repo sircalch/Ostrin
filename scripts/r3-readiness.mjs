@@ -327,6 +327,7 @@ function buildGapDiagnostics(records) {
       literalReadPathCallCount: 0,
       dynamicReadCallCount: 0,
       readFileReferenceCount: 0,
+      shadowedReadFileCallCount: 0,
       undeclaredLiteralReadPaths: [],
       declaredSnapshotsWithoutDirectRead: [],
       sourceReadsWithoutFilesystemCapability: [],
@@ -389,11 +390,13 @@ function buildGapDiagnostics(records) {
     const unreferencedSnapshotPaths = declaredSnapshotPaths.filter((snapshotPath) => !literalPaths.includes(snapshotPath));
     const dynamicReadCount = readCalls.filter((call) => call.kind === "dynamic").length;
     const referenceCount = readCalls.filter((call) => call.kind === "reference").length;
-    sourceReadAudit.directReadFileCallCount += readCalls.filter((call) => call.kind !== "reference").length;
+    const directReadCount = readCalls.filter((call) => call.kind === "literal" || call.kind === "dynamic").length;
+    sourceReadAudit.directReadFileCallCount += directReadCount;
     sourceReadAudit.literalReadPathCallCount += readCalls.filter((call) => call.kind === "literal").length;
     sourceReadAudit.dynamicReadCallCount += dynamicReadCount;
     sourceReadAudit.readFileReferenceCount += referenceCount;
-    if (readCalls.some((call) => call.kind !== "reference")) sourceReadAudit.bundlesWithDirectReadFileCalls++;
+    sourceReadAudit.shadowedReadFileCallCount += readCalls.filter((call) => call.kind === "shadowed").length;
+    if (directReadCount > 0) sourceReadAudit.bundlesWithDirectReadFileCalls++;
     if (undeclaredLiteralPaths.length > 0) {
       sourceReadAudit.undeclaredLiteralReadPaths.push({ bundle, paths: undeclaredLiteralPaths });
     }
@@ -405,7 +408,7 @@ function buildGapDiagnostics(records) {
       : [];
     const hasFilesystemReadCapability = capabilities.some((capability) =>
       typeof capability === "string" && capability.startsWith("filesystem.read:"));
-    const hasDirectReadCall = readCalls.some((call) => call.kind !== "reference");
+    const hasDirectReadCall = readCalls.some((call) => call.kind === "literal" || call.kind === "dynamic");
     if (hasFilesystemReadCapability) {
       externalInputEvidence.bundlesWithFilesystemReadCapability++;
     }

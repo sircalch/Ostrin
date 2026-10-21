@@ -147,6 +147,32 @@ test("R3 source read audit catches undeclared and dynamic direct file reads", (t
   assert.deepEqual(audit.undeclaredLiteralReadPaths[0], { bundle: "surface", paths: ["unlisted.csv"] });
 });
 
+test("R3 source read audit does not treat a local read_file function as filesystem IO", (t) => {
+  const tempParent = path.resolve(os.tmpdir());
+  const root = mkdtempSync(path.join(tempParent, "ostrin-r3-shadowed-read-"));
+  t.after(() => {
+    assert.equal(path.dirname(root), tempParent);
+    assert.match(path.basename(root), /^ostrin-r3-shadowed-read-/);
+    rmSync(root, { recursive: true, force: true });
+  });
+  const directory = path.join(root, "website/assets/experiments");
+  mkdirSync(directory, { recursive: true });
+  for (const fixture of Object.values(experimentFixtures)) {
+    cpSync(path.join(repositoryRoot, fixture.outputPath), path.join(directory, path.basename(fixture.outputPath)));
+  }
+  const fixture = experimentFixtures.animation;
+  const filePath = path.join(directory, path.basename(fixture.outputPath));
+  const bundle = JSON.parse(readFileSync(filePath, "utf8"));
+  const sourcePath = bundle.experiment.source;
+  bundle.files[sourcePath] = `fn read_file(path: String) -> String { path }\nread_file("local-data.csv")\n${bundle.files[sourcePath]}`;
+  writeFileSync(filePath, JSON.stringify(bundle));
+
+  const audit = buildReadiness(root).gapDiagnostics.externalInputEvidence.sourceReadAudit;
+  assert.equal(audit.directReadFileCallCount, 21);
+  assert.equal(audit.shadowedReadFileCallCount, 1);
+  assert.deepEqual(audit.undeclaredLiteralReadPaths, []);
+});
+
 test("R3 readiness requires host, dependencies, scheduler and effects", () => {
   const bundle = {
     provenance: {
@@ -660,6 +686,7 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(externalInputEvidence.sourceReadAudit.literalReadPathCallCount, 21);
   assert.equal(externalInputEvidence.sourceReadAudit.dynamicReadCallCount, 0);
   assert.equal(externalInputEvidence.sourceReadAudit.readFileReferenceCount, 0);
+  assert.equal(externalInputEvidence.sourceReadAudit.shadowedReadFileCallCount, 0);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.undeclaredLiteralReadPaths, []);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.declaredSnapshotsWithoutDirectRead, []);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.sourceReadsWithoutFilesystemCapability, []);
