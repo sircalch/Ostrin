@@ -128,7 +128,9 @@ nombres. Este análisis léxico no detecta lecturas ocultas por alias, funciones
 código del host, y no observa el sistema de
 archivos durante la ejecución. Por tanto no prueba que no existan otras entradas externas ni que el
 contenido real coincida; esa verificación requiere captura de lecturas en runtime y replay. El
-inventario también conserva 18 entradas de parámetros; ninguno de estos contadores cierra R3.
+inventario también conserva 18 entradas de parámetros; tanto las llamadas con calificador de
+módulo (`std.io::read_file`) como las llamadas de miembro (`io.read_file`) se contabilizan como
+calificadas sin resolver y no se descartan. Ninguno de estos contadores cierra R3.
 
 ## Primer recibo de replay ligado a una ejecución
 

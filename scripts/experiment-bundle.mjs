@@ -384,11 +384,10 @@ export function scanReadFileCalls(source) {
     const current = tokens[tokenIndex];
     if (current.kind !== "identifier" || current.value !== "read_file") continue;
     if (tokens[tokenIndex - 1]?.kind === "identifier" && tokens[tokenIndex - 1]?.value === "fn") continue;
-    const qualified = tokens[tokenIndex - 1]?.kind === "punctuation"
-      && tokens[tokenIndex - 1]?.value === ":";
-    const memberCall = tokens[tokenIndex - 1]?.kind === "punctuation"
-      && tokens[tokenIndex - 1]?.value === ".";
-    if (!qualified && memberCall) continue;
+    const qualifier = tokens[tokenIndex - 1]?.kind === "punctuation"
+      ? tokens[tokenIndex - 1]?.value
+      : null;
+    const qualified = qualifier === ":" || qualifier === ".";
     const isCall = tokens[tokenIndex + 1]?.kind === "punctuation"
       && tokens[tokenIndex + 1]?.value === "(";
     if (qualified) {

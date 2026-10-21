@@ -26,13 +26,15 @@ test("source read inventory distinguishes literal, dynamic and aliased file read
     'text = "read_file(\\\"string.json\\\")"',
     'fn read_file(path: String) -> String { path }',
     'literal = std.io::read_file("data.json")',
+    'member = io.read_file("member-data.json")',
     'dynamic = read_file(path)',
     'reader = read_file',
   ].join("\n");
   assert.deepEqual(scanReadFileCalls(source), [
     { kind: "qualified", path: null, line: 4 },
-    { kind: "shadowed", path: null, line: 5 },
+    { kind: "qualified", path: null, line: 5 },
     { kind: "shadowed", path: null, line: 6 },
+    { kind: "shadowed", path: null, line: 7 },
   ]);
   assert.deepEqual(scanReadFileCalls('literal = read_file("data.json")\ndynamic = read_file(path)'), [
     { kind: "literal", path: "data.json", line: 1 },

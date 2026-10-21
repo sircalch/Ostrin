@@ -164,12 +164,13 @@ test("R3 source read audit does not treat a local read_file function as filesyst
   const filePath = path.join(directory, path.basename(fixture.outputPath));
   const bundle = JSON.parse(readFileSync(filePath, "utf8"));
   const sourcePath = bundle.experiment.source;
-  bundle.files[sourcePath] = `fn read_file(path: String) -> String { path }\nread_file("local-data.csv")\n${bundle.files[sourcePath]}`;
+  bundle.files[sourcePath] = `fn read_file(path: String) -> String { path }\nread_file("local-data.csv")\nio.read_file("unresolved-data.csv")\n${bundle.files[sourcePath]}`;
   writeFileSync(filePath, JSON.stringify(bundle));
 
   const audit = buildReadiness(root).gapDiagnostics.externalInputEvidence.sourceReadAudit;
   assert.equal(audit.directReadFileCallCount, 21);
   assert.equal(audit.shadowedReadFileCallCount, 1);
+  assert.equal(audit.qualifiedReadFileCallCount, 1);
   assert.deepEqual(audit.undeclaredLiteralReadPaths, []);
 });
 
