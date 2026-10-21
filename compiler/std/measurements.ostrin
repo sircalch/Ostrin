@@ -363,6 +363,9 @@ pub fn div_quantity<A: Dimension, B: Dimension>(
     if b_value == 0.0 {
         return Err("measurement division by zero")
     }
+    if a.value.dimension_key() == b.value.dimension_key() {
+        return Err("dimensionless quotient requires div_quantity_same")
+    }
     result = a.value / b.value
     if not is_finite(result.value()) or not is_finite(result.value() * result.unit_scale()) {
         return Err("measurement value must be finite")

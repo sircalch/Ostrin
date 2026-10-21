@@ -184,6 +184,22 @@ test("the gate rejects cross-dimension quotient propagation without the numerato
   }
 });
 
+test("the gate requires an explicit dimensionless quotient boundary", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      "dimensionless quotient requires div_quantity_same",
+      "unsupported quotient",
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same- or cross-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects equating a source dimension with a propagated product dimension", () => {
   const root = fixtureRoot();
   try {

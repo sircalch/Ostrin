@@ -99,6 +99,10 @@ fn main() -> Void {
     ratio = measurements.div_quantity_same(ratio_a, ratio_b).unwrap()
     print(ratio.value)
     print(measurements.uncertainty(ratio).unwrap())
+    match measurements.div_quantity(ratio_a, ratio_b) {
+        Ok(_) => print("dimensionless quotient accepted as a quantity"),
+        Err(message) => print("dimensionless quantity quotient = " + message),
+    }
 
     ratio_independent_a = measurements.from_quantity_source(4 m, 10 cm, "numerator", "ruler").unwrap()
     ratio_independent_b = measurements.from_quantity_source(400 cm, 0.1 m, "denominator", "ruler").unwrap()

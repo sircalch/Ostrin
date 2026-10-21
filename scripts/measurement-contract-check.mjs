@@ -154,6 +154,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /scale_quantity_sources_to_float\(a\.sources, a_factor\)/.test(std)
       && /scale_quantity_sources_to_float\(b\.sources, b_factor\)/.test(std)
       && /pub fn div_quantity<A: Dimension, B: Dimension>/.test(std)
+      && /if a\.value\.dimension_key\(\) == b\.value\.dimension_key\(\) \{[\s\S]*?dimensionless quotient requires div_quantity_same/.test(std)
       && /contribution: item\.contribution \/ divisor/.test(std)
       && /numerator \* item\.contribution\) \/ \(denominator \* denominator/.test(std),
     "compiler/std/measurements.ostrin: dimensional products and same- or cross-dimension ratios must propagate derivatives");
@@ -161,12 +162,13 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /div_quantity\(distance, elapsed\)/.test(labExample)
       && /same- or cross-dimension ratios/.test(lab)
       && tests.includes("Length*Time^-1\\n5\\n0.05\\n-0.5\\nLength*Time^-1\\n0.5024937810560445")
+      && tests.includes("dimensionless quantity quotient = dimensionless quotient requires div_quantity_same")
       && /cocientes entre dimensiones distintas/i.test(design),
     "dimensional measurement evidence: cross-dimension quotient type, derivative values, uncertainty, or web demo is missing");
   check(errors, /Length\^2\\nLength\\nLength\^2\\n0\.8/.test(tests),
     "compiler/tests/examples.rs: correlated product evidence is missing");
-  check(errors, /1\\n0\\n0\.03535533905932738/.test(tests),
-    "compiler/tests/examples.rs: same-dimension quotient correlation evidence is missing");
+  check(errors, /1\\n0\\ndimensionless quantity quotient = dimensionless quotient requires div_quantity_same\\n0\.03535533905932738/.test(tests),
+    "compiler/tests/examples.rs: same-dimension quotient correlation and dimensionless boundary evidence is missing");
   check(errors, /Length\*Time\\n0\.2\\n0\.6000000000000001\\n0\.632455532033676/.test(tests),
     "compiler/tests/examples.rs: cross-dimension product derivative evidence is missing");
   check(errors, /zero dimensional denominator = measurement division by zero/.test(tests),

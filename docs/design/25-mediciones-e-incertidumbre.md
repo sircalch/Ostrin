@@ -299,8 +299,10 @@ la misma fuente compartida al sumarse da `0.4`.
 del resultado y la sigma de cada fuente en su dimensión original. El ejemplo `10 m ± 0.1 m` sobre
 `2 s ± 0.2 s` produce `5 m/s`, contribuciones coherentes `0.05 m/s` y `-0.5 m/s`, e incertidumbre
 combinada `0.5024937810560445 m/s`. `div_quantity_same` conserva la API compatible que devuelve
-`Measurement<Float>` para cocientes de igual dimensión. El backend nativo mantiene el rechazo
-explícito hasta cerrar ownership, dimensión de incertidumbre y ABI.
+`Measurement<Float>` para cocientes de igual dimensión. `div_quantity` devuelve un error explícito
+si el cociente cancela las dimensiones; en ese caso se debe usar `div_quantity_same`, que representa
+el resultado adimensional como `Measurement<Float>`. El backend nativo mantiene el rechazo explícito
+hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
 Este prototipo no habilita todavía `Array<Measurement<T>>`, covarianza ni soporte nativo de
 `Measurement<Quantity<D>>`. La propagación deberá mantener la dimensión del resultado en
