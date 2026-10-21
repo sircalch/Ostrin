@@ -82,6 +82,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
       "dynamicReadCallCount": 0,
       "readFileReferenceCount": 0,
       "shadowedReadFileCallCount": 0,
+      "qualifiedReadFileCallCount": 0,
       "undeclaredLiteralPathCount": 0,
       "declaredSnapshotWithoutDirectReadCount": 0,
       "sourceReadsWithoutFilesystemCapabilityCount": 0,
