@@ -103,5 +103,6 @@ runs:
           website/assets/experiments/*.ostrin-experiment.json
           target/r3-ci/surface-replay-receipt.json
           target/r3-ci/wasi-file-read-evidence.json
+          target/r3-ci/wasi-random-evidence.json
         if-no-files-found: error
         retention-days: 90

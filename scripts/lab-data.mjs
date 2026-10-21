@@ -338,9 +338,9 @@ function sourceAssignmentPattern(name) {
 // Runs ostrinc.wasm on `files` in a bounded child Node process and returns its stdout lines.
 // Each run gets a fresh process: WebAssembly memories of finished instances are not reliably
 // released within one process, and a few dozen heavy Viz programs used to crash Node.
-function spawnWasmChild(files, args, withEvidence = false, compilerWasmPath = wasmPath, captureFilesystem = false) {
+function spawnWasmChild(files, args, withEvidence = false, compilerWasmPath = wasmPath, captureFilesystem = false, deterministicRandomSeed = null) {
   const child = spawnBoundedChild(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
-    input: JSON.stringify({ files, args, withEvidence, compilerWasmPath, captureFilesystem }),
+    input: JSON.stringify({ files, args, withEvidence, compilerWasmPath, captureFilesystem, deterministicRandomSeed }),
     maxBuffer: 256 * 1024 * 1024,
     encoding: "utf8",
   });
@@ -362,8 +362,11 @@ export async function runWasmWithEvidence(files, args, compilerWasmPath = wasmPa
 // the module. This is stronger than scanning source text for read_file calls,
 // but deliberately does not claim to cover directory enumeration or metadata
 // queries.
-export async function runWasmWithFilesystemEvidence(files, args, compilerWasmPath = wasmPath) {
-  return spawnWasmChild(files, args, true, compilerWasmPath, true);
+export async function runWasmWithFilesystemEvidence(files, args, compilerWasmPath = wasmPath, deterministicRandomSeed) {
+  if (!/^[a-f0-9]{64}$/.test(deterministicRandomSeed ?? "")) {
+    throw new Error("WASI replay evidence requires a deterministic 32-byte random seed");
+  }
+  return spawnWasmChild(files, args, true, compilerWasmPath, true, deterministicRandomSeed);
 }
 
 function wasiPathLabel(bytes) {
@@ -502,8 +505,67 @@ export function captureWasiFileReads(importObject) {
   };
 }
 
+const wasiRandomEvidenceSchema = "ostrin.wasi-random-evidence/v1";
+const wasiRandomAlgorithm = "sha256-counter-test-only/v1";
+const wasiErrnoInvalid = 28;
+
+// WASI replay must not depend on ambient host entropy. This deterministic test
+// provider is deliberately unsuitable for cryptographic use; the bundle-bound
+// seed and each returned buffer hash make the replay input explicit.
+export function captureWasiRandom(importObject, deterministicRandomSeed) {
+  if (!/^[a-f0-9]{64}$/.test(deterministicRandomSeed ?? "")) {
+    throw new Error("WASI random capture requires a deterministic 32-byte seed");
+  }
+  const wasi = importObject.wasi_snapshot_preview1;
+  const original = wasi.random_get;
+  if (typeof original !== "function") throw new Error("WASI random_get import is missing");
+  const seed = Buffer.from(deterministicRandomSeed, "hex");
+  const requests = [];
+  let memory = null;
+  let blockCounter = 0n;
+  wasi.random_get = function (pointer, length) {
+    if (!memory || !Number.isInteger(pointer) || !Number.isInteger(length)
+      || pointer < 0 || length < 0 || pointer + length > memory.buffer.byteLength) {
+      requests.push({ byteLength: Number.isInteger(length) && length >= 0 ? length : null, status: "invalid-memory-range" });
+      return wasiErrnoInvalid;
+    }
+    const target = new Uint8Array(memory.buffer, pointer, length);
+    let offset = 0;
+    while (offset < length) {
+      const counter = Buffer.alloc(8);
+      counter.writeBigUInt64BE(blockCounter++);
+      const block = createHash("sha256")
+        .update("ostrin.wasi.random.sha256-counter-test-only.v1\0", "utf8")
+        .update(seed)
+        .update(counter)
+        .digest();
+      const count = Math.min(block.length, length - offset);
+      target.set(block.subarray(0, count), offset);
+      offset += count;
+    }
+    requests.push({
+      byteLength: length,
+      contentSha256: `sha256:${createHash("sha256").update(target).digest("hex")}`,
+    });
+    return 0;
+  };
+  return {
+    attachInstance(instance) {
+      memory = instance.exports.memory;
+    },
+    finish() {
+      return {
+        schema: wasiRandomEvidenceSchema,
+        algorithm: wasiRandomAlgorithm,
+        seed: `sha256:${createHash("sha256").update(seed).digest("hex")}`,
+        requests: requests.map((request) => ({ ...request })),
+      };
+    },
+  };
+}
+
 // Runs ostrinc.wasm under Node WASI in a scratch copy of `files`; returns stdout lines.
-async function runWasmHere(module, files, args, captureFilesystem = false) {
+async function runWasmHere(module, files, args, captureFilesystem = false, deterministicRandomSeed = null) {
   const scratch = mkdtempSync(path.join(os.tmpdir(), "ostrin-lab-"));
   const stdoutPath = path.join(scratch, ".stdout");
   const stderrPath = path.join(scratch, ".stderr");
@@ -521,8 +583,10 @@ async function runWasmHere(module, files, args, captureFilesystem = false) {
     const wasi = new WASI({ version: "preview1", args: ["ostrinc", ...args], env: {}, preopens: { ".": work }, stdout: stdoutFd, stderr: stderrFd, returnOnExit: true });
     const importObject = wasi.getImportObject();
     const filesystemCapture = captureFilesystem ? captureWasiFileReads(importObject) : null;
+    const randomCapture = captureFilesystem ? captureWasiRandom(importObject, deterministicRandomSeed) : null;
     const instance = await WebAssembly.instantiate(module, importObject);
     filesystemCapture?.attachInstance(instance);
+    randomCapture?.attachInstance(instance);
     const code = wasi.start(instance);
     closeSync(stdoutFd);
     closeSync(stderrFd);
@@ -532,7 +596,7 @@ async function runWasmHere(module, files, args, captureFilesystem = false) {
     if (code !== 0) throw new Error(`ostrinc ${args.join(" ")} exited with ${code}: ${stderr}${stdout}`);
     const lines = stdout.replace(/\n$/, "").split("\n");
     return filesystemCapture
-      ? { lines, filesystemReads: filesystemCapture.finish() }
+      ? { lines, filesystemReads: filesystemCapture.finish(), wasiRandomEvidence: randomCapture.finish() }
       : lines;
   } finally {
     if (stdoutFd !== undefined) closeSync(stdoutFd);
@@ -796,17 +860,18 @@ async function main() {
 }
 
 async function wasmChild() {
-  const { files, args, withEvidence, captureFilesystem, compilerWasmPath = wasmPath } = JSON.parse(readFileSync(0, "utf8"));
+  const { files, args, withEvidence, captureFilesystem, deterministicRandomSeed, compilerWasmPath = wasmPath } = JSON.parse(readFileSync(0, "utf8"));
   const wasmBytes = readFileSync(compilerWasmPath);
   const wasmSha256 = `sha256:${createHash("sha256").update(wasmBytes).digest("hex")}`;
   const module = await WebAssembly.compile(wasmBytes);
-  const result = await runWasmHere(module, files, args, captureFilesystem);
+  const result = await runWasmHere(module, files, args, captureFilesystem, deterministicRandomSeed);
   const lines = Array.isArray(result) ? result : result.lines;
   if (withEvidence || captureFilesystem) {
     process.stdout.write(JSON.stringify({
       lines,
       ...(withEvidence ? { wasmSha256 } : {}),
       ...(captureFilesystem ? { filesystemReads: result.filesystemReads } : {}),
+      ...(captureFilesystem ? { wasiRandomEvidence: result.wasiRandomEvidence } : {}),
     }));
   } else {
     process.stdout.write(JSON.stringify(lines));

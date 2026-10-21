@@ -152,7 +152,8 @@ versiona.
 En un paquete descargado, `--verify-artifact` valida integridad y procedencia estructural del
 recibo de `surface`; `node scripts/experiment-replay.mjs --replay-artifact-all <directorio>
 --run-id <id> --tested-sha <sha>` vuelve a ejecutar el inventario R0/R1/R2 registrado en ese run con el
-WASM archivado. Cada ejecución WASI se aísla en un proceso hijo con un límite de 120 segundos.
+WASM archivado y compara los reportes de lectura y azar determinista del paquete con la evidencia
+regenerada. Cada ejecución WASI se aísla en un proceso hijo con un límite de 120 segundos.
 Los R0 ejecutan dos veces el `source.ostrin` archivado con sus parámetros registrados y comparan
 la salida SVG completa y su hash de invocación; no se les atribuye sensibilidad de entradas
 externas. Los R1/R2 comparan el SVG completo, prueban el cambio de
@@ -163,10 +164,14 @@ que se inspecciona un artefacto antiguo. Cada replay contrasta los bytes con ese
 verifica la fila de efectos cerrada de `main`, que es la función realmente ejecutada. Además,
 `target/r3-ci/wasi-file-read-evidence.json` registra las rutas relativas, estado de apertura, bytes
 leídos y hashes por ejecución; liga el inventario, el SHA del WASM, el `run_id` y el `tested_sha`, y
-se incluye en el artefacto host-bound. El recibo de `surface` ancla el hash del módulo que cargan
-todos los replays. La lectura limita el tamaño de cada archivo y rechaza rutas que escapen del
-directorio descargado. Website CI ejecuta este replay completo antes de subir el paquete como
-evidencia. La captura de CI no es una atestación criptográfica:
+se incluye en el artefacto host-bound. `target/r3-ci/wasi-random-evidence.json` registra las llamadas
+`random_get` por ejecución con un generador SHA-256 de contador de uso exclusivo para replay de
+prueba; su semilla deriva del ID y hash completo del bundle y permanece igual en las pasadas de
+baseline, repetición y sensibilidad. Este proveedor reemplaza la entropía del host y **no sirve para
+uso criptográfico**; la evidencia describe un input de replay controlado, no azar del sistema.
+El recibo de `surface` ancla el hash del módulo que cargan todos los replays. La lectura limita el
+tamaño de cada archivo y rechaza rutas que escapen del directorio descargado. Website CI ejecuta
+este replay completo antes de subir el paquete como evidencia. La captura de CI no es una atestación criptográfica:
 el éxito acredita las salidas bajo ese WASM y host, no equivalencia numérica universal.
 
 `fixtureSourceRevision` identifica el commit del programa fuente `examples/viz_surface.ostrin`;

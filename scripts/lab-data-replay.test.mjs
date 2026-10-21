@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { captureWasiFileReads, compareReplayFigure, runWasmWithFilesystemEvidence, spawnBoundedChild } from "./lab-data.mjs";
+import { captureWasiFileReads, captureWasiRandom, compareReplayFigure, runWasmWithFilesystemEvidence, spawnBoundedChild } from "./lab-data.mjs";
 import { experimentFixtures, outputPathFor } from "./experiment-bundle.mjs";
 
 test("WASI child processes terminate when they exceed their timeout", () => {
@@ -17,16 +17,21 @@ test("WASI filesystem evidence hashes bytes actually read from a declared input"
   const bundle = JSON.parse(readFileSync(outputPathFor(fixture.id), "utf8"));
   const source = bundle.files[bundle.experiment.source];
   const input = bundle.files["data.json"];
+  const deterministicRandomSeed = "ab".repeat(32);
   const result = await runWasmWithFilesystemEvidence({
     "main.ostrin": source,
     "data.json": input,
-  }, ["--run", "main.ostrin"]);
+  }, ["--run", "main.ostrin"], undefined, deterministicRandomSeed);
 
   const inputReads = result.filesystemReads.filter((event) => event.path === "data.json");
   assert.ok(inputReads.length > 0, JSON.stringify(result.filesystemReads));
   assert.ok(inputReads.every((event) => event.openStatus === "opened" && event.bytesRead === Buffer.byteLength(input)));
   const expected = `sha256:${createHash("sha256").update(input, "utf8").digest("hex")}`;
   assert.ok(inputReads.every((event) => event.contentSha256 === expected));
+  assert.equal(result.wasiRandomEvidence.schema, "ostrin.wasi-random-evidence/v1");
+  assert.equal(result.wasiRandomEvidence.algorithm, "sha256-counter-test-only/v1");
+  assert.ok(result.wasiRandomEvidence.requests.length > 0);
+  assert.ok(result.wasiRandomEvidence.requests.every((request) => /^sha256:[a-f0-9]{64}$/.test(request.contentSha256)));
 });
 
 test("WASI filesystem evidence records a failed open for an omitted input", async () => {
@@ -34,7 +39,7 @@ test("WASI filesystem evidence records a failed open for an omitted input", asyn
   const bundle = JSON.parse(readFileSync(outputPathFor(fixture.id), "utf8"));
   const result = await runWasmWithFilesystemEvidence({
     "main.ostrin": bundle.files[bundle.experiment.source],
-  }, ["--run", "main.ostrin"]);
+  }, ["--run", "main.ostrin"], undefined, "cd".repeat(32));
   const failed = result.filesystemReads.find((event) => event.path === "data.json");
   assert.ok(failed, JSON.stringify(result.filesystemReads));
   assert.equal(failed.openStatus, "open-failed");
@@ -64,6 +69,42 @@ test("WASI filesystem evidence marks a nonzero fd_read errno as incomplete", () 
   assert.equal(event.openStatus, "opened");
   assert.equal(event.readStatus, "fd_read_errno_5");
   assert.equal(event.contentSha256, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+});
+
+test("WASI random_get uses reproducible bundle-controlled bytes and rejects invalid memory ranges", () => {
+  const seed = "12".repeat(32);
+  const run = (selectedSeed) => {
+    const memory = new WebAssembly.Memory({ initial: 1 });
+    const importObject = { wasi_snapshot_preview1: { random_get() { return 99; } } };
+    const capture = captureWasiRandom(importObject, selectedSeed);
+    capture.attachInstance({ exports: { memory } });
+    assert.equal(importObject.wasi_snapshot_preview1.random_get(64, 32), 0);
+    return {
+      bytes: Array.from(new Uint8Array(memory.buffer, 64, 32)),
+      evidence: capture.finish(),
+    };
+  };
+
+  const first = run(seed);
+  const repeated = run(seed);
+  const changedSeed = run("34".repeat(32));
+  assert.deepEqual(repeated, first);
+  assert.notDeepEqual(changedSeed.bytes, first.bytes);
+  const expectedBlock = createHash("sha256")
+    .update("ostrin.wasi.random.sha256-counter-test-only.v1\0")
+    .update(Buffer.from(seed, "hex"))
+    .update(Buffer.alloc(8))
+    .digest();
+  assert.deepEqual(Buffer.from(first.bytes), expectedBlock);
+  assert.equal(first.evidence.algorithm, "sha256-counter-test-only/v1");
+  assert.equal(first.evidence.requests[0].byteLength, 32);
+
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const importObject = { wasi_snapshot_preview1: { random_get() { return 0; } } };
+  const capture = captureWasiRandom(importObject, seed);
+  capture.attachInstance({ exports: { memory } });
+  assert.equal(importObject.wasi_snapshot_preview1.random_get(memory.buffer.byteLength - 2, 8), 28);
+  assert.equal(capture.finish().requests[0].status, "invalid-memory-range");
 });
 
 function bundle(svg = "<svg/>") {
