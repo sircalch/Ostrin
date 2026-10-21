@@ -51,6 +51,29 @@ if (existsSync(socialCardAbsolutePath)) {
   }
 }
 
+const logoPaths = ["assets/ostrin-logo.png", "website/assets/ostrin-logo.png"];
+const logos = [];
+for (const logoPath of logoPaths) {
+  const logoAbsolutePath = path.join(repositoryRoot, logoPath);
+  check(existsSync(logoAbsolutePath), `${logoPath}: missing site logo`);
+  if (!existsSync(logoAbsolutePath)) continue;
+  const logo = readFileSync(logoAbsolutePath);
+  logos.push(logo);
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const hasPngHeader = logo.length >= 24
+    && logo.subarray(0, 8).equals(pngSignature)
+    && logo.toString("ascii", 12, 16) === "IHDR";
+  check(hasPngHeader, `${logoPath}: expected a valid PNG image`);
+  if (hasPngHeader) {
+    check(logo.readUInt32BE(16) === 256 && logo.readUInt32BE(20) === 256,
+      `${logoPath}: expected 256x256 dimensions for the site logo`);
+  }
+  check(logo.length <= 100_000, `${logoPath}: expected at most 100,000 bytes`);
+}
+if (logos.length === logoPaths.length) {
+  check(logos[0].equals(logos[1]), "assets/ostrin-logo.png and website/assets/ostrin-logo.png must stay identical");
+}
+
 let facts;
 try {
   facts = collectSiteFacts();
