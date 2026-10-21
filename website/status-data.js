@@ -18,7 +18,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 370
+    "rustMarkedTests": 377
   },
   "nativeBackend": {
     "ir": 7198,
@@ -81,7 +81,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "indexedPublicFiles": 0,
     "threshold": 2000,
     "readyForUpstreamPullRequest": false,
-    "generatedAt": "2026-10-11T19:35:50.280Z",
+    "generatedAt": "2026-10-21T16:52:44.849Z",
     "queryUrl": "https://github.com/search?q=NOT%20is%3Afork%20extension%3Aostrin%20-repo%3Asircalch%2FOstrin&type=code"
   },
   "releaseReadiness": {
