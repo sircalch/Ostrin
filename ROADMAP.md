@@ -209,10 +209,10 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    `std.viz.errorbars`. `from_source` ya separa la identidad explícita de la etiqueta; `standard`
    mantiene compatibilidad usando la etiqueta como ID. `Measurement<Quantity<D>>` ya tiene un
    prototipo sólo de intérprete para fuentes explícitas, suma correlacionada, incertidumbre estándar,
-   productos entre dimensiones y cocientes entre dimensiones iguales; el Scientific Lab lo muestra
-   por WASM. Ownership/ABI nativos, `Array<Measurement<T>>`, covarianza, cocientes entre dimensiones
-   distintas, Monte Carlo y cobertura siguen abiertos; la paridad scalar/native no implica paridad
-   dimensional/native.
+   productos entre dimensiones y cocientes entre dimensiones iguales y distintas; el Scientific Lab lo
+   muestra por WASM. Este ciclo añade el rechazo de nominales no finitos al convertir a unidades
+   coherentes. Ownership/ABI nativos, `Array<Measurement<T>>`, covarianzas parciales y Monte Carlo
+   siguen abiertos; la paridad scalar/native no implica paridad dimensional/native.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
    reproducible antes de fijar sintaxis pública. El inventario experimental ya está disponible con
@@ -224,7 +224,7 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
 
 ## Horizonte posterior
 
-- Integración completa de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md), junto con efectos científicos y procedencia en [docs/design/26-efectos-cientificos.md](docs/design/26-efectos-cientificos.md); el API escalar tiene paridad y error bars; el prototipo dimensional ya tiene suma, producto, cociente de dimensiones iguales y proyección de incertidumbre en intérprete/WASM. Paridad nativa, arrays, covarianza, cocientes entre dimensiones distintas, Monte Carlo y cobertura siguen pendientes.
+- Integración completa de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md), junto con efectos científicos y procedencia en [docs/design/26-efectos-cientificos.md](docs/design/26-efectos-cientificos.md); el API escalar tiene paridad y error bars; el prototipo dimensional ya tiene suma, producto, cocientes de dimensiones iguales y distintas y proyección de incertidumbre en intérprete/WASM. Paridad nativa, arrays, covarianzas parciales y Monte Carlo siguen pendientes.
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
 - Mayor calidad de vídeo y codecs adicionales; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF, MP4 cuando existe el codec y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.

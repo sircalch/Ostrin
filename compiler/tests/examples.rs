@@ -12096,6 +12096,72 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn dimensional_measurements_reject_non_finite_coherent_values() {
+    let source = temp_source(
+        "measurement_coherent_finiteness",
+        "import std.measurements\n\
+         fn main() -> Void {\n\
+         match measurements.from_quantity_source(2e305 km, 1 m, \"constructor\", \"large\") {\n\
+         Ok(_) => print(\"constructor accepted overflow\"),\n\
+         Err(message) => print(\"constructor = \" + message),\n\
+         }\n\
+         left = measurements.from_quantity_source(1e305 km, 1 m, \"left\", \"left\").unwrap()\n\
+         right = measurements.from_quantity_source(1e305 km, 1 m, \"right\", \"right\").unwrap()\n\
+         match measurements.add_quantity(left, right) {\n\
+         Ok(_) => print(\"addition accepted overflow\"),\n\
+         Err(message) => print(\"addition = \" + message),\n\
+         }\n\
+         subtract_left = measurements.from_quantity_source(1e305 km, 1 m, \"subtract-left\", \"left\").unwrap()\n\
+         subtract_right = measurements.from_quantity_source(-1e305 km, 1 m, \"subtract-right\", \"right\").unwrap()\n\
+         match measurements.sub_quantity(subtract_left, subtract_right) {\n\
+         Ok(_) => print(\"subtraction accepted overflow\"),\n\
+         Err(message) => print(\"subtraction = \" + message),\n\
+         }\n\
+         unknown_add_left = Measurement<Quantity<Length>> { value: 1e305 km, sources: [], known: false, reason: \"unknown\" }\n\
+         unknown_add_right = Measurement<Quantity<Length>> { value: 1e305 km, sources: [], known: false, reason: \"unknown\" }\n\
+         match measurements.add_quantity(unknown_add_left, unknown_add_right) {\n\
+         Ok(_) => print(\"unknown addition accepted overflow\"),\n\
+         Err(message) => print(\"unknown addition = \" + message),\n\
+         }\n\
+         unknown_sub_left = Measurement<Quantity<Length>> { value: 1e305 km, sources: [], known: false, reason: \"unknown\" }\n\
+         unknown_sub_right = Measurement<Quantity<Length>> { value: -1e305 km, sources: [], known: false, reason: \"unknown\" }\n\
+         match measurements.sub_quantity(unknown_sub_left, unknown_sub_right) {\n\
+         Ok(_) => print(\"unknown subtraction accepted overflow\"),\n\
+         Err(message) => print(\"unknown subtraction = \" + message),\n\
+         }\n\
+         product_left = measurements.from_quantity_source(1.5e151 km, 1 m, \"product-left\", \"left\").unwrap()\n\
+         product_right = measurements.from_quantity_source(1.5e151 km, 1 m, \"product-right\", \"right\").unwrap()\n\
+         match measurements.mul_quantity(product_left, product_right) {\n\
+         Ok(_) => print(\"product accepted overflow\"),\n\
+         Err(message) => print(\"product = \" + message),\n\
+         }\n\
+         unknown_left = Measurement<Quantity<Length>> { value: 1.5e151 km, sources: [], known: false, reason: \"unknown\" }\n\
+         unknown_right = Measurement<Quantity<Length>> { value: 1.5e151 km, sources: [], known: false, reason: \"unknown\" }\n\
+         match measurements.mul_quantity(unknown_left, unknown_right) {\n\
+         Ok(_) => print(\"unknown product accepted overflow\"),\n\
+         Err(message) => print(\"unknown product = \" + message),\n\
+         }\n\
+         invalid = Measurement<Quantity<Length>> { value: 2e305 km, sources: [], known: true, reason: \"\" }\n\
+         match measurements.quantity_uncertainty(invalid) {\n\
+         Ok(_) => print(\"uncertainty accepted overflow\"),\n\
+         Err(message) => print(\"uncertainty = \" + message),\n\
+         }\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &source]);
+    let _ = fs::remove_file(&source);
+    assert!(
+        interpreted.status.success(),
+        "dimensional measurement finiteness probe failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "constructor = measurement value must be finite\naddition = measurement value must be finite\nsubtraction = measurement value must be finite\nunknown addition = measurement value must be finite\nunknown subtraction = measurement value must be finite\nproduct = measurement value must be finite\nunknown product = measurement value must be finite\nuncertainty = measurement value must be finite\n"
+    );
+}
+
+#[test]
 fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
     let source = temp_source(
         "temperature_point_measurement_boundary",

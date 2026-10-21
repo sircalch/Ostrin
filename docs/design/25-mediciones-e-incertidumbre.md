@@ -275,7 +275,12 @@ runtime:
 El prototipo `from_quantity_source` ya construye `Measurement<Quantity<D>>` en el intérprete:
 conserva la contribución como `Quantity<D>`, guarda la sigma de la fuente en la unidad coherente
 mediante `sigma.value() * sigma.unit_scale()` y registra la dimensión estática con
-`value.dimension_key()`. La evidencia cubre `20 cm` y `0.2 m` como sigmas coherentes equivalentes,
+`value.dimension_key()`. Tanto el constructor como suma, resta, producto y `quantity_uncertainty` rechazan
+nominales cuyo valor almacenado sea finito pero cuyo valor convertido a la unidad coherente no lo
+sea; la validación de `quantity_uncertainty` también protege frente a records construidos
+directamente por el usuario. `dimensional_measurements_reject_non_finite_coherent_values` cubre
+constructor, suma/resta/producto, resultados con incertidumbre desconocida y records manuales.
+La evidencia cubre `20 cm` y `0.2 m` como sigmas coherentes equivalentes,
 además de rechazos para valores y sigmas no finitos, sigma negativa e identificador vacío. La
 propagación de suma y resta también está disponible en el intérprete: `12 m ± 20 cm` y
 `1200 cm ± 0.2 m` con la misma identidad producen una contribución de `40 cm` al sumar y `0 cm`
