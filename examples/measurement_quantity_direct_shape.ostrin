@@ -105,6 +105,17 @@ fn main() -> Void {
     ratio_independent = measurements.div_quantity_same(ratio_independent_a, ratio_independent_b).unwrap()
     print(measurements.uncertainty(ratio_independent).unwrap())
 
+    distance_reading = measurements.from_quantity_source(10 m, 10 cm, "distance", "distance").unwrap()
+    elapsed_reading = measurements.from_quantity_source(2 s, 0.2 s, "elapsed", "elapsed").unwrap()
+    measured_speed = measurements.div_quantity(distance_reading, elapsed_reading).unwrap()
+    print(measured_speed.value.dimension_key())
+    print(measured_speed.value.value() * measured_speed.value.unit_scale())
+    print(measured_speed.sources[0].contribution.value() * measured_speed.sources[0].contribution.unit_scale())
+    print(measured_speed.sources[1].contribution.value() * measured_speed.sources[1].contribution.unit_scale())
+    speed_uncertainty = measurements.quantity_uncertainty(measured_speed).unwrap()
+    print(speed_uncertainty.dimension_key)
+    print(speed_uncertainty.value)
+
     zero_denominator = measurements.from_quantity_source(0 m, 10 cm, "zero", "ruler").unwrap()
     match measurements.div_quantity_same(ratio_a, zero_denominator) {
         Ok(_) => print("zero dimensional denominator accepted"),

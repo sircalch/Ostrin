@@ -25,6 +25,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const std = read("compiler/std/measurements.ostrin", root);
   const example = read("examples/measurement_scalar.ostrin", root);
   const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
+  const labExample = read("examples/measurement_lab.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
@@ -151,8 +152,17 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /pub fn div_quantity_same<D: Dimension>/.test(std)
       && /a_factor = 1\.0 \/ b_value/.test(std)
       && /scale_quantity_sources_to_float\(a\.sources, a_factor\)/.test(std)
-      && /scale_quantity_sources_to_float\(b\.sources, b_factor\)/.test(std),
-    "compiler/std/measurements.ostrin: dimensional products and same-dimension ratios must propagate derivatives");
+      && /scale_quantity_sources_to_float\(b\.sources, b_factor\)/.test(std)
+      && /pub fn div_quantity<A: Dimension, B: Dimension>/.test(std)
+      && /contribution: item\.contribution \/ divisor/.test(std)
+      && /numerator \* item\.contribution\) \/ \(denominator \* denominator/.test(std),
+    "compiler/std/measurements.ostrin: dimensional products and same- or cross-dimension ratios must propagate derivatives");
+  check(errors, /measurements\.div_quantity\(distance_reading, elapsed_reading\)/.test(directQuantityExample)
+      && /div_quantity\(distance, elapsed\)/.test(labExample)
+      && /same- or cross-dimension ratios/.test(lab)
+      && tests.includes("Length*Time^-1\\n5\\n0.05\\n-0.5\\nLength*Time^-1\\n0.5024937810560445")
+      && /cocientes entre dimensiones distintas/i.test(design),
+    "dimensional measurement evidence: cross-dimension quotient type, derivative values, uncertainty, or web demo is missing");
   check(errors, /Length\^2\\nLength\\nLength\^2\\n0\.8/.test(tests),
     "compiler/tests/examples.rs: correlated product evidence is missing");
   check(errors, /1\\n0\\n0\.03535533905932738/.test(tests),

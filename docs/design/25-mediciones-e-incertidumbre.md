@@ -294,10 +294,13 @@ con incertidumbre combinada `0.632455532033676`. `quantity_uncertainty` suma los
 `dimension_key`. Una medición exacta devuelve cero; incertidumbre desconocida y overflow producen
 `Err`. La suma de dos fuentes independientes de `0.2 m` da `0.28284271247461906`, mientras que
 la misma fuente compartida al sumarse da `0.4`.
-El cociente entre magnitudes de dimensiones distintas aún no está disponible porque requiere
-representar el resultado adimensional como `Measurement<Float>` o el resultado dimensional como
-`Measurement<Quantity<A/B>>`. El backend nativo mantiene el rechazo explícito hasta cerrar ownership,
-dimensión de incertidumbre y ABI.
+`div_quantity` propaga ahora cocientes entre dimensiones distintas y conserva el tipo
+`Measurement<Quantity<A/B>>`; las derivadas de numerador y denominador permanecen en la dimensión
+del resultado y la sigma de cada fuente en su dimensión original. El ejemplo `10 m ± 0.1 m` sobre
+`2 s ± 0.2 s` produce `5 m/s`, contribuciones coherentes `0.05 m/s` y `-0.5 m/s`, e incertidumbre
+combinada `0.5024937810560445 m/s`. `div_quantity_same` conserva la API compatible que devuelve
+`Measurement<Float>` para cocientes de igual dimensión. El backend nativo mantiene el rechazo
+explícito hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
 Este prototipo no habilita todavía `Array<Measurement<T>>`, covarianza ni soporte nativo de
 `Measurement<Quantity<D>>`. La propagación deberá mantener la dimensión del resultado en

@@ -21,4 +21,12 @@ fn main() -> Void {
 
     ratio = measurements.div_quantity_same(ruler_a, ruler_b).unwrap()
     print("same-source ratio = " + measurements.summary(ratio))
+
+    distance = measurements.from_quantity_source(10 m, 10 cm, "distance", "distance").unwrap()
+    elapsed = measurements.from_quantity_source(2 s, 0.2 s, "elapsed", "elapsed").unwrap()
+    speed = measurements.div_quantity(distance, elapsed).unwrap()
+    speed_u = measurements.quantity_uncertainty(speed).unwrap()
+    print("cross-dimension ratio = " + speed.value.to_string())
+    print("speed dimension = " + speed.value.dimension_key())
+    print("speed standard uncertainty (m/s) = " + speed_u.value.to_string())
 }
