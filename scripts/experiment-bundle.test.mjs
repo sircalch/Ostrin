@@ -265,6 +265,7 @@ test("every registered fixture produces a verified recorded bundle", () => {
     assert.equal(bundle.provenance.effects.source, "ostrinc --effect-report --json");
     assert.ok(Array.isArray(bundle.provenance.effects.kinds));
     assert.ok(Array.isArray(bundle.provenance.effects.functions.main));
+    assert.equal(bundle.files["provenance.json"], `${JSON.stringify(bundle.provenance)}\n`);
     assert.ok(bundle.provenance.effects.function_calls);
     assert.ok(bundle.provenance.effects.unresolved_calls);
     assert.equal(bundle.provenance.effects.call_resolution.schema, "ostrin.call-resolution-evidence/v1");

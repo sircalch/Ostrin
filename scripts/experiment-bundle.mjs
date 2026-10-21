@@ -1027,7 +1027,10 @@ export function buildExperimentBundle(fixtureId = defaultFixtureId, root = repos
   const provenance = provenanceFor(root, fixture, files, manifest);
   const inputData = JSON.parse(files["data.json"]);
   const reproducibility = reproducibilityFor(inputData);
-  const provenanceFile = canonicalJson(provenance);
+  // The bundle already contains a readable provenance object. Keep its nested
+  // file compact so large effect reports are not duplicated with pretty-print
+  // whitespace in every downloadable experiment bundle.
+  const provenanceFile = `${JSON.stringify(provenance)}\n`;
   const allFiles = { ...files, "provenance.json": provenanceFile };
   const completeManifest = manifestFor(allFiles);
   return {
