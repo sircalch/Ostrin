@@ -124,6 +124,8 @@ export function inspectBundle(bundle, file) {
     missingR3Extensions.push("provenance.effects");
   } else {
     const effectErrors = validateEffectCapture(effects);
+    const callResolutionErrors = effectErrors.filter((error) => /call_resolution|call resolution|resolved local target|function call edge/i.test(error));
+    const effectCoverageErrors = effectErrors.filter((error) => !callResolutionErrors.includes(error));
     const symbolicCallCount = effects.effect_coverage?.symbolic_calls;
     const symbolicCalls = effects.symbolic_effect_calls;
     const hasSymbolicCalls = symbolicCalls !== undefined;
@@ -132,8 +134,11 @@ export function inspectBundle(bundle, file) {
         || !calls.every((call) => typeof call === "string")));
     const symbolicCountMalformed = symbolicCallCount !== undefined
       && (!Number.isInteger(symbolicCallCount) || symbolicCallCount < 0);
-    if (effectErrors.length > 0 || symbolicCallsMalformed || symbolicCountMalformed) {
+    if (effectCoverageErrors.length > 0 || symbolicCallsMalformed || symbolicCountMalformed) {
       missingR3Extensions.push("provenance.effects.effect_coverage");
+    }
+    if (callResolutionErrors.length > 0) {
+      missingR3Extensions.push("provenance.effects.call_resolution");
     }
     const signatureErrors = validateEntryEffectSignature(
       effects.entry_effect_signature,
@@ -209,6 +214,100 @@ function effectOperationSyntax(operation) {
   return "other";
 }
 
+const CALL_RESOLUTION_CATEGORIES = [
+  ["resolvedLocalOperations", "resolved_local_operations"],
+  ["effectClassifiedOperations", "effect_classified_operations"],
+  ["effectFreeIntrinsics", "effect_free_intrinsics"],
+  ["compilerBuiltinCallbacks", "compiler_builtin_callbacks"],
+  ["indirectOperations", "indirect_operations"],
+  ["unresolvedOperations", "unresolved_calls"],
+  ["symbolicCallbacks", "symbolic_effect_calls"],
+];
+
+export function diagnoseCallResolution(effects) {
+  const resolution = effects?.call_resolution;
+  const calls = effects?.function_calls;
+  const targets = resolution?.resolved_local_targets;
+  if (resolution?.schema !== "ostrin.call-resolution-evidence/v1"
+    || resolution.count_unit !== "distinct_function_operation_edges"
+    || !isObject(calls)
+    || !isObject(effects?.unresolved_calls)
+    || !isObject(effects?.symbolic_effect_calls)
+    || !Array.isArray(targets)
+    || !CALL_RESOLUTION_CATEGORIES.every(([, field]) =>
+      isObject(field === "unresolved_calls" || field === "symbolic_effect_calls" ? effects[field] : resolution[field]))) {
+    return { status: "unavailable", edgeCount: null, uncategorizedEdgeCount: null };
+  }
+
+  const edges = new Set();
+  for (const [caller, operations] of Object.entries(calls)) {
+    if (!Array.isArray(operations) || !operations.every((operation) => typeof operation === "string")) {
+      return { status: "invalid", edgeCount: null, uncategorizedEdgeCount: null };
+    }
+    for (const operation of operations) edges.add(`${caller}\0${operation}`);
+  }
+  const categories = Object.fromEntries(CALL_RESOLUTION_CATEGORIES.map(([name]) => [name, new Set()]));
+  let categoryEdgesValid = true;
+  for (const [name, field] of CALL_RESOLUTION_CATEGORIES) {
+    const categoryMap = field === "unresolved_calls" || field === "symbolic_effect_calls"
+      ? effects[field]
+      : resolution[field];
+    for (const [caller, operations] of Object.entries(categoryMap)) {
+      if (!Array.isArray(operations) || !operations.every((operation) => typeof operation === "string")) {
+        return { status: "invalid", edgeCount: edges.size, uncategorizedEdgeCount: null };
+      }
+      for (const operation of operations) {
+        const edge = `${caller}\0${operation}`;
+        if (!edges.has(edge)) categoryEdgesValid = false;
+        categories[name].add(edge);
+      }
+    }
+  }
+
+  const targetEdges = new Set();
+  let staticLocalFunctionEdgeCount = 0;
+  let genericTraitCandidateEdgeCount = 0;
+  let localTargetCandidateCount = 0;
+  let multiTargetEdgeCount = 0;
+  for (const target of targets) {
+    if (!target || typeof target.function !== "string" || typeof target.operation !== "string"
+      || !["static", "generic-trait-candidates"].includes(target.dispatch)
+      || !Array.isArray(target.targets) || target.targets.length === 0
+      || !target.targets.every((name) => typeof name === "string")) {
+      return { status: "invalid", edgeCount: edges.size, uncategorizedEdgeCount: null };
+    }
+    const edge = `${target.function}\0${target.operation}`;
+    if (!edges.has(edge)) categoryEdgesValid = false;
+    targetEdges.add(edge);
+    if (target.dispatch === "static") staticLocalFunctionEdgeCount++;
+    else genericTraitCandidateEdgeCount++;
+    localTargetCandidateCount += target.targets.length;
+    if (target.targets.length > 1) multiTargetEdgeCount++;
+  }
+  const localOperations = categories.resolvedLocalOperations;
+  const targetAssociationComplete = targetEdges.size === targets.length
+    && targetEdges.size === localOperations.size
+    && [...targetEdges].every((edge) => localOperations.has(edge));
+  const categorized = new Set([...Object.values(categories).flatMap((set) => [...set]), ...targetEdges]);
+  const uncategorizedEdgeCount = [...edges].filter((edge) => !categorized.has(edge)).length;
+  const categoryCounts = Object.fromEntries(Object.entries(categories).map(([name, set]) => [name, set.size]));
+  return {
+    status: categoryEdgesValid && targetAssociationComplete && uncategorizedEdgeCount === 0 ? "available" : "invalid",
+    countUnit: "bundle_function_operation_edges",
+    edgeCount: edges.size,
+    categorizedEdgeCount: categorized.size,
+    uncategorizedEdgeCount,
+    localTargetAssociationComplete: targetAssociationComplete,
+    localFunctionEdgeCount: targetEdges.size,
+    staticLocalFunctionEdgeCount,
+    genericTraitCandidateEdgeCount,
+    localTargetCandidateCount,
+    multiTargetEdgeCount,
+    categoryCounts,
+    interpretation: "Categories are compiler-emitted typed effect-analysis results aggregated by function and operation spelling. One edge may carry multiple categories; this is not a per-invocation trace, proof of runtime dispatch, purity, or semantic soundness.",
+  };
+}
+
 export function diagnoseEffectCalls(effects) {
   const bySyntax = { identifier: 0, memberPath: 0, qualifiedPath: 0, other: 0 };
   const operationReferences = new Map();
@@ -278,6 +377,7 @@ export function diagnoseEffectCalls(effects) {
   }
   return {
     referenceCount,
+    callResolution: diagnoseCallResolution(effects),
     uniqueOperationNames: operationReferences.size,
     bySyntax,
     operations: operationReferences,
@@ -302,6 +402,21 @@ function buildGapDiagnostics(records) {
   let symbolicInventoryBundleCount = 0;
   let directlyReachableSymbolicReferenceCount = 0;
   let reachableGraphBundleCount = 0;
+  const callResolutionEvidence = {
+    bundleCount: records.length,
+    availableBundleCount: 0,
+    unavailableBundleCount: 0,
+    invalidBundleCount: 0,
+    edgeCount: 0,
+    categorizedEdgeCount: 0,
+    uncategorizedEdgeCount: 0,
+    localFunctionEdgeCount: 0,
+    staticLocalFunctionEdgeCount: 0,
+    genericTraitCandidateEdgeCount: 0,
+    localTargetCandidateCount: 0,
+    multiTargetEdgeCount: 0,
+    categoryCounts: Object.fromEntries(CALL_RESOLUTION_CATEGORIES.map(([name]) => [name, 0])),
+  };
   const entrypointBundles = [];
   const reproducibility = {
     embeddedInputSnapshotBundles: 0,
@@ -340,6 +455,25 @@ function buildGapDiagnostics(records) {
   for (const { entry, effectCalls, bundle: sourceBundle } of records) {
     const bundle = entry.id ?? entry.file;
     const provenance = sourceBundle?.provenance ?? {};
+    const resolution = effectCalls.callResolution;
+    if (resolution.status === "available") {
+      callResolutionEvidence.availableBundleCount++;
+      callResolutionEvidence.edgeCount += resolution.edgeCount;
+      callResolutionEvidence.categorizedEdgeCount += resolution.categorizedEdgeCount;
+      callResolutionEvidence.uncategorizedEdgeCount += resolution.uncategorizedEdgeCount;
+      callResolutionEvidence.localFunctionEdgeCount += resolution.localFunctionEdgeCount;
+      callResolutionEvidence.staticLocalFunctionEdgeCount += resolution.staticLocalFunctionEdgeCount;
+      callResolutionEvidence.genericTraitCandidateEdgeCount += resolution.genericTraitCandidateEdgeCount;
+      callResolutionEvidence.localTargetCandidateCount += resolution.localTargetCandidateCount;
+      callResolutionEvidence.multiTargetEdgeCount += resolution.multiTargetEdgeCount;
+      for (const [category, count] of Object.entries(resolution.categoryCounts)) {
+        callResolutionEvidence.categoryCounts[category] += count;
+      }
+    } else if (resolution.status === "invalid") {
+      callResolutionEvidence.invalidBundleCount++;
+    } else {
+      callResolutionEvidence.unavailableBundleCount++;
+    }
     const inputRecords = Array.isArray(provenance.inputs) ? provenance.inputs : [];
     externalInputEvidence.declaredInputRecords += inputRecords.length;
     for (const input of inputRecords) {
@@ -570,6 +704,16 @@ function buildGapDiagnostics(records) {
       },
       interpretation: "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity.",
     },
+    callResolutionEvidence: {
+      status: callResolutionEvidence.availableBundleCount === records.length && records.length > 0
+        ? "available"
+        : callResolutionEvidence.availableBundleCount === 0 ? "unavailable" : "partial",
+      countUnit: "bundle_function_operation_edges",
+      localTargetAssociationComplete: callResolutionEvidence.availableBundleCount === records.length
+        && callResolutionEvidence.invalidBundleCount === 0 && records.length > 0,
+      ...callResolutionEvidence,
+      interpretation: "Compiler-emitted resolution categories now associate local function targets with operation spellings and classify effectful, known effect-free, callback, indirect, symbolic and unresolved edges. They are aggregated per function-operation edge; they do not provide per-invocation dispatch traces or prove purity or semantic soundness.",
+    },
     entrypointEffects,
     reproducibilityEvidence: {
       ...reproducibility,
@@ -594,7 +738,7 @@ function buildGapDiagnostics(records) {
       interpretation: "Counts describe declared provenance inputs, runtime snapshot references, source read_file calls and execution capabilities. The source scan identifies direct literal paths and surfaces dynamic calls or references, but cannot detect reads hidden behind aliases, imported helpers, FFI or host code; it is not a runtime trace. A path/hash match is structural consistency only and does not prove that every external input is captured or that snapshot bytes were re-read.",
     },
     notAssessed: [
-      "Whether an operation resolves to a typed function or intrinsic",
+      "Whether every invocation, including dynamic dispatch, is resolved at call-site granularity and matches runtime dispatch",
       "Whether external inputs are fully captured and privacy-safe",
       "Whether numerical tolerances are scientifically justified",
     ],

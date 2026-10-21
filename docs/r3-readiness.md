@@ -31,7 +31,8 @@ El checkout local tiene los **29/29 bundles con los campos base completos**, inc
 porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
 reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
 la marca de que el análisis es experimental y conservador. El resumen conserva las llamadas locales,
-las llamadas no resueltas, los bordes simbólicos y la firma calculada para `main`.
+las llamadas no resueltas, los bordes simbólicos, la asociación entre operación y destinos locales,
+las categorías de efecto/intrínseco/callback y la firma calculada para `main`.
 `entry_effect_signature` es la evidencia del cierre de efectos del punto de entrada: debe ser válida,
 estar cerrada y no afirmar pureza. Una fila cerrada puede incluir efectos conocidos como `io` o
 `state(local)`. Los callbacks simbólicos de funciones no alcanzadas o sustituidos por una función
@@ -95,11 +96,18 @@ la firma de efectos del entrypoint ni las demás comprobaciones.
 ## Diagnósticos de brechas
 
 `gapDiagnostics` desglosa los campos de captura ausentes o incompletos, el inventario de referencias
-no resueltas y callbacks simbólicos, la fila de efectos del entrypoint y la alcanzabilidad directa
-que puede reconstruirse desde `function_calls`. Las referencias por sintaxis (identificador, ruta de
-miembro o ruta cualificada) son agrupaciones textuales; no deciden si una llamada resuelve a función,
-método, callback o API externa. El recorrido directo sigue solo aristas que coinciden exactamente
-con nombres registrados de función y no acredita alcanzabilidad dinámica completa.
+no resueltas y callbacks simbólicos, la fila de efectos del entrypoint, la evidencia de resolución
+por arista y la alcanzabilidad directa que puede reconstruirse desde `function_calls`. Para cada
+arista distinta `(función, operación)`, `call_resolution` conserva destinos locales canónicos y
+categorías emitidas por el análisis tipado: efecto clasificado, intrínseco sin efecto conocido,
+callback incorporado, indirecta, simbólica o no resuelta. Cada arista local distingue un destino
+estático de los candidatos conservadores de una llamada mediante trait genérico. La validación
+comprueba que todas las aristas estén categorizadas y que los destinos locales coincidan con las
+operaciones marcadas como resueltas. Estas categorías pueden solaparse y no equivalen a una traza por invocación, no demuestran
+que el despacho dinámico en ejecución coincida con el estático y no prueban pureza ni soundness.
+Las referencias por sintaxis (identificador, ruta de miembro o ruta cualificada) siguen siendo
+agrupaciones textuales. El recorrido directo sigue solo aristas que coinciden exactamente con nombres
+registrados de función y no acredita alcanzabilidad dinámica completa.
 
 En el reporte local generado desde el código actual hay 29/29 filas de `main` cerradas, 74
 referencias a 10 callbacks simbólicos en el inventario global, cero llamadas no resueltas y 29/29

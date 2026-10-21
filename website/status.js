@@ -63,13 +63,23 @@ function render() {
       valueCard("Inventory", coverage.complete ? "COMPLETE" : "PARTIAL", "not a purity proof", coverage.complete ? "ready" : "open"),
     );
   }
-  reproducibility.replaceChildren(
+  const reproducibilityCards = [
     valueCard("R0", String(status.reproducibility.R0), "recorded replay", "neutral"),
     valueCard("R1", String(status.reproducibility.R1), "seeded replay", status.reproducibility.R1 > 0 ? "ready" : "open"),
     valueCard("R2", String(status.reproducibility.R2), "input snapshot", status.reproducibility.R2 > 0 ? "ready" : "open"),
     valueCard("R3 claims", String(status.reproducibility.R3), `${status.reproducibility.R3} fixtures claim R3 · ${status.r3.readyCount}/${status.r3.bundleCount} pass the structural CI capture gate · ${status.r3.closedEntryEffectBundleCount}/${status.r3.bundleCount} entry rows closed · ${status.r3.symbolicEffectCallCount} module-wide symbolic · ${status.r3.unresolvedEffectCallCount} unresolved`, "neutral"),
     valueCard("Source input scan", `${status.r3.sourceReadAudit.literalReadPathCallCount} literal reads`, `${status.r3.sourceReadAudit.bundlesWithDirectReadFileCalls}/${status.r3.sourceReadAudit.sourceBundleCount} bundles · ${status.r3.sourceReadAudit.dynamicReadCallCount} dynamic · ${status.r3.sourceReadAudit.shadowedReadFileCallCount} shadowed local · ${status.r3.sourceReadAudit.qualifiedReadFileCallCount} qualified unresolved · ${status.r3.sourceReadAudit.readFileReferenceCount} references · ${status.r3.sourceReadAudit.undeclaredLiteralPathCount} unlisted · ${status.r3.sourceReadAudit.declaredSnapshotWithoutDirectReadCount + status.r3.sourceReadAudit.filesystemCapabilitiesWithoutDirectReadCount} snapshot/capability gaps · static scan only`, "neutral"),
-  );
+  ];
+  const callResolution = status.r3.callResolutionEvidence;
+  if (callResolution) {
+    reproducibilityCards.push(valueCard(
+      "Call-edge categories",
+      `${callResolution.categorizedEdgeCount.toLocaleString()} / ${callResolution.edgeCount.toLocaleString()}`,
+      `${callResolution.staticLocalFunctionEdgeCount.toLocaleString()} static local · ${callResolution.genericTraitCandidateEdgeCount.toLocaleString()} generic trait candidate edges · ${callResolution.uncategorizedEdgeCount.toLocaleString()} uncategorized · edge-level only, not a runtime trace`,
+      callResolution.status === "available" && callResolution.uncategorizedEdgeCount === 0 ? "neutral" : "open",
+    ));
+  }
+  reproducibility.replaceChildren(...reproducibilityCards);
   if (linguist) {
     const indexed = status.linguist.indexedPublicFiles == null ? "—" : status.linguist.indexedPublicFiles.toLocaleString();
     linguist.replaceChildren(

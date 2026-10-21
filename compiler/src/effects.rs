@@ -148,6 +148,10 @@ pub struct EffectReport {
     pub free_function_names: BTreeSet<String>,
     /// Local callees resolved to a canonical function key, per caller.
     pub resolved_function_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Local call targets grouped by the caller and source operation spelling.
+    /// This retains the association that `resolved_function_calls` intentionally
+    /// flattens for transitive effect propagation.
+    pub resolved_call_targets: BTreeMap<(String, String), BTreeSet<String>>,
     /// Source spellings corresponding to the resolved edges, per caller.
     pub resolved_call_operations: BTreeMap<String, BTreeSet<String>>,
     /// Calls to typed compiler intrinsics with no host effect in the current
@@ -237,6 +241,17 @@ enum DropEffect {
 }
 
 impl EffectReport {
+    /// Return candidate targets for a generic trait-bound call, if this
+    /// operation was resolved through a generic trait bound.
+    pub fn generic_trait_call_targets(
+        &self,
+        caller: &str,
+        operation: &str,
+    ) -> Option<&BTreeSet<String>> {
+        self.generic_trait_calls
+            .get(&(caller.to_string(), operation.to_string()))
+    }
+
     /// Return (concrete, symbolic, unresolved) distinct function-operation
     /// edge counts. The report stores operation names in sets, so repeated
     /// calls with the same spelling in one function count once. A symbolic
@@ -1082,6 +1097,11 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                     .clone()
                     .unwrap_or_else(|| resolve_local_target(callee, report).into_iter().collect());
                 if !targets.is_empty() {
+                    report
+                        .resolved_call_targets
+                        .entry((function.to_string(), operation.clone()))
+                        .or_default()
+                        .extend(targets.iter().cloned());
                     if generic_targets.is_some() {
                         report
                             .generic_trait_calls

@@ -400,6 +400,22 @@ export async function buildScorecard() {
         closedEntryEffectBundleCount: report.closedEntryEffectBundleCount,
         symbolicEffectCallCount: report.symbolicEffectCallCount,
         unresolvedEffectCallCount: report.unresolvedEffectCallCount,
+        callResolutionEvidence: (() => {
+          const evidence = report.gapDiagnostics.callResolutionEvidence;
+          return {
+            status: evidence.status,
+            bundleCount: evidence.bundleCount,
+            availableBundleCount: evidence.availableBundleCount,
+            invalidBundleCount: evidence.invalidBundleCount,
+            edgeCount: evidence.edgeCount,
+            categorizedEdgeCount: evidence.categorizedEdgeCount,
+            uncategorizedEdgeCount: evidence.uncategorizedEdgeCount,
+            staticLocalFunctionEdgeCount: evidence.staticLocalFunctionEdgeCount,
+            genericTraitCandidateEdgeCount: evidence.genericTraitCandidateEdgeCount,
+            localTargetCandidateCount: evidence.localTargetCandidateCount,
+            multiTargetEdgeCount: evidence.multiTargetEdgeCount,
+          };
+        })(),
         sourceReadAudit: (() => {
           const audit = report.gapDiagnostics.externalInputEvidence.sourceReadAudit;
           return {

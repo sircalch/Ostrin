@@ -450,6 +450,41 @@ export function validateEffectCapture(effects) {
   if (!isStringArrayMap(effects.function_effect_variables)) errors.push("effects capture function_effect_variables must map names to effect-variable arrays");
   if (!isStringArrayMap(effects.symbolic_effect_calls)) errors.push("effects capture symbolic_effect_calls must map names to callback arrays");
 
+  const resolution = effects.call_resolution;
+  const resolutionMaps = [
+    "resolved_local_operations",
+    "effect_classified_operations",
+    "effect_free_intrinsics",
+    "compiler_builtin_callbacks",
+    "indirect_operations",
+  ];
+  if (!resolution || typeof resolution !== "object" || Array.isArray(resolution)
+    || resolution.schema !== "ostrin.call-resolution-evidence/v1"
+    || resolution.count_unit !== "distinct_function_operation_edges") {
+    errors.push("effects capture call_resolution schema/count_unit is missing or unsupported");
+  } else {
+    for (const name of resolutionMaps) {
+      if (!isStringArrayMap(resolution[name])) errors.push(`effects capture call_resolution.${name} must map function names to operation arrays`);
+    }
+    if (!Array.isArray(resolution.resolved_local_targets)
+      || !resolution.resolved_local_targets.every((target) => target && typeof target === "object"
+        && typeof target.function === "string" && typeof target.operation === "string"
+        && ["static", "generic-trait-candidates"].includes(target.dispatch)
+        && Array.isArray(target.targets) && target.targets.length > 0
+        && target.targets.every((name) => typeof name === "string"))) {
+      errors.push("effects capture call_resolution.resolved_local_targets must preserve caller/operation/target records");
+    } else if (isStringArrayMap(resolution.resolved_local_operations)) {
+      const targetEdges = new Set(resolution.resolved_local_targets.map(({ function: caller, operation }) => `${caller}\0${operation}`));
+      const operationEdges = new Set(Object.entries(resolution.resolved_local_operations)
+        .flatMap(([caller, operations]) => operations.map((operation) => `${caller}\0${operation}`)));
+      if (targetEdges.size !== resolution.resolved_local_targets.length
+        || targetEdges.size !== operationEdges.size
+        || [...targetEdges].some((edge) => !operationEdges.has(edge))) {
+        errors.push("effects capture call_resolution local target records do not match resolved local operations");
+      }
+    }
+  }
+
   const coverage = effects.effect_coverage;
   if (coverage?.count_unit !== "distinct_function_operation_edges") {
     errors.push("effects capture effect_coverage.count_unit must be distinct_function_operation_edges");
@@ -467,6 +502,36 @@ export function validateEffectCapture(effects) {
     || !isStringArrayMap(effects.function_effect_variables) || !isStringArrayMap(effects.symbolic_effect_calls)) return errors;
 
   const callCount = Object.values(effects.function_calls).reduce((total, calls) => total + calls.length, 0);
+  if (resolution && typeof resolution === "object" && !Array.isArray(resolution)) {
+    const callEdges = new Set(Object.entries(effects.function_calls)
+      .flatMap(([caller, calls]) => calls.map((call) => `${caller}\0${call}`)));
+    const recordedEdges = new Set();
+    const categoryMaps = [
+      ...resolutionMaps.map((name) => [name, resolution[name]]),
+      ["unresolved_operations", effects.unresolved_calls],
+      ["symbolic_callbacks", effects.symbolic_effect_calls],
+    ];
+    for (const [name, categoryMap] of categoryMaps) {
+      if (!isStringArrayMap(categoryMap)) continue;
+      for (const [caller, calls] of Object.entries(categoryMap)) {
+        for (const call of calls) {
+          const edge = `${caller}\0${call}`;
+          if (!callEdges.has(edge)) errors.push(`call resolution ${name} edge ${caller}.${call} is absent from function_calls`);
+          recordedEdges.add(edge);
+        }
+      }
+    }
+    if (Array.isArray(resolution.resolved_local_targets)) {
+      for (const { function: caller, operation } of resolution.resolved_local_targets) {
+        const edge = `${caller}\0${operation}`;
+        if (!callEdges.has(edge)) errors.push(`resolved local target ${caller}.${operation} is absent from function_calls`);
+        recordedEdges.add(edge);
+      }
+    }
+    for (const edge of callEdges) {
+      if (!recordedEdges.has(edge)) errors.push(`function call edge ${edge.replace("\0", ".")} has no call-resolution category`);
+    }
+  }
   let unresolvedCount = 0;
   for (const [caller, calls] of Object.entries(effects.unresolved_calls)) {
     const recordedCalls = new Set(effects.function_calls[caller] ?? []);
@@ -698,6 +763,16 @@ function compilerEffectSummary(root, sourcePath) {
       .map(([name, kinds]) => [name, [...new Set(kinds)].sort()])),
     function_calls: report.function_calls,
     unresolved_calls: report.unresolved_calls,
+    call_resolution: {
+      schema: "ostrin.call-resolution-evidence/v1",
+      count_unit: "distinct_function_operation_edges",
+      resolved_local_targets: report.resolved_call_targets,
+      resolved_local_operations: report.resolved_call_operations,
+      effect_classified_operations: report.classified_calls,
+      effect_free_intrinsics: report.known_effect_free_calls,
+      compiler_builtin_callbacks: report.builtin_callback_calls,
+      indirect_operations: report.indirect_calls,
+    },
     function_effect_variables: report.function_effect_variables,
     symbolic_effect_calls: report.symbolic_effect_calls,
     entry_effect_signature: {
@@ -705,7 +780,7 @@ function compilerEffectSummary(root, sourcePath) {
       ...report.function_effect_signatures?.main,
     },
     effect_coverage: report.effect_coverage,
-    analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
+    analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs", "scripts/experiment-bundle.mjs"].map((relativePath) => ({
       path: relativePath,
       sha256: sha256(normalizedText(root, relativePath)),
     })),

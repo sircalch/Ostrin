@@ -12880,6 +12880,16 @@ fn experimental_effect_report_propagates_effects_through_generic_trait_bounds() 
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
 
+    let generic_targets = report["resolved_call_targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|target| target["function"] == "emit_any" && target["operation"] == "value.emit")
+        .expect("generic trait calls must preserve their candidate targets");
+    assert_eq!(generic_targets["dispatch"], "generic-trait-candidates");
+    assert!(generic_targets["targets"]
+        .as_array()
+        .is_some_and(|targets| !targets.is_empty()));
     assert_eq!(
         report["function_effect_signatures"]["emit_any"]["effects"],
         serde_json::json!(["io"]),
@@ -12996,6 +13006,8 @@ fn experimental_effect_report_closes_only_typed_intrinsics_and_builtin_methods()
          trait Printer {\n    fn print(self) -> Void\n}\n\
          trait Normalizer {\n    fn normal(self) -> Float\n}\n\
          record MutableBox { mut value: Int }\n\
+         fn helper(x: Float) -> Float {\n    x\n}\n\
+         fn calls_helper(x: Float) -> Float {\n    helper(x)\n}\n\
          fn math(x: Float) -> Float {\n    sin(x)\n}\n\
          fn array_read(xs: Array<Float>) -> Float {\n    xs.get(0)\n}\n\
          fn stable_hash(value: Int) -> Int {\n    hash(value)\n}\n\
@@ -13069,6 +13081,18 @@ fn experimental_effect_report_closes_only_typed_intrinsics_and_builtin_methods()
         report["known_effect_free_calls"]["stringify"],
         serde_json::json!(["value.to_string"])
     );
+    let local_target = report["resolved_call_targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|target| target["function"] == "calls_helper" && target["operation"] == "helper")
+        .expect("the report must retain the operation-to-function target association");
+    assert_eq!(local_target["targets"], serde_json::json!(["helper"]));
+    assert_eq!(local_target["dispatch"], "static");
+    assert_eq!(
+        report["resolved_call_operations"]["calls_helper"],
+        serde_json::json!(["helper"])
+    );
 }
 
 #[test]
@@ -13095,6 +13119,7 @@ fn experimental_effect_report_tracks_trait_defaults_and_excludes_overrides() {
     );
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+
     assert_eq!(
         report["function_effects"]["Console.inherited"],
         serde_json::json!(["io"])

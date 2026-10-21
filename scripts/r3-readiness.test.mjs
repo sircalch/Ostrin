@@ -5,7 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import os from "node:os";
 import path from "node:path";
 import { experimentFixtures, runtimeSnapshotFor } from "./experiment-bundle.mjs";
-import { buildReadiness, diagnoseEffectCalls, diagnoseEntryEffectClosure, inspectBundle, repositoryRoot, requiredCaptureErrors } from "./r3-readiness.mjs";
+import { buildReadiness, diagnoseCallResolution, diagnoseEffectCalls, diagnoseEntryEffectClosure, inspectBundle, repositoryRoot, requiredCaptureErrors } from "./r3-readiness.mjs";
 
 const originalCaptureHost = process.env.OSTRIN_CAPTURE_HOST;
 delete process.env.OSTRIN_CAPTURE_HOST;
@@ -57,6 +57,17 @@ const validRuntime = () => ({
     status: "declared",
   },
 });
+const validCallResolution = (overrides = {}) => ({
+  schema: "ostrin.call-resolution-evidence/v1",
+  count_unit: "distinct_function_operation_edges",
+  resolved_local_targets: [],
+  resolved_local_operations: {},
+  effect_classified_operations: {},
+  effect_free_intrinsics: {},
+  compiler_builtin_callbacks: {},
+  indirect_operations: {},
+  ...overrides,
+});
 const validEffects = () => ({
   schema: "ostrin.effect-report/v0",
   status: "captured",
@@ -66,6 +77,7 @@ const validEffects = () => ({
   functions: { main: [] },
   function_calls: { main: [] },
   unresolved_calls: {},
+  call_resolution: validCallResolution(),
   function_effect_variables: {},
   symbolic_effect_calls: {},
   entry_effect_signature: {
@@ -195,6 +207,7 @@ test("R3 readiness requires host, dependencies, scheduler and effects", () => {
         functions: { main: [] },
         function_calls: { main: ["write_file"] },
         unresolved_calls: {},
+        call_resolution: validCallResolution({ effect_classified_operations: { main: ["write_file"] } }),
         function_effect_variables: {},
         symbolic_effect_calls: {},
         entry_effect_signature: {
@@ -223,6 +236,7 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
     functions: { main: [] },
     function_calls: { main: [] },
     unresolved_calls: {},
+    call_resolution: validCallResolution(),
     function_effect_variables: {},
     symbolic_effect_calls: {},
     entry_effect_signature: {
@@ -355,6 +369,7 @@ test("R3 stays open while the entry effect signature is open", () => {
     functions: { main: [] },
     function_calls: { main: ["mystery_operation"] },
     unresolved_calls: { main: ["mystery_operation"] },
+    call_resolution: validCallResolution({ unresolved_operations: { main: ["mystery_operation"] } }),
     function_effect_variables: {},
     symbolic_effect_calls: {},
     entry_effect_signature: {
@@ -397,6 +412,7 @@ test("R3 stays open when an otherwise complete effect inventory has symbolic cal
     function_calls: { main: ["callback"] },
     function_effect_variables: { main: ["ε_callback"] },
     symbolic_effect_calls: { main: ["callback"] },
+    call_resolution: validCallResolution({ symbolic_callbacks: { main: ["callback"] } }),
     entry_effect_signature: {
       function: "main", effects: [], variables: ["ε_callback"], open_calls: [],
       row_closed: false, purity_proven: false,
@@ -504,6 +520,48 @@ test("effect-gap diagnostics group operation syntax without inferring resolution
   assert.equal(diagnostics.operations.get("array"), 2);
   assert.equal(diagnostics.symbolicCallbackReferenceCount, 0);
   assert.equal(diagnostics.uniqueSymbolicCallbacks, 0);
+});
+
+test("call-resolution evidence reconciles typed edge categories and local targets", () => {
+  const diagnostic = diagnoseCallResolution({
+    function_calls: { main: ["helper", "xs.map", "read_file", "value.method"] },
+    unresolved_calls: { main: ["value.method"] },
+    symbolic_effect_calls: {},
+    call_resolution: {
+      schema: "ostrin.call-resolution-evidence/v1",
+      count_unit: "distinct_function_operation_edges",
+      resolved_local_targets: [{ function: "main", operation: "helper", dispatch: "static", targets: ["helper"] }],
+      resolved_local_operations: { main: ["helper"] },
+      effect_classified_operations: { main: ["read_file"] },
+      effect_free_intrinsics: {},
+      compiler_builtin_callbacks: { main: ["xs.map"] },
+      indirect_operations: { main: ["value.method"] },
+    },
+  });
+  assert.equal(diagnostic.status, "available");
+  assert.equal(diagnostic.edgeCount, 4);
+  assert.equal(diagnostic.categorizedEdgeCount, 4);
+  assert.equal(diagnostic.uncategorizedEdgeCount, 0);
+  assert.equal(diagnostic.localFunctionEdgeCount, 1);
+  assert.equal(diagnostic.staticLocalFunctionEdgeCount, 1);
+  assert.equal(diagnostic.localTargetCandidateCount, 1);
+
+  const missingTarget = diagnoseCallResolution({
+    function_calls: { main: ["helper"] },
+    unresolved_calls: {},
+    symbolic_effect_calls: {},
+    call_resolution: {
+      schema: "ostrin.call-resolution-evidence/v1",
+      count_unit: "distinct_function_operation_edges",
+      resolved_local_targets: [],
+      resolved_local_operations: { main: ["helper"] },
+      effect_classified_operations: {},
+      effect_free_intrinsics: {},
+      compiler_builtin_callbacks: {},
+      indirect_operations: {},
+    },
+  });
+  assert.equal(missingTarget.status, "invalid");
 });
 
 test("entry closure diagnostics separate the root row from module-wide effect rows", () => {
@@ -634,6 +692,7 @@ test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostri
 test("R3 gap summary reconciles with per-bundle missing fields and effect coverage", () => {
   const report = buildReadiness();
   const { captureGaps, effectInventory, notAssessed, reproducibilityEvidence, externalInputEvidence } = report.gapDiagnostics;
+  const callResolution = report.gapDiagnostics.callResolutionEvidence;
   const hostGap = captureGaps.missingExtensionFields.find(({ field }) => field === "provenance.runtime.host");
   const effectGap = captureGaps.incompleteExtensionFields.find(({ field }) => field === "provenance.effects.effect_coverage");
 
@@ -667,6 +726,13 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(entrypoint.openBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "open").length);
   assert.equal(entrypoint.unavailableBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "unavailable").length);
   assert.match(effectInventory.interpretation, /does not determine type resolution or prove purity/i);
+  assert.equal(callResolution.status, "available");
+  assert.equal(callResolution.availableBundleCount, report.bundleCount);
+  assert.equal(callResolution.uncategorizedEdgeCount, 0);
+  assert.equal(callResolution.localTargetAssociationComplete, true);
+  assert.ok(callResolution.localTargetCandidateCount > 0);
+  assert.match(callResolution.interpretation, /do not provide per-invocation dispatch traces/i);
+  assert.ok(notAssessed.some((item) => /call-site granularity/.test(item)));
   assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
   assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles > 0);
   assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles <= report.bundleCount);

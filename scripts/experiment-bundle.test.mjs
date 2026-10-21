@@ -267,6 +267,9 @@ test("every registered fixture produces a verified recorded bundle", () => {
     assert.ok(Array.isArray(bundle.provenance.effects.functions.main));
     assert.ok(bundle.provenance.effects.function_calls);
     assert.ok(bundle.provenance.effects.unresolved_calls);
+    assert.equal(bundle.provenance.effects.call_resolution.schema, "ostrin.call-resolution-evidence/v1");
+    assert.equal(bundle.provenance.effects.call_resolution.count_unit, "distinct_function_operation_edges");
+    assert.ok(Array.isArray(bundle.provenance.effects.call_resolution.resolved_local_targets));
     assert.ok(bundle.provenance.effects.effect_coverage);
     assert.deepEqual(validateEntryEffectSignature(
       bundle.provenance.effects.entry_effect_signature,
@@ -279,6 +282,7 @@ test("every registered fixture produces a verified recorded bundle", () => {
     for (const analyzer of bundle.provenance.effects.analyzer) {
       assert.match(analyzer.sha256, /^sha256:[0-9a-f]{64}$/);
     }
+    assert.ok(bundle.provenance.effects.analyzer.some(({ path: sourcePath }) => sourcePath === "scripts/experiment-bundle.mjs"));
     if (id === "surface") {
       assert.deepEqual(bundle.provenance.parameters, { scale: 1 });
       assert.deepEqual(bundle.provenance.camera, { azimuth: -55, elevation: 28 });
@@ -300,6 +304,16 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     unresolved_calls: {},
     function_effect_variables: {},
     symbolic_effect_calls: {},
+    call_resolution: {
+      schema: "ostrin.call-resolution-evidence/v1",
+      count_unit: "distinct_function_operation_edges",
+      resolved_local_targets: [],
+      resolved_local_operations: {},
+      effect_classified_operations: { main: ["known_call"] },
+      effect_free_intrinsics: {},
+      compiler_builtin_callbacks: {},
+      indirect_operations: {},
+    },
     effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   assert.deepEqual(validateEffectCapture(complete), []);
@@ -308,6 +322,10 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     ...complete,
     function_calls: { main: ["mystery_operation"] },
     unresolved_calls: { main: ["mystery_operation"] },
+    call_resolution: {
+      ...complete.call_resolution,
+      effect_classified_operations: {},
+    },
     effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   assert.deepEqual(validateEffectCapture(incomplete), []);
@@ -330,11 +348,32 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     function_calls: { map_open: ["callback"] },
     function_effect_variables: { map_open: ["ε_callback"] },
     symbolic_effect_calls: { map_open: ["callback"] },
+    call_resolution: {
+      ...complete.call_resolution,
+      effect_classified_operations: {},
+    },
     effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 1, unresolved_calls: 0, complete: true },
   };
   assert.deepEqual(validateEffectCapture(symbolic), []);
   const unsupportedSymbolic = { ...symbolic, function_effect_variables: {} };
   assert.ok(validateEffectCapture(unsupportedSymbolic).some((error) => error.includes("no effect variable")));
+
+  const uncategorized = {
+    ...complete,
+    call_resolution: { ...complete.call_resolution, effect_classified_operations: {} },
+  };
+  assert.ok(validateEffectCapture(uncategorized).some((error) => error.includes("no call-resolution category")));
+
+  const mismatchedLocalTarget = {
+    ...complete,
+    call_resolution: {
+      ...complete.call_resolution,
+      effect_classified_operations: {},
+      resolved_local_operations: { main: ["known_call"] },
+      resolved_local_targets: [{ function: "main", operation: "different_call", dispatch: "static", targets: ["helper"] }],
+    },
+  };
+  assert.ok(validateEffectCapture(mismatchedLocalTarget).some((error) => error.includes("local target records")));
 });
 
 test("entry effect signature validates closure without treating known effects as purity", () => {
