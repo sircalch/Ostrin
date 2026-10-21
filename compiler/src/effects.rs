@@ -158,6 +158,14 @@ pub struct EffectReport {
     pub classified_calls: BTreeMap<String, BTreeSet<String>>,
     /// Impl methods available for a concrete receiver owner type.
     pub impl_methods_by_type: BTreeMap<String, BTreeMap<String, String>>,
+    /// Impl bodies available for methods selected through a generic trait
+    /// bound. A generic body conservatively unions all visible implementations.
+    trait_method_targets: BTreeMap<(String, String), BTreeSet<String>>,
+    /// Trait bounds in scope for each generic parameter of a function body.
+    generic_bounds_by_function: BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
+    /// Generic bound calls retained so callback effect variables can stay open
+    /// when their arguments cannot yet be substituted through the trait call.
+    generic_trait_calls: BTreeMap<(String, String), BTreeSet<String>>,
     /// Receiver node types supplied by the type checker; absent in syntax-only reports.
     pub receiver_types: BTreeMap<usize, String>,
     /// Types of AST expressions, used to determine whether builtin destruction
@@ -356,9 +364,31 @@ fn analyze_with_types_internal(
         match item {
             Item::Function(function) => {
                 report.free_function_names.insert(function.name.clone());
+                register_generic_bounds(
+                    &function.name,
+                    &function.generics,
+                    &mut report.generic_bounds_by_function,
+                );
             }
             Item::Impl(implementation) => {
                 register_impl_methods(implementation, items, &mut report);
+                for method in &implementation.methods {
+                    let mut generics = implementation.generics.clone();
+                    generics.extend(method.generics.clone());
+                    register_generic_bounds(
+                        &impl_method_key(&implementation.type_name, &method.name),
+                        &generics,
+                        &mut report.generic_bounds_by_function,
+                    );
+                }
+                for (trait_decl, method) in default_methods(implementation, items) {
+                    let function = trait_default_as_function(trait_decl, method, implementation);
+                    register_generic_bounds(
+                        &impl_method_key(&implementation.type_name, &method.name),
+                        &function.generics,
+                        &mut report.generic_bounds_by_function,
+                    );
+                }
             }
             _ => {}
         }
@@ -373,6 +403,7 @@ fn analyze_with_types_internal(
     classify_unresolved_calls(&mut report);
     propagate_function_effects(&mut report);
     infer_callback_effects(items, &mut report);
+    keep_generic_trait_callback_rows_open(&mut report);
     propagate_function_effects(&mut report);
     let mut signature_open_calls = BTreeMap::<String, BTreeSet<String>>::new();
     for function in &report.function_names {
@@ -855,24 +886,48 @@ fn walk_impl(implementation: &ImplDecl, items: &[Item], report: &mut EffectRepor
 
 fn register_impl_methods(implementation: &ImplDecl, items: &[Item], report: &mut EffectReport) {
     for method in &implementation.methods {
+        let target = impl_method_key(&implementation.type_name, &method.name);
         report
             .impl_methods_by_type
             .entry(implementation.type_name.clone())
             .or_default()
-            .insert(
-                method.name.clone(),
-                impl_method_key(&implementation.type_name, &method.name),
-            );
+            .insert(method.name.clone(), target.clone());
+        if let Some(trait_name) = &implementation.trait_name {
+            report
+                .trait_method_targets
+                .entry((trait_name.clone(), method.name.clone()))
+                .or_default()
+                .insert(target);
+        }
     }
-    for (_, method) in default_methods(implementation, items) {
+    for (trait_decl, method) in default_methods(implementation, items) {
+        let target = impl_method_key(&implementation.type_name, &method.name);
         report
             .impl_methods_by_type
             .entry(implementation.type_name.clone())
             .or_default()
-            .insert(
-                method.name.clone(),
-                impl_method_key(&implementation.type_name, &method.name),
-            );
+            .insert(method.name.clone(), target.clone());
+        report
+            .trait_method_targets
+            .entry((trait_decl.name.clone(), method.name.clone()))
+            .or_default()
+            .insert(target);
+    }
+}
+
+fn register_generic_bounds(
+    function: &str,
+    generics: &[crate::ast::GenericParam],
+    bounds_by_function: &mut BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
+) {
+    for generic in generics {
+        let bounds = generic.bounds.iter().cloned().collect::<BTreeSet<_>>();
+        if !bounds.is_empty() {
+            bounds_by_function
+                .entry(function.to_string())
+                .or_default()
+                .insert(generic.name.clone(), bounds);
+        }
     }
 }
 
@@ -1022,12 +1077,25 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                     .entry(function.to_string())
                     .or_default()
                     .insert(operation.clone());
-                if let Some(target) = resolve_local_target(callee, report) {
-                    report
-                        .resolved_function_calls
-                        .entry(function.to_string())
-                        .or_default()
-                        .insert(target.clone());
+                let generic_targets = resolve_generic_trait_targets(callee, function, report);
+                let targets = generic_targets
+                    .clone()
+                    .unwrap_or_else(|| resolve_local_target(callee, report).into_iter().collect());
+                if !targets.is_empty() {
+                    if generic_targets.is_some() {
+                        report
+                            .generic_trait_calls
+                            .entry((function.to_string(), operation.clone()))
+                            .or_default()
+                            .extend(targets.iter().cloned());
+                    }
+                    for target in targets {
+                        report
+                            .resolved_function_calls
+                            .entry(function.to_string())
+                            .or_default()
+                            .insert(target);
+                    }
                     report
                         .resolved_call_operations
                         .entry(function.to_string())
@@ -1683,6 +1751,31 @@ fn infer_callback_effects(items: &[Item], report: &mut EffectReport) {
 }
 
 #[allow(clippy::too_many_arguments)]
+fn keep_generic_trait_callback_rows_open(report: &mut EffectReport) {
+    let open_calls = report
+        .generic_trait_calls
+        .iter()
+        .filter_map(|((caller, operation), targets)| {
+            targets
+                .iter()
+                .any(|target| {
+                    report
+                        .function_effect_variables
+                        .get(target)
+                        .is_some_and(|variables| !variables.is_empty())
+                })
+                .then(|| (caller.clone(), operation.clone()))
+        })
+        .collect::<Vec<_>>();
+    for (caller, operation) in open_calls {
+        report
+            .unresolved_calls
+            .entry(caller)
+            .or_default()
+            .insert(operation);
+    }
+}
+
 fn collect_callback_block(
     block: &Block,
     function: &str,
@@ -2507,6 +2600,38 @@ fn resolve_local_target(callee: &Expr, report: &EffectReport) -> Option<String> 
         }
         _ => None,
     }
+}
+
+fn resolve_generic_trait_targets(
+    callee: &Expr,
+    function: &str,
+    report: &EffectReport,
+) -> Option<BTreeSet<String>> {
+    if let Expr::FieldAccess(receiver, method) = callee.unlocated() {
+        if let Some(Ty::Generic(generic)) = report
+            .expression_types
+            .get(&(receiver.as_ref() as *const Expr as usize))
+        {
+            return Some(
+                report
+                    .generic_bounds_by_function
+                    .get(function)
+                    .and_then(|parameters| parameters.get(generic))
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|trait_name| {
+                        report
+                            .trait_method_targets
+                            .get(&(trait_name.clone(), method.clone()))
+                            .into_iter()
+                            .flatten()
+                            .cloned()
+                    })
+                    .collect::<BTreeSet<_>>(),
+            );
+        }
+    }
+    None
 }
 
 fn is_indirect_function_call(callee: &Expr, report: &EffectReport) -> bool {
