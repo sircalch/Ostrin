@@ -18,7 +18,7 @@ function check(errors, condition, message) {
 /**
  * Check that the experimental scalar Measurement contract is still source-backed.
  * This gate intentionally verifies evidence and boundaries; it does not enable
- * Array<Measurement>, Quantity integration, covariance, or Monte Carlo.
+ * Array<Measurement>, native dimensional support, covariance, or Monte Carlo.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
@@ -80,8 +80,12 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
-  check(errors, /Quantity integration[\s\S]{0,220}(?:remain|pending|siguen pendientes)/i.test(lab),
-    "scripts/lab-data.mjs: experimental Measurement boundary is missing");
+  check(errors, /dimensioned Measurement prototype[\s\S]{0,260}interpreter\/WASM path/i.test(lab),
+    "scripts/lab-data.mjs: interpreter/WASM dimensional Measurement scope is missing");
+  check(errors, /Native support[\s\S]{0,180}remain planned/i.test(lab),
+    "scripts/lab-data.mjs: native dimensional Measurement boundary is missing");
+  check(errors, /Array<Measurement>[\s\S]{0,100}covariance[\s\S]{0,100}Monte Carlo/i.test(lab),
+    "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
   check(errors, testsWithQuantityBoundary,
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native boundary test is missing");
   check(errors, testsWithDirectQuantityBoundary,
@@ -137,7 +141,26 @@ export function validateMeasurementContract(root = repositoryRoot) {
     check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
       "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
 
-  return { errors };
+  const quantitySourceValidation = std.match(/fn validate_quantity_source<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /source\.source_dimension\.length\(\) == 0/.test(quantitySourceValidation)
+      && !/source\.source_dimension != source\.contribution\.dimension_key\(\)/.test(quantitySourceValidation),
+    "compiler/std/measurements.ostrin: source dimension metadata must remain independent of propagated contribution dimension");
+  check(errors, /pub fn mul_quantity<A: Dimension, B: Dimension>/.test(std)
+      && /contribution: item\.contribution \* factor/.test(std)
+      && /contribution: factor \* item\.contribution/.test(std)
+      && /pub fn div_quantity_same<D: Dimension>/.test(std)
+      && /a_factor = 1\.0 \/ b_value/.test(std)
+      && /scale_quantity_sources_to_float\(a\.sources, a_factor\)/.test(std)
+      && /scale_quantity_sources_to_float\(b\.sources, b_factor\)/.test(std),
+    "compiler/std/measurements.ostrin: dimensional products and same-dimension ratios must propagate derivatives");
+  check(errors, /Length\^2\\nLength\\nLength\^2\\n0\.8/.test(tests),
+    "compiler/tests/examples.rs: correlated product evidence is missing");
+  check(errors, /1\\n0\\n0\.03535533905932738/.test(tests),
+    "compiler/tests/examples.rs: same-dimension quotient correlation evidence is missing");
+  check(errors, /Length\*Time\\n0\.2\\n0\.6000000000000001\\n0\.632455532033676/.test(tests),
+    "compiler/tests/examples.rs: cross-dimension product derivative evidence is missing");
+  check(errors, /zero dimensional denominator = measurement division by zero/.test(tests),
+    "compiler/tests/examples.rs: quantity quotient must reject a zero denominator");  return { errors };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

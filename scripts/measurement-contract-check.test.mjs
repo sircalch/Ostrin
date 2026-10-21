@@ -28,6 +28,27 @@ test("the scalar Measurement contract is aligned with source and parity evidence
   assert.deepEqual(validateMeasurementContract(repositoryRoot).errors, []);
 });
 
+test("the gate requires accurate dimensional web scope and experimental boundaries", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "scripts/lab-data.mjs");
+    const original = readFileSync(file, "utf8");
+    writeFileSync(file, original.replace("interpreter/WASM path", "native path"));
+    let result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("interpreter/WASM dimensional Measurement scope")));
+
+    writeFileSync(file, original.replace("Array<Measurement>, covariance, Monte Carlo", "native support"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
+
+    writeFileSync(file, original.replace("Native support", "Native parity"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("native dimensional Measurement boundary")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects an example that silently drops unknown uncertainty", () => {
   const root = fixtureRoot();
   try {
@@ -112,6 +133,51 @@ test("the gate requires dimensional uncertainty to sum canonical contribution sq
     writeFileSync(file, source);
     const result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("quantity uncertainty must use coherent dimensioned contributions")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects dimensional product propagation without both derivative factors", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      "contribution: item.contribution * factor",
+      "contribution: item.contribution",
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects same-dimension quotient propagation without the numerator derivative", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace("a_factor = 1.0 / b_value", "a_factor = 0.0");
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects equating a source dimension with a propagated product dimension", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      'if source.source_dimension.length() == 0 {',
+      'if source.source_dimension != source.contribution.dimension_key() {',
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("source dimension metadata must remain independent")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

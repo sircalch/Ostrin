@@ -1,0 +1,24 @@
+// Scientific Lab · Measurements
+// Source identity carries correlation through dimensional products and ratios.
+import std.measurements
+
+fn main() -> Void {
+    ruler_a = measurements.from_quantity_source(4 m, 10 cm, "shared-ruler", "ruler reading A").unwrap()
+    ruler_b = measurements.from_quantity_source(4 m, 10 cm, "shared-ruler", "ruler reading B").unwrap()
+
+    combined = measurements.add_quantity(ruler_a, ruler_b).unwrap()
+    combined_u = measurements.quantity_uncertainty(combined).unwrap()
+    print("shared readings")
+    print(combined.value)
+    print("standard uncertainty (m) = " + combined_u.value.to_string())
+
+    area = measurements.mul_quantity(ruler_a, ruler_b).unwrap()
+    area_u = measurements.quantity_uncertainty(area).unwrap()
+    print("product dimension = " + area.value.dimension_key())
+    print("product contribution")
+    print(area.sources[0].contribution)
+    print("product standard uncertainty = " + area_u.value.to_string())
+
+    ratio = measurements.div_quantity_same(ruler_a, ruler_b).unwrap()
+    print("same-source ratio = " + measurements.summary(ratio))
+}
