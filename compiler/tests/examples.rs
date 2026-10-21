@@ -3543,6 +3543,69 @@ fn native_backend_emits_one_c_function_per_concrete_instantiation() {
 }
 
 #[test]
+fn native_ir_infers_empty_generic_collection_arguments_from_checker() {
+    let source = temp_source(
+        "native_empty_generic_argument",
+        "fn identity<T>(items: List<T>, value: T) -> T {\n\
+         value\n\
+         }\n\
+         fn main() -> Void {\n\
+         print(identity([], 42))\n\
+         }\n",
+    );
+
+    let report = run(&["--native-type-report", &source]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&source);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| line == "ir-generated: 2"),
+        "generic call should stay in IR after contextualizing its empty list: {report_text}"
+    );
+    assert!(
+        report_text.lines().any(|line| line == "ast-fallback: 0"),
+        "empty generic list argument introduced an AST fallback: {report_text}"
+    );
+
+    let exe = temp_artifact("native_empty_generic_argument.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    let _ = fs::remove_file(&source);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run empty generic argument example");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "42\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "empty generic collection argument leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_compiles_and_runs_dyn_trait() {
     // A standalone `dyn Shape` (no `List`, which the native backend doesn't
     // support at all): a function parameter typed `dyn Shape` boxing two

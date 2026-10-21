@@ -7253,11 +7253,36 @@ impl<'a> Codegen<'a> {
                 ));
             }
         }
-        let hints = self
-            .signatures
+        // Generic calls may contain empty collection arguments (for example,
+        // `merge([], values)`). The checker has already inferred the concrete
+        // substitutions from the complete call, so specialize the parameter
+        // types before generating any argument expressions. This gives `[]`
+        // the same contextual element type that the checker used and avoids
+        // trying to infer it from the literal itself.
+        let generic_hints = self
+            .generic_functions
             .get(name)
-            .map(|(params, _)| params.clone())
-            .unwrap_or_default();
+            .copied()
+            .cloned()
+            .and_then(|decl| {
+                call_key
+                    .as_ref()
+                    .and_then(|key| self.checker_call_subst(&decl, key))
+                    .map(|subst| {
+                        let types = self.named_types();
+                        decl.params
+                            .iter()
+                            .map(|param| map_type_with_subst(&param.ty, &types, &subst))
+                            .collect::<Result<Vec<_>, _>>()
+                    })
+            })
+            .transpose()?;
+        let hints = generic_hints.unwrap_or_else(|| {
+            self.signatures
+                .get(name)
+                .map(|(params, _)| params.clone())
+                .unwrap_or_default()
+        });
         let (arg_codes, arg_types) = self.gen_args_hinted(args, &hints)?;
         // `drop` and native `select` intentionally consume their input; all
         // other calls borrow reference-like parameters for the call duration.
