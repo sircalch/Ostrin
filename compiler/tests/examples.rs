@@ -12918,7 +12918,7 @@ fn experimental_effect_report_propagates_effects_through_generic_trait_bounds() 
 }
 
 #[test]
-fn experimental_effect_report_keeps_generic_trait_callbacks_open_until_substituted() {
+fn experimental_effect_report_substitutes_callbacks_through_generic_trait_methods() {
     let file = temp_source(
         "effects-generic-trait-callback.ostrin",
         "trait Handler {\n    fn run(self, action: fn() -> Void) -> Void\n}\n\
@@ -12926,7 +12926,9 @@ fn experimental_effect_report_keeps_generic_trait_callbacks_open_until_substitut
          impl Handler for Direct {\n    fn run(self, action: fn() -> Void) -> Void {\n        action()\n    }\n}\n\
          fn run_any<T: Handler>(value: T, action: fn() -> Void) -> Void {\n    value.run(action)\n}\n\
          fn io_action() -> Void {\n    print(\"callback\")\n}\n\
-         fn main() -> Void {\n    run_any(Direct { marker: 0 }, io_action)\n}\n",
+         fn host_action() -> Void {\n    host.callback()\n}\n\
+         fn main() -> Void {\n    run_any(Direct { marker: 0 }, io_action)\n}\n\
+         fn open_main() -> Void {\n    run_any(Direct { marker: 0 }, host_action)\n}\n",
     );
     let out = run(&["--effect-report", "--json", &file]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -12935,20 +12937,54 @@ fn experimental_effect_report_keeps_generic_trait_callbacks_open_until_substitut
 
     assert_eq!(
         report["function_effect_signatures"]["run_any"]["row_closed"], false,
-        "callbacks crossing a generic trait method must not be silently treated as pure"
+        "the generic method's callback variable should be represented symbolically"
     );
     assert_eq!(
         report["function_effect_signatures"]["run_any"]["open_calls"],
-        serde_json::json!(["value.run", "value.run.callback"])
+        serde_json::json!([])
     );
     assert_eq!(
-        report["function_effect_signatures"]["main"]["row_closed"], false,
-        "the unresolved callback boundary must propagate to the concrete caller"
+        report["function_effect_signatures"]["run_any"]["variables"],
+        serde_json::json!(["ε_action"]),
+        "the unresolved callback contract should remain an explicit effect variable"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the concrete callback effect must propagate through trait dispatch to its caller"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], true,
+        "a known callback passed through a generic trait method should close the caller row"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "an unknown effect in the concrete callback must remain open through trait dispatch"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        false
+    );
+    assert_eq!(
+        report["effect_variable_substitutions"]["run_any"][0]["callee"],
+        serde_json::json!("Direct.run")
     );
 
     let hir = run(&["--hir", &file]);
     assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
-    assert!(stdout(&hir).contains("unresolved effect calls: value.run"));
+    let hir_text = stdout(&hir);
+    assert!(!hir_text.contains("unresolved effect calls: value.run"));
+    assert!(hir_text.contains("effects: io"));
+    assert!(hir_text.contains("effect substitution: ε_action <- ε_action via Direct.run"));
+    assert!(hir_text.contains("unresolved effect calls: host.callback"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(!ir_text.contains("unresolved effect calls: value.run"));
+    assert!(ir_text.contains("effects: io"));
+    assert!(ir_text.contains("effect substitution: ε_action <- ε_action via Direct.run"));
+    assert!(ir_text.contains("unresolved effect calls: host.callback"));
     let _ = fs::remove_file(file);
 }
 

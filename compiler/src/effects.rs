@@ -1762,7 +1762,25 @@ fn keep_generic_trait_callback_rows_open(report: &mut EffectReport) {
                     report
                         .function_effect_variables
                         .get(target)
-                        .is_some_and(|variables| !variables.is_empty())
+                        .is_some_and(|variables| {
+                            variables.iter().any(|parameter| {
+                                let symbolic = report
+                                    .effect_variable_substitutions
+                                    .get(caller)
+                                    .is_some_and(|substitutions| {
+                                        substitutions.iter().any(|substitution| {
+                                            substitution.callee == *target
+                                                && substitution.callee_parameter == *parameter
+                                        })
+                                    });
+                                let concrete = report
+                                    .closed_callback_parameters
+                                    .get(caller)
+                                    .and_then(|by_target| by_target.get(target))
+                                    .is_some_and(|parameters| parameters.contains(parameter));
+                                !symbolic && !concrete
+                            })
+                        })
                 })
                 .then(|| (caller.clone(), operation.clone()))
         })
@@ -1949,78 +1967,85 @@ fn collect_callback_expr(
                 }
                 _ => false,
             };
-            let target = if callback_callee {
-                None
+            let targets = if callback_callee {
+                BTreeSet::new()
+            } else if let Some(targets) = resolve_generic_trait_targets(callee, function, report) {
+                targets
             } else {
                 resolve_local_target(callee, report)
                     .or_else(|| builtin_callback_target(callee, report))
+                    .into_iter()
+                    .collect()
             };
-            if let Some(target) = target {
-                if let Some(callback) = report
-                    .callback_parameters
-                    .get(&target)
-                    .and_then(|parameters| parameters.iter().next())
-                    .filter(|_| target.starts_with("@builtin."))
-                {
-                    invoked.insert(CallbackParameter {
-                        function: target.clone(),
-                        name: callback.clone(),
-                    });
-                }
-                let names = report.function_parameters.get(&target);
-                let callback_params = report.callback_parameters.get(&target);
-                let positional_offset =
-                    usize::from(matches!(callee.unlocated(), Expr::FieldAccess(_, _)));
-                let mut positional = positional_offset;
-                for argument in args {
-                    let (index, value) = match argument {
-                        Arg::Positional(value) => {
-                            let index = positional;
-                            positional += 1;
-                            (Some(index), value)
-                        }
-                        Arg::Named(name, value) => (
-                            names.and_then(|names| {
-                                names.iter().position(|parameter| parameter == name)
-                            }),
-                            value,
-                        ),
-                    };
-                    let Some(index) = index else { continue };
-                    let Some(parameter) = names.and_then(|names| names.get(index)) else {
-                        continue;
-                    };
-                    if !callback_params.is_some_and(|params| params.contains(parameter)) {
-                        continue;
-                    }
-                    let source = callback_source(value, function, shadowed, report);
-                    let target_parameter = CallbackParameter {
-                        function: target.clone(),
-                        name: parameter.clone(),
-                    };
-                    if let CallbackSource::Parameter {
-                        function: source_function,
-                        name: source_name,
-                    } = &source
+            if !targets.is_empty() {
+                for target in targets {
+                    if let Some(callback) = report
+                        .callback_parameters
+                        .get(&target)
+                        .and_then(|parameters| parameters.iter().next())
+                        .filter(|_| target.starts_with("@builtin."))
                     {
-                        forwarded.push((
-                            CallbackParameter {
-                                function: source_function.clone(),
-                                name: source_name.clone(),
-                            },
-                            target_parameter,
-                        ));
+                        invoked.insert(CallbackParameter {
+                            function: target.clone(),
+                            name: callback.clone(),
+                        });
                     }
-                    callsites.push(CallbackCallsite {
-                        caller: function.to_string(),
-                        target: target.clone(),
-                        target_parameter: parameter.clone(),
-                        source,
-                        operation: expression_path(callee).unwrap_or_else(|| "<call>".to_string()),
-                        file: file.map(str::to_string),
-                        line,
-                        col,
-                    });
+                    let names = report.function_parameters.get(&target);
+                    let callback_params = report.callback_parameters.get(&target);
+                    let positional_offset =
+                        usize::from(matches!(callee.unlocated(), Expr::FieldAccess(_, _)));
+                    let mut positional = positional_offset;
+                    for argument in args {
+                        let (index, value) = match argument {
+                            Arg::Positional(value) => {
+                                let index = positional;
+                                positional += 1;
+                                (Some(index), value)
+                            }
+                            Arg::Named(name, value) => (
+                                names.and_then(|names| {
+                                    names.iter().position(|parameter| parameter == name)
+                                }),
+                                value,
+                            ),
+                        };
+                        let Some(index) = index else { continue };
+                        let Some(parameter) = names.and_then(|names| names.get(index)) else {
+                            continue;
+                        };
+                        if !callback_params.is_some_and(|params| params.contains(parameter)) {
+                            continue;
+                        }
+                        let source = callback_source(value, function, shadowed, report);
+                        let target_parameter = CallbackParameter {
+                            function: target.clone(),
+                            name: parameter.clone(),
+                        };
+                        if let CallbackSource::Parameter {
+                            function: source_function,
+                            name: source_name,
+                        } = &source
+                        {
+                            forwarded.push((
+                                CallbackParameter {
+                                    function: source_function.clone(),
+                                    name: source_name.clone(),
+                                },
+                                target_parameter,
+                            ));
+                        }
+                        callsites.push(CallbackCallsite {
+                            caller: function.to_string(),
+                            target: target.clone(),
+                            target_parameter: parameter.clone(),
+                            source,
+                            operation: expression_path(callee)
+                                .unwrap_or_else(|| "<call>".to_string()),
+                            file: file.map(str::to_string),
+                            line,
+                            col,
+                        });
+                    }
                 }
             } else if !callback_callee {
                 let operation = expression_path(callee).unwrap_or_else(|| "<call>".to_string());
