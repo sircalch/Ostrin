@@ -418,6 +418,19 @@ function normalizedText(root, relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8").replaceAll("\r\n", "\n");
 }
 
+function publicSourcePath(root, sourceFile) {
+  if (typeof sourceFile !== "string" || sourceFile.length === 0) return null;
+  if (sourceFile.startsWith("<ostrin-std>/")) return sourceFile.replaceAll("\\", "/");
+  if (path.isAbsolute(sourceFile)) {
+    const relativePath = path.relative(root, sourceFile).replaceAll("\\", "/");
+    if (relativePath === ".." || relativePath.startsWith("../") || path.isAbsolute(relativePath)) return null;
+    return relativePath;
+  }
+  const normalized = path.posix.normalize(sourceFile.replaceAll("\\", "/"));
+  if (normalized === ".." || normalized.startsWith("../") || path.posix.isAbsolute(normalized)) return null;
+  return normalized;
+}
+
 function sha256(value) {
   return `sha256:${createHash("sha256").update(Buffer.from(value, "utf8")).digest("hex")}`;
 }
@@ -459,10 +472,13 @@ export function validateEffectCapture(effects) {
     "indirect_operations",
   ];
   if (!resolution || typeof resolution !== "object" || Array.isArray(resolution)
-    || resolution.schema !== "ostrin.call-resolution-evidence/v1"
+    || resolution.schema !== "ostrin.call-resolution-evidence/v2"
     || resolution.count_unit !== "distinct_function_operation_edges") {
     errors.push("effects capture call_resolution schema/count_unit is missing or unsupported");
   } else {
+    if (resolution.call_site_scope !== "bundle_source_file") {
+      errors.push("effects capture call_resolution.call_site_scope must identify bundle_source_file scope");
+    }
     for (const name of resolutionMaps) {
       if (!isStringArrayMap(resolution[name])) errors.push(`effects capture call_resolution.${name} must map function names to operation arrays`);
     }
@@ -481,6 +497,43 @@ export function validateEffectCapture(effects) {
         || targetEdges.size !== operationEdges.size
         || [...targetEdges].some((edge) => !operationEdges.has(edge))) {
         errors.push("effects capture call_resolution local target records do not match resolved local operations");
+      }
+    }
+    const callSites = resolution.resolved_local_call_sites;
+    if (!Array.isArray(callSites)) {
+      errors.push("effects capture call_resolution.resolved_local_call_sites must be an array");
+    }
+    const validCallSite = (site) => site && typeof site === "object"
+      && typeof site.function === "string" && typeof site.operation === "string"
+      && typeof site.file === "string" && site.file.length > 0
+      && !site.file.startsWith("/") && !site.file.includes("\\")
+      && !/^[A-Za-z]:/.test(site.file) && !site.file.split("/").includes("..")
+      && Number.isInteger(site.line) && site.line >= 0
+      && Number.isInteger(site.col) && site.col >= 0
+      && ["static", "generic-trait-candidates"].includes(site.dispatch)
+      && Array.isArray(site.targets) && site.targets.length > 0
+      && site.targets.every((name) => typeof name === "string");
+    if (Array.isArray(callSites) && !callSites.every(validCallSite)) {
+      errors.push("effects capture call_resolution.resolved_local_call_sites must preserve source-scoped target records");
+    }
+    if (Array.isArray(callSites) && callSites.every(validCallSite)
+      && Array.isArray(resolution.resolved_local_targets)
+      && resolution.resolved_local_targets.every((target) => target && typeof target === "object"
+        && typeof target.function === "string" && typeof target.operation === "string"
+        && ["static", "generic-trait-candidates"].includes(target.dispatch)
+        && Array.isArray(target.targets) && target.targets.every((name) => typeof name === "string"))) {
+      const aggregateTargets = new Map(resolution.resolved_local_targets.map((target) => [
+        `${target.function}\0${target.operation}`,
+        { dispatch: target.dispatch, targets: new Set(target.targets) },
+      ]));
+      for (const site of callSites) {
+        const edge = `${site.function}\0${site.operation}`;
+        const aggregate = aggregateTargets.get(edge);
+        if (!aggregate || aggregate.dispatch !== site.dispatch
+          || site.targets.some((target) => !aggregate.targets.has(target))) {
+          errors.push("effects capture call_resolution source call sites do not match resolved local target edges");
+          break;
+        }
       }
     }
   }
@@ -764,9 +817,21 @@ function compilerEffectSummary(root, sourcePath) {
     function_calls: report.function_calls,
     unresolved_calls: report.unresolved_calls,
     call_resolution: {
-      schema: "ostrin.call-resolution-evidence/v1",
+      schema: "ostrin.call-resolution-evidence/v2",
       count_unit: "distinct_function_operation_edges",
+      call_site_scope: "bundle_source_file",
       resolved_local_targets: report.resolved_call_targets,
+      resolved_local_call_sites: report.resolved_call_sites.filter((site) =>
+        publicSourcePath(root, site.file) === path.posix.normalize(sourcePath.replaceAll("\\", "/")))
+        .map((site) => ({
+        function: site.function,
+        operation: site.operation,
+        file: publicSourcePath(root, site.file),
+        line: site.line,
+        col: site.col,
+        dispatch: site.dispatch,
+        targets: site.targets,
+        })),
       resolved_local_operations: report.resolved_call_operations,
       effect_classified_operations: report.classified_calls,
       effect_free_intrinsics: report.known_effect_free_calls,
@@ -1098,6 +1163,12 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   const effects = bundle?.provenance?.effects;
   for (const error of validateEffectCapture(effects)) errors.push(`provenance ${error}`);
+  for (const site of effects?.call_resolution?.resolved_local_call_sites ?? []) {
+    if (site.file !== fixture.sourcePath) {
+      errors.push("provenance call-site evidence must be scoped to the bundle source file");
+      break;
+    }
+  }
   for (const error of validateEntryEffectSignature(effects?.entry_effect_signature, effects?.entry, effects)) {
     errors.push(`provenance ${error}`);
   }

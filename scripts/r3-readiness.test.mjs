@@ -58,9 +58,11 @@ const validRuntime = () => ({
   },
 });
 const validCallResolution = (overrides = {}) => ({
-  schema: "ostrin.call-resolution-evidence/v1",
+  schema: "ostrin.call-resolution-evidence/v2",
   count_unit: "distinct_function_operation_edges",
+  call_site_scope: "bundle_source_file",
   resolved_local_targets: [],
+  resolved_local_call_sites: [],
   resolved_local_operations: {},
   effect_classified_operations: {},
   effect_free_intrinsics: {},
@@ -528,9 +530,14 @@ test("call-resolution evidence reconciles typed edge categories and local target
     unresolved_calls: { main: ["value.method"] },
     symbolic_effect_calls: {},
     call_resolution: {
-      schema: "ostrin.call-resolution-evidence/v1",
+      schema: "ostrin.call-resolution-evidence/v2",
       count_unit: "distinct_function_operation_edges",
+      call_site_scope: "bundle_source_file",
       resolved_local_targets: [{ function: "main", operation: "helper", dispatch: "static", targets: ["helper"] }],
+      resolved_local_call_sites: [{
+        function: "main", operation: "helper", file: "examples/main.ostrin",
+        line: 1, col: 5, dispatch: "static", targets: ["helper"],
+      }],
       resolved_local_operations: { main: ["helper"] },
       effect_classified_operations: { main: ["read_file"] },
       effect_free_intrinsics: {},
@@ -545,15 +552,39 @@ test("call-resolution evidence reconciles typed edge categories and local target
   assert.equal(diagnostic.localFunctionEdgeCount, 1);
   assert.equal(diagnostic.staticLocalFunctionEdgeCount, 1);
   assert.equal(diagnostic.localTargetCandidateCount, 1);
+  assert.equal(diagnostic.resolvedCallSiteCount, 1);
+  assert.equal(diagnostic.locatedCallSiteCount, 1);
+  assert.equal(diagnostic.unlocatedCallSiteCount, 0);
+  assert.equal(diagnostic.sourceSiteAssociationsValid, true);
+  assert.match(diagnostic.interpretation, /not runtime traces/i);
+
+  const missingSite = diagnoseCallResolution({
+    function_calls: { main: ["helper"] },
+    unresolved_calls: {},
+    symbolic_effect_calls: {},
+    call_resolution: {
+      ...validCallResolution(),
+      resolved_local_targets: [{ function: "main", operation: "helper", dispatch: "static", targets: ["helper"] }],
+      resolved_local_call_sites: [{
+        function: "main", operation: "helper", file: "examples/main.ostrin",
+        line: 1, col: 5, dispatch: "static", targets: ["different_helper"],
+      }],
+      resolved_local_operations: { main: ["helper"] },
+    },
+  });
+  assert.equal(missingSite.status, "invalid", "source-site targets must match the aggregate edge");
+  assert.equal(missingSite.sourceSiteAssociationsValid, false);
 
   const missingTarget = diagnoseCallResolution({
     function_calls: { main: ["helper"] },
     unresolved_calls: {},
     symbolic_effect_calls: {},
     call_resolution: {
-      schema: "ostrin.call-resolution-evidence/v1",
+      schema: "ostrin.call-resolution-evidence/v2",
       count_unit: "distinct_function_operation_edges",
+      call_site_scope: "bundle_source_file",
       resolved_local_targets: [],
+      resolved_local_call_sites: [],
       resolved_local_operations: { main: ["helper"] },
       effect_classified_operations: {},
       effect_free_intrinsics: {},
@@ -731,7 +762,11 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(callResolution.uncategorizedEdgeCount, 0);
   assert.equal(callResolution.localTargetAssociationComplete, true);
   assert.ok(callResolution.localTargetCandidateCount > 0);
-  assert.match(callResolution.interpretation, /do not provide per-invocation dispatch traces/i);
+  assert.match(callResolution.interpretation, /not runtime traces/i);
+  assert.ok(callResolution.resolvedCallSiteCount > 0);
+  assert.equal(callResolution.locatedCallSiteCount + callResolution.unlocatedCallSiteCount,
+    callResolution.resolvedCallSiteCount);
+  assert.equal(callResolution.sourceSiteAssociationsValid, true);
   assert.ok(notAssessed.some((item) => /call-site granularity/.test(item)));
   assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
   assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles > 0);

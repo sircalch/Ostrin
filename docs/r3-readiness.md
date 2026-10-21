@@ -103,7 +103,16 @@ categorías emitidas por el análisis tipado: efecto clasificado, intrínseco si
 callback incorporado, indirecta, simbólica o no resuelta. Cada arista local distingue un destino
 estático de los candidatos conservadores de una llamada mediante trait genérico. La validación
 comprueba que todas las aristas estén categorizadas y que los destinos locales coincidan con las
-operaciones marcadas como resueltas. Estas categorías pueden solaparse y no equivalen a una traza por invocación, no demuestran
+operaciones marcadas como resueltas. El esquema `ostrin.call-resolution-evidence/v2` añade
+`resolved_local_call_sites` con alcance explícito `bundle_source_file`: cada bundle conserva sólo
+las ocurrencias del archivo fuente del experimento, junto con archivo, línea, columna, clasificación
+de despacho y candidatos asociados. Las aristas agregadas continúan incluyendo el grafo visible de
+módulos; por ello el conteo de ocurrencias no se presenta como una cobertura uno-a-uno de todas las
+aristas. Las rutas absolutas y archivos fuera del repositorio se excluyen. Si el analizador no puede
+recuperar una posición exacta, se conserva como ubicación desconocida en lugar de inventarla.
+En el snapshot local hay 245 ocurrencias fuente: 184 con línea/columna y 61 sin ellas. La web muestra
+ambos conteos y mantiene el alcance estático explícito. Estas categorías pueden solaparse y no equivalen
+a una traza por invocación, no demuestran
 que el despacho dinámico en ejecución coincida con el estático y no prueban pureza ni soundness.
 Las referencias por sintaxis (identificador, ruta de miembro o ruta cualificada) siguen siendo
 agrupaciones textuales. El recorrido directo sigue solo aristas que coinciden exactamente con nombres

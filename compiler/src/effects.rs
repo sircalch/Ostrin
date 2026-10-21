@@ -110,6 +110,21 @@ pub struct UnresolvedCallSite {
     pub col: usize,
 }
 
+/// A statically resolved source call occurrence. `inventory_index` ties this
+/// record to the complete call inventory so lexical span recovery can preserve
+/// separate locations even when several calls share the same operation edge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedCallSite {
+    pub operation: String,
+    pub function: String,
+    pub file: Option<String>,
+    pub line: usize,
+    pub col: usize,
+    pub generic_trait_candidates: bool,
+    pub targets: BTreeSet<String>,
+    inventory_index: usize,
+}
+
 /// Source location for an invocation through a function-valued expression.
 /// The call can still be open or symbolically tracked; this records only that
 /// the invocation is indirect, not that its effects are known.
@@ -152,6 +167,8 @@ pub struct EffectReport {
     /// This retains the association that `resolved_function_calls` intentionally
     /// flattens for transitive effect propagation.
     pub resolved_call_targets: BTreeMap<(String, String), BTreeSet<String>>,
+    /// Source occurrences for each call that has local function targets.
+    pub resolved_call_sites: Vec<ResolvedCallSite>,
     /// Source spellings corresponding to the resolved edges, per caller.
     pub resolved_call_operations: BTreeMap<String, BTreeSet<String>>,
     /// Calls to typed compiler intrinsics with no host effect in the current
@@ -289,6 +306,19 @@ impl EffectReport {
                 .then(left.function.cmp(&right.function))
                 .then(left.effect.cmp(&right.effect))
                 .then(left.operation.cmp(&right.operation))
+        });
+        self.resolved_call_sites.sort_by(|left, right| {
+            left.file
+                .cmp(&right.file)
+                .then(left.line.cmp(&right.line))
+                .then(left.col.cmp(&right.col))
+                .then(left.function.cmp(&right.function))
+                .then(left.operation.cmp(&right.operation))
+                .then(
+                    left.generic_trait_candidates
+                        .cmp(&right.generic_trait_candidates),
+                )
+                .then(left.targets.cmp(&right.targets))
         });
     }
 }
@@ -496,10 +526,11 @@ fn analyze_with_types_internal(
         })
         .collect();
     report.sort_sites();
-    collect_unresolved_call_sites(&mut report);
     if resolve_report_spans {
-        resolve_unresolved_call_site_spans(&mut report);
+        resolve_call_site_spans(&mut report);
     }
+    collect_unresolved_call_sites(&mut report);
+    report.sort_sites();
     report
 }
 
@@ -762,14 +793,14 @@ fn collect_unresolved_call_sites(report: &mut EffectReport) {
     });
 }
 
-/// Recover the callee token location for unresolved calls nested inside a
-/// larger located expression. The parser currently attaches some source spans
-/// to the enclosing expression, which can otherwise leave these callsites at
-/// 0:0. We only replace a group when lexical and AST occurrence counts agree;
-/// ambiguous groups retain their original conservative locations.
-fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
+/// Recover callee token locations for calls nested inside larger located
+/// expressions. The parser can attach a span to the enclosing expression,
+/// which otherwise leaves nested calls at 0:0. Replace a group only when
+/// lexical and AST occurrence counts agree; ambiguous groups keep their
+/// conservative parser locations.
+fn resolve_call_site_spans(report: &mut EffectReport) {
     let mut files = BTreeSet::new();
-    for site in &report.unresolved_call_sites {
+    for site in &report.unresolved_call_site_inventory {
         if let Some(file) = &site.file {
             files.insert(file.clone());
         }
@@ -816,7 +847,7 @@ fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
     }
 
     let mut groups = BTreeMap::<(String, String), Vec<usize>>::new();
-    for (index, site) in report.unresolved_call_sites.iter().enumerate() {
+    for (index, site) in report.unresolved_call_site_inventory.iter().enumerate() {
         let Some(file) = &site.file else {
             continue;
         };
@@ -834,23 +865,22 @@ fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
             continue;
         }
         site_indices.sort_by_key(|index| {
-            let site = &report.unresolved_call_sites[*index];
+            let site = &report.unresolved_call_site_inventory[*index];
             (site.line, site.col)
         });
         for (site_index, (line, col)) in site_indices.into_iter().zip(spans) {
-            let site = &mut report.unresolved_call_sites[site_index];
+            let site = &mut report.unresolved_call_site_inventory[site_index];
             site.line = *line;
             site.col = *col;
+            for resolved in &mut report.resolved_call_sites {
+                if resolved.inventory_index == site_index {
+                    resolved.line = *line;
+                    resolved.col = *col;
+                    break;
+                }
+            }
         }
     }
-    report.unresolved_call_sites.sort_by(|left, right| {
-        left.file
-            .cmp(&right.file)
-            .then(left.line.cmp(&right.line))
-            .then(left.col.cmp(&right.col))
-            .then(left.function.cmp(&right.function))
-            .then(left.operation.cmp(&right.operation))
-    });
 }
 
 fn follows_call_arguments(tokens: &[Token], mut index: usize) -> bool {
@@ -1078,6 +1108,7 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
         Expr::Located(inner, _) => walk_expr(inner, function, file, report),
         Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
             if let Some(operation) = expression_path(callee) {
+                let inventory_index = report.unresolved_call_site_inventory.len();
                 report
                     .unresolved_call_site_inventory
                     .push(UnresolvedCallSite {
@@ -1097,6 +1128,16 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                     .clone()
                     .unwrap_or_else(|| resolve_local_target(callee, report).into_iter().collect());
                 if !targets.is_empty() {
+                    report.resolved_call_sites.push(ResolvedCallSite {
+                        operation: operation.clone(),
+                        function: function.to_string(),
+                        file: file.map(str::to_string),
+                        line,
+                        col,
+                        generic_trait_candidates: generic_targets.is_some(),
+                        targets: targets.iter().cloned().collect(),
+                        inventory_index,
+                    });
                     report
                         .resolved_call_targets
                         .entry((function.to_string(), operation.clone()))

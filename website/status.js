@@ -75,8 +75,14 @@ function render() {
     reproducibilityCards.push(valueCard(
       "Call-edge categories",
       `${callResolution.categorizedEdgeCount.toLocaleString()} / ${callResolution.edgeCount.toLocaleString()}`,
-      `${callResolution.staticLocalFunctionEdgeCount.toLocaleString()} static local · ${callResolution.genericTraitCandidateEdgeCount.toLocaleString()} generic trait candidate edges · ${callResolution.uncategorizedEdgeCount.toLocaleString()} uncategorized · edge-level only, not a runtime trace`,
+      `${callResolution.staticLocalFunctionEdgeCount.toLocaleString()} static local · ${callResolution.genericTraitCandidateEdgeCount.toLocaleString()} generic trait candidate edges · ${callResolution.uncategorizedEdgeCount.toLocaleString()} uncategorized · edge-level only`,
       callResolution.status === "available" && callResolution.uncategorizedEdgeCount === 0 ? "neutral" : "open",
+    ));
+    reproducibilityCards.push(valueCard(
+      "Resolved source call sites",
+      callResolution.resolvedCallSiteCount.toLocaleString(),
+      `${callResolution.locatedCallSiteCount.toLocaleString()} located · ${callResolution.unlocatedCallSiteCount.toLocaleString()} without source location · bundle source file only · static analysis, not a runtime trace`,
+      callResolution.sourceSiteAssociationsValid && callResolution.unlocatedCallSiteCount === 0 ? "neutral" : "open",
     ));
   }
   reproducibility.replaceChildren(...reproducibilityCards);

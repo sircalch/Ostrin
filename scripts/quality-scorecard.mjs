@@ -414,6 +414,10 @@ export async function buildScorecard() {
             genericTraitCandidateEdgeCount: evidence.genericTraitCandidateEdgeCount,
             localTargetCandidateCount: evidence.localTargetCandidateCount,
             multiTargetEdgeCount: evidence.multiTargetEdgeCount,
+            resolvedCallSiteCount: evidence.resolvedCallSiteCount,
+            locatedCallSiteCount: evidence.locatedCallSiteCount,
+            unlocatedCallSiteCount: evidence.unlocatedCallSiteCount,
+            sourceSiteAssociationsValid: evidence.sourceSiteAssociationsValid,
           };
         })(),
         sourceReadAudit: (() => {

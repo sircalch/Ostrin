@@ -142,6 +142,11 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
   assert.equal(scorecard.r3.callResolutionEvidence.categorizedEdgeCount,
     scorecard.r3.callResolutionEvidence.edgeCount);
   assert.ok(scorecard.r3.callResolutionEvidence.staticLocalFunctionEdgeCount > 0);
+  assert.ok(scorecard.r3.callResolutionEvidence.resolvedCallSiteCount > 0);
+  assert.equal(scorecard.r3.callResolutionEvidence.locatedCallSiteCount
+    + scorecard.r3.callResolutionEvidence.unlocatedCallSiteCount,
+  scorecard.r3.callResolutionEvidence.resolvedCallSiteCount);
+  assert.equal(scorecard.r3.callResolutionEvidence.sourceSiteAssociationsValid, true);
   assert.equal(scorecard.r3.callResolutionEvidence.invalidBundleCount, 0);
   assert.deepEqual(scorecard.r3.sourceReadAudit, {
     sourceBundleCount: scorecard.r3.bundleCount,

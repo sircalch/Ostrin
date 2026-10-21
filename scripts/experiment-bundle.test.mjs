@@ -268,9 +268,15 @@ test("every registered fixture produces a verified recorded bundle", () => {
     assert.equal(bundle.files["provenance.json"], `${JSON.stringify(bundle.provenance)}\n`);
     assert.ok(bundle.provenance.effects.function_calls);
     assert.ok(bundle.provenance.effects.unresolved_calls);
-    assert.equal(bundle.provenance.effects.call_resolution.schema, "ostrin.call-resolution-evidence/v1");
+    assert.equal(bundle.provenance.effects.call_resolution.schema, "ostrin.call-resolution-evidence/v2");
     assert.equal(bundle.provenance.effects.call_resolution.count_unit, "distinct_function_operation_edges");
     assert.ok(Array.isArray(bundle.provenance.effects.call_resolution.resolved_local_targets));
+    const resolvedSites = bundle.provenance.effects.call_resolution.resolved_local_call_sites;
+    assert.ok(Array.isArray(resolvedSites));
+    for (const site of resolvedSites) {
+      assert.equal(site.file, fixture.sourcePath, `${id}: call-site evidence stays within its source file`);
+      assert.ok(site.file === null || !path.isAbsolute(site.file), `${id}: call site must not expose a local absolute path`);
+    }
     assert.ok(bundle.provenance.effects.effect_coverage);
     assert.deepEqual(validateEntryEffectSignature(
       bundle.provenance.effects.entry_effect_signature,
@@ -306,9 +312,11 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     function_effect_variables: {},
     symbolic_effect_calls: {},
     call_resolution: {
-      schema: "ostrin.call-resolution-evidence/v1",
+      schema: "ostrin.call-resolution-evidence/v2",
       count_unit: "distinct_function_operation_edges",
+      call_site_scope: "bundle_source_file",
       resolved_local_targets: [],
+      resolved_local_call_sites: [],
       resolved_local_operations: {},
       effect_classified_operations: { main: ["known_call"] },
       effect_free_intrinsics: {},
@@ -318,6 +326,19 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   assert.deepEqual(validateEffectCapture(complete), []);
+
+  const callSiteWithoutTarget = {
+    ...complete,
+    call_resolution: {
+      ...complete.call_resolution,
+      resolved_local_call_sites: [{
+        function: "main", operation: "known_call", file: "examples/main.ostrin",
+        line: 1, col: 5, dispatch: "static", targets: ["helper"],
+      }],
+    },
+  };
+  assert.ok(validateEffectCapture(callSiteWithoutTarget)
+    .some((error) => error.includes("source call sites do not match")));
 
   const incomplete = {
     ...complete,
