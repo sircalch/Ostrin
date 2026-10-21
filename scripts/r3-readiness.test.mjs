@@ -687,6 +687,7 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(externalInputEvidence.sourceReadAudit.dynamicReadCallCount, 0);
   assert.equal(externalInputEvidence.sourceReadAudit.readFileReferenceCount, 0);
   assert.equal(externalInputEvidence.sourceReadAudit.shadowedReadFileCallCount, 0);
+  assert.equal(externalInputEvidence.sourceReadAudit.qualifiedReadFileCallCount, 0);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.undeclaredLiteralReadPaths, []);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.declaredSnapshotsWithoutDirectRead, []);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.sourceReadsWithoutFilesystemCapability, []);

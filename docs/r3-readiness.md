@@ -122,9 +122,10 @@ fuente embebido e inventaría llamadas directas a `read_file`: en el snapshot lo
 con ruta literal en 11 bundles; todas leen `data.json`, cuya declaración de snapshot y capacidad
 `filesystem.read` coinciden. No encontró rutas literales sin declarar, snapshots sin lectura directa,
 llamadas con ruta dinámica ni referencias directas a `read_file`. Las llamadas no calificadas que
-resuelven a una función libre local `read_file` se contabilizan por separado como sombreadas. Este
-análisis léxico no detecta lecturas ocultas por alias, funciones importadas, FFI ni código del host,
-y no observa el sistema de
+resuelven a una función libre local `read_file` se contabilizan por separado como sombreadas. Las
+llamadas calificadas se reportan como no resueltas y no se atribuyen al builtin sin resolución de
+nombres. Este análisis léxico no detecta lecturas ocultas por alias, funciones importadas, FFI ni
+código del host, y no observa el sistema de
 archivos durante la ejecución. Por tanto no prueba que no existan otras entradas externas ni que el
 contenido real coincida; esa verificación requiere captura de lecturas en runtime y replay. El
 inventario también conserva 18 entradas de parámetros; ninguno de estos contadores cierra R3.

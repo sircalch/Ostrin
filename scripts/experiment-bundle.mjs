@@ -389,11 +389,17 @@ export function scanReadFileCalls(source) {
     const memberCall = tokens[tokenIndex - 1]?.kind === "punctuation"
       && tokens[tokenIndex - 1]?.value === ".";
     if (!qualified && memberCall) continue;
+    const isCall = tokens[tokenIndex + 1]?.kind === "punctuation"
+      && tokens[tokenIndex + 1]?.value === "(";
+    if (qualified) {
+      if (isCall) reads.push({ kind: "qualified", path: null, line: current.line });
+      continue;
+    }
     if (localReadFile && !qualified) {
       reads.push({ kind: "shadowed", path: null, line: current.line });
       continue;
     }
-    if (tokens[tokenIndex + 1]?.kind !== "punctuation" || tokens[tokenIndex + 1]?.value !== "(") {
+    if (!isCall) {
       reads.push({ kind: "reference", path: null, line: current.line });
       continue;
     }

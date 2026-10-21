@@ -144,6 +144,7 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
     dynamicReadCallCount: 0,
     readFileReferenceCount: 0,
     shadowedReadFileCallCount: 0,
+    qualifiedReadFileCallCount: 0,
     undeclaredLiteralPathCount: 0,
     declaredSnapshotWithoutDirectReadCount: 0,
     sourceReadsWithoutFilesystemCapabilityCount: 0,

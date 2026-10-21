@@ -1045,6 +1045,7 @@ test("public status dashboard exposes separate evidence dimensions", async ({ pa
   await expect(sourceReadMetric).toHaveCount(1);
   await expect(sourceReadMetric).toContainText(`${r3.sourceReadAudit.literalReadPathCallCount} literal reads`);
   await expect(sourceReadMetric).toContainText(`${r3.sourceReadAudit.shadowedReadFileCallCount} shadowed local`);
+  await expect(sourceReadMetric).toContainText(`${r3.sourceReadAudit.qualifiedReadFileCallCount} qualified unresolved`);
   await expect(sourceReadMetric).toContainText("static scan only");
   await expect(page.locator("[data-status-linguist] .status-metric-value").first()).toHaveText("0");
   await expect(page.locator("[data-status-linguist] .status-metric-value").nth(2)).toHaveText("PENDING");

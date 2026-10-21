@@ -328,6 +328,7 @@ function buildGapDiagnostics(records) {
       dynamicReadCallCount: 0,
       readFileReferenceCount: 0,
       shadowedReadFileCallCount: 0,
+      qualifiedReadFileCallCount: 0,
       undeclaredLiteralReadPaths: [],
       declaredSnapshotsWithoutDirectRead: [],
       sourceReadsWithoutFilesystemCapability: [],
@@ -396,6 +397,7 @@ function buildGapDiagnostics(records) {
     sourceReadAudit.dynamicReadCallCount += dynamicReadCount;
     sourceReadAudit.readFileReferenceCount += referenceCount;
     sourceReadAudit.shadowedReadFileCallCount += readCalls.filter((call) => call.kind === "shadowed").length;
+    sourceReadAudit.qualifiedReadFileCallCount += readCalls.filter((call) => call.kind === "qualified").length;
     if (directReadCount > 0) sourceReadAudit.bundlesWithDirectReadFileCalls++;
     if (undeclaredLiteralPaths.length > 0) {
       sourceReadAudit.undeclaredLiteralReadPaths.push({ bundle, paths: undeclaredLiteralPaths });
