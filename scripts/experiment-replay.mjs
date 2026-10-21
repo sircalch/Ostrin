@@ -12,11 +12,27 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
-import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
+import { runWasmWithFilesystemEvidence } from "./lab-data.mjs";
 import { createSurfaceReceipt, readArchivedFile, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
 import { inspectBundle } from "./r3-readiness.mjs";
 
 const schema = "ostrin.experiment/v0";
+const filesystemEvidenceSchema = "ostrin.wasi-file-read-evidence/v1";
+const wasiRandomEvidenceSchema = "ostrin.wasi-random-evidence/v1";
+const wasiRandomAlgorithm = "sha256-counter-test-only/v1";
+
+function wasiRandomSeed(id, bundleDigest) {
+  return createHash("sha256")
+    .update("ostrin.wasi.random.seed.from-bundle.v1\0", "utf8")
+    .update(id, "utf8")
+    .update("\0", "utf8")
+    .update(bundleDigest, "utf8")
+    .digest("hex");
+}
+
+function wasiRandomSeedLabel(seed) {
+  return `sha256:${createHash("sha256").update(Buffer.from(seed, "hex")).digest("hex")}`;
+}
 
 function sha256(text) {
   return `sha256:${createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex")}`;
@@ -24,6 +40,199 @@ function sha256(text) {
 
 function bytes(text) {
   return Buffer.byteLength(text, "utf8");
+}
+
+export function validateWasiReadEvidence(id, events, files, requiredPaths = []) {
+  const errors = [];
+  const seen = new Set();
+  if (!Array.isArray(events)) return [`${id}: WASI filesystem read evidence is missing`];
+  for (const event of events) {
+    if (event.kind !== "file-read") continue;
+    if (event.pathStatus !== "relative" || typeof event.path !== "string") {
+      errors.push(`${id}: WASI read path is ${event.pathStatus ?? "unknown"}`);
+      continue;
+    }
+    const expected = files[event.path];
+    if (typeof expected !== "string") {
+      errors.push(`${id}: WASI attempted to read ${event.path} outside the supplied filesystem`);
+      continue;
+    }
+    if (event.openStatus !== "opened") {
+      errors.push(`${id}: declared file ${event.path} could not be opened (${event.openStatus})`);
+      continue;
+    }
+    if (event.readStatus) {
+      errors.push(`${id}: WASI read from ${event.path} was incomplete (${event.readStatus})`);
+      continue;
+    }
+    const expectedBytes = Buffer.from(expected, "utf8");
+    const expectedHash = `sha256:${createHash("sha256").update(expectedBytes).digest("hex")}`;
+    if (event.bytesRead !== expectedBytes.byteLength || event.contentSha256 !== expectedHash) {
+      errors.push(`${id}: bytes read from ${event.path} differ from the supplied file`);
+      continue;
+    }
+    seen.add(event.path);
+  }
+  for (const file of requiredPaths) {
+    if (!seen.has(file)) errors.push(`${id}: WASI execution did not read required file ${file}`);
+  }
+  return errors;
+}
+
+export function validateWasiRandomEvidence(id, evidence, expectedSeed) {
+  const errors = [];
+  if (!evidence || evidence.schema !== wasiRandomEvidenceSchema) {
+    return [`${id}: deterministic WASI random evidence is missing or has an unsupported schema`];
+  }
+  if (evidence.algorithm !== wasiRandomAlgorithm || evidence.seed !== wasiRandomSeedLabel(expectedSeed)) {
+    errors.push(`${id}: deterministic WASI random algorithm or bundle-bound seed differs`);
+  }
+  if (!Array.isArray(evidence.requests)) return [`${id}: deterministic WASI random request list is malformed`];
+  for (const [index, request] of evidence.requests.entries()) {
+    if (request.status) {
+      errors.push(`${id}: WASI random_get request ${index} failed (${request.status})`);
+    } else if (!Number.isSafeInteger(request.byteLength) || request.byteLength < 0
+      || !/^sha256:[a-f0-9]{64}$/.test(request.contentSha256 ?? "")) {
+      errors.push(`${id}: WASI random_get request ${index} has incomplete byte evidence`);
+    }
+  }
+  return errors;
+}
+
+function sanitizeWasiReadEvents(events) {
+  return events.map((event) => ({
+    kind: event.kind,
+    ...(event.path === null ? {} : { path: event.path }),
+    ...(event.pathHash ? { pathSha256: event.pathHash } : {}),
+    pathStatus: event.pathStatus,
+    openStatus: event.openStatus,
+    ...(event.openErrno == null ? {} : { openErrno: event.openErrno }),
+    bytesRead: event.bytesRead,
+    contentSha256: event.contentSha256,
+    ...(event.readStatus ? { readStatus: event.readStatus } : {}),
+  }));
+}
+
+export function createWasiFileReadEvidenceReport(results, expectedRun, compilerWasmSha256, replayBundles) {
+  if (!/^\d+$/.test(expectedRun?.runId ?? "") || !/^[a-f0-9]{40}$/.test(expectedRun?.testedSha ?? "")) {
+    throw new Error("WASI file-read evidence requires a run ID and tested commit SHA");
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(compilerWasmSha256 ?? "")) {
+    throw new Error("WASI file-read evidence requires the tested compiler WASM digest");
+  }
+  const resultById = new Map(results.map((result) => [result.id, result]));
+  const ids = Object.keys(replayBundles ?? {}).sort();
+  if (ids.length === 0 || results.length !== ids.length || resultById.size !== ids.length || ids.some((id) => !resultById.has(id))) {
+    throw new Error("WASI file-read evidence does not cover the complete replay inventory");
+  }
+  const bundles = Object.fromEntries(ids.map((id) => {
+    const result = resultById.get(id);
+    const inventory = replayBundles[id];
+    if (!result.filesystemReadEvidence || result.filesystemReadEvidence.schema !== filesystemEvidenceSchema
+      || !Array.isArray(result.filesystemReadEvidence.executions) || result.filesystemReadEvidence.executions.length === 0) {
+      throw new Error(`${id}: replay is missing runtime WASI file-read evidence`);
+    }
+    if (result.wasmSha256 !== compilerWasmSha256 || result.bundleSha256 !== inventory.bundleSha256) {
+      throw new Error(`${id}: replay evidence does not match the tested compiler or bundle inventory`);
+    }
+    return [id, {
+      level: inventory.level,
+      bundleSha256: result.bundleSha256,
+      executions: result.filesystemReadEvidence.executions,
+    }];
+  }));
+  return {
+    schema: filesystemEvidenceSchema,
+    ciRun: { run_id: expectedRun.runId, tested_sha: expectedRun.testedSha },
+    compilerWasmSha256,
+    scope: "regular files read through WASI Preview 1 path_open/fd_read only",
+    limitations: [
+      "Does not observe directory enumeration or filesystem metadata queries.",
+      "Does not cover native host filesystem access, network, clock, environment variables, or other WASI interfaces.",
+      "A completed read trace does not establish general R3 closure or cross-platform equivalence.",
+    ],
+    replayBundles: bundles,
+  };
+}
+
+export function createWasiRandomEvidenceReport(results, expectedRun, compilerWasmSha256, replayBundles) {
+  if (!/^\d+$/.test(expectedRun?.runId ?? "") || !/^[a-f0-9]{40}$/.test(expectedRun?.testedSha ?? "")) {
+    throw new Error("WASI random evidence requires a run ID and tested commit SHA");
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(compilerWasmSha256 ?? "")) {
+    throw new Error("WASI random evidence requires the tested compiler WASM digest");
+  }
+  const resultById = new Map(results.map((result) => [result.id, result]));
+  const ids = Object.keys(replayBundles ?? {}).sort();
+  if (ids.length === 0 || results.length !== ids.length || resultById.size !== ids.length
+    || ids.some((id) => !resultById.has(id))) {
+    throw new Error("WASI random evidence does not cover the complete replay inventory");
+  }
+  const bundles = Object.fromEntries(ids.map((id) => {
+    const result = resultById.get(id);
+    const inventory = replayBundles[id];
+    const evidence = result.wasiRandomEvidence;
+    const fileReadExecutions = result.filesystemReadEvidence?.executions;
+    if (!evidence || evidence.schema !== wasiRandomEvidenceSchema || evidence.algorithm !== wasiRandomAlgorithm
+      || !Array.isArray(evidence.executions) || evidence.executions.length === 0
+      || !Array.isArray(fileReadExecutions) || fileReadExecutions.length !== evidence.executions.length) {
+      throw new Error(`${id}: replay is missing deterministic WASI random evidence`);
+    }
+    if (result.wasmSha256 !== compilerWasmSha256 || result.bundleSha256 !== inventory.bundleSha256
+      || evidence.seed !== wasiRandomSeedLabel(wasiRandomSeed(id, result.bundleSha256))) {
+      throw new Error(`${id}: random evidence does not match the tested compiler, bundle, or deterministic seed`);
+    }
+    for (const [index, execution] of evidence.executions.entries()) {
+      if (typeof execution.scenario !== "string" || !Array.isArray(execution.requests)) {
+        throw new Error(`${id}: deterministic WASI random execution evidence is malformed`);
+      }
+      if (execution.scenario !== fileReadExecutions[index]?.scenario) {
+        throw new Error(`${id}: random and filesystem evidence describe different execution scenarios`);
+      }
+      const requestErrors = validateWasiRandomEvidence(id, {
+        schema: evidence.schema,
+        algorithm: evidence.algorithm,
+        seed: evidence.seed,
+        requests: execution.requests,
+      }, wasiRandomSeed(id, result.bundleSha256));
+      if (requestErrors.length) throw new Error(requestErrors.join("; "));
+    }
+    return [id, {
+      level: inventory.level,
+      bundleSha256: result.bundleSha256,
+      schema: evidence.schema,
+      algorithm: evidence.algorithm,
+      seed: evidence.seed,
+      executions: evidence.executions,
+    }];
+  }));
+  return {
+    schema: wasiRandomEvidenceSchema,
+    ciRun: { run_id: expectedRun.runId, tested_sha: expectedRun.testedSha },
+    compilerWasmSha256,
+    seedDerivation: "sha256(label || fixture-id || bundle-sha256)",
+    scope: "deterministic test-only WASI Preview 1 random_get input; same seed is used for every scenario of a bundle",
+    limitations: [
+      "The SHA-256 counter generator is only for deterministic test replay and is not suitable for cryptographic use.",
+      "This records a controlled replay input, not entropy from the host operating system.",
+      "A deterministic random_get input does not establish general R3 closure or cross-platform equivalence.",
+    ],
+    replayBundles: bundles,
+  };
+}
+
+export function verifyArchivedReplayEvidence(directory, fileReadEvidence, randomEvidence) {
+  const archivedReports = [
+    ["target/r3-ci/wasi-file-read-evidence.json", fileReadEvidence],
+    ["target/r3-ci/wasi-random-evidence.json", randomEvidence],
+  ];
+  for (const [relativePath, expected] of archivedReports) {
+    const archived = readArchivedFile(directory, relativePath, 32 * 1024 * 1024);
+    const expectedBytes = Buffer.from(canonicalJson(expected), "utf8");
+    if (!archived.bytes.equals(expectedBytes)) {
+      throw new Error(`archived ${relativePath} differs from the independently replayed evidence`);
+    }
+  }
 }
 
 function canonicalJson(value) {
@@ -204,22 +413,38 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
   const modulePath = compilerWasmPath ?? path.join(repositoryRoot, "website", "ostrinc.wasm");
   if (!existsSync(modulePath)) throw new Error(`${id}: compiler WASM is missing at ${modulePath}`);
   if (compilerWasmPath && !bindWasm) throw new Error(`${id}: an archived compiler requires a bound replay`);
-  const module = bindWasm ? null : await WebAssembly.compile(readFileSync(modulePath));
   let wasmSha256;
-  const execute = async (files) => {
-    if (!bindWasm) return runWasm(module, files, ["--run", "main.ostrin"]);
-    const observed = await runWasmWithEvidence(files, ["--run", "main.ostrin"], modulePath);
+  const bundleDigest = sha256(bundleText);
+  const randomSeed = wasiRandomSeed(id, bundleDigest);
+  const filesystemExecutions = [];
+  const randomExecutions = [];
+  const execute = async (files, scenario) => {
+    const observed = await runWasmWithFilesystemEvidence(files, ["--run", "main.ostrin"], modulePath, randomSeed);
     if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
-      throw new Error(`${id}: WASI child did not return a valid module execution digest`);
+      throw new Error(`${id}: WASI child did not return valid execution evidence`);
     }
     if (wasmSha256 && observed.wasmSha256 !== wasmSha256) {
       throw new Error(`${id}: WASM module changed between replay executions`);
     }
     wasmSha256 = observed.wasmSha256;
+    const readErrors = validateWasiReadEvidence(
+      id,
+      observed.filesystemReads,
+      files,
+      ["main.ostrin", inputFile],
+    );
+    if (readErrors.length) throw new Error(readErrors.join("\n"));
+    const randomErrors = validateWasiRandomEvidence(id, observed.wasiRandomEvidence, randomSeed);
+    if (randomErrors.length) throw new Error(randomErrors.join("\n"));
+    filesystemExecutions.push({
+      scenario,
+      reads: sanitizeWasiReadEvents(observed.filesystemReads),
+    });
+    randomExecutions.push({ scenario, requests: observed.wasiRandomEvidence.requests });
     return observed.lines;
   };
   const files = { "main.ostrin": source, [inputFile]: input };
-  const output = await execute(files);
+  const output = await execute(files, "baseline");
   const recorded = bundle.provenance.figure_metadata;
   const metadata = {
     sourceHash: recorded.source_hash,
@@ -232,7 +457,7 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
   const seeded = bundle.reproducibility?.level === "R1"
     || bundle.provenance?.randomness?.status === "input-driven-r1";
   if (seeded) {
-    const repeatedOutput = await execute(files);
+    const repeatedOutput = await execute(files, "repeatability");
     const repeated = normalizeFigureMetadata(extractSvg(repeatedOutput, id), metadata);
     if (repeated !== rendered) {
       throw new Error(`${id}: same input and seed produced different SVG output on replay`);
@@ -244,7 +469,7 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
   }
 
   const changedInput = alternateInput(bundle, id);
-  const changedOutput = await execute({ "main.ostrin": source, [inputFile]: changedInput });
+  const changedOutput = await execute({ "main.ostrin": source, [inputFile]: changedInput }, "changed-input");
   const changedSvg = normalizeFigureMetadata(extractSvg(changedOutput, id), metadata);
   if (changedSvg === rendered) throw new Error(`${id}: changing a declared input did not change the rendered figure`);
 
@@ -255,9 +480,20 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
     baseline: "match",
     sensitivity: "changed-output",
     ...(seeded ? { seeded: "same-seed-and-changed-output" } : {}),
+    ...(bindWasm ? { filesystemReadEvidence: {
+      schema: filesystemEvidenceSchema,
+      scope: "regular files read through WASI Preview 1 path_open/fd_read only",
+      executions: filesystemExecutions,
+    } } : {}),
+    ...(bindWasm ? { wasiRandomEvidence: {
+      schema: wasiRandomEvidenceSchema,
+      algorithm: wasiRandomAlgorithm,
+      seed: wasiRandomSeedLabel(randomSeed),
+      executions: randomExecutions,
+    } } : {}),
     ...(bindWasm ? {
       wasmSha256,
-      bundleSha256: sha256(bundleText),
+      bundleSha256: bundleDigest,
       fileHashes: Object.fromEntries(["source.ostrin", "data.json", "figure.svg", "provenance.json"]
         .map((name) => [name, sha256(bundle.files[name])])),
     } : {}),
@@ -367,9 +603,15 @@ export async function replayRecordedR0(id, { bundleText: suppliedBundleText, com
     seed: String(bundle.provenance.figure_metadata?.seed ?? "").replace(/^seed=/, ""),
     compiler: bundle.provenance.figure_metadata?.compiler,
   };
+  const bundleDigest = sha256(bundleText);
+  const randomSeed = wasiRandomSeed(id, bundleDigest);
   let wasmSha256;
+  const filesystemExecutions = [];
+  const randomExecutions = [];
+  let executionCount = 0;
   const execute = async () => {
-    const observed = await runWasmWithEvidence({ "main.ostrin": source }, ["--run", "main.ostrin"], modulePath);
+    const files = { "main.ostrin": source };
+    const observed = await runWasmWithFilesystemEvidence(files, ["--run", "main.ostrin"], modulePath, randomSeed);
     if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
       throw new Error(`${id}: WASI child did not return a valid module execution digest`);
     }
@@ -377,6 +619,16 @@ export async function replayRecordedR0(id, { bundleText: suppliedBundleText, com
       throw new Error(`${id}: WASM module changed between R0 replay executions`);
     }
     wasmSha256 = observed.wasmSha256;
+    const readErrors = validateWasiReadEvidence(id, observed.filesystemReads, files, ["main.ostrin"]);
+    if (readErrors.length) throw new Error(readErrors.join("\n"));
+    const randomErrors = validateWasiRandomEvidence(id, observed.wasiRandomEvidence, randomSeed);
+    if (randomErrors.length) throw new Error(randomErrors.join("\n"));
+    const scenario = executionCount++ === 0 ? "baseline" : "repeatability";
+    filesystemExecutions.push({
+      scenario,
+      reads: sanitizeWasiReadEvents(observed.filesystemReads),
+    });
+    randomExecutions.push({ scenario, requests: observed.wasiRandomEvidence.requests });
     const rendered = normalizeFigureMetadata(extractSvg(observed.lines, id), metadata);
     if (rendered !== recordedFigure) throw new Error(`${id}: archived R0 source replay differs from its recorded SVG`);
     if (bytes(rendered) !== invocationOutput.bytes || sha256(rendered) !== invocationOutput.sha256) {
@@ -393,7 +645,18 @@ export async function replayRecordedR0(id, { bundleText: suppliedBundleText, com
     baseline: "match",
     repeatability: "same-output",
     wasmSha256,
-    bundleSha256: sha256(bundleText),
+    bundleSha256: bundleDigest,
+    filesystemReadEvidence: {
+      schema: filesystemEvidenceSchema,
+      scope: "regular files read through WASI Preview 1 path_open/fd_read only",
+      executions: filesystemExecutions,
+    },
+    wasiRandomEvidence: {
+      schema: wasiRandomEvidenceSchema,
+      algorithm: wasiRandomAlgorithm,
+      seed: wasiRandomSeedLabel(randomSeed),
+      executions: randomExecutions,
+    },
   };
 }
 
@@ -478,6 +741,7 @@ async function main() {
     if (ids.length === 0) throw new Error("archived receipt is missing the tested run's executable replay inventory");
     if (!ids.includes("surface")) throw new Error("surface must be in the executable replay registry to bind the archived WASM");
     const moduleSha256 = surface.receipt.compilerWasmSha256;
+    const replayResults = [];
     for (const id of ids) {
       const artifact = id === "surface" ? surface : readArchivedReplayBundle(directory, id, expectedRun);
       const level = expectedRun.replayBundles[id]?.level;
@@ -494,6 +758,7 @@ async function main() {
       if (result.wasmSha256 !== moduleSha256) {
         throw new Error(`${id}: archived replay loaded WASM bytes that differ from the run-bound surface receipt`);
       }
+      replayResults.push(result);
       if (id === "surface"
         && JSON.stringify(createSurfaceReceipt(artifact.bundleText, result, surface.receipt.replayBundles))
           !== JSON.stringify(surface.receipt)) {
@@ -503,6 +768,19 @@ async function main() {
         ? `${result.baseline}; ${result.repeatability}`
         : `${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""}`;
       console.log(`experiment-replay: independently replayed ${id} (${level}) from archived WASM in CI run ${runId} (${replayDetails})`);
+    }
+    const readEvidence = createWasiFileReadEvidenceReport(replayResults, expectedRun, moduleSha256, expectedRun.replayBundles);
+    const randomEvidence = createWasiRandomEvidenceReport(replayResults, expectedRun, moduleSha256, expectedRun.replayBundles);
+    const workspaceRoot = realpathSync(repositoryRoot);
+    if (realpathSync(directory) === workspaceRoot) {
+      const evidenceRoot = path.join(repositoryRoot, "target/r3-ci");
+      mkdirSync(evidenceRoot, { recursive: true });
+      writeFileSync(path.join(evidenceRoot, "wasi-file-read-evidence.json"), canonicalJson(readEvidence), "utf8");
+      writeFileSync(path.join(evidenceRoot, "wasi-random-evidence.json"), canonicalJson(randomEvidence), "utf8");
+      console.log(`experiment-replay: wrote run-bound file-read and deterministic random evidence for ${ids.length} bundles`);
+    } else {
+      verifyArchivedReplayEvidence(directory, readEvidence, randomEvidence);
+      console.log(`experiment-replay: archived file-read and deterministic random evidence match all ${ids.length} replays`);
     }
     console.log(`experiment-replay: independently replayed all ${ids.length} bundles in the archived R0/R1/R2 inventory`);
     return;

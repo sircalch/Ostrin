@@ -37,6 +37,10 @@ test("Pages deploys when any surface replay evidence producer changes", () => {
     "the archived receipt needs the exact CI-built WASM bytes");
   assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"'),
     "CI must independently execute every archived R1/R2 package before uploading evidence");
+  assert.ok(upload.split(/\r?\n/).includes("          target/r3-ci/wasi-file-read-evidence.json"),
+    "CI must upload validated file-read evidence from the archived replay");
+  assert.ok(upload.split(/\r?\n/).includes("          target/r3-ci/wasi-random-evidence.json"),
+    "CI must upload the controlled WASI random input and replay hashes");
 });
 
 test("offline artifact bundle replay requires a matching host capture and a closed entry row", () => {
