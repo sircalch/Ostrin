@@ -139,9 +139,10 @@ versiona.
 En un paquete descargado, `--verify-artifact` valida integridad y procedencia estructural del
 recibo de `surface`; `node scripts/experiment-replay.mjs --replay-artifact-all <directorio>
 --run-id <id> --tested-sha <sha>` vuelve a ejecutar el inventario R0/R1/R2 registrado en ese run con el
-WASM archivado. Los R0 ejecutan dos veces el `source.ostrin` archivado con sus parámetros
-registrados y comparan la salida SVG completa y su hash de invocación; no se les atribuye
-sensibilidad de entradas externas. Los R1/R2 comparan el SVG completo, prueban el cambio de
+WASM archivado. Cada ejecución WASI se aísla en un proceso hijo con un límite de 120 segundos.
+Los R0 ejecutan dos veces el `source.ostrin` archivado con sus parámetros registrados y comparan
+la salida SVG completa y su hash de invocación; no se les atribuye sensibilidad de entradas
+externas. Los R1/R2 comparan el SVG completo, prueban el cambio de
 parámetro y, para R1, repiten la semilla. Cada captura
 debe identificar el mismo run/SHA y tener una fila de entrada cerrada. El recibo registra para
 cada bundle su ID, nivel y hash, de modo que selección y madurez no dependan del checkout desde el

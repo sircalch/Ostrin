@@ -312,17 +312,34 @@ export function demoInputs(demo) {
 }
 
 const SOURCE_NUMBER = "-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
+export const DEFAULT_WASI_CHILD_TIMEOUT_MS = 120_000;
+
+export function spawnBoundedChild(command, args, options = {}, timeoutMs = DEFAULT_WASI_CHILD_TIMEOUT_MS) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+    throw new RangeError(`child timeout must be a positive integer, got ${timeoutMs}`);
+  }
+  const child = spawnSync(command, args, {
+    ...options,
+    timeout: timeoutMs,
+    windowsHide: true,
+  });
+  if (child.error?.code === "ETIMEDOUT") {
+    throw new Error(`${command} timed out after ${timeoutMs} ms`);
+  }
+  if (child.error) throw new Error(`${command} could not be started: ${child.error.message}`);
+  return child;
+}
 
 function sourceAssignmentPattern(name) {
   const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^\\s*${escaped}\\s*=\\s*${SOURCE_NUMBER}$`, "m");
 }
 
-// Runs ostrinc.wasm on `files` in a child Node process and returns its stdout lines. Each run
-// gets a fresh process: WebAssembly memories of finished instances are not reliably released
-// within one process, and a few dozen heavy Viz programs used to crash Node.
+// Runs ostrinc.wasm on `files` in a bounded child Node process and returns its stdout lines.
+// Each run gets a fresh process: WebAssembly memories of finished instances are not reliably
+// released within one process, and a few dozen heavy Viz programs used to crash Node.
 function spawnWasmChild(files, args, withEvidence = false, compilerWasmPath = wasmPath) {
-  const child = spawnSync(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
+  const child = spawnBoundedChild(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
     input: JSON.stringify({ files, args, withEvidence, compilerWasmPath }),
     maxBuffer: 256 * 1024 * 1024,
     encoding: "utf8",
