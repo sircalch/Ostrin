@@ -21,10 +21,9 @@ jobs:
       OSTRIN_CC: clang
       OSTRIN_CFLAGS: "-fsanitize=address -fno-omit-frame-pointer"
       OSTRIN_REQUIRE_CC: "1"
-      # The compiler's --leak-check assertions remain enabled in the native
-      # examples. LeakSanitizer is disabled here because std.viz deliberately
-      # retains a small process-lifetime SVG metadata cache.
-      ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+      # Keep compiler-level live-allocation assertions and process-wide
+      # LeakSanitizer checks enabled together for the generated native programs.
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
