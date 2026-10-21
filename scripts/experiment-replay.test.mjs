@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bundleErrors, extractSvg, listExecutableReplayIds, replay } from "./experiment-replay.mjs";
+import { createHash } from "node:crypto";
+import { bundleErrors, extractSvg, listExecutableReplayIds, replay, replayRecordedR0 } from "./experiment-replay.mjs";
 import { buildExperimentBundle, experimentFixtures } from "./experiment-bundle.mjs";
 
 test("the executable replay registry includes every source-backed R1/R2 bundle", () => {
@@ -10,6 +11,37 @@ test("the executable replay registry includes every source-backed R1/R2 bundle",
   });
   assert.deepEqual(listExecutableReplayIds(), expected);
   assert.equal(expected.length, 11);
+});
+
+test("an R0 recorded-parameter bundle replays twice from its archived source", async () => {
+  const result = await replayRecordedR0("animation");
+  assert.equal(result.id, "animation");
+  assert.equal(result.level, "R0");
+  assert.equal(result.baseline, "match");
+  assert.equal(result.repeatability, "same-output");
+  assert.match(result.wasmSha256, /^sha256:[a-f0-9]{64}$/);
+  assert.match(result.bundleSha256, /^sha256:[a-f0-9]{64}$/);
+});
+
+test("R0 archive replay rejects mismatched provenance hashes and undeclared external effects", async () => {
+  const hashMismatch = buildExperimentBundle("animation");
+  hashMismatch.provenance.program.source_hash = `sha256:${"0".repeat(64)}`;
+  await assert.rejects(
+    replayRecordedR0("animation", { bundleText: JSON.stringify(hashMismatch) }),
+    /R0 source, parameter-only execution or recorded output contract is incomplete/,
+  );
+
+  const externalEffect = buildExperimentBundle("animation");
+  externalEffect.provenance.effects.entry_effect_signature.effects.push("network");
+  const provenanceText = `${JSON.stringify(externalEffect.provenance, null, 2)}\n`;
+  externalEffect.files["provenance.json"] = provenanceText;
+  const provenanceEntry = externalEffect.manifest.files.find((entry) => entry.path === "provenance.json");
+  provenanceEntry.bytes = Buffer.byteLength(provenanceText, "utf8");
+  provenanceEntry.sha256 = `sha256:${createHash("sha256").update(Buffer.from(provenanceText, "utf8")).digest("hex")}`;
+  await assert.rejects(
+    replayRecordedR0("animation", { bundleText: JSON.stringify(externalEffect) }),
+    /R0 replay requires a closed entry row/,
+  );
 });
 
 test("the surface bundle executes from its declared data.json input", async () => {

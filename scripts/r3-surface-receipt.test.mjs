@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import path from "node:path";
 import { listExecutableReplayIds, readArchivedReplayBundle, replay } from "./experiment-replay.mjs";
 import { bundlePath, createSurfaceReceipt, verifySurfaceReceipt } from "./r3-surface-receipt.mjs";
-import { buildExperimentBundle, repositoryRoot, verifyExperimentBundle } from "./experiment-bundle.mjs";
+import { buildExperimentBundle, outputPathFor, repositoryRoot, verifyExperimentBundle } from "./experiment-bundle.mjs";
 
 const sha256 = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const canonicalJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
@@ -83,6 +83,35 @@ test("offline artifact bundle replay requires a matching host capture and a clos
   }
 });
 
+test("archived R0 bundles are accepted only with matching host and bundle inventory", () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-replay-artifact-"));
+  try {
+    const bundle = JSON.parse(readFileSync(outputPathFor("animation"), "utf8"));
+    bundle.provenance.runtime.host = structuredClone(capturedSurface().provenance.runtime.host);
+    bundle.provenance.runtime.missing = bundle.provenance.runtime.missing
+      .filter((item) => item !== "captured host and hardware metadata");
+    refreshProvenance(bundle);
+    const text = canonicalJson(bundle);
+    const file = path.join(root, "website/assets/experiments/animation.ostrin-experiment.json");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, text);
+    const run = {
+      ...expectedRun,
+      replayBundles: {
+        animation: { level: "R0", bundleSha256: sha256(Buffer.from(text, "utf8")) },
+      },
+    };
+    const archived = readArchivedReplayBundle(root, "animation", run);
+    assert.equal(archived.bundle.reproducibility.level, "R0");
+
+    run.replayBundles.animation.bundleSha256 = sha256(Buffer.from("different bundle", "utf8"));
+    assert.throws(() => readArchivedReplayBundle(root, "animation", run), /tested run inventory/);
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("offline replay registry reads fixture contracts without building the native compiler", () => {
   const ids = listExecutableReplayIds();
   assert.equal(ids.length, 11);
@@ -112,7 +141,7 @@ test("archived replay maturity and membership are bound to the tested run invent
     assert.throws(() => readArchivedReplayBundle(root, "surface", {
       ...run,
       replayBundles: { "removed-in-current-checkout": { level: "R2", bundleSha256: "sha256:" + "a".repeat(64) } },
-    }), /does not register this fixture as executable R1\/R2/);
+    }), /does not register this fixture as an executable R0\/R1\/R2 bundle/);
   } finally {
     assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-replay-artifact-")));
     rmSync(root, { recursive: true, force: true });
@@ -271,13 +300,15 @@ function replayProof(bundleText, wasmBytes = fakeWasm) {
   };
 }
 
-test("a surface receipt binds one captured run, bundle, entry row and WASM bytes", () => {
+test("a surface receipt binds the run and every archived R0/R1/R2 bundle", () => {
   const text = canonicalJson(capturedSurface());
   const receipt = createSurfaceReceipt(text, replayProof(text));
   assert.deepEqual(verifySurfaceReceipt(receipt, text, fakeWasm, expectedRun), []);
   assert.equal(receipt.fixtureSourceRevision, JSON.parse(text).provenance.commit);
   assert.equal(receipt.compilerWasmSha256, sha256(fakeWasm));
-  assert.equal(Object.keys(receipt.replayBundles).length, 11);
+  assert.equal(Object.keys(receipt.replayBundles).length, 29);
+  assert.equal(Object.values(receipt.replayBundles).filter((item) => item.level === "R0").length, 18);
+  assert.equal(Object.values(receipt.replayBundles).filter((item) => item.level === "R2").length, 11);
   assert.equal(receipt.replayBundles.surface.bundleSha256, receipt.bundleSha256);
 
   const historicalInventory = {
