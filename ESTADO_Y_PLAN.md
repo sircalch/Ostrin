@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-21 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 369 de integración y 27 unitarias en verde. Este desarrollo posterior añade constructores explícitos y finitos para estados exactos y desconocidos de `Measurement<Quantity<D>>`.*
+*Corte: 2026-10-21 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 371 de integración y 27 unitarias en verde. Este desarrollo posterior añade constructores explícitos y finitos para estados exactos y desconocidos de `Measurement<Quantity<D>>`.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -619,7 +619,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 369 de integración + 27 unitarias
+    cargo test                                   # 6 diferenciales + 371 de integración + 27 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

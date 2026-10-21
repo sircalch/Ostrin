@@ -12864,6 +12864,95 @@ fn experimental_effect_report_resolves_homonymous_methods_by_receiver_type() {
 }
 
 #[test]
+fn experimental_effect_report_propagates_effects_through_generic_trait_bounds() {
+    let file = temp_source(
+        "effects-generic-trait-method.ostrin",
+        "trait Output {\n    fn emit(self) -> Void\n}\n\
+         record Console { marker: Int }\n\
+         record Remote { marker: Int }\n\
+         impl Output for Console {\n    fn emit(self) -> Void {\n        print(\"console\")\n    }\n}\n\
+         impl Output for Remote {\n    fn emit(self) -> Void {\n        host.callback()\n    }\n}\n\
+         fn emit_any<T: Output>(value: T) -> Void {\n    value.emit()\n}\n\
+         fn main() -> Void {\n    emit_any(Console { marker: 0 })\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+
+    assert_eq!(
+        report["function_effect_signatures"]["emit_any"]["effects"],
+        serde_json::json!(["io"]),
+        "known effects from visible implementations of a generic trait bound must propagate"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["emit_any"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "an unknown effect in any visible implementation must keep the generic row open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], false,
+        "a call through a generic trait bound must not hide an open implementation effect"
+    );
+    assert_eq!(
+        report["unresolved_calls"].get("emit_any"),
+        None,
+        "the generic bound method itself is resolved against visible implementations"
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("hir unresolved effect calls: 3"));
+    assert!(!stdout(&hir).contains("unresolved effect calls: value.emit"));
+    assert!(stdout(&hir).contains("fn emit_any<T>(value: T) -> Void\n  effects: io"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir unresolved effect calls: 3"));
+    assert!(!stdout(&ir).contains("unresolved effect calls: value.emit"));
+    assert!(stdout(&ir).contains("ir fn emit_any(value: T) -> Void\n  effects: io"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_keeps_generic_trait_callbacks_open_until_substituted() {
+    let file = temp_source(
+        "effects-generic-trait-callback.ostrin",
+        "trait Handler {\n    fn run(self, action: fn() -> Void) -> Void\n}\n\
+         record Direct { marker: Int }\n\
+         impl Handler for Direct {\n    fn run(self, action: fn() -> Void) -> Void {\n        action()\n    }\n}\n\
+         fn run_any<T: Handler>(value: T, action: fn() -> Void) -> Void {\n    value.run(action)\n}\n\
+         fn io_action() -> Void {\n    print(\"callback\")\n}\n\
+         fn main() -> Void {\n    run_any(Direct { marker: 0 }, io_action)\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+
+    assert_eq!(
+        report["function_effect_signatures"]["run_any"]["row_closed"], false,
+        "callbacks crossing a generic trait method must not be silently treated as pure"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["run_any"]["open_calls"],
+        serde_json::json!(["value.run", "value.run.callback"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], false,
+        "the unresolved callback boundary must propagate to the concrete caller"
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("unresolved effect calls: value.run"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_report_closes_only_typed_intrinsics_and_builtin_methods() {
     let file = temp_source(
         "effects-typed-intrinsics.ostrin",
