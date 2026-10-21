@@ -215,8 +215,12 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    siguen abiertos; la paridad scalar/native no implica paridad dimensional/native.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
-   reproducible antes de fijar sintaxis pública. El inventario experimental ya está disponible con
-   `ostrinc --effect-report` y `--provenance-report`; el artefacto se publica en
+   reproducible antes de fijar sintaxis pública. `ostrinc --effect-report` ya compone filas experimentales
+   a través de llamadas locales, recursión, closures, callbacks genéricos e implementaciones visibles de
+   métodos genéricos de traits; HIR/IR transportan y verifican filas y sustituciones callback. Las llamadas
+   desconocidas y el dispatch `dyn Trait` permanecen abiertos, y la unión de implementaciones puede
+   sobreestimar efectos. El reporte no es todavía un contrato de pureza ni un sistema completo de
+   capacidades. `--provenance-report` está disponible; el artefacto se publica en
    [`website/provenance.html`](website/provenance.html) con hash de fuente, target, perfil WASI,
    hashes de lockfiles/manifiestos disponibles y límites de replay. El snapshot ostrin.runtime/v1
    es parcial: los once bundles input-driven ya usan su extensión de snapshot de entrada para R2,
