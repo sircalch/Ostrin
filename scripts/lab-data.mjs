@@ -383,7 +383,7 @@ function wasiPathLabel(bytes) {
   return { path: normalized, pathHash, pathStatus: "relative" };
 }
 
-function captureWasiFileReads(importObject) {
+export function captureWasiFileReads(importObject) {
   const wasi = importObject.wasi_snapshot_preview1;
   const originals = {
     path_open: wasi.path_open,
@@ -453,7 +453,11 @@ function captureWasiFileReads(importObject) {
         openFiles.set(descriptor, record);
       }
     }
-    if (!record || !memory || errno !== 0) return errno;
+    if (!record || !memory) return errno;
+    if (errno !== 0) {
+      record.event.readStatus = `fd_read_errno_${errno}`;
+      return errno;
+    }
     if (!Number.isInteger(args[1]) || !Number.isInteger(args[2]) || !Number.isInteger(args[3])
       || args[1] < 0 || args[2] < 0 || args[3] < 0
       || args[1] + args[2] * 8 > memory.buffer.byteLength || args[3] + 4 > memory.buffer.byteLength) {

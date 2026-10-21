@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { compareReplayFigure, runWasmWithFilesystemEvidence, spawnBoundedChild } from "./lab-data.mjs";
+import { captureWasiFileReads, compareReplayFigure, runWasmWithFilesystemEvidence, spawnBoundedChild } from "./lab-data.mjs";
 import { experimentFixtures, outputPathFor } from "./experiment-bundle.mjs";
 
 test("WASI child processes terminate when they exceed their timeout", () => {
@@ -40,6 +40,30 @@ test("WASI filesystem evidence records a failed open for an omitted input", asyn
   assert.equal(failed.openStatus, "open-failed");
   assert.equal(failed.bytesRead, 0);
   assert.equal(failed.contentSha256, null);
+});
+
+test("WASI filesystem evidence marks a nonzero fd_read errno as incomplete", () => {
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const memoryBytes = new Uint8Array(memory.buffer);
+  memoryBytes.set(new TextEncoder().encode("data.json"), 8);
+  const importObject = {
+    wasi_snapshot_preview1: {
+      path_open(...args) {
+        new DataView(memory.buffer).setInt32(args[8], 7, true);
+        return 0;
+      },
+      fd_read() { return 5; },
+      fd_close() { return 0; },
+    },
+  };
+  const capture = captureWasiFileReads(importObject);
+  capture.attachInstance({ exports: { memory } });
+  assert.equal(importObject.wasi_snapshot_preview1.path_open(3, 0, 8, 9, 0, 2n, 0n, 0, 64), 0);
+  assert.equal(importObject.wasi_snapshot_preview1.fd_read(7, 100, 1, 80), 5);
+  const [event] = capture.finish();
+  assert.equal(event.openStatus, "opened");
+  assert.equal(event.readStatus, "fd_read_errno_5");
+  assert.equal(event.contentSha256, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 });
 
 function bundle(svg = "<svg/>") {

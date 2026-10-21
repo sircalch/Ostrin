@@ -41,6 +41,11 @@ test("WASI read evidence requires declared files and exact bytes actually read",
     validateWasiReadEvidence("fixture", [read("main.ostrin"), missing], files, ["main.ostrin", "data.json"]).join("\n"),
     /could not be opened/,
   );
+  const failedRead = { ...read("data.json"), readStatus: "fd_read_errno_5" };
+  assert.match(
+    validateWasiReadEvidence("fixture", [read("main.ostrin"), failedRead], files, ["main.ostrin", "data.json"]).join("\n"),
+    /WASI read from data\.json was incomplete/,
+  );
   assert.match(
     validateWasiReadEvidence("fixture", [read("main.ostrin")], files, ["main.ostrin", "data.json"]).join("\n"),
     /did not read required file data\.json/,
