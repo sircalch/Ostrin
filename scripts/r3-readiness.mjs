@@ -3,7 +3,12 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { experimentFixtures, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
+import {
+  experimentFixtures,
+  scanReadFileCalls,
+  validateEffectCapture,
+  validateEntryEffectSignature,
+} from "./experiment-bundle.mjs";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const bundlesDirectory = path.join(repositoryRoot, "website/assets/experiments");
@@ -315,6 +320,21 @@ function buildGapDiagnostics(records) {
     bundlesWithFilesystemReadCapability: 0,
     inputKinds: new Map(),
     bundlesMissingSnapshotDeclaration: [],
+    sourceReadAudit: {
+      sourceBundleCount: 0,
+      bundlesWithDirectReadFileCalls: 0,
+      directReadFileCallCount: 0,
+      literalReadPathCallCount: 0,
+      dynamicReadCallCount: 0,
+      readFileReferenceCount: 0,
+      shadowedReadFileCallCount: 0,
+      qualifiedReadFileCallCount: 0,
+      undeclaredLiteralReadPaths: [],
+      declaredSnapshotsWithoutDirectRead: [],
+      sourceReadsWithoutFilesystemCapability: [],
+      filesystemCapabilitiesWithoutDirectRead: [],
+      bundles: [],
+    },
   };
 
   for (const { entry, effectCalls, bundle: sourceBundle } of records) {
@@ -355,11 +375,60 @@ function buildGapDiagnostics(records) {
         inputs: missingSnapshotInputs,
       });
     }
+    const sourcePath = sourceBundle?.experiment?.source;
+    const source = typeof sourcePath === "string"
+      ? sourceBundle?.files?.[sourcePath]
+      : sourceBundle?.files?.["source.ostrin"];
+    const readCalls = scanReadFileCalls(source);
+    const sourceReadAudit = externalInputEvidence.sourceReadAudit;
+    if (typeof source === "string") sourceReadAudit.sourceBundleCount++;
+    const literalPaths = [...new Set(readCalls.filter((call) => call.kind === "literal").map((call) => call.path))].sort();
+    const declaredSnapshotPaths = [...new Set(externalSnapshotInputs.flatMap((input) => {
+      const snapshotPath = input?.snapshot?.path;
+      return typeof snapshotPath === "string" ? [snapshotPath] : [];
+    }))].sort();
+    const undeclaredLiteralPaths = literalPaths.filter((readPath) => !declaredSnapshotPaths.includes(readPath));
+    const unreferencedSnapshotPaths = declaredSnapshotPaths.filter((snapshotPath) => !literalPaths.includes(snapshotPath));
+    const dynamicReadCount = readCalls.filter((call) => call.kind === "dynamic").length;
+    const referenceCount = readCalls.filter((call) => call.kind === "reference").length;
+    const directReadCount = readCalls.filter((call) => call.kind === "literal" || call.kind === "dynamic").length;
+    sourceReadAudit.directReadFileCallCount += directReadCount;
+    sourceReadAudit.literalReadPathCallCount += readCalls.filter((call) => call.kind === "literal").length;
+    sourceReadAudit.dynamicReadCallCount += dynamicReadCount;
+    sourceReadAudit.readFileReferenceCount += referenceCount;
+    sourceReadAudit.shadowedReadFileCallCount += readCalls.filter((call) => call.kind === "shadowed").length;
+    sourceReadAudit.qualifiedReadFileCallCount += readCalls.filter((call) => call.kind === "qualified").length;
+    if (directReadCount > 0) sourceReadAudit.bundlesWithDirectReadFileCalls++;
+    if (undeclaredLiteralPaths.length > 0) {
+      sourceReadAudit.undeclaredLiteralReadPaths.push({ bundle, paths: undeclaredLiteralPaths });
+    }
+    if (unreferencedSnapshotPaths.length > 0) {
+      sourceReadAudit.declaredSnapshotsWithoutDirectRead.push({ bundle, paths: unreferencedSnapshotPaths });
+    }
     const capabilities = Array.isArray(provenance.execution?.capabilities)
       ? provenance.execution.capabilities
       : [];
-    if (capabilities.some((capability) => typeof capability === "string" && capability.startsWith("filesystem.read:"))) {
+    const hasFilesystemReadCapability = capabilities.some((capability) =>
+      typeof capability === "string" && capability.startsWith("filesystem.read:"));
+    const hasDirectReadCall = readCalls.some((call) => call.kind === "literal" || call.kind === "dynamic");
+    if (hasFilesystemReadCapability) {
       externalInputEvidence.bundlesWithFilesystemReadCapability++;
+    }
+    if (hasDirectReadCall && !hasFilesystemReadCapability) {
+      sourceReadAudit.sourceReadsWithoutFilesystemCapability.push(bundle);
+    }
+    if (hasFilesystemReadCapability && !hasDirectReadCall) {
+      sourceReadAudit.filesystemCapabilitiesWithoutDirectRead.push(bundle);
+    }
+    if (readCalls.length > 0 || unreferencedSnapshotPaths.length > 0 || typeof source !== "string") {
+      sourceReadAudit.bundles.push({
+        bundle,
+        sourceAvailable: typeof source === "string",
+        calls: readCalls,
+        declaredSnapshotPaths,
+        undeclaredLiteralPaths,
+        unreferencedSnapshotPaths,
+      });
     }
     if (provenance.execution?.status === "verified-in-ci") reproducibility.ciVerifiedExecutionBundles++;
     if (provenance.replay?.status === "verified") reproducibility.recordedVerifiedReplayBundles++;
@@ -511,7 +580,18 @@ function buildGapDiagnostics(records) {
       inputKinds: Object.fromEntries([...externalInputEvidence.inputKinds].sort(([left], [right]) => left.localeCompare(right))),
       bundlesMissingSnapshotDeclaration: externalInputEvidence.bundlesMissingSnapshotDeclaration
         .sort((left, right) => left.bundle.localeCompare(right.bundle)),
-      interpretation: "Counts describe declared provenance inputs, runtime snapshot references and execution capabilities. A path/hash match is structural consistency only; it does not prove that every external input is declared or read, and this report does not re-execute the bundle to verify snapshot bytes.",
+      sourceReadAudit: {
+        ...externalInputEvidence.sourceReadAudit,
+        undeclaredLiteralReadPaths: externalInputEvidence.sourceReadAudit.undeclaredLiteralReadPaths
+          .sort((left, right) => left.bundle.localeCompare(right.bundle)),
+        declaredSnapshotsWithoutDirectRead: externalInputEvidence.sourceReadAudit.declaredSnapshotsWithoutDirectRead
+          .sort((left, right) => left.bundle.localeCompare(right.bundle)),
+        sourceReadsWithoutFilesystemCapability: [...externalInputEvidence.sourceReadAudit.sourceReadsWithoutFilesystemCapability].sort(),
+        filesystemCapabilitiesWithoutDirectRead: [...externalInputEvidence.sourceReadAudit.filesystemCapabilitiesWithoutDirectRead].sort(),
+        bundles: externalInputEvidence.sourceReadAudit.bundles
+          .sort((left, right) => left.bundle.localeCompare(right.bundle)),
+      },
+      interpretation: "Counts describe declared provenance inputs, runtime snapshot references, source read_file calls and execution capabilities. The source scan identifies direct literal paths and surfaces dynamic calls or references, but cannot detect reads hidden behind aliases, imported helpers, FFI or host code; it is not a runtime trace. A path/hash match is structural consistency only and does not prove that every external input is captured or that snapshot bytes were re-read.",
     },
     notAssessed: [
       "Whether an operation resolves to a typed function or intrinsic",

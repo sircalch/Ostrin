@@ -73,7 +73,21 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "incompleteEffectBundleCount": 0,
     "closedEntryEffectBundleCount": 29,
     "symbolicEffectCallCount": 74,
-    "unresolvedEffectCallCount": 0
+    "unresolvedEffectCallCount": 0,
+    "sourceReadAudit": {
+      "sourceBundleCount": 29,
+      "bundlesWithDirectReadFileCalls": 11,
+      "directReadFileCallCount": 21,
+      "literalReadPathCallCount": 21,
+      "dynamicReadCallCount": 0,
+      "readFileReferenceCount": 0,
+      "shadowedReadFileCallCount": 0,
+      "qualifiedReadFileCallCount": 0,
+      "undeclaredLiteralPathCount": 0,
+      "declaredSnapshotWithoutDirectReadCount": 0,
+      "sourceReadsWithoutFilesystemCapabilityCount": 0,
+      "filesystemCapabilitiesWithoutDirectReadCount": 0
+    }
   },
   "linguist": {
     "preparation": "READY",

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { experimentFixtures, runtimeSnapshotFor } from "./experiment-bundle.mjs";
@@ -118,6 +118,60 @@ test("R3 gates reject an empty, incomplete or unregistered bundle inventory", (t
   assert.equal(unexpected.status, "OPEN");
   assert.deepEqual(unexpected.inventory.unexpected, ["unregistered.ostrin-experiment.json"]);
   assert.match(requiredCaptureErrors(unexpected)[0], /bundle is not registered/);
+});
+
+test("R3 source read audit catches undeclared and dynamic direct file reads", (t) => {
+  const tempParent = path.resolve(os.tmpdir());
+  const root = mkdtempSync(path.join(tempParent, "ostrin-r3-source-reads-"));
+  t.after(() => {
+    assert.equal(path.dirname(root), tempParent);
+    assert.match(path.basename(root), /^ostrin-r3-source-reads-/);
+    rmSync(root, { recursive: true, force: true });
+  });
+  const directory = path.join(root, "website/assets/experiments");
+  mkdirSync(directory, { recursive: true });
+  for (const fixture of Object.values(experimentFixtures)) {
+    cpSync(path.join(repositoryRoot, fixture.outputPath), path.join(directory, path.basename(fixture.outputPath)));
+  }
+  const fixture = experimentFixtures.surface;
+  const filePath = path.join(directory, path.basename(fixture.outputPath));
+  const bundle = JSON.parse(readFileSync(filePath, "utf8"));
+  const sourcePath = bundle.experiment.source;
+  bundle.files[sourcePath] = `read_file("unlisted.csv")\nread_file(path)\n${bundle.files[sourcePath]}`;
+  writeFileSync(filePath, JSON.stringify(bundle));
+
+  const audit = buildReadiness(root).gapDiagnostics.externalInputEvidence.sourceReadAudit;
+  assert.equal(audit.sourceBundleCount, Object.keys(experimentFixtures).length);
+  assert.equal(audit.dynamicReadCallCount, 1);
+  assert.equal(audit.undeclaredLiteralReadPaths.length, 1);
+  assert.deepEqual(audit.undeclaredLiteralReadPaths[0], { bundle: "surface", paths: ["unlisted.csv"] });
+});
+
+test("R3 source read audit does not treat a local read_file function as filesystem IO", (t) => {
+  const tempParent = path.resolve(os.tmpdir());
+  const root = mkdtempSync(path.join(tempParent, "ostrin-r3-shadowed-read-"));
+  t.after(() => {
+    assert.equal(path.dirname(root), tempParent);
+    assert.match(path.basename(root), /^ostrin-r3-shadowed-read-/);
+    rmSync(root, { recursive: true, force: true });
+  });
+  const directory = path.join(root, "website/assets/experiments");
+  mkdirSync(directory, { recursive: true });
+  for (const fixture of Object.values(experimentFixtures)) {
+    cpSync(path.join(repositoryRoot, fixture.outputPath), path.join(directory, path.basename(fixture.outputPath)));
+  }
+  const fixture = experimentFixtures.animation;
+  const filePath = path.join(directory, path.basename(fixture.outputPath));
+  const bundle = JSON.parse(readFileSync(filePath, "utf8"));
+  const sourcePath = bundle.experiment.source;
+  bundle.files[sourcePath] = `fn read_file(path: String) -> String { path }\nread_file("local-data.csv")\nio.read_file("unresolved-data.csv")\n${bundle.files[sourcePath]}`;
+  writeFileSync(filePath, JSON.stringify(bundle));
+
+  const audit = buildReadiness(root).gapDiagnostics.externalInputEvidence.sourceReadAudit;
+  assert.equal(audit.directReadFileCallCount, 21);
+  assert.equal(audit.shadowedReadFileCallCount, 1);
+  assert.equal(audit.qualifiedReadFileCallCount, 1);
+  assert.deepEqual(audit.undeclaredLiteralReadPaths, []);
 });
 
 test("R3 readiness requires host, dependencies, scheduler and effects", () => {
@@ -628,6 +682,17 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.equal(externalInputEvidence.externalSnapshotInputsWithMatchingEmbeddedDeclaration, 11);
   assert.equal(externalInputEvidence.externalSnapshotInputsMissingMatchingEmbeddedDeclaration, 0);
   assert.equal(externalInputEvidence.bundlesWithFilesystemReadCapability, 11);
+  assert.equal(externalInputEvidence.sourceReadAudit.sourceBundleCount, report.bundleCount);
+  assert.equal(externalInputEvidence.sourceReadAudit.bundlesWithDirectReadFileCalls, 11);
+  assert.equal(externalInputEvidence.sourceReadAudit.literalReadPathCallCount, 21);
+  assert.equal(externalInputEvidence.sourceReadAudit.dynamicReadCallCount, 0);
+  assert.equal(externalInputEvidence.sourceReadAudit.readFileReferenceCount, 0);
+  assert.equal(externalInputEvidence.sourceReadAudit.shadowedReadFileCallCount, 0);
+  assert.equal(externalInputEvidence.sourceReadAudit.qualifiedReadFileCallCount, 0);
+  assert.deepEqual(externalInputEvidence.sourceReadAudit.undeclaredLiteralReadPaths, []);
+  assert.deepEqual(externalInputEvidence.sourceReadAudit.declaredSnapshotsWithoutDirectRead, []);
+  assert.deepEqual(externalInputEvidence.sourceReadAudit.sourceReadsWithoutFilesystemCapability, []);
+  assert.deepEqual(externalInputEvidence.sourceReadAudit.filesystemCapabilitiesWithoutDirectRead, []);
   assert.deepEqual(externalInputEvidence.inputKinds, { "external-snapshot": 11, parameters: 18 });
-  assert.match(externalInputEvidence.interpretation, /does not prove that every external input is declared/i);
+  assert.match(externalInputEvidence.interpretation, /cannot detect reads hidden behind aliases/i);
 });

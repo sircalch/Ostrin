@@ -117,10 +117,20 @@ evaluadas. La justificación científica aún requiere métricas, unidades, mét
 
 `gapDiagnostics.externalInputEvidence` separa las entradas declaradas como `parameters` de las
 declaradas como `external-snapshot`, y cruza ruta/hash de estas últimas con `runtime.input_snapshots`.
-El cruce verifica consistencia estructural del manifiesto. No prueba que no existan otras entradas
-externas ni que el contenido real coincida; esa verificación corresponde al replay que consume el
-snapshot. En el snapshot local hay 11 entradas externas con referencia embebida coincidente y
-capacidad `filesystem.read`, y 18 entradas de parámetros; esos números tampoco cierran R3.
+El cruce verifica consistencia estructural del manifiesto. El diagnóstico también recorre el código
+fuente embebido e inventaría llamadas directas a `read_file`: en el snapshot local hay 21 llamadas
+con ruta literal en 11 bundles; todas leen `data.json`, cuya declaración de snapshot y capacidad
+`filesystem.read` coinciden. No encontró rutas literales sin declarar, snapshots sin lectura directa,
+llamadas con ruta dinámica ni referencias directas a `read_file`. Las llamadas no calificadas que
+resuelven a una función libre local `read_file` se contabilizan por separado como sombreadas. Las
+llamadas calificadas se reportan como no resueltas y no se atribuyen al builtin sin resolución de
+nombres. Este análisis léxico no detecta lecturas ocultas por alias, funciones importadas, FFI ni
+código del host, y no observa el sistema de
+archivos durante la ejecución. Por tanto no prueba que no existan otras entradas externas ni que el
+contenido real coincida; esa verificación requiere captura de lecturas en runtime y replay. El
+inventario también conserva 18 entradas de parámetros; tanto las llamadas con calificador de
+módulo (`std.io::read_file`) como las llamadas de miembro (`io.read_file`) se contabilizan como
+calificadas sin resolver y no se descartan. Ninguno de estos contadores cierra R3.
 
 ## Primer recibo de replay ligado a una ejecución
 
