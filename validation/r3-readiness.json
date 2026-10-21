@@ -420,6 +420,7 @@
         "literalReadPathCallCount": 21,
         "dynamicReadCallCount": 0,
         "readFileReferenceCount": 0,
+        "shadowedReadFileCallCount": 0,
         "undeclaredLiteralReadPaths": [],
         "declaredSnapshotsWithoutDirectRead": [],
         "sourceReadsWithoutFilesystemCapability": [],
