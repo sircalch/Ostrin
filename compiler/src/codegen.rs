@@ -4367,8 +4367,8 @@ impl<'a> Codegen<'a> {
             crate::hir::HirKind::Block(block)
             | crate::hir::HirKind::Loop(block)
             | crate::hir::HirKind::Spawn(block)
-            | crate::hir::HirKind::SpawnScope(block)
-            | crate::hir::HirKind::Lambda(_, block) => self.register_hir_block_types(block),
+            | crate::hir::HirKind::SpawnScope(block) => self.register_hir_block_types(block),
+            crate::hir::HirKind::Lambda(lambda) => self.register_hir_block_types(&lambda.body),
             crate::hir::HirKind::List(values) | crate::hir::HirKind::Set(values) => {
                 for value in values {
                     self.register_hir_expr_types(value);

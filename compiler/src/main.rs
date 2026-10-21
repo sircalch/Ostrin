@@ -383,6 +383,7 @@ fn real_main() -> ExitCode {
                             "variables": signature.variables.iter().map(|name| format!("ε_{name}")).collect::<Vec<_>>(),
                             "open_calls": signature.open_calls,
                             "row_closed": signature.is_closed(),
+                            "type_errors": signature.type_errors,
                             "purity_proven": false,
                         })
                     )).collect::<std::collections::BTreeMap<_, _>>(),

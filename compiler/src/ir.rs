@@ -14,7 +14,9 @@ use std::fmt::Write as _;
 
 use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
 use crate::effects::{EffectKind, EffectSignature, EffectVariableSubstitution};
-use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirProgram, HirStmt, IteratorInfo};
+use crate::hir::{
+    HirBlock, HirExpr, HirFunction, HirKind, HirLambda, HirProgram, HirStmt, IteratorInfo,
+};
 use crate::types::Ty;
 
 pub type ValueId = usize;
@@ -529,12 +531,9 @@ impl Builder {
         self.close_scopes_to(0);
     }
 
-    fn lower_lambda(
-        &mut self,
-        expression: &HirExpr,
-        params: &[String],
-        body: &HirBlock,
-    ) -> ValueId {
+    fn lower_lambda(&mut self, expression: &HirExpr, lambda: &HirLambda) -> ValueId {
+        let params = &lambda.params;
+        let body = &lambda.body;
         let Ty::Fn(param_tys, ret) = &expression.ty else {
             return self.opaque_lambda(expression, params);
         };
@@ -575,19 +574,17 @@ impl Builder {
         child_params.extend(params.iter().cloned().zip(param_tys.iter().cloned()));
         let child = HirFunction {
             name: closure_name.clone(),
-            effect_source_key: closure_name.clone(),
+            effect_source_key: lambda.effect_source_key.clone(),
             generics: Vec::new(),
             params: child_params.clone(),
             ret: (**ret).clone(),
             body: body.clone(),
             source_file: Some(self.function.name.clone()),
-            effect_signature: self.function.effect_signature.clone(),
-            effect_variable_substitutions: Default::default(),
-            effect_calls: self.function.effect_calls.clone(),
-            indirect_effect_calls: self.function.indirect_effect_calls.clone(),
-            // The parent's callsite substitutions do not describe this
-            // synthesized closure body. Keep the child's proof set empty.
-            closed_callback_calls: Default::default(),
+            effect_signature: lambda.effect_signature.clone(),
+            effect_variable_substitutions: lambda.effect_variable_substitutions.clone(),
+            effect_calls: lambda.effect_calls.clone(),
+            indirect_effect_calls: lambda.indirect_effect_calls.clone(),
+            closed_callback_calls: lambda.closed_callback_calls.clone(),
         };
         let body_ir = lower_function(
             &child,
@@ -1857,10 +1854,10 @@ impl Builder {
         {
             return None;
         }
-        let HirKind::Lambda(params, body) = &callback.kind else {
+        let HirKind::Lambda(lambda) = &callback.kind else {
             return None;
         };
-        if params.len() != 1 {
+        if lambda.params.len() != 1 {
             return None;
         }
 
@@ -1887,7 +1884,7 @@ impl Builder {
         });
         let normal_value = match method {
             "map" => {
-                let mapped = self.lower_inline_lambda(params, body, normal_payload);
+                let mapped = self.lower_inline_lambda(&lambda.params, &lambda.body, normal_payload);
                 let dst = self.fresh();
                 self.emit(IrInstr::Call {
                     dst: Some(dst),
@@ -1907,7 +1904,7 @@ impl Builder {
                 });
                 dst
             }
-            "then" => self.lower_inline_lambda(params, body, normal_payload),
+            "then" => self.lower_inline_lambda(&lambda.params, &lambda.body, normal_payload),
             _ => return None,
         };
         let normal_predecessor = self.current;
@@ -1935,7 +1932,7 @@ impl Builder {
                 dst
             }
             "map_err" => {
-                let mapped = self.lower_inline_lambda(params, body, error_payload);
+                let mapped = self.lower_inline_lambda(&lambda.params, &lambda.body, error_payload);
                 let dst = self.fresh();
                 self.emit(IrInstr::Call {
                     dst: Some(dst),
@@ -2001,10 +1998,10 @@ impl Builder {
         {
             return None;
         }
-        let HirKind::Lambda(params, body) = &callback.kind else {
+        let HirKind::Lambda(lambda) = &callback.kind else {
             return None;
         };
-        if params.len() != 1 {
+        if lambda.params.len() != 1 {
             return None;
         }
 
@@ -2029,7 +2026,7 @@ impl Builder {
             value: receiver,
             ty: receiver_args[0].clone(),
         });
-        let some_value = self.lower_inline_lambda(params, body, payload);
+        let some_value = self.lower_inline_lambda(&lambda.params, &lambda.body, payload);
         let mapped = if method == "map" {
             let dst = self.fresh();
             self.emit(IrInstr::Call {
@@ -2537,7 +2534,7 @@ impl Builder {
             HirKind::Block(block) | HirKind::Loop(block) => {
                 self.lower_block(block).unwrap_or_else(|| self.unit())
             }
-            HirKind::Lambda(params, body) => self.lower_lambda(expression, params, body),
+            HirKind::Lambda(lambda) => self.lower_lambda(expression, lambda),
             HirKind::List(values) | HirKind::Set(values) => {
                 let element = match &expression.ty {
                     Ty::List(element) | Ty::Set(element) => element.as_ref(),
@@ -2713,14 +2710,14 @@ impl Builder {
                 Ty::Applied(name, args) if name == "Result" && args.len() == 2 => args[1].clone(),
                 _ => Ty::Unknown,
             };
-            let mapped = if let HirKind::Lambda(params, body) = &handler.kind {
-                if let Some(parameter) = params.first() {
+            let mapped = if let HirKind::Lambda(lambda) = &handler.kind {
+                if let Some(parameter) = lambda.params.first() {
                     self.locals.push(HashMap::new());
                     self.locals
                         .last_mut()
                         .expect("handler scope")
                         .insert(parameter.clone(), error);
-                    let mapped = match self.lower_block(body) {
+                    let mapped = match self.lower_block(&lambda.body) {
                         Some(mapped) => mapped,
                         None if self.terminated() => self.fresh(),
                         None => self.unit(),
@@ -3189,13 +3186,13 @@ fn collect_lambda_locals_expr(
             let mut nested = bound.clone();
             collect_lambda_locals_block(block, &mut nested, used);
         }
-        HirKind::Lambda(params, body) => {
+        HirKind::Lambda(lambda) => {
             // A nested lambda captures names relative to its own parameters.
             // Propagating those free names to the enclosing scan lets the
             // outer closure carry values from its environment far enough for
             // the nested IR helper to capture them again.
-            let mut nested_bound: HashSet<String> = params.iter().cloned().collect();
-            collect_lambda_locals_block(body, &mut nested_bound, used);
+            let mut nested_bound: HashSet<String> = lambda.params.iter().cloned().collect();
+            collect_lambda_locals_block(&lambda.body, &mut nested_bound, used);
         }
         HirKind::List(values) | HirKind::Set(values) => {
             for value in values {
@@ -3256,7 +3253,17 @@ fn collect_pattern_names(pattern: &crate::ast::Pattern, bound: &mut HashSet<Stri
 
 pub fn verify(program: &IrProgram) -> VerifyReport {
     let mut report = VerifyReport::default();
-    for function in &program.functions {
+    fn collect_functions<'a>(functions: &'a [IrFunction], out: &mut Vec<&'a IrFunction>) {
+        for function in functions {
+            out.push(function);
+            for closure in &function.closures {
+                collect_functions(std::slice::from_ref(&closure.body), out);
+            }
+        }
+    }
+    let mut functions = Vec::new();
+    collect_functions(&program.functions, &mut functions);
+    for function in &functions {
         report.unresolved_effect_calls += function.effect_signature.open_calls.len();
         report.indirect_effect_calls += function.indirect_effect_calls.len();
         for variable in &function.effect_signature.variables {
@@ -3279,7 +3286,7 @@ pub fn verify(program: &IrProgram) -> VerifyReport {
                 && function.params.iter().any(|(name, ty)| {
                     name == &substitution.caller_parameter && matches!(ty, Ty::Fn(..))
                 });
-            let callee_is_variable = program.functions.iter().any(|target| {
+            let callee_is_variable = functions.iter().any(|target| {
                 target.effect_source_key == substitution.callee
                     && target
                         .effect_signature
@@ -3300,8 +3307,7 @@ pub fn verify(program: &IrProgram) -> VerifyReport {
             }
         }
         for callee in &function.effect_calls {
-            let targets: Vec<_> = program
-                .functions
+            let targets: Vec<_> = functions
                 .iter()
                 .filter(|candidate| candidate.effect_source_key == *callee)
                 .collect();
@@ -3559,9 +3565,64 @@ pub fn dump(program: &IrProgram) -> String {
                 let _ = writeln!(out, "  {}", display_terminator(terminator));
             }
         }
+        for closure in &function.closures {
+            dump_closure_effects(&mut out, closure, 1);
+        }
         out.push('\n');
     }
     out
+}
+
+fn dump_closure_effects(out: &mut String, closure: &IrClosure, depth: usize) {
+    let indent = "  ".repeat(depth);
+    let function = &closure.body;
+    let _ = writeln!(
+        out,
+        "{indent}closure {} (effect source: {})",
+        closure.name, function.effect_source_key
+    );
+    if !function.effect_signature.effects.is_empty() {
+        let _ = writeln!(
+            out,
+            "{indent}  effects: {}",
+            function
+                .effect_signature
+                .effects
+                .iter()
+                .map(EffectKind::label)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    if !function.effect_signature.variables.is_empty() {
+        let _ = writeln!(
+            out,
+            "{indent}  effect variables: {}",
+            function
+                .effect_signature
+                .variables
+                .iter()
+                .map(|name| format!("ε_{name}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    if !function.effect_signature.open_calls.is_empty() {
+        let _ = writeln!(
+            out,
+            "{indent}  unresolved effect calls: {}",
+            function
+                .effect_signature
+                .open_calls
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    for nested in &function.closures {
+        dump_closure_effects(out, nested, depth + 1);
+    }
 }
 
 #[cfg(test)]

@@ -42,11 +42,14 @@ pub struct EffectSignature {
     pub effects: BTreeSet<EffectKind>,
     pub variables: BTreeSet<String>,
     pub open_calls: BTreeSet<String>,
+    /// A row inferred from a program with type errors cannot be advertised as
+    /// closed, even if its effect-call inventory is otherwise empty.
+    pub type_errors: usize,
 }
 
 impl EffectSignature {
     pub fn is_closed(&self) -> bool {
-        self.variables.is_empty() && self.open_calls.is_empty()
+        self.type_errors == 0 && self.variables.is_empty() && self.open_calls.is_empty()
     }
 }
 
@@ -179,6 +182,14 @@ pub struct EffectReport {
     /// Callback contracts whose effects are substituted at a callsite because
     /// the actual function value has a known local body.
     pub closed_callback_parameters: BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
+    /// Callback parameters captured by each lambda body, keyed by the lambda
+    /// source key and then by their lexical owner and binding name.
+    pub captured_callback_parameters: BTreeMap<String, BTreeSet<(String, String)>>,
+    /// Lambda bodies returned with one statically resolved identity. This
+    /// distinguishes closure creation from the later invocation of its body.
+    returned_closure_keys: BTreeSet<String>,
+    returned_closures_by_function: BTreeMap<String, BTreeSet<String>>,
+    ambiguous_returned_closure_functions: BTreeSet<String>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
     /// Compiler-known higher-order calls resolved from checked receiver types.
     pub builtin_callback_calls: BTreeMap<String, BTreeSet<String>>,
@@ -433,6 +444,7 @@ fn analyze_with_types_internal(
                         .get(function)
                         .cloned()
                         .unwrap_or_default(),
+                    type_errors: typed.errors.len(),
                 },
             )
         })
@@ -1015,7 +1027,7 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                         .resolved_function_calls
                         .entry(function.to_string())
                         .or_default()
-                        .insert(target);
+                        .insert(target.clone());
                     report
                         .resolved_call_operations
                         .entry(function.to_string())
@@ -1217,11 +1229,18 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CallbackSource {
     Function(String),
-    Parameter { function: String, name: String },
+    Parameter {
+        function: String,
+        name: String,
+    },
+    ReturnedClosure {
+        function: String,
+        captures: BTreeMap<String, Box<CallbackSource>>,
+    },
     Unknown,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 struct CallbackScope {
     names: BTreeSet<String>,
     aliases: BTreeMap<String, CallbackSource>,
@@ -1285,51 +1304,190 @@ fn register_lambda_parameters(params: &[String], function: &str, report: &mut Ef
     }
 }
 
+fn register_directly_returned_closures(block: &Block, function: &str, report: &mut EffectReport) {
+    fn closure_keys_from_expr(
+        expression: &Expr,
+        function: &str,
+        aliases: &BTreeMap<String, String>,
+    ) -> (BTreeSet<String>, bool) {
+        match expression.unlocated() {
+            Expr::Lambda(..) => (
+                BTreeSet::from([lambda_function_key(expression, function)]),
+                true,
+            ),
+            Expr::Ident(name) => aliases
+                .get(name)
+                .cloned()
+                .map(|key| (BTreeSet::from([key]), true))
+                .unwrap_or_default(),
+            Expr::Block(block) => closure_keys_from_block(block, function, aliases),
+            Expr::If(_, then_block, else_block) => {
+                let (mut keys, mut complete) =
+                    closure_keys_from_block(then_block, function, aliases);
+                if let Some(else_block) = else_block {
+                    let (else_keys, else_complete) =
+                        closure_keys_from_block(else_block, function, aliases);
+                    keys.extend(else_keys);
+                    complete &= else_complete;
+                } else {
+                    complete = false;
+                }
+                (keys, complete)
+            }
+            Expr::Match(_, arms) => {
+                let mut keys = BTreeSet::new();
+                let has_unguarded_catch_all = arms.iter().any(|arm| {
+                    arm.guard.is_none()
+                        && matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_))
+                });
+                let mut complete = !arms.is_empty() && has_unguarded_catch_all;
+                for arm in arms {
+                    let (arm_keys, arm_complete) =
+                        closure_keys_from_block(&arm.body, function, aliases);
+                    keys.extend(arm_keys);
+                    complete &= arm.guard.is_none() && arm_complete;
+                }
+                (keys, complete)
+            }
+            _ => (BTreeSet::new(), false),
+        }
+    }
+
+    fn closure_keys_from_block(
+        block: &Block,
+        function: &str,
+        inherited_aliases: &BTreeMap<String, String>,
+    ) -> (BTreeSet<String>, bool) {
+        let mut aliases = inherited_aliases.clone();
+        let mut returned = BTreeSet::<String>::new();
+        let mut complete = true;
+        for located in &block.stmts {
+            match &located.stmt {
+                Stmt::Binding { name, value, .. } | Stmt::Assign { name, value } => {
+                    let (keys, value_complete) = closure_keys_from_expr(value, function, &aliases);
+                    if value_complete && keys.len() == 1 {
+                        aliases.insert(name.clone(), keys.into_iter().next().unwrap());
+                    } else {
+                        aliases.remove(name);
+                    }
+                }
+                Stmt::Return(Some(value)) => {
+                    let (keys, value_complete) = closure_keys_from_expr(value, function, &aliases);
+                    returned.extend(keys);
+                    complete &= value_complete;
+                }
+                Stmt::Return(None) => complete = false,
+                Stmt::For { .. } | Stmt::While { .. } => {
+                    // Returns nested in these constructs are not yet associated
+                    // with a complete function result on every path.
+                    complete = false;
+                }
+                Stmt::Expr(value)
+                    if matches!(
+                        value.unlocated(),
+                        Expr::If(..) | Expr::Block(..) | Expr::Loop(..) | Expr::Match(..)
+                    ) =>
+                {
+                    // The parser wraps expressions with source locations, so
+                    // inspect the semantic node to catch nested control flow.
+                    complete = false;
+                }
+                Stmt::FieldAssign { .. } | Stmt::Expr(_) | Stmt::Break(_) | Stmt::Continue => {}
+            }
+        }
+        if let Some(tail) = &block.tail {
+            let (keys, tail_complete) = closure_keys_from_expr(tail, function, &aliases);
+            returned.extend(keys);
+            complete &= tail_complete;
+        } else if returned.is_empty() {
+            complete = false;
+        }
+        (returned, complete)
+    }
+
+    let (returned, complete) = closure_keys_from_block(block, function, &BTreeMap::new());
+    if !complete {
+        report
+            .ambiguous_returned_closure_functions
+            .insert(function.to_string());
+    }
+    if complete && returned.len() == 1 {
+        report
+            .returned_closure_keys
+            .extend(returned.iter().cloned());
+    }
+    for lambda in returned {
+        report
+            .returned_closures_by_function
+            .entry(function.to_string())
+            .or_default()
+            .insert(lambda);
+    }
+}
+
 fn infer_callback_effects(items: &[Item], report: &mut EffectReport) {
     report.symbolic_effect_calls.clear();
+    report.returned_closure_keys.clear();
+    report.returned_closures_by_function.clear();
+    report.ambiguous_returned_closure_functions.clear();
+    for item in items {
+        if let Item::Function(function) = item {
+            register_directly_returned_closures(&function.body, &function.name, report);
+        }
+    }
     let mut invoked = BTreeSet::<CallbackParameter>::new();
     let mut forwarded = Vec::<(CallbackParameter, CallbackParameter)>::new();
     let mut callsites = Vec::<CallbackCallsite>::new();
-    for item in items {
-        match item {
-            Item::Function(function) => collect_callback_block(
-                &function.body,
-                &function.name,
-                function.source_file.as_deref(),
-                report,
-                &mut Vec::new(),
-                &mut invoked,
-                &mut forwarded,
-                &mut callsites,
-            ),
-            Item::Impl(implementation) => {
-                for method in &implementation.methods {
-                    collect_callback_block(
-                        &method.body,
-                        &impl_method_key(&implementation.type_name, &method.name),
-                        method.source_file.as_deref(),
-                        report,
-                        &mut Vec::new(),
-                        &mut invoked,
-                        &mut forwarded,
-                        &mut callsites,
-                    );
+    loop {
+        let captures_before = report.captured_callback_parameters.clone();
+        invoked.clear();
+        forwarded.clear();
+        callsites.clear();
+        for item in items {
+            match item {
+                Item::Function(function) => collect_callback_block(
+                    &function.body,
+                    &function.name,
+                    function.source_file.as_deref(),
+                    report,
+                    &mut Vec::new(),
+                    &mut invoked,
+                    &mut forwarded,
+                    &mut callsites,
+                ),
+                Item::Impl(implementation) => {
+                    for method in &implementation.methods {
+                        collect_callback_block(
+                            &method.body,
+                            &impl_method_key(&implementation.type_name, &method.name),
+                            method.source_file.as_deref(),
+                            report,
+                            &mut Vec::new(),
+                            &mut invoked,
+                            &mut forwarded,
+                            &mut callsites,
+                        );
+                    }
+                    for (trait_decl, method) in default_methods(implementation, items) {
+                        let function =
+                            trait_default_as_function(trait_decl, method, implementation);
+                        collect_callback_block(
+                            &function.body,
+                            &impl_method_key(&implementation.type_name, &method.name),
+                            function.source_file.as_deref(),
+                            report,
+                            &mut Vec::new(),
+                            &mut invoked,
+                            &mut forwarded,
+                            &mut callsites,
+                        );
+                    }
                 }
-                for (trait_decl, method) in default_methods(implementation, items) {
-                    let function = trait_default_as_function(trait_decl, method, implementation);
-                    collect_callback_block(
-                        &function.body,
-                        &impl_method_key(&implementation.type_name, &method.name),
-                        function.source_file.as_deref(),
-                        report,
-                        &mut Vec::new(),
-                        &mut invoked,
-                        &mut forwarded,
-                        &mut callsites,
-                    );
-                }
+                _ => {}
             }
-            _ => {}
+        }
+        if report.captured_callback_parameters == captures_before {
+            break;
         }
     }
 
@@ -1376,7 +1534,10 @@ fn infer_callback_effects(items: &[Item], report: &mut EffectReport) {
                 callsite.target.clone(),
                 callsite.target_parameter.clone(),
             );
-            let known = matches!(&callsite.source, CallbackSource::Function(_));
+            let known = matches!(
+                &callsite.source,
+                CallbackSource::Function(_) | CallbackSource::ReturnedClosure { .. }
+            );
             callback_callsite_resolution
                 .entry(key)
                 .and_modify(|all_known| *all_known &= known)
@@ -1493,6 +1654,16 @@ fn infer_callback_effects(items: &[Item], report: &mut EffectReport) {
                     }
                 }
                 CallbackSource::Unknown => {
+                    report
+                        .indirect_calls
+                        .entry(callsite.caller.clone())
+                        .or_default()
+                        .insert(format!(
+                            "{}.{}",
+                            callsite.operation, callsite.target_parameter
+                        ));
+                }
+                CallbackSource::ReturnedClosure { .. } => {
                     report
                         .indirect_calls
                         .entry(callsite.caller.clone())
@@ -1641,18 +1812,18 @@ fn collect_callback_expr(
                     function: parameter_function,
                     name,
                 } => {
+                    let operation = expression_path(callee).unwrap_or_default();
+                    report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
+                    report
+                        .unresolved_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
                     if parameter_function == function {
-                        let operation = expression_path(callee).unwrap_or_default();
-                        report
-                            .indirect_calls
-                            .entry(function.to_string())
-                            .or_default()
-                            .remove(&operation);
-                        report
-                            .unresolved_calls
-                            .entry(function.to_string())
-                            .or_default()
-                            .remove(&operation);
                         report
                             .indirect_calls
                             .entry(function.to_string())
@@ -1664,10 +1835,23 @@ fn collect_callback_expr(
                             .or_default()
                             .insert(name.clone());
                     }
-                    invoked.insert(CallbackParameter {
-                        function: parameter_function,
-                        name,
-                    });
+                    if parameter_function != function {
+                        invoked.insert(CallbackParameter {
+                            function: function.to_string(),
+                            name: name.clone(),
+                        });
+                        report
+                            .captured_callback_parameters
+                            .entry(function.to_string())
+                            .or_default()
+                            .insert((parameter_function.clone(), name.clone()));
+                    }
+                    if !report.returned_closure_keys.contains(function) {
+                        invoked.insert(CallbackParameter {
+                            function: parameter_function,
+                            name,
+                        });
+                    }
                     true
                 }
                 _ => false,
@@ -1747,32 +1931,122 @@ fn collect_callback_expr(
                 }
             } else if !callback_callee {
                 let operation = expression_path(callee).unwrap_or_else(|| "<call>".to_string());
-                let local_alias_target = match (&callee_source, is_callback_alias(callee, shadowed))
+                let returned_closure_call =
+                    matches!(&callee_source, CallbackSource::ReturnedClosure { .. });
+                let local_alias_target = if !is_callback_alias(callee, shadowed)
+                    && !returned_closure_call
                 {
-                    (CallbackSource::Function(source), true)
-                        if report.function_names.contains(source)
-                            && !source.contains("::<lambda@") =>
-                    {
-                        Some(source.clone())
+                    None
+                } else {
+                    match &callee_source {
+                        CallbackSource::Function(source)
+                            if report.function_names.contains(source)
+                                && report.captured_callback_parameters.get(source).is_none_or(
+                                    |captures| {
+                                        captures.iter().all(|(owner, parameter)| {
+                                            matches!(
+                                                callback_source(
+                                                    &Expr::Ident(parameter.clone()),
+                                                    function,
+                                                    shadowed,
+                                                    report,
+                                                ),
+                                                CallbackSource::Parameter {
+                                                    function: visible_owner,
+                                                    name: visible_parameter,
+                                                } if visible_owner == *owner
+                                                    && visible_parameter == *parameter
+                                            )
+                                        })
+                                    },
+                                ) =>
+                        {
+                            Some((source.clone(), None))
+                        }
+                        CallbackSource::ReturnedClosure {
+                            function: target,
+                            captures,
+                        } if report.function_names.contains(target) => {
+                            Some((target.clone(), Some(captures.clone())))
+                        }
+                        _ => None,
                     }
-                    _ => None,
                 };
-                if let Some(target) = local_alias_target {
+                if let Some((target, returned_captures)) = local_alias_target {
                     report
                         .resolved_function_calls
                         .entry(function.to_string())
                         .or_default()
-                        .insert(target);
+                        .insert(target.clone());
                     report
                         .resolved_call_operations
                         .entry(function.to_string())
                         .or_default()
                         .insert(operation.clone());
                     report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
+                    report
                         .unresolved_calls
                         .entry(function.to_string())
                         .or_default()
                         .remove(&operation);
+                    if let Some(captures) =
+                        report.captured_callback_parameters.get(&target).cloned()
+                    {
+                        for (owner, parameter) in captures {
+                            let source = if let Some(returned_captures) = &returned_captures {
+                                let Some(source) = returned_captures.get(&parameter) else {
+                                    continue;
+                                };
+                                (**source).clone()
+                            } else {
+                                let visible_source = callback_source(
+                                    &Expr::Ident(parameter.clone()),
+                                    function,
+                                    shadowed,
+                                    report,
+                                );
+                                if !matches!(
+                                    visible_source,
+                                    CallbackSource::Parameter {
+                                        function: visible_owner,
+                                        name: visible_parameter,
+                                    } if visible_owner == *owner
+                                        && visible_parameter == *parameter
+                                ) {
+                                    continue;
+                                }
+                                if owner != function {
+                                    report
+                                        .captured_callback_parameters
+                                        .entry(function.to_string())
+                                        .or_default()
+                                        .insert((owner.clone(), parameter.clone()));
+                                }
+                                CallbackSource::Parameter {
+                                    function: function.to_string(),
+                                    name: parameter.clone(),
+                                }
+                            };
+                            invoked.insert(CallbackParameter {
+                                function: target.clone(),
+                                name: parameter.clone(),
+                            });
+                            callsites.push(CallbackCallsite {
+                                caller: function.to_string(),
+                                target: target.clone(),
+                                target_parameter: parameter.clone(),
+                                source,
+                                operation: operation.clone(),
+                                file: file.map(str::to_string),
+                                line,
+                                col,
+                            });
+                        }
+                    }
                 } else if is_function_value(callee, report) {
                     report
                         .indirect_calls
@@ -1805,9 +2079,30 @@ fn collect_callback_expr(
                 }
             }
         }
-        Expr::Lambda(_params, body) => {
+        Expr::Lambda(params, body) => {
             let lambda = format!("{function}::<lambda@{line}:{col}>");
-            let mut lambda_shadowed = Vec::new();
+            let mut lambda_shadowed = vec![CallbackScope::default()];
+            if let Some(callbacks) = report.callback_parameters.get(function) {
+                for name in callbacks {
+                    lambda_shadowed[0].names.insert(name.clone());
+                    lambda_shadowed[0].aliases.insert(
+                        name.clone(),
+                        CallbackSource::Parameter {
+                            function: function.to_string(),
+                            name: name.clone(),
+                        },
+                    );
+                }
+            }
+            lambda_shadowed.extend(shadowed.iter().cloned());
+            let mut lambda_parameters = CallbackScope::default();
+            for name in params {
+                lambda_parameters.names.insert(name.clone());
+                lambda_parameters
+                    .aliases
+                    .insert(name.clone(), CallbackSource::Unknown);
+            }
+            lambda_shadowed.push(lambda_parameters);
             collect_callback_block(
                 body,
                 &lambda,
@@ -1964,6 +2259,10 @@ fn callback_source(
 ) -> CallbackSource {
     match expr.unlocated() {
         Expr::Lambda(_, _) => CallbackSource::Function(lambda_function_key(expr, caller)),
+        Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
+            returned_closure_source(callee, args, caller, shadowed, report)
+                .unwrap_or(CallbackSource::Unknown)
+        }
         Expr::Ident(name) => {
             if let Some(source) = shadowed
                 .iter()
@@ -1992,6 +2291,75 @@ fn callback_source(
             .map(CallbackSource::Function)
             .unwrap_or(CallbackSource::Unknown),
     }
+}
+
+fn returned_closure_source(
+    callee: &Expr,
+    args: &[Arg],
+    caller: &str,
+    shadowed: &[CallbackScope],
+    report: &EffectReport,
+) -> Option<CallbackSource> {
+    if !matches!(callee.unlocated(), Expr::Ident(_)) {
+        return None;
+    }
+    let producer = resolve_local_target(callee, report)?;
+    if report
+        .ambiguous_returned_closure_functions
+        .contains(&producer)
+    {
+        return None;
+    }
+    let returned = report.returned_closures_by_function.get(&producer)?;
+    if returned.len() != 1 {
+        return None;
+    }
+    let closure = returned.iter().next()?;
+    let mut captures = BTreeMap::new();
+    if let Some(parameters) = report.captured_callback_parameters.get(closure) {
+        for (owner, parameter) in parameters {
+            if owner != &producer {
+                continue;
+            }
+            let Some(actual) = call_argument_for_parameter(
+                args,
+                report.function_parameters.get(&producer)?,
+                parameter,
+            ) else {
+                return Some(CallbackSource::Unknown);
+            };
+            captures.insert(
+                parameter.clone(),
+                Box::new(callback_source(actual, caller, shadowed, report)),
+            );
+        }
+    }
+    Some(CallbackSource::ReturnedClosure {
+        function: closure.clone(),
+        captures,
+    })
+}
+
+fn call_argument_for_parameter<'a>(
+    args: &'a [Arg],
+    parameters: &[String],
+    parameter: &str,
+) -> Option<&'a Expr> {
+    let index = parameters.iter().position(|name| name == parameter)?;
+    let mut positional = 0;
+    for argument in args {
+        match argument {
+            Arg::Positional(value) => {
+                if positional == index {
+                    return Some(value);
+                }
+                positional += 1;
+            }
+            Arg::Named(name, value) if name == parameter => return Some(value),
+            Arg::Named(_, _) => {}
+        }
+    }
+    None
 }
 
 fn is_callback_alias(expr: &Expr, scopes: &[CallbackScope]) -> bool {

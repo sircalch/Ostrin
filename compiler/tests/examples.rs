@@ -13852,6 +13852,428 @@ fn main() -> Void { caller() }
 }
 
 #[test]
+fn experimental_effect_signatures_compose_through_closure_captured_callbacks() {
+    let file = temp_source(
+        "effects-closure-captured-callback.ostrin",
+        r#"fn wrapper(action: fn() -> Void) -> Void {
+    deferred: fn() -> Void = fn() { action() }
+    deferred()
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn main() -> Void { wrapper(io_action) }
+fn open_main() -> Void { wrapper(unknown_action) }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["variables"],
+        serde_json::json!(["ε_action"]),
+        "the callback invoked by a captured closure remains a symbolic row variable"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["open_calls"],
+        serde_json::json!([]),
+        "a local closure call with a known captured callback has a verified effect edge"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the concrete callback row must reach the caller through the closure"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "an unresolved effect in a captured callback must remain open without keeping the local closure call open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        false
+    );
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(hir_text.contains("hir violations: 0"));
+    assert!(
+        hir_text.contains("[effect variables: ε_action]")
+            && hir_text.contains("effect substitution: ε_action <- ε_action via wrapper::<lambda@"),
+        "HIR must retain the captured callback row and its local closure edge: {hir_text}"
+    );
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("ir violations: 0"));
+    assert!(
+        ir_text.contains("closure wrapper$closure")
+            && ir_text.contains("(effect source: wrapper::<lambda@")
+            && ir_text.contains("effect variables: ε_action"),
+        "IR must retain the captured callback row on the synthesized closure: {ir_text}"
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_signatures_compose_through_nested_captured_closures() {
+    let file = temp_source(
+        "effects-nested-closure-captured-callback.ostrin",
+        r#"fn wrapper(action: fn() -> Void) -> Void {
+    first: fn() -> Void = fn() {
+        deferred: fn() -> Void = fn() { action() }
+        deferred()
+    }
+    first()
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn main() -> Void { wrapper(io_action) }
+fn open_main() -> Void { wrapper(unknown_action) }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the concrete callback row must pass through both local closures"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "an unknown effect inside the captured callback must remain open"
+    );
+    assert_eq!(
+        report["effect_variable_substitutions"]["wrapper"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1,
+        "the outer function must substitute its callback into the first closure"
+    );
+    let nested_lambda = report["effect_variable_substitutions"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .find(|name| name.starts_with("wrapper::<lambda@"))
+        .expect("the first closure must forward its captured callback to the nested closure");
+    assert_eq!(
+        report["effect_variable_substitutions"][nested_lambda]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(hir_text.contains("hir violations: 0"), "{hir_text}");
+    assert!(hir_text.contains("effect substitution: ε_action <- ε_action via wrapper::<lambda@"));
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("ir violations: 0"), "{ir_text}");
+    assert!(
+        ir_text.contains("closure wrapper$closure0$closure0")
+            && ir_text.contains("effect variables: ε_action"),
+        "IR must preserve effect metadata on the nested closure: {ir_text}"
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_signatures_follow_a_directly_returned_closure() {
+    let file = temp_source(
+        "effects-returned-closure.ostrin",
+        r#"fn main() -> Void {
+    deferred: fn() -> Void = make(io_action)
+    deferred()
+}
+fn main_direct_call() -> Void {
+    make(io_action)()
+}
+fn main_alias() -> Void {
+    deferred: fn() -> Void = make_alias(io_action)
+    deferred()
+}
+fn main_same_branch_alias() -> Void {
+    deferred: fn() -> Void = choose_same(io_action, true)
+    deferred()
+}
+fn main_match_alias() -> Void {
+    deferred: fn() -> Void = choose_match(io_action, Left)
+    deferred()
+}
+fn main_guarded_match() -> Void {
+    deferred: fn() -> Void = choose_guarded(io_action, Left, true)
+    deferred()
+}
+fn open_alias() -> Void {
+    deferred: fn() -> Void = make_alias(unknown_action)
+    deferred()
+}
+fn open_main() -> Void {
+    deferred: fn() -> Void = make(unknown_action)
+    deferred()
+}
+fn discard() -> Void {
+    deferred: fn() -> Void = make(io_action)
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn make(action: fn() -> Void) -> fn() -> Void {
+    return fn() { action() }
+}
+fn make_alias(action: fn() -> Void) -> fn() -> Void {
+    deferred = fn() { action() }
+    return deferred
+}
+fn choose_same(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    deferred = fn() { action() }
+    if flag { deferred } else { deferred }
+}
+enum Choice { Left Right }
+fn choose_match(action: fn() -> Void, choice: Choice) -> fn() -> Void {
+    deferred = fn() { action() }
+    match choice {
+        _ => deferred,
+    }
+}
+fn choose_guarded(action: fn() -> Void, choice: Choice, flag: Bool) -> fn() -> Void {
+    deferred = fn() { action() }
+    match choice {
+        Left if flag => deferred,
+        _ => deferred,
+    }
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["make"]["effects"],
+        serde_json::json!([]),
+        "creating and returning the closure must not execute its callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["make"]["variables"],
+        serde_json::json!([]),
+        "the factory's row must not inherit the deferred callback variable"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["make"]["purity_proven"], false,
+        "an empty factory row is not a proof of purity"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["discard"]["effects"],
+        serde_json::json!([]),
+        "constructing and discarding the closure must not attribute its deferred IO"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "invoking the returned closure must propagate the actual callback's effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_direct_call"]["effects"],
+        serde_json::json!(["io"]),
+        "directly invoking a returned closure must propagate its captured callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_direct_call"]["row_closed"], true,
+        "a directly invoked statically identified closure must keep its effect row closed"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["make_alias"]["effects"],
+        serde_json::json!([]),
+        "returning a local closure alias must not execute its callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_alias"]["effects"],
+        serde_json::json!(["io"]),
+        "invoking a single returned local closure alias must propagate its captured callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_alias"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["choose_same"]["effects"],
+        serde_json::json!([]),
+        "choosing the same closure identity across branches must defer its callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_same_branch_alias"]["effects"],
+        serde_json::json!(["io"]),
+        "a branch-selected alias with one closure identity must propagate its callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_same_branch_alias"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["choose_match"]["effects"],
+        serde_json::json!([]),
+        "a match that returns the same closure identity must not execute its callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_match_alias"]["effects"],
+        serde_json::json!(["io"]),
+        "exhaustive match arms returning one identity must propagate its callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_match_alias"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_guarded_match"]["row_closed"], false,
+        "a guarded match arm must leave closure identity unresolved"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_guarded_match"]["open_calls"],
+        serde_json::json!(["deferred"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_alias"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "unknown effects captured by an aliased returned closure must remain open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "unknown effects in a returned closure must remain open at its invocation"
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_signatures_keep_ambiguous_returned_closures_open() {
+    let file = temp_source(
+        "effects-ambiguous-returned-closure.ostrin",
+        r#"fn choose(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    if flag { fn() { action() } } else { fn() { action() } }
+}
+fn choose_mixed(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    if flag { fn() { action() } } else { unknown_action }
+}
+fn choose_mutating(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    deferred = fn() { action() }
+    if flag { deferred = unknown_action }
+    deferred
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn main() -> Void {
+    deferred: fn() -> Void = choose(io_action, true)
+    deferred()
+}
+fn mixed_main() -> Void {
+    deferred: fn() -> Void = choose_mixed(io_action, true)
+    deferred()
+}
+fn mutating_main() -> Void {
+    deferred: fn() -> Void = choose_mutating(io_action, true)
+    deferred()
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the known callback effect may be retained as a safe over-approximation"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], false,
+        "a conditional choice between closures is not assigned one precise identity"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["open_calls"],
+        serde_json::json!(["deferred"]),
+        "invoking an ambiguous returned closure must remain explicitly open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mixed_main"]["row_closed"], false,
+        "a known closure on one branch cannot close a return with an unknown alternative"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mixed_main"]["open_calls"],
+        serde_json::json!(["deferred"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mutating_main"]["row_closed"], false,
+        "a conditional reassignment must invalidate the earlier closure identity"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["mutating_main"]["open_calls"],
+        serde_json::json!(["deferred"])
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_keeps_type_invalid_partial_matches_open() {
+    let file = temp_source(
+        "effects-partial-returned-closure-match.ostrin",
+        r#"enum Choice { Left Right }
+fn choose(action: fn() -> Void, choice: Choice) -> fn() -> Void {
+    deferred = fn() { action() }
+    match choice { Left => deferred }
+}
+fn main() -> Void {
+    deferred: fn() -> Void = choose(io_action, Left)
+    deferred()
+}
+fn io_action() -> Void { print("effect") }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["effect_closure"]["status"], "open",
+        "a type-invalid partial match cannot claim global effect closure"
+    );
+    assert!(report["effect_closure"]["type_errors"].as_u64().unwrap() > 0);
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], false,
+        "type errors must keep per-function effect rows open"
+    );
+    assert!(
+        report["function_effect_signatures"]["main"]["type_errors"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_report_separates_lambda_creation_from_indirect_execution() {
     let file = temp_source(
         "effects-lambda-execution.ostrin",
@@ -13892,6 +14314,29 @@ fn experimental_effect_report_separates_lambda_creation_from_indirect_execution(
         .collect::<Vec<_>>();
     assert_eq!(lambda_rows.len(), 1);
     assert_eq!(lambda_rows[0].1, &serde_json::json!(["io"]));
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(
+        hir_text.contains("[effects: io]"),
+        "HIR lost the lambda row: {hir_text}"
+    );
+    assert!(
+        !hir_text.contains("fn make_only() -> Void\n  effects: io"),
+        "creating the closure must not attribute its deferred IO to make_only"
+    );
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(
+        ir_text.contains("closure make_only$closure")
+            && ir_text.contains("(effect source: make_only::<lambda@"),
+        "IR must retain the source identity of the synthesized closure: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("effects: io"),
+        "IR lost the lambda row: {ir_text}"
+    );
     let _ = fs::remove_file(file);
 }
 

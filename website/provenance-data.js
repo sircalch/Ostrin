@@ -23,6 +23,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::add": {
@@ -33,6 +34,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::add_quantity": {
@@ -43,6 +45,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::div": {
@@ -53,6 +56,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::div_quantity": {
@@ -63,6 +67,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::div_quantity_same": {
@@ -73,6 +78,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::divide_quantity_sources_by_left": {
@@ -83,6 +89,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::divide_quantity_sources_by_right": {
@@ -93,6 +100,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::exact": {
@@ -102,6 +110,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::exact_quantity": {
@@ -109,6 +118,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::from_quantity_source": {
@@ -116,6 +126,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::from_source": {
@@ -123,6 +134,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::is_exact": {
@@ -130,6 +142,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::is_known": {
@@ -137,6 +150,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::mean": {
@@ -147,6 +161,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::merge_quantity_sources": {
@@ -157,6 +172,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::merge_scaled": {
@@ -166,6 +182,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::mul": {
@@ -176,6 +193,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::mul_quantity": {
@@ -186,6 +204,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::quantity_uncertainty": {
@@ -195,6 +214,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::scale": {
@@ -205,6 +225,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::scale_quantity_sources_by_left": {
@@ -215,6 +236,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::scale_quantity_sources_by_right": {
@@ -225,6 +247,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::scale_quantity_sources_to_float": {
@@ -235,6 +258,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::source_count": {
@@ -242,6 +266,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::standard": {
@@ -249,6 +274,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::sub": {
@@ -259,6 +285,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::sub_quantity": {
@@ -269,6 +296,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::sum": {
@@ -279,6 +307,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::summary": {
@@ -288,6 +317,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::uncertainties": {
@@ -298,6 +328,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::uncertainty": {
@@ -307,6 +338,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::unknown": {
@@ -314,6 +346,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::unknown_from": {
@@ -323,6 +356,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::unknown_quantity": {
@@ -330,6 +364,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::unknown_quantity_from": {
@@ -337,6 +372,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::validate_quantity_source": {
@@ -344,6 +380,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::value": {
@@ -351,6 +388,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::values": {
@@ -360,6 +398,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "std.measurements::variance": {
@@ -367,6 +406,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       }
     },

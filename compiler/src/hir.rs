@@ -70,6 +70,21 @@ pub struct HirFunction {
     pub closed_callback_calls: BTreeMap<String, BTreeSet<String>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct HirLambda {
+    pub params: Vec<String>,
+    /// Parameter and captured-variable types used to validate the lambda's
+    /// symbolic effect variables at the HIR boundary.
+    pub effect_params: Vec<(String, Ty)>,
+    pub body: HirBlock,
+    pub effect_source_key: String,
+    pub effect_signature: EffectSignature,
+    pub effect_variable_substitutions: BTreeSet<EffectVariableSubstitution>,
+    pub effect_calls: BTreeSet<String>,
+    pub indirect_effect_calls: BTreeSet<String>,
+    pub closed_callback_calls: BTreeMap<String, BTreeSet<String>>,
+}
+
 /// Gives impl methods a collision-free HIR name when a generic record/enum
 /// has more than one concrete or trait implementation with the same method
 /// spelling. Plain non-generic impls retain the historical `Type.method`
@@ -217,7 +232,7 @@ pub enum HirKind {
     Index(Box<HirExpr>, Box<HirExpr>),
     If(Box<HirExpr>, HirBlock, Option<HirBlock>),
     Block(HirBlock),
-    Lambda(Vec<String>, HirBlock),
+    Lambda(HirLambda),
     List(Vec<HirExpr>),
     Set(Vec<HirExpr>),
     Map(Vec<(HirExpr, HirExpr)>),
@@ -249,9 +264,11 @@ struct Signatures<'a> {
     variants: std::collections::HashMap<&'a str, Vec<Option<String>>>,
 }
 
-struct Lowerer<'a> {
+struct Lowerer<'a, 'e> {
     typed: &'a TypedProgram,
     signatures: &'a Signatures<'a>,
+    effect_report: &'e crate::effects::EffectReport,
+    effect_source_key: String,
     file: Option<String>,
     /// Innermost-last stack of local names, to tell `Local` from `Global`.
     scopes: Vec<HashSet<String>>,
@@ -259,7 +276,7 @@ struct Lowerer<'a> {
     local_types: std::collections::HashMap<String, Ty>,
 }
 
-impl<'a> Lowerer<'a> {
+impl<'a, 'e> Lowerer<'a, 'e> {
     fn ty_of(&self, expr: &Expr) -> Ty {
         self.typed
             .node_types
@@ -504,10 +521,68 @@ impl<'a> Lowerer<'a> {
             ),
             Expr::Block(b) => HirKind::Block(self.block(b)),
             Expr::Lambda(params, body) => {
+                let position = key.as_ref().map(|key| key.start);
+                let effect_source_key = format!(
+                    "{}::<lambda@{}:{}>",
+                    self.effect_source_key,
+                    position.map_or(0, |position| position.line),
+                    position.map_or(0, |position| position.col)
+                );
+                let previous_source_key =
+                    std::mem::replace(&mut self.effect_source_key, effect_source_key.clone());
                 self.scopes.push(params.iter().cloned().collect());
                 let body = self.block(body);
                 self.scopes.pop();
-                HirKind::Lambda(params.clone(), body)
+                self.effect_source_key = previous_source_key;
+                let effect_report = self.effect_report;
+                let effect_signature = effect_report
+                    .function_effect_signatures
+                    .get(&effect_source_key)
+                    .cloned()
+                    .unwrap_or_default();
+                let mut effect_params = match &ty {
+                    Ty::Fn(param_types, _) => params
+                        .iter()
+                        .cloned()
+                        .zip(param_types.iter().cloned())
+                        .collect::<Vec<_>>(),
+                    _ => Vec::new(),
+                };
+                for variable in &effect_signature.variables {
+                    if effect_params.iter().any(|(name, _)| name == variable) {
+                        continue;
+                    }
+                    if let Some(ty @ Ty::Fn(..)) = self.local_types.get(variable) {
+                        effect_params.push((variable.clone(), ty.clone()));
+                    }
+                }
+                HirKind::Lambda(HirLambda {
+                    params: params.clone(),
+                    effect_params,
+                    body,
+                    effect_source_key: effect_source_key.clone(),
+                    effect_signature,
+                    effect_variable_substitutions: effect_report
+                        .effect_variable_substitutions
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    effect_calls: effect_report
+                        .resolved_function_calls
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    indirect_effect_calls: effect_report
+                        .indirect_calls
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                    closed_callback_calls: effect_report
+                        .closed_callback_parameters
+                        .get(&effect_source_key)
+                        .cloned()
+                        .unwrap_or_default(),
+                })
             }
             Expr::ListLiteral(items) => HirKind::List(items.iter().map(|e| self.expr(e)).collect()),
             Expr::SetLiteral(items) => HirKind::Set(items.iter().map(|e| self.expr(e)).collect()),
@@ -806,6 +881,8 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
         let mut lowerer = Lowerer {
             typed,
             signatures,
+            effect_report: &effect_report,
+            effect_source_key: effect_source_key.clone(),
             file: source_file.clone(),
             scopes: vec![HashSet::new()],
             local_types: Default::default(),
@@ -1258,9 +1335,17 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
                 .map(|block| specialize_block(block, subst)),
         ),
         HirKind::Block(block) => HirKind::Block(specialize_block(block, subst)),
-        HirKind::Lambda(params, block) => {
-            HirKind::Lambda(params.clone(), specialize_block(block, subst))
-        }
+        HirKind::Lambda(lambda) => HirKind::Lambda(HirLambda {
+            params: lambda.params.clone(),
+            effect_params: lambda.effect_params.clone(),
+            body: specialize_block(&lambda.body, subst),
+            effect_source_key: lambda.effect_source_key.clone(),
+            effect_signature: lambda.effect_signature.clone(),
+            effect_variable_substitutions: lambda.effect_variable_substitutions.clone(),
+            effect_calls: lambda.effect_calls.clone(),
+            indirect_effect_calls: lambda.indirect_effect_calls.clone(),
+            closed_callback_calls: lambda.closed_callback_calls.clone(),
+        }),
         HirKind::List(values) => HirKind::List(
             values
                 .iter()
@@ -1483,8 +1568,8 @@ where
         HirKind::Block(block)
         | HirKind::Loop(block)
         | HirKind::Spawn(block)
-        | HirKind::SpawnScope(block)
-        | HirKind::Lambda(_, block) => resolve_block_calls(block, resolver),
+        | HirKind::SpawnScope(block) => resolve_block_calls(block, resolver),
+        HirKind::Lambda(lambda) => resolve_block_calls(&mut lambda.body, resolver),
         HirKind::List(values) | HirKind::Set(values) => {
             for value in values {
                 resolve_expr_calls(value, resolver);
@@ -1558,6 +1643,10 @@ pub struct VerifyReport {
 /// generic function carries its resolved type arguments.
 pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> VerifyReport {
     let mut report = VerifyReport::default();
+    let mut lambdas = Vec::new();
+    for function in &program.functions {
+        collect_hir_lambdas(&function.body, &mut lambdas);
+    }
     for f in &program.functions {
         report.unresolved_effect_calls += f.effect_signature.open_calls.len();
         report.indirect_effect_calls += f.indirect_effect_calls.len();
@@ -1592,6 +1681,15 @@ pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> Veri
                     && target.params.iter().any(|(name, ty)| {
                         name == &substitution.callee_parameter && matches!(ty, Ty::Fn(..))
                     })
+            }) || lambdas.iter().any(|target| {
+                target.effect_source_key == substitution.callee
+                    && target
+                        .effect_signature
+                        .variables
+                        .contains(&substitution.callee_parameter)
+                    && target.effect_params.iter().any(|(name, ty)| {
+                        name == &substitution.callee_parameter && matches!(ty, Ty::Fn(..))
+                    })
             });
             if !caller_is_variable || !callee_is_variable {
                 report.violations.push(Violation {
@@ -1611,7 +1709,12 @@ pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> Veri
                 .iter()
                 .filter(|candidate| candidate.effect_source_key == *callee)
                 .collect();
-            if targets.is_empty() {
+            let lambda_targets: Vec<_> = lambdas
+                .iter()
+                .copied()
+                .filter(|candidate| candidate.effect_source_key == *callee)
+                .collect();
+            if targets.is_empty() && lambda_targets.is_empty() {
                 report.violations.push(Violation {
                     function: f.name.clone(),
                     message: format!(
@@ -1622,59 +1725,28 @@ pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> Veri
             }
             report.effect_edges += 1;
             for target in targets {
-                for variable in &target.effect_signature.variables {
-                    let closed = f
-                        .closed_callback_calls
-                        .get(&target.effect_source_key)
-                        .is_some_and(|parameters| parameters.contains(variable));
-                    let substituted = f.effect_variable_substitutions.iter().any(|mapping| {
-                        mapping.callee == target.effect_source_key
-                            && mapping.callee_parameter == *variable
-                            && f.effect_signature
-                                .variables
-                                .contains(&mapping.caller_parameter)
-                    });
-                    let remains_open =
-                        f.effect_signature.open_calls.iter().any(|call| {
-                            call == variable || call.ends_with(&format!(".{variable}"))
-                        });
-                    if !closed && !substituted && !remains_open {
-                        report.violations.push(Violation {
-                            function: f.name.clone(),
-                            message: format!(
-                                "effect variable ε_{variable} from local call '{}' was neither substituted nor kept open",
-                                target.name
-                            ),
-                        });
-                    }
-                }
-                for effect in &target.effect_signature.effects {
-                    if !f.effect_signature.effects.contains(effect) {
-                        report.violations.push(Violation {
-                            function: f.name.clone(),
-                            message: format!(
-                                "effect row is missing '{}' propagated from local call '{}'",
-                                effect.label(),
-                                target.name
-                            ),
-                        });
-                    }
-                }
-                for call in &target.effect_signature.open_calls {
-                    let substituted = f
-                        .closed_callback_calls
-                        .get(&target.effect_source_key)
-                        .is_some_and(|parameters| parameters.contains(call));
-                    if !substituted && !f.effect_signature.open_calls.contains(call) {
-                        report.violations.push(Violation {
-                            function: f.name.clone(),
-                            message: format!(
-                                "open effect call '{call}' was not propagated from local call '{}'",
-                                target.name
-                            ),
-                        });
-                    }
-                }
+                verify_effect_target(
+                    &f.name,
+                    &f.effect_signature,
+                    &f.effect_variable_substitutions,
+                    &f.closed_callback_calls,
+                    target.effect_source_key.as_str(),
+                    target.name.as_str(),
+                    &target.effect_signature,
+                    &mut report,
+                );
+            }
+            for target in lambda_targets {
+                verify_effect_target(
+                    &f.name,
+                    &f.effect_signature,
+                    &f.effect_variable_substitutions,
+                    &f.closed_callback_calls,
+                    target.effect_source_key.as_str(),
+                    target.effect_source_key.as_str(),
+                    &target.effect_signature,
+                    &mut report,
+                );
             }
         }
         for call in &f.indirect_effect_calls {
@@ -1696,6 +1768,197 @@ pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> Veri
         verify_block(&f.body, generic_functions, &mut ctx);
     }
     report
+}
+
+fn verify_effect_target(
+    caller_name: &str,
+    caller_signature: &EffectSignature,
+    substitutions: &BTreeSet<EffectVariableSubstitution>,
+    closed_callback_calls: &BTreeMap<String, BTreeSet<String>>,
+    source_key: &str,
+    display_name: &str,
+    target_signature: &EffectSignature,
+    report: &mut VerifyReport,
+) {
+    for variable in &target_signature.variables {
+        let closed = closed_callback_calls
+            .get(source_key)
+            .is_some_and(|parameters| parameters.contains(variable));
+        let substituted = substitutions.iter().any(|mapping| {
+            mapping.callee == source_key
+                && mapping.callee_parameter == *variable
+                && caller_signature
+                    .variables
+                    .contains(&mapping.caller_parameter)
+        });
+        let remains_open = caller_signature
+            .open_calls
+            .iter()
+            .any(|call| call == variable || call.ends_with(&format!(".{variable}")));
+        if !closed && !substituted && !remains_open {
+            report.violations.push(Violation {
+                function: caller_name.to_owned(),
+                message: format!("effect variable ε_{variable} from local call '{display_name}' was neither substituted nor kept open"),
+            });
+        }
+    }
+    for effect in &target_signature.effects {
+        if !caller_signature.effects.contains(effect) {
+            report.violations.push(Violation {
+                function: caller_name.to_owned(),
+                message: format!(
+                    "effect row is missing '{}' propagated from local call '{display_name}'",
+                    effect.label()
+                ),
+            });
+        }
+    }
+    for call in &target_signature.open_calls {
+        let substituted = closed_callback_calls
+            .get(source_key)
+            .is_some_and(|parameters| parameters.contains(call));
+        if !substituted && !caller_signature.open_calls.contains(call) {
+            report.violations.push(Violation {
+                function: caller_name.to_owned(),
+                message: format!(
+                    "open effect call '{call}' was not propagated from local call '{display_name}'"
+                ),
+            });
+        }
+    }
+}
+
+fn collect_hir_lambdas<'a>(block: &'a HirBlock, out: &mut Vec<&'a HirLambda>) {
+    fn expr<'a>(value: &'a HirExpr, out: &mut Vec<&'a HirLambda>) {
+        match &value.kind {
+            HirKind::Lambda(lambda) => {
+                out.push(lambda);
+                collect_hir_lambdas(&lambda.body, out);
+            }
+            HirKind::Call { callee, args, .. } => {
+                expr(callee, out);
+                for arg in args {
+                    expr(&arg.value, out);
+                }
+            }
+            HirKind::MethodCall { recv, args, .. } => {
+                expr(recv, out);
+                for arg in args {
+                    expr(&arg.value, out);
+                }
+            }
+            HirKind::Field(base, _)
+            | HirKind::Unary(_, base)
+            | HirKind::As(base, _)
+            | HirKind::DynCoerce(base) => expr(base, out),
+            HirKind::Binary(_, left, right) | HirKind::Index(left, right) => {
+                expr(left, out);
+                expr(right, out);
+            }
+            HirKind::Approximately(a, b, c) => {
+                expr(a, out);
+                expr(b, out);
+                expr(c, out);
+            }
+            HirKind::If(cond, then_block, else_block) => {
+                expr(cond, out);
+                collect_hir_lambdas(then_block, out);
+                if let Some(other) = else_block {
+                    collect_hir_lambdas(other, out);
+                }
+            }
+            HirKind::Block(nested) => collect_hir_lambdas(nested, out),
+            HirKind::List(items) | HirKind::Set(items) => {
+                for item in items {
+                    expr(item, out);
+                }
+            }
+            HirKind::Map(items) => {
+                for (key, value) in items {
+                    expr(key, out);
+                    expr(value, out);
+                }
+            }
+            HirKind::Try(body, catch) => {
+                expr(body, out);
+                if let Some(catch) = catch {
+                    expr(catch, out);
+                }
+            }
+            HirKind::Within(a, b) => {
+                expr(a, out);
+                expr(b, out);
+            }
+            HirKind::Loop(body) | HirKind::SpawnScope(body) | HirKind::Spawn(body) => {
+                collect_hir_lambdas(body, out)
+            }
+            HirKind::Range(start, _, end, step) => {
+                expr(start, out);
+                expr(end, out);
+                if let Some(step) = step {
+                    expr(step, out);
+                }
+            }
+            HirKind::Record { fields, .. } => {
+                for (_, value) in fields {
+                    expr(value, out);
+                }
+            }
+            HirKind::Match(value, arms) => {
+                expr(value, out);
+                for arm in arms {
+                    if let Some(guard) = &arm.guard {
+                        expr(guard, out);
+                    }
+                    collect_hir_lambdas(&arm.body, out);
+                }
+            }
+            HirKind::Channel(_, capacity) => {
+                if let Some(capacity) = capacity {
+                    expr(capacity, out);
+                }
+            }
+            HirKind::Unit(inner, _) => expr(inner, out),
+            HirKind::Int(_)
+            | HirKind::Sized(_, _)
+            | HirKind::Float(_)
+            | HirKind::Float32(_)
+            | HirKind::Str(_)
+            | HirKind::Char(_)
+            | HirKind::Bool(_)
+            | HirKind::Local(_)
+            | HirKind::Global(_)
+            | HirKind::EmptyCollection(_, _) => {}
+        }
+    }
+    for statement in &block.stmts {
+        match statement {
+            HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } | HirStmt::Expr(value) => {
+                expr(value, out)
+            }
+            HirStmt::FieldAssign { target, value } => {
+                expr(target, out);
+                expr(value, out);
+            }
+            HirStmt::Return(value) | HirStmt::Break(value) => {
+                if let Some(value) = value {
+                    expr(value, out);
+                }
+            }
+            HirStmt::While { cond, body } => {
+                expr(cond, out);
+                collect_hir_lambdas(body, out);
+            }
+            HirStmt::For { iter, body, .. } => {
+                expr(iter, out);
+                collect_hir_lambdas(body, out);
+            }
+            HirStmt::Continue => {}
+        }
+    }
+    if let Some(tail) = &block.tail {
+        expr(tail, out);
+    }
 }
 
 type Ctx<'r> = (
@@ -1816,11 +2079,10 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 verify_block(f, generics, ctx);
             }
         }
-        HirKind::Block(b)
-        | HirKind::Loop(b)
-        | HirKind::Spawn(b)
-        | HirKind::SpawnScope(b)
-        | HirKind::Lambda(_, b) => verify_block(b, generics, ctx),
+        HirKind::Block(b) | HirKind::Loop(b) | HirKind::Spawn(b) | HirKind::SpawnScope(b) => {
+            verify_block(b, generics, ctx)
+        }
+        HirKind::Lambda(lambda) => verify_block(&lambda.body, generics, ctx),
         HirKind::List(v) | HirKind::Set(v) => {
             for x in v {
                 go(x, ctx);
@@ -2055,7 +2317,51 @@ fn one_line(e: &HirExpr) -> String {
         HirKind::Index(a, i) => format!("{}[{}]", one_line(a), one_line(i)),
         HirKind::If(c, ..) => format!("if {} {{…}}", one_line(c)),
         HirKind::Block(_) => "{…}".to_string(),
-        HirKind::Lambda(p, _) => format!("fn({}) {{…}}", p.join(", ")),
+        HirKind::Lambda(lambda) => {
+            let mut effects = Vec::new();
+            if !lambda.effect_signature.effects.is_empty() {
+                effects.push(format!(
+                    "effects: {}",
+                    lambda
+                        .effect_signature
+                        .effects
+                        .iter()
+                        .map(EffectKind::label)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !lambda.effect_signature.variables.is_empty() {
+                effects.push(format!(
+                    "effect variables: {}",
+                    lambda
+                        .effect_signature
+                        .variables
+                        .iter()
+                        .map(|name| format!("ε_{name}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !lambda.effect_signature.open_calls.is_empty() {
+                effects.push(format!(
+                    "open calls: {}",
+                    lambda
+                        .effect_signature
+                        .open_calls
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            let suffix = if effects.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", effects.join("; "))
+            };
+            format!("fn({}) {{…}}{suffix}", lambda.params.join(", "))
+        }
         HirKind::List(v) => format!(
             "[{}]",
             v.iter().map(one_line).collect::<Vec<_>>().join(", ")
