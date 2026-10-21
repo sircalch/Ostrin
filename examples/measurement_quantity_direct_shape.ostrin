@@ -19,22 +19,12 @@ fn main() -> Void {
     print(x_uncertainty.value)
     drop(x)
 
-    exact_dimensional = Measurement<Quantity<Length>> {
-        value: 0 m,
-        sources: [],
-        known: true,
-        reason: ""
-    }
+    exact_dimensional = measurements.exact_quantity(0 m).unwrap()
     exact_uncertainty = measurements.quantity_uncertainty(exact_dimensional).unwrap()
     print(exact_uncertainty.dimension_key)
     print(exact_uncertainty.value)
 
-    unknown_dimensional = Measurement<Quantity<Length>> {
-        value: 12 m,
-        sources: [],
-        known: false,
-        reason: "sensor offline"
-    }
+    unknown_dimensional = measurements.unknown_quantity(12 m, "sensor offline").unwrap()
     match measurements.quantity_uncertainty(unknown_dimensional) {
         Ok(_) => print("unknown dimensional uncertainty accepted"),
         Err(message) => print("unknown dimensional uncertainty = " + message),

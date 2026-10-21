@@ -93,8 +93,25 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native boundary test is missing");
   check(errors, /Sensitivity<Quantity<Length>>/.test(directQuantityExample)
       && /from_quantity_source\(/.test(directQuantityExample)
+      && /measurements\.exact_quantity\(/.test(directQuantityExample)
+      && /measurements\.unknown_quantity\(/.test(directQuantityExample)
       && /20 cm[\s\S]*0\.2 m/.test(directQuantityExample),
-    "examples/measurement_quantity_direct_shape.ostrin: generic dimensional sensitivity shape is missing");
+    "examples/measurement_quantity_direct_shape.ostrin: dimensional sensitivity and explicit-state examples are missing");
+  for (const constructor of ["exact_quantity", "unknown_quantity"]) {
+    const body = std.match(new RegExp(`pub fn ${constructor}<D: Dimension>[\\s\\S]*?\\n}\\n`))?.[0] ?? "";
+    check(errors, body.includes("is_finite(value.value())")
+        && body.includes("is_finite(value.value() * value.unit_scale())")
+        && body.includes("measurement value must be finite"),
+      `compiler/std/measurements.ostrin: ${constructor} must reject non-finite nominal and coherent values`);
+  }
+  check(errors, /dimensional_measurement_state_constructors_are_explicit_and_finite/.test(tests),
+    "compiler/tests/examples.rs: dimensional exact/unknown constructor runtime test is missing");
+  check(errors, /non-finite exact = measurement value must be finite[\s\S]*non-finite unknown = measurement value must be finite/.test(tests),
+    "compiler/tests/examples.rs: exact/unknown constructor overflow rejection evidence is missing");
+  check(errors, /exact_zero = measurements\.exact_quantity\(/.test(labExample),
+    "examples/measurement_lab.ostrin: exact dimensional Measurement demo is missing");
+  check(errors, /pending_reading = measurements\.unknown_quantity\(/.test(labExample),
+    "examples/measurement_lab.ostrin: unknown dimensional Measurement demo is missing");
   check(errors, /pub fn from_quantity_source<D: Dimension>[\s\S]*?sigma\.unit_scale\(\)[\s\S]*?value\.dimension_key\(\)/.test(std),
     "compiler/std/measurements.ostrin: dimensional source sigma must be canonicalized and keyed by the static dimension");
   const dimensionalConstructor = std.match(/pub fn from_quantity_source<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";

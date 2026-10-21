@@ -138,6 +138,37 @@ pub fn from_quantity_source<D: Dimension>(value: Quantity<D>, sigma: Quantity<D>
     })
 }
 
+// Exact and unknown dimensional readings share the same finite nominal-value
+// invariant as source-backed measurements. Unknown uncertainty is explicit; it
+// never turns a non-finite nominal value into an apparently valid record.
+pub fn exact_quantity<D: Dimension>(value: Quantity<D>) -> Result<Measurement<Quantity<D>>, String> {
+    if not is_finite(value.value())
+        or not is_finite(value.value() * value.unit_scale())
+    {
+        return Err("measurement value must be finite")
+    }
+    Ok(Measurement<Quantity<D>> {
+        value: value,
+        sources: [],
+        known: true,
+        reason: "",
+    })
+}
+
+pub fn unknown_quantity<D: Dimension>(value: Quantity<D>, reason: String) -> Result<Measurement<Quantity<D>>, String> {
+    if not is_finite(value.value())
+        or not is_finite(value.value() * value.unit_scale())
+    {
+        return Err("measurement value must be finite")
+    }
+    Ok(Measurement<Quantity<D>> {
+        value: value,
+        sources: [],
+        known: false,
+        reason: reason,
+    })
+}
+
 fn merge_quantity_sources<D: Dimension>(
     result: List<Sensitivity<Quantity<D>>>,
     input: List<Sensitivity<Quantity<D>>>,
