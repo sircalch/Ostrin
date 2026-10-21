@@ -155,6 +155,40 @@ test("the gate rejects dimensional product propagation without both derivative f
   }
 });
 
+test("the gate rejects a dimensional exact constructor without coherent finiteness validation", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const original = readFileSync(file, "utf8");
+    const start = original.indexOf("pub fn exact_quantity<D: Dimension>");
+    const end = original.indexOf("\npub fn unknown_quantity<D: Dimension>", start);
+    const body = original.slice(start, end);
+    assert.ok(body.includes("is_finite(value.value() * value.unit_scale())"));
+    writeFileSync(file, original.slice(0, start) + body.replace("is_finite(value.value() * value.unit_scale())", "true") + original.slice(end));
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("exact_quantity must reject non-finite nominal and coherent values")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects a dimensional unknown constructor without coherent finiteness validation", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const original = readFileSync(file, "utf8");
+    const start = original.indexOf("pub fn unknown_quantity<D: Dimension>");
+    const end = original.indexOf("\nfn merge_quantity_sources<D: Dimension>", start);
+    const body = original.slice(start, end);
+    assert.ok(body.includes("is_finite(value.value() * value.unit_scale())"));
+    writeFileSync(file, original.slice(0, start) + body.replace("is_finite(value.value() * value.unit_scale())", "true") + original.slice(end));
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("unknown_quantity must reject non-finite nominal and coherent values")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects same-dimension quotient propagation without the numerator derivative", () => {
   const root = fixtureRoot();
   try {

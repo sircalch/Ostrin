@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-20 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 362 de integración y 27 unitarias en verde. Este checkout añade una regresión de finitud dimensional posterior a la release.*
+*Corte: 2026-10-20 · `v0.2.0` está publicada; el tag apunta al commit fuente `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59` · 6 pruebas diferenciales, 363 de integración y 27 unitarias en verde. Este desarrollo posterior añade constructores explícitos y finitos para estados exactos y desconocidos de `Measurement<Quantity<D>>`.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -485,7 +485,7 @@ el panel público de benchmarks debe crecer con histórico por commit sin mezcla
 convertir ratios locales en comparaciones entre lenguajes. El explorador Viz ofrece además
 exportación MP4 cuando `MediaRecorder` expone un códec H.264 compatible; en navegadores WebM-only
 el control queda deshabilitado con un motivo explícito y se conserva WebM/GIF como ruta portable.
-La demo Measurements muestra el API experimental de `std.measurements`: el ejemplo escalar conserva su paridad intérprete/nativo; la forma `Measurement<Quantity<D>>` muestra en WASM fuentes explícitas, suma correlacionada, producto dimensional, incertidumbre coherente y cocientes de dimensiones iguales y distintas. Esa forma aún no tiene soporte nativo verificado. El constructor y las operaciones dimensionales rechazan nominales no finitos tanto en la unidad declarada como en la unidad coherente; la incertidumbre también valida records construidos directamente. `from_source` separa la identidad estable de la etiqueta; `standard` conserva la compatibilidad usando la etiqueta como identidad. La figura de barras de error de la galería proyecta cinco mediciones a `std.viz.errorbars`. Ownership/ABI nativos de cantidades, `Array<Measurement<T>>`, covarianzas parciales, Monte Carlo y cobertura permanecen pendientes.
+La demo Measurements muestra el API experimental de `std.measurements`: el ejemplo escalar conserva su paridad intérprete/nativo; la forma `Measurement<Quantity<D>>` muestra en WASM constructores explícitos para estados exactos, desconocidos y con fuentes, suma correlacionada, producto dimensional, incertidumbre coherente y cocientes de dimensiones iguales y distintas. Los constructores exacto/desconocido y el constructor con fuente rechazan nominales no finitos tanto en la unidad declarada como en la unidad coherente; la incertidumbre también valida records construidos directamente. Esa forma aún no tiene soporte nativo verificado. `from_source` separa la identidad estable de la etiqueta; `standard` conserva la compatibilidad usando la etiqueta como identidad. La figura de barras de error de la galería proyecta cinco mediciones a `std.viz.errorbars`. Ownership/ABI nativos de cantidades, `Array<Measurement<T>>`, covarianzas parciales, Monte Carlo y cobertura permanecen pendientes.
 La regresión visual automatizada ya cubre seis superficies públicas en desktop/tablet/móvil y siete
 figuras representativas; sus baselines Chromium para Windows y Ubuntu 24.04 se comparan en Pages CI.
 Queda pendiente la auditoría completa con lector de pantalla y continuar mejorando la arquitectura
@@ -619,7 +619,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 362 de integración + 27 unitarias
+    cargo test                                   # 6 diferenciales + 363 de integración + 27 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

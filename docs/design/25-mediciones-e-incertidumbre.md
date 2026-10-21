@@ -272,7 +272,12 @@ runtime:
 - `Measurement<Quantity<D>>` no se convierte implícitamente a `Quantity<D>`; una proyección debe
   indicar que descarta la incertidumbre.
 
-El prototipo `from_quantity_source` ya construye `Measurement<Quantity<D>>` en el intérprete:
+Los constructores `exact_quantity`, `unknown_quantity` y `from_quantity_source` crean
+`Measurement<Quantity<D>>` en el intérprete. Los dos primeros permiten expresar los estados exacto
+y de incertidumbre desconocida sin construir records manualmente; los tres rechazan nominales no
+finitos tanto en el valor almacenado como después de convertirlo a la unidad coherente. `unknown_quantity`
+no relaja la validez del nominal: sólo la incertidumbre queda desconocida.
+`from_quantity_source` además:
 conserva la contribución como `Quantity<D>`, guarda la sigma de la fuente en la unidad coherente
 mediante `sigma.value() * sigma.unit_scale()` y registra la dimensión estática con
 `value.dimension_key()`. Tanto el constructor como suma, resta, producto y `quantity_uncertainty` rechazan

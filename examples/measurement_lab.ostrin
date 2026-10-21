@@ -3,6 +3,12 @@
 import std.measurements
 
 fn main() -> Void {
+    exact_zero = measurements.exact_quantity(0 m).unwrap()
+    print("exact zero uncertainty (m) = " + measurements.quantity_uncertainty(exact_zero).unwrap().value.to_string())
+
+    pending_reading = measurements.unknown_quantity(12 m, "sensor offline").unwrap()
+    print("unknown reading = " + pending_reading.reason)
+
     ruler_a = measurements.from_quantity_source(4 m, 10 cm, "shared-ruler", "ruler reading A").unwrap()
     ruler_b = measurements.from_quantity_source(4 m, 10 cm, "shared-ruler", "ruler reading B").unwrap()
 

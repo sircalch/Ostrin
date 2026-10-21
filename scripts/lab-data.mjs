@@ -154,7 +154,7 @@ export const LAB = [
     file: "examples/measurement_lab.ostrin",
     render: "text",
     params: [],
-    how: "std.measurements keeps explicit source identities with values and their uncertainty state. Shared IDs preserve correlation through sums, products and same- or cross-dimension ratios; independent IDs combine through the linearized variance rule. The dimensional API runs here through ostrinc.wasm and remains interpreter-only; the scalar API separately has interpreter/native parity.",
+    how: "std.measurements keeps explicit source identities with values and their uncertainty state. For dimensional values, exact_quantity, unknown_quantity and from_quantity_source construct exact, unknown and source-backed states without hand-written records. Shared IDs preserve correlation through sums, products and same- or cross-dimension ratios; independent IDs combine through the linearized variance rule. The dimensional API runs here through ostrinc.wasm and remains interpreter-only; the scalar API separately has interpreter/native parity.",
     docs: { label: "measurement design", href: `${repository}/blob/main/docs/design/25-mediciones-e-incertidumbre.md` },
     limits: "The dimensioned Measurement prototype supports source construction, sums, products, coherent standard uncertainty and ratios between equal or different dimensions in the interpreter/WASM path. Native support, Array<Measurement>, covariance, Monte Carlo and coverage intervals remain planned; unknown uncertainty is never treated as zero.",
   },

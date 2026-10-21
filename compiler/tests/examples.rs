@@ -12162,6 +12162,44 @@ fn dimensional_measurements_reject_non_finite_coherent_values() {
 }
 
 #[test]
+fn dimensional_measurement_state_constructors_are_explicit_and_finite() {
+    let source = temp_source(
+        "measurement_quantity_state_constructors",
+        "import std.measurements\n\
+         fn main() -> Void {\n\
+         exact_value = measurements.exact_quantity(0 cm).unwrap()\n\
+         print(exact_value.known)\n\
+         print(measurements.quantity_uncertainty(exact_value).unwrap().value)\n\
+         unknown_value = measurements.unknown_quantity(12 m, \"sensor offline\").unwrap()\n\
+         print(unknown_value.known)\n\
+         match measurements.quantity_uncertainty(unknown_value) {\n\
+         Ok(_) => print(\"unknown uncertainty accepted\"),\n\
+         Err(message) => print(\"unknown uncertainty = \" + message),\n\
+         }\n\
+         match measurements.exact_quantity(2e305 km) {\n\
+         Ok(_) => print(\"non-finite exact accepted\"),\n\
+         Err(message) => print(\"non-finite exact = \" + message),\n\
+         }\n\
+         match measurements.unknown_quantity(2e305 km, \"unknown\") {\n\
+         Ok(_) => print(\"non-finite unknown accepted\"),\n\
+         Err(message) => print(\"non-finite unknown = \" + message),\n\
+         }\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &source]);
+    let _ = fs::remove_file(&source);
+    assert!(
+        interpreted.status.success(),
+        "dimensional Measurement state constructors failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "true\n0\nfalse\nunknown uncertainty = sensor offline\nnon-finite exact = measurement value must be finite\nnon-finite unknown = measurement value must be finite\n"
+    );
+}
+
+#[test]
 fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
     let source = temp_source(
         "temperature_point_measurement_boundary",
