@@ -14000,6 +14000,9 @@ fn experimental_effect_signatures_follow_a_directly_returned_closure() {
     deferred: fn() -> Void = make(io_action)
     deferred()
 }
+fn main_direct_call() -> Void {
+    make(io_action)()
+}
 fn main_alias() -> Void {
     deferred: fn() -> Void = make_alias(io_action)
     deferred()
@@ -14086,6 +14089,15 @@ fn choose_guarded(action: fn() -> Void, choice: Choice, flag: Bool) -> fn() -> V
     assert_eq!(
         report["function_effect_signatures"]["main"]["row_closed"],
         true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_direct_call"]["effects"],
+        serde_json::json!(["io"]),
+        "directly invoking a returned closure must propagate its captured callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_direct_call"]["row_closed"], true,
+        "a directly invoked statically identified closure must keep its effect row closed"
     );
     assert_eq!(
         report["function_effect_signatures"]["make_alias"]["effects"],

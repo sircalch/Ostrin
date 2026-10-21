@@ -1931,7 +1931,11 @@ fn collect_callback_expr(
                 }
             } else if !callback_callee {
                 let operation = expression_path(callee).unwrap_or_else(|| "<call>".to_string());
-                let local_alias_target = if !is_callback_alias(callee, shadowed) {
+                let returned_closure_call =
+                    matches!(&callee_source, CallbackSource::ReturnedClosure { .. });
+                let local_alias_target = if !is_callback_alias(callee, shadowed)
+                    && !returned_closure_call
+                {
                     None
                 } else {
                     match &callee_source {
