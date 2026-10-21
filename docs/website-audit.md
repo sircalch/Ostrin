@@ -23,6 +23,22 @@ generated `ostrinc.wasm` artifact:
 The cross-browser CI gate is green in the pinned Ubuntu 24.04 environment. The local Windows
 Firefox launch limitation remains documented as a tooling note and does not replace the CI result.
 
+## Logo asset optimization (2026-10-21)
+
+The duplicated site and repository logo was reduced from **956,831 bytes at 1254×1254** to
+**59,704 bytes at 256×256**, a **93.8%** byte reduction. Both copies remain byte-identical.
+At the largest observed page rendering size (74×74 CSS pixels), the optimized source retains
+more than 3× device-pixel density; a Chromium comparison at 74×74 and 148×148 showed mean
+absolute channel differences of 1.3/255 and 0.5/255 respectively. These image checks compare
+the prior tracked logo with the optimized file; they are local measurements, not a cross-browser
+visual regression claim.
+
+`scripts/website-check.mjs` now verifies both logo copies are valid 256×256 PNGs, match byte for
+byte, and stay at or below 100,000 bytes. After regenerating the source-backed experiment bundles,
+`node scripts/website-check.mjs` passed with 17 public pages, 303 Ostrin examples and 371
+integration tests. Chromium also loaded both desktop and mobile homepage layouts with the 256 px
+logo and no horizontal overflow.
+
 ## Existing surfaces
 
 | Surface | Evidence | Current state |
