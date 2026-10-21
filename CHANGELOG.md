@@ -4,6 +4,9 @@
 
 ### Correctness
 
+- Native generic calls now apply checker-resolved parameter types before lowering
+  arguments, so an empty collection can inherit its element type from another
+  argument without introducing an AST fallback.
 - Dimensional measurements now reject nominal values that are finite in their
   displayed unit but overflow when converted to coherent units, including
   arithmetic on measurements with unknown uncertainty.

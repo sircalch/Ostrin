@@ -75,7 +75,7 @@ siguen como límites explícitos.
 | Pieza | Dónde | Papel en la migración |
 |---|---|---|
 | `TypedProgram.expr_types` | `typeck` | Tipo real (`Ty`) de cada expresión (clave: archivo + rango) |
-| `TypedProgram.call_substs` | `typeck` | Argumentos de tipo por llamada genérica |
+| `TypedProgram.call_substs` | `typeck` | Sustituciones concretas y tipos esperados de parámetros antes de generar argumentos genéricos (incluidas colecciones vacías cuyo elemento se infiere de otros argumentos) |
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
