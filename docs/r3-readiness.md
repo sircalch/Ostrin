@@ -125,10 +125,13 @@ llamadas con ruta dinámica ni referencias directas a `read_file`. Las llamadas 
 resuelven a una función libre local `read_file` se contabilizan por separado como sombreadas. Las
 llamadas calificadas se reportan como no resueltas y no se atribuyen al builtin sin resolución de
 nombres. Este análisis léxico no detecta lecturas ocultas por alias, funciones importadas, FFI ni
-código del host, y no observa el sistema de
-archivos durante la ejecución. Por tanto no prueba que no existan otras entradas externas ni que el
-contenido real coincida; esa verificación requiere captura de lecturas en runtime y replay. El
-inventario también conserva 18 entradas de parámetros; tanto las llamadas con calificador de
+código del host. El replay WASI ahora instrumenta `path_open` y `fd_read`: para cada bundle
+ejecutable verifica que el código fuente y las entradas declaradas se abrieron, y que el tamaño y
+SHA-256 de los bytes devueltos al módulo coinciden con los archivos suministrados a esa ejecución,
+incluida la pasada de sensibilidad. Esto acredita las lecturas regulares observadas en ese host; no
+cubre enumeración de directorios, consultas de metadatos, otras interfaces WASI, FFI ni efectos del
+host, así que no demuestra que se hayan enumerado todas las entradas externas. El inventario también
+conserva 18 entradas de parámetros; tanto las llamadas con calificador de
 módulo (`std.io::read_file`) como las llamadas de miembro (`io.read_file`) se contabilizan como
 calificadas sin resolver y no se descartan. Ninguno de estos contadores cierra R3.
 
@@ -157,10 +160,13 @@ parámetro y, para R1, repiten la semilla. Cada captura
 debe identificar el mismo run/SHA y tener una fila de entrada cerrada. El recibo registra para
 cada bundle su ID, nivel y hash, de modo que selección y madurez no dependan del checkout desde el
 que se inspecciona un artefacto antiguo. Cada replay contrasta los bytes con ese inventario y
-verifica la fila de efectos cerrada de `main`, que es la función realmente ejecutada. El recibo de
-`surface` ancla el hash del módulo que cargan todos los replays. La lectura limita el tamaño de cada archivo
-y rechaza rutas que escapen del directorio descargado. Website CI ejecuta este replay completo
-antes de subir el paquete como evidencia. La captura de CI no es una atestación criptográfica:
+verifica la fila de efectos cerrada de `main`, que es la función realmente ejecutada. Además,
+`target/r3-ci/wasi-file-read-evidence.json` registra las rutas relativas, estado de apertura, bytes
+leídos y hashes por ejecución; liga el inventario, el SHA del WASM, el `run_id` y el `tested_sha`, y
+se incluye en el artefacto host-bound. El recibo de `surface` ancla el hash del módulo que cargan
+todos los replays. La lectura limita el tamaño de cada archivo y rechaza rutas que escapen del
+directorio descargado. Website CI ejecuta este replay completo antes de subir el paquete como
+evidencia. La captura de CI no es una atestación criptográfica:
 el éxito acredita las salidas bajo ese WASM y host, no equivalencia numérica universal.
 
 `fixtureSourceRevision` identifica el commit del programa fuente `examples/viz_surface.ostrin`;

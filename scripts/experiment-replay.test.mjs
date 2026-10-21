@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { bundleErrors, extractSvg, listExecutableReplayIds, replay, replayRecordedR0 } from "./experiment-replay.mjs";
+import { bundleErrors, createWasiFileReadEvidenceReport, extractSvg, listExecutableReplayIds, replay, replayRecordedR0, validateWasiReadEvidence } from "./experiment-replay.mjs";
 import { buildExperimentBundle, experimentFixtures } from "./experiment-bundle.mjs";
 
 test("the executable replay registry includes every source-backed R1/R2 bundle", () => {
@@ -11,6 +11,70 @@ test("the executable replay registry includes every source-backed R1/R2 bundle",
   });
   assert.deepEqual(listExecutableReplayIds(), expected);
   assert.equal(expected.length, 11);
+});
+
+test("WASI read evidence requires declared files and exact bytes actually read", () => {
+  const files = { "main.ostrin": "print(1)\n", "data.json": "{\"x\":1}\n" };
+  const read = (file) => ({
+    kind: "file-read",
+    path: file,
+    pathStatus: "relative",
+    openStatus: "opened",
+    bytesRead: Buffer.byteLength(files[file] ?? "", "utf8"),
+    contentSha256: `sha256:${createHash("sha256").update(Buffer.from(files[file] ?? "", "utf8")).digest("hex")}`,
+  });
+  assert.deepEqual(
+    validateWasiReadEvidence("fixture", [read("main.ostrin"), read("data.json")], files, ["main.ostrin", "data.json"]),
+    [],
+  );
+  assert.match(
+    validateWasiReadEvidence("fixture", [read("main.ostrin"), read("secret.txt")], files, ["main.ostrin", "data.json"]).join("\n"),
+    /outside the supplied filesystem/,
+  );
+  const mismatch = { ...read("data.json"), contentSha256: `sha256:${"0".repeat(64)}` };
+  assert.match(
+    validateWasiReadEvidence("fixture", [read("main.ostrin"), mismatch], files, ["main.ostrin", "data.json"]).join("\n"),
+    /bytes read from data\.json differ/,
+  );
+  const missing = { ...read("data.json"), openStatus: "open-failed" };
+  assert.match(
+    validateWasiReadEvidence("fixture", [read("main.ostrin"), missing], files, ["main.ostrin", "data.json"]).join("\n"),
+    /could not be opened/,
+  );
+  assert.match(
+    validateWasiReadEvidence("fixture", [read("main.ostrin")], files, ["main.ostrin", "data.json"]).join("\n"),
+    /did not read required file data\.json/,
+  );
+});
+
+test("run-bound WASI evidence binds every archived replay to one run, compiler and bundle inventory", () => {
+  const compilerWasmSha256 = `sha256:${"a".repeat(64)}`;
+  const bundleSha256 = `sha256:${"b".repeat(64)}`;
+  const inventory = { surface: { level: "R2", bundleSha256 } };
+  const result = {
+    id: "surface",
+    wasmSha256: compilerWasmSha256,
+    bundleSha256,
+    filesystemReadEvidence: {
+      schema: "ostrin.wasi-file-read-evidence/v1",
+      executions: [{ scenario: "baseline", reads: [] }],
+    },
+  };
+  const report = createWasiFileReadEvidenceReport(
+    [result],
+    { runId: "1234", testedSha: "c".repeat(40) },
+    compilerWasmSha256,
+    inventory,
+  );
+  assert.equal(report.ciRun.run_id, "1234");
+  assert.equal(report.ciRun.tested_sha, "c".repeat(40));
+  assert.equal(report.replayBundles.surface.bundleSha256, bundleSha256);
+  assert.equal(report.replayBundles.surface.executions.length, 1);
+  assert.ok(report.limitations.some((item) => item.includes("does not establish general R3 closure")));
+  assert.throws(
+    () => createWasiFileReadEvidenceReport([], { runId: "1234", testedSha: "c".repeat(40) }, compilerWasmSha256, inventory),
+    /complete replay inventory/,
+  );
 });
 
 test("an R0 recorded-parameter bundle replays twice from its archived source", async () => {

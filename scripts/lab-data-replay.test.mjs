@@ -1,12 +1,45 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareReplayFigure, spawnBoundedChild } from "./lab-data.mjs";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { compareReplayFigure, runWasmWithFilesystemEvidence, spawnBoundedChild } from "./lab-data.mjs";
+import { experimentFixtures, outputPathFor } from "./experiment-bundle.mjs";
 
 test("WASI child processes terminate when they exceed their timeout", () => {
   assert.throws(
     () => spawnBoundedChild(process.execPath, ["-e", "while (true) {}"], { encoding: "utf8" }, 100),
     /timed out after 100 ms/,
   );
+});
+
+test("WASI filesystem evidence hashes bytes actually read from a declared input", async () => {
+  const fixture = experimentFixtures.surface;
+  const bundle = JSON.parse(readFileSync(outputPathFor(fixture.id), "utf8"));
+  const source = bundle.files[bundle.experiment.source];
+  const input = bundle.files["data.json"];
+  const result = await runWasmWithFilesystemEvidence({
+    "main.ostrin": source,
+    "data.json": input,
+  }, ["--run", "main.ostrin"]);
+
+  const inputReads = result.filesystemReads.filter((event) => event.path === "data.json");
+  assert.ok(inputReads.length > 0, JSON.stringify(result.filesystemReads));
+  assert.ok(inputReads.every((event) => event.openStatus === "opened" && event.bytesRead === Buffer.byteLength(input)));
+  const expected = `sha256:${createHash("sha256").update(input, "utf8").digest("hex")}`;
+  assert.ok(inputReads.every((event) => event.contentSha256 === expected));
+});
+
+test("WASI filesystem evidence records a failed open for an omitted input", async () => {
+  const fixture = experimentFixtures.surface;
+  const bundle = JSON.parse(readFileSync(outputPathFor(fixture.id), "utf8"));
+  const result = await runWasmWithFilesystemEvidence({
+    "main.ostrin": bundle.files[bundle.experiment.source],
+  }, ["--run", "main.ostrin"]);
+  const failed = result.filesystemReads.find((event) => event.path === "data.json");
+  assert.ok(failed, JSON.stringify(result.filesystemReads));
+  assert.equal(failed.openStatus, "open-failed");
+  assert.equal(failed.bytesRead, 0);
+  assert.equal(failed.contentSha256, null);
 });
 
 function bundle(svg = "<svg/>") {

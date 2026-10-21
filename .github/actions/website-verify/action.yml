@@ -102,5 +102,6 @@ runs:
           website/ostrinc.wasm
           website/assets/experiments/*.ostrin-experiment.json
           target/r3-ci/surface-replay-receipt.json
+          target/r3-ci/wasi-file-read-evidence.json
         if-no-files-found: error
         retention-days: 90

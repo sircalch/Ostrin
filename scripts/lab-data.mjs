@@ -338,9 +338,9 @@ function sourceAssignmentPattern(name) {
 // Runs ostrinc.wasm on `files` in a bounded child Node process and returns its stdout lines.
 // Each run gets a fresh process: WebAssembly memories of finished instances are not reliably
 // released within one process, and a few dozen heavy Viz programs used to crash Node.
-function spawnWasmChild(files, args, withEvidence = false, compilerWasmPath = wasmPath) {
+function spawnWasmChild(files, args, withEvidence = false, compilerWasmPath = wasmPath, captureFilesystem = false) {
   const child = spawnBoundedChild(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
-    input: JSON.stringify({ files, args, withEvidence, compilerWasmPath }),
+    input: JSON.stringify({ files, args, withEvidence, compilerWasmPath, captureFilesystem }),
     maxBuffer: 256 * 1024 * 1024,
     encoding: "utf8",
   });
@@ -358,8 +358,148 @@ export async function runWasmWithEvidence(files, args, compilerWasmPath = wasmPa
   return spawnWasmChild(files, args, true, compilerWasmPath);
 }
 
+// Observe regular-file reads at the WASI boundary and hash the bytes returned to
+// the module. This is stronger than scanning source text for read_file calls,
+// but deliberately does not claim to cover directory enumeration or metadata
+// queries.
+export async function runWasmWithFilesystemEvidence(files, args, compilerWasmPath = wasmPath) {
+  return spawnWasmChild(files, args, true, compilerWasmPath, true);
+}
+
+function wasiPathLabel(bytes) {
+  const pathHash = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  let value;
+  try {
+    value = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return { path: null, pathHash, pathStatus: "non-utf8" };
+  }
+  const parts = value.split("/");
+  if (value.startsWith("/") || value.includes("\0") || parts.includes("..")) {
+    return { path: null, pathHash, pathStatus: "unsafe" };
+  }
+  const normalized = parts.filter((part) => part && part !== ".").join("/");
+  if (!normalized) return { path: ".", pathHash, pathStatus: "directory" };
+  return { path: normalized, pathHash, pathStatus: "relative" };
+}
+
+function captureWasiFileReads(importObject) {
+  const wasi = importObject.wasi_snapshot_preview1;
+  const originals = {
+    path_open: wasi.path_open,
+    fd_read: wasi.fd_read,
+    fd_close: wasi.fd_close,
+  };
+  let memory = null;
+  const openFiles = new Map();
+  const events = [];
+  const emptyHash = () => createHash("sha256");
+  const decodePath = (pointer, length) => {
+    if (!memory || !Number.isInteger(pointer) || !Number.isInteger(length)
+      || pointer < 0 || length < 0 || pointer + length > memory.buffer.byteLength) {
+      return { path: null, pathHash: null, pathStatus: "invalid-memory-range" };
+    }
+    return wasiPathLabel(new Uint8Array(memory.buffer, pointer, length));
+  };
+  const startRead = (label, openStatus, openErrno = null) => {
+    const event = {
+      kind: "file-read",
+      ...label,
+      openStatus,
+      ...(openErrno == null ? {} : { openErrno }),
+      bytesRead: 0,
+      contentSha256: null,
+    };
+    const record = { event, hash: emptyHash(), finalized: false };
+    events.push(event);
+    return record;
+  };
+  const finish = (record) => {
+    if (!record || record.finalized) return;
+    record.event.contentSha256 = `sha256:${record.hash.digest("hex")}`;
+    record.finalized = true;
+  };
+
+  wasi.path_open = function (...args) {
+    const label = decodePath(args[2], args[3]);
+    const rights = typeof args[5] === "bigint" ? args[5] : BigInt(args[5]);
+    const requestsRead = (rights & 2n) !== 0n; // WASI FD_READ
+    const errno = Reflect.apply(originals.path_open, this, args);
+    if (!requestsRead) return errno;
+    if (errno !== 0) {
+      startRead(label, "open-failed", errno);
+      return errno;
+    }
+    if (!memory || !Number.isInteger(args[8]) || args[8] < 0 || args[8] + 4 > memory.buffer.byteLength) {
+      startRead(label, "trace-failed");
+      return errno;
+    }
+    const descriptor = new DataView(memory.buffer).getInt32(args[8], true);
+    const prior = openFiles.get(descriptor);
+    finish(prior);
+    openFiles.set(descriptor, startRead(label, "opened"));
+    return errno;
+  };
+
+  wasi.fd_read = function (...args) {
+    const errno = Reflect.apply(originals.fd_read, this, args);
+    const descriptor = args[0];
+    let record = openFiles.get(descriptor);
+    if (!record && descriptor === 0 && errno === 0 && memory
+      && Number.isInteger(args[3]) && args[3] >= 0 && args[3] + 4 <= memory.buffer.byteLength) {
+      const amount = new DataView(memory.buffer).getUint32(args[3], true);
+      if (amount > 0) {
+        record = startRead({ path: "<stdin>", pathHash: null, pathStatus: "standard-input" }, "opened");
+        openFiles.set(descriptor, record);
+      }
+    }
+    if (!record || !memory || errno !== 0) return errno;
+    if (!Number.isInteger(args[1]) || !Number.isInteger(args[2]) || !Number.isInteger(args[3])
+      || args[1] < 0 || args[2] < 0 || args[3] < 0
+      || args[1] + args[2] * 8 > memory.buffer.byteLength || args[3] + 4 > memory.buffer.byteLength) {
+      record.event.readStatus = "invalid-memory-range";
+      return errno;
+    }
+    const view = new DataView(memory.buffer);
+    let remaining = view.getUint32(args[3], true);
+    for (let index = 0; index < args[2] && remaining > 0; index++) {
+      const entry = args[1] + index * 8;
+      const pointer = view.getUint32(entry, true);
+      const length = view.getUint32(entry + 4, true);
+      if (pointer + length > memory.buffer.byteLength) {
+        record.event.readStatus = "invalid-memory-range";
+        return errno;
+      }
+      const consumed = Math.min(remaining, length);
+      record.hash.update(new Uint8Array(memory.buffer, pointer, consumed));
+      record.event.bytesRead += consumed;
+      remaining -= consumed;
+    }
+    if (remaining > 0) record.event.readStatus = "short-iovec-accounting";
+    return errno;
+  };
+
+  wasi.fd_close = function (...args) {
+    const errno = Reflect.apply(originals.fd_close, this, args);
+    finish(openFiles.get(args[0]));
+    openFiles.delete(args[0]);
+    return errno;
+  };
+
+  return {
+    attachInstance(instance) {
+      memory = instance.exports.memory;
+    },
+    finish() {
+      for (const record of openFiles.values()) finish(record);
+      openFiles.clear();
+      return events.map((event) => ({ ...event }));
+    },
+  };
+}
+
 // Runs ostrinc.wasm under Node WASI in a scratch copy of `files`; returns stdout lines.
-async function runWasmHere(module, files, args) {
+async function runWasmHere(module, files, args, captureFilesystem = false) {
   const scratch = mkdtempSync(path.join(os.tmpdir(), "ostrin-lab-"));
   const stdoutPath = path.join(scratch, ".stdout");
   const stderrPath = path.join(scratch, ".stderr");
@@ -375,7 +515,10 @@ async function runWasmHere(module, files, args) {
     stdoutFd = openSync(stdoutPath, "w");
     stderrFd = openSync(stderrPath, "w");
     const wasi = new WASI({ version: "preview1", args: ["ostrinc", ...args], env: {}, preopens: { ".": work }, stdout: stdoutFd, stderr: stderrFd, returnOnExit: true });
-    const instance = await WebAssembly.instantiate(module, wasi.getImportObject());
+    const importObject = wasi.getImportObject();
+    const filesystemCapture = captureFilesystem ? captureWasiFileReads(importObject) : null;
+    const instance = await WebAssembly.instantiate(module, importObject);
+    filesystemCapture?.attachInstance(instance);
     const code = wasi.start(instance);
     closeSync(stdoutFd);
     closeSync(stderrFd);
@@ -383,7 +526,10 @@ async function runWasmHere(module, files, args) {
     const stdout = readFileSync(stdoutPath, "utf8").replaceAll("\r\n", "\n");
     const stderr = readFileSync(stderrPath, "utf8");
     if (code !== 0) throw new Error(`ostrinc ${args.join(" ")} exited with ${code}: ${stderr}${stdout}`);
-    return stdout.replace(/\n$/, "").split("\n");
+    const lines = stdout.replace(/\n$/, "").split("\n");
+    return filesystemCapture
+      ? { lines, filesystemReads: filesystemCapture.finish() }
+      : lines;
   } finally {
     if (stdoutFd !== undefined) closeSync(stdoutFd);
     if (stderrFd !== undefined) closeSync(stderrFd);
@@ -646,12 +792,21 @@ async function main() {
 }
 
 async function wasmChild() {
-  const { files, args, withEvidence, compilerWasmPath = wasmPath } = JSON.parse(readFileSync(0, "utf8"));
+  const { files, args, withEvidence, captureFilesystem, compilerWasmPath = wasmPath } = JSON.parse(readFileSync(0, "utf8"));
   const wasmBytes = readFileSync(compilerWasmPath);
   const wasmSha256 = `sha256:${createHash("sha256").update(wasmBytes).digest("hex")}`;
   const module = await WebAssembly.compile(wasmBytes);
-  const lines = await runWasmHere(module, files, args);
-  process.stdout.write(JSON.stringify(withEvidence ? { lines, wasmSha256 } : lines));
+  const result = await runWasmHere(module, files, args, captureFilesystem);
+  const lines = Array.isArray(result) ? result : result.lines;
+  if (withEvidence || captureFilesystem) {
+    process.stdout.write(JSON.stringify({
+      lines,
+      ...(withEvidence ? { wasmSha256 } : {}),
+      ...(captureFilesystem ? { filesystemReads: result.filesystemReads } : {}),
+    }));
+  } else {
+    process.stdout.write(JSON.stringify(lines));
+  }
 }
 
 if (process.argv.includes("--wasm-child")) {

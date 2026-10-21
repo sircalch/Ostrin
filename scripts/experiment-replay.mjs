@@ -12,11 +12,12 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
-import { runWasm, runWasmWithEvidence } from "./lab-data.mjs";
+import { runWasmWithFilesystemEvidence } from "./lab-data.mjs";
 import { createSurfaceReceipt, readArchivedFile, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
 import { inspectBundle } from "./r3-readiness.mjs";
 
 const schema = "ostrin.experiment/v0";
+const filesystemEvidenceSchema = "ostrin.wasi-file-read-evidence/v1";
 
 function sha256(text) {
   return `sha256:${createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex")}`;
@@ -24,6 +25,99 @@ function sha256(text) {
 
 function bytes(text) {
   return Buffer.byteLength(text, "utf8");
+}
+
+export function validateWasiReadEvidence(id, events, files, requiredPaths = []) {
+  const errors = [];
+  const seen = new Set();
+  if (!Array.isArray(events)) return [`${id}: WASI filesystem read evidence is missing`];
+  for (const event of events) {
+    if (event.kind !== "file-read") continue;
+    if (event.pathStatus !== "relative" || typeof event.path !== "string") {
+      errors.push(`${id}: WASI read path is ${event.pathStatus ?? "unknown"}`);
+      continue;
+    }
+    const expected = files[event.path];
+    if (typeof expected !== "string") {
+      errors.push(`${id}: WASI attempted to read ${event.path} outside the supplied filesystem`);
+      continue;
+    }
+    if (event.openStatus !== "opened") {
+      errors.push(`${id}: declared file ${event.path} could not be opened (${event.openStatus})`);
+      continue;
+    }
+    if (event.readStatus) {
+      errors.push(`${id}: WASI read from ${event.path} was incomplete (${event.readStatus})`);
+      continue;
+    }
+    const expectedBytes = Buffer.from(expected, "utf8");
+    const expectedHash = `sha256:${createHash("sha256").update(expectedBytes).digest("hex")}`;
+    if (event.bytesRead !== expectedBytes.byteLength || event.contentSha256 !== expectedHash) {
+      errors.push(`${id}: bytes read from ${event.path} differ from the supplied file`);
+      continue;
+    }
+    seen.add(event.path);
+  }
+  for (const file of requiredPaths) {
+    if (!seen.has(file)) errors.push(`${id}: WASI execution did not read required file ${file}`);
+  }
+  return errors;
+}
+
+function sanitizeWasiReadEvents(events) {
+  return events.map((event) => ({
+    kind: event.kind,
+    ...(event.path === null ? {} : { path: event.path }),
+    ...(event.pathHash ? { pathSha256: event.pathHash } : {}),
+    pathStatus: event.pathStatus,
+    openStatus: event.openStatus,
+    ...(event.openErrno == null ? {} : { openErrno: event.openErrno }),
+    bytesRead: event.bytesRead,
+    contentSha256: event.contentSha256,
+    ...(event.readStatus ? { readStatus: event.readStatus } : {}),
+  }));
+}
+
+export function createWasiFileReadEvidenceReport(results, expectedRun, compilerWasmSha256, replayBundles) {
+  if (!/^\d+$/.test(expectedRun?.runId ?? "") || !/^[a-f0-9]{40}$/.test(expectedRun?.testedSha ?? "")) {
+    throw new Error("WASI file-read evidence requires a run ID and tested commit SHA");
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(compilerWasmSha256 ?? "")) {
+    throw new Error("WASI file-read evidence requires the tested compiler WASM digest");
+  }
+  const resultById = new Map(results.map((result) => [result.id, result]));
+  const ids = Object.keys(replayBundles ?? {}).sort();
+  if (ids.length === 0 || results.length !== ids.length || resultById.size !== ids.length || ids.some((id) => !resultById.has(id))) {
+    throw new Error("WASI file-read evidence does not cover the complete replay inventory");
+  }
+  const bundles = Object.fromEntries(ids.map((id) => {
+    const result = resultById.get(id);
+    const inventory = replayBundles[id];
+    if (!result.filesystemReadEvidence || result.filesystemReadEvidence.schema !== filesystemEvidenceSchema
+      || !Array.isArray(result.filesystemReadEvidence.executions) || result.filesystemReadEvidence.executions.length === 0) {
+      throw new Error(`${id}: replay is missing runtime WASI file-read evidence`);
+    }
+    if (result.wasmSha256 !== compilerWasmSha256 || result.bundleSha256 !== inventory.bundleSha256) {
+      throw new Error(`${id}: replay evidence does not match the tested compiler or bundle inventory`);
+    }
+    return [id, {
+      level: inventory.level,
+      bundleSha256: result.bundleSha256,
+      executions: result.filesystemReadEvidence.executions,
+    }];
+  }));
+  return {
+    schema: filesystemEvidenceSchema,
+    ciRun: { run_id: expectedRun.runId, tested_sha: expectedRun.testedSha },
+    compilerWasmSha256,
+    scope: "regular files read through WASI Preview 1 path_open/fd_read only",
+    limitations: [
+      "Does not observe directory enumeration or filesystem metadata queries.",
+      "Does not cover native host filesystem access, network, clock, environment variables, or other WASI interfaces.",
+      "A completed read trace does not establish general R3 closure or cross-platform equivalence.",
+    ],
+    replayBundles: bundles,
+  };
 }
 
 function canonicalJson(value) {
@@ -204,18 +298,28 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
   const modulePath = compilerWasmPath ?? path.join(repositoryRoot, "website", "ostrinc.wasm");
   if (!existsSync(modulePath)) throw new Error(`${id}: compiler WASM is missing at ${modulePath}`);
   if (compilerWasmPath && !bindWasm) throw new Error(`${id}: an archived compiler requires a bound replay`);
-  const module = bindWasm ? null : await WebAssembly.compile(readFileSync(modulePath));
   let wasmSha256;
+  const filesystemExecutions = [];
   const execute = async (files) => {
-    if (!bindWasm) return runWasm(module, files, ["--run", "main.ostrin"]);
-    const observed = await runWasmWithEvidence(files, ["--run", "main.ostrin"], modulePath);
+    const observed = await runWasmWithFilesystemEvidence(files, ["--run", "main.ostrin"], modulePath);
     if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
-      throw new Error(`${id}: WASI child did not return a valid module execution digest`);
+      throw new Error(`${id}: WASI child did not return valid execution evidence`);
     }
     if (wasmSha256 && observed.wasmSha256 !== wasmSha256) {
       throw new Error(`${id}: WASM module changed between replay executions`);
     }
     wasmSha256 = observed.wasmSha256;
+    const readErrors = validateWasiReadEvidence(
+      id,
+      observed.filesystemReads,
+      files,
+      ["main.ostrin", inputFile],
+    );
+    if (readErrors.length) throw new Error(readErrors.join("\n"));
+    filesystemExecutions.push({
+      scenario: filesystemExecutions.length === 0 ? "baseline" : "subsequent-run",
+      reads: sanitizeWasiReadEvents(observed.filesystemReads),
+    });
     return observed.lines;
   };
   const files = { "main.ostrin": source, [inputFile]: input };
@@ -244,7 +348,9 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
   }
 
   const changedInput = alternateInput(bundle, id);
+  const changedRunIndex = filesystemExecutions.length;
   const changedOutput = await execute({ "main.ostrin": source, [inputFile]: changedInput });
+  filesystemExecutions[changedRunIndex].scenario = "changed-input";
   const changedSvg = normalizeFigureMetadata(extractSvg(changedOutput, id), metadata);
   if (changedSvg === rendered) throw new Error(`${id}: changing a declared input did not change the rendered figure`);
 
@@ -255,6 +361,11 @@ async function replay(id, { bindWasm = false, bundleText: suppliedBundleText, co
     baseline: "match",
     sensitivity: "changed-output",
     ...(seeded ? { seeded: "same-seed-and-changed-output" } : {}),
+    ...(bindWasm ? { filesystemReadEvidence: {
+      schema: filesystemEvidenceSchema,
+      scope: "regular files read through WASI Preview 1 path_open/fd_read only",
+      executions: filesystemExecutions,
+    } } : {}),
     ...(bindWasm ? {
       wasmSha256,
       bundleSha256: sha256(bundleText),
@@ -368,8 +479,11 @@ export async function replayRecordedR0(id, { bundleText: suppliedBundleText, com
     compiler: bundle.provenance.figure_metadata?.compiler,
   };
   let wasmSha256;
+  const filesystemExecutions = [];
+  let executionCount = 0;
   const execute = async () => {
-    const observed = await runWasmWithEvidence({ "main.ostrin": source }, ["--run", "main.ostrin"], modulePath);
+    const files = { "main.ostrin": source };
+    const observed = await runWasmWithFilesystemEvidence(files, ["--run", "main.ostrin"], modulePath);
     if (!Array.isArray(observed?.lines) || !/^sha256:[a-f0-9]{64}$/.test(observed?.wasmSha256 ?? "")) {
       throw new Error(`${id}: WASI child did not return a valid module execution digest`);
     }
@@ -377,6 +491,12 @@ export async function replayRecordedR0(id, { bundleText: suppliedBundleText, com
       throw new Error(`${id}: WASM module changed between R0 replay executions`);
     }
     wasmSha256 = observed.wasmSha256;
+    const readErrors = validateWasiReadEvidence(id, observed.filesystemReads, files, ["main.ostrin"]);
+    if (readErrors.length) throw new Error(readErrors.join("\n"));
+    filesystemExecutions.push({
+      scenario: executionCount++ === 0 ? "baseline" : "repeatability",
+      reads: sanitizeWasiReadEvents(observed.filesystemReads),
+    });
     const rendered = normalizeFigureMetadata(extractSvg(observed.lines, id), metadata);
     if (rendered !== recordedFigure) throw new Error(`${id}: archived R0 source replay differs from its recorded SVG`);
     if (bytes(rendered) !== invocationOutput.bytes || sha256(rendered) !== invocationOutput.sha256) {
@@ -394,6 +514,11 @@ export async function replayRecordedR0(id, { bundleText: suppliedBundleText, com
     repeatability: "same-output",
     wasmSha256,
     bundleSha256: sha256(bundleText),
+    filesystemReadEvidence: {
+      schema: filesystemEvidenceSchema,
+      scope: "regular files read through WASI Preview 1 path_open/fd_read only",
+      executions: filesystemExecutions,
+    },
   };
 }
 
@@ -478,6 +603,7 @@ async function main() {
     if (ids.length === 0) throw new Error("archived receipt is missing the tested run's executable replay inventory");
     if (!ids.includes("surface")) throw new Error("surface must be in the executable replay registry to bind the archived WASM");
     const moduleSha256 = surface.receipt.compilerWasmSha256;
+    const replayResults = [];
     for (const id of ids) {
       const artifact = id === "surface" ? surface : readArchivedReplayBundle(directory, id, expectedRun);
       const level = expectedRun.replayBundles[id]?.level;
@@ -494,6 +620,7 @@ async function main() {
       if (result.wasmSha256 !== moduleSha256) {
         throw new Error(`${id}: archived replay loaded WASM bytes that differ from the run-bound surface receipt`);
       }
+      replayResults.push(result);
       if (id === "surface"
         && JSON.stringify(createSurfaceReceipt(artifact.bundleText, result, surface.receipt.replayBundles))
           !== JSON.stringify(surface.receipt)) {
@@ -504,6 +631,11 @@ async function main() {
         : `${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""}`;
       console.log(`experiment-replay: independently replayed ${id} (${level}) from archived WASM in CI run ${runId} (${replayDetails})`);
     }
+    const readEvidence = createWasiFileReadEvidenceReport(replayResults, expectedRun, moduleSha256, expectedRun.replayBundles);
+    const evidencePath = path.join(repositoryRoot, "target/r3-ci/wasi-file-read-evidence.json");
+    mkdirSync(path.dirname(evidencePath), { recursive: true });
+    writeFileSync(evidencePath, `${JSON.stringify(readEvidence, null, 2)}\n`, "utf8");
+    console.log(`experiment-replay: wrote run-bound runtime file-read evidence for ${ids.length} bundles`);
     console.log(`experiment-replay: independently replayed all ${ids.length} bundles in the archived R0/R1/R2 inventory`);
     return;
   }
