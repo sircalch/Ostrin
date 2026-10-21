@@ -9,6 +9,7 @@ const trackedFiles = [
   "compiler/std/measurements.ostrin",
   "examples/measurement_scalar.ostrin",
   "examples/measurement_quantity_direct_shape.ostrin",
+  "examples/measurement_lab.ostrin",
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
   "scripts/lab-data.mjs",
@@ -148,7 +149,7 @@ test("the gate rejects dimensional product propagation without both derivative f
     );
     writeFileSync(file, source);
     const result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("dimensional products and same-dimension ratios")));
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same- or cross-dimension ratios")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -161,7 +162,39 @@ test("the gate rejects same-dimension quotient propagation without the numerator
     const source = readFileSync(file, "utf8").replace("a_factor = 1.0 / b_value", "a_factor = 0.0");
     writeFileSync(file, source);
     const result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("dimensional products and same-dimension ratios")));
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same- or cross-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects cross-dimension quotient propagation without the numerator derivative", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      "contribution: item.contribution / divisor",
+      "contribution: item.contribution",
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same- or cross-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate requires an explicit dimensionless quotient boundary", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      "dimensionless quotient requires div_quantity_same",
+      "unsupported quotient",
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same- or cross-dimension ratios")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

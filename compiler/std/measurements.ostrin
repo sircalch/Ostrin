@@ -295,6 +295,101 @@ pub fn mul_quantity<A: Dimension, B: Dimension>(
     }
 }
 
+fn divide_quantity_sources_by_right<A: Dimension, B: Dimension>(
+    input: List<Sensitivity<Quantity<A>>>,
+    divisor: Quantity<B>
+) -> Result<List<Sensitivity<Quantity<A / B>>>, String> {
+    mut output: List<Sensitivity<Quantity<A / B>>> = []
+    for item in input {
+        mut validation_error = validate_quantity_source(item)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        scaled = Sensitivity<Quantity<A / B>> {
+            source_id: item.source_id,
+            label: item.label,
+            source_dimension: item.source_dimension,
+            source_sigma: item.source_sigma,
+            contribution: item.contribution / divisor,
+        }
+        validation_error = validate_quantity_source(scaled)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        output.push(scaled)
+    }
+    Ok(output)
+}
+
+fn divide_quantity_sources_by_left<A: Dimension, B: Dimension>(
+    input: List<Sensitivity<Quantity<B>>>,
+    numerator: Quantity<A>,
+    denominator: Quantity<B>
+) -> Result<List<Sensitivity<Quantity<A / B>>>, String> {
+    mut output: List<Sensitivity<Quantity<A / B>>> = []
+    for item in input {
+        mut validation_error = validate_quantity_source(item)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        scaled = Sensitivity<Quantity<A / B>> {
+            source_id: item.source_id,
+            label: item.label,
+            source_dimension: item.source_dimension,
+            source_sigma: item.source_sigma,
+            contribution: ((numerator * item.contribution) / (denominator * denominator)) * -1.0,
+        }
+        validation_error = validate_quantity_source(scaled)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        output.push(scaled)
+    }
+    Ok(output)
+}
+
+// Propagate division while preserving the quotient dimension in the result and
+// in every source contribution. The same-dimension Float API remains available
+// through div_quantity_same for compatibility.
+pub fn div_quantity<A: Dimension, B: Dimension>(
+    a: Measurement<Quantity<A>>,
+    b: Measurement<Quantity<B>>
+) -> Result<Measurement<Quantity<A / B>>, String> {
+    a_value = a.value.value() * a.value.unit_scale()
+    b_value = b.value.value() * b.value.unit_scale()
+    if not is_finite(a_value) or not is_finite(b_value) {
+        return Err("measurement value must be finite")
+    }
+    if b_value == 0.0 {
+        return Err("measurement division by zero")
+    }
+    if a.value.dimension_key() == b.value.dimension_key() {
+        return Err("dimensionless quotient requires div_quantity_same")
+    }
+    result = a.value / b.value
+    if not is_finite(result.value()) or not is_finite(result.value() * result.unit_scale()) {
+        return Err("measurement value must be finite")
+    }
+    if not a.known or not b.known {
+        return Ok(unknown_quantity_from("div", result))
+    }
+    match divide_quantity_sources_by_right(a.sources, b.value) {
+        Ok(left_sources) => match divide_quantity_sources_by_left(b.sources, a.value, b.value) {
+            Ok(right_sources) => match merge_quantity_sources(left_sources, right_sources, 1.0) {
+                Ok(sources) => Ok(Measurement<Quantity<A / B>> {
+                    value: result,
+                    sources: sources,
+                    known: true,
+                    reason: "",
+                }),
+                Err(message) => Err(message),
+            },
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
 fn scale_quantity_sources_to_float<D: Dimension>(
     input: List<Sensitivity<Quantity<D>>>,
     factor: Float

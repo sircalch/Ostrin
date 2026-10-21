@@ -694,14 +694,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "file": "examples/measurement_lab.ostrin",
       "render": "text",
       "params": [],
-      "how": "std.measurements keeps explicit source identities with values and their uncertainty state. Shared IDs preserve correlation through sums, products and same-dimension ratios; independent IDs combine through the linearized variance rule. The dimensional API runs here through ostrinc.wasm and remains interpreter-only; the scalar API separately has interpreter/native parity.",
+      "how": "std.measurements keeps explicit source identities with values and their uncertainty state. Shared IDs preserve correlation through sums, products and same- or cross-dimension ratios; independent IDs combine through the linearized variance rule. The dimensional API runs here through ostrinc.wasm and remains interpreter-only; the scalar API separately has interpreter/native parity.",
       "docs": {
         "label": "measurement design",
         "href": "https://github.com/sircalch/Ostrin/blob/main/docs/design/25-mediciones-e-incertidumbre.md"
       },
-      "limits": "The dimensioned Measurement prototype supports source construction, sums, products, coherent standard uncertainty and ratios between equal dimensions in the interpreter/WASM path. Native support, Array<Measurement>, covariance, Monte Carlo and coverage intervals remain planned. Ratios between different dimensions are not implemented; unknown uncertainty is never treated as zero.",
+      "limits": "The dimensioned Measurement prototype supports source construction, sums, products, coherent standard uncertainty and ratios between equal or different dimensions in the interpreter/WASM path. Native support, Array<Measurement>, covariance, Monte Carlo and coverage intervals remain planned; unknown uncertainty is never treated as zero.",
       "files": {
-        "main.ostrin": "// Scientific Lab · Measurements\n// Source identity carries correlation through dimensional products and ratios.\nimport std.measurements\n\nfn main() -> Void {\n    ruler_a = measurements.from_quantity_source(4 m, 10 cm, \"shared-ruler\", \"ruler reading A\").unwrap()\n    ruler_b = measurements.from_quantity_source(4 m, 10 cm, \"shared-ruler\", \"ruler reading B\").unwrap()\n\n    combined = measurements.add_quantity(ruler_a, ruler_b).unwrap()\n    combined_u = measurements.quantity_uncertainty(combined).unwrap()\n    print(\"shared readings\")\n    print(combined.value)\n    print(\"standard uncertainty (m) = \" + combined_u.value.to_string())\n\n    area = measurements.mul_quantity(ruler_a, ruler_b).unwrap()\n    area_u = measurements.quantity_uncertainty(area).unwrap()\n    print(\"product dimension = \" + area.value.dimension_key())\n    print(\"product contribution\")\n    print(area.sources[0].contribution)\n    print(\"product standard uncertainty = \" + area_u.value.to_string())\n\n    ratio = measurements.div_quantity_same(ruler_a, ruler_b).unwrap()\n    print(\"same-source ratio = \" + measurements.summary(ratio))\n}\n"
+        "main.ostrin": "// Scientific Lab · Measurements\n// Source identity carries correlation through dimensional products and ratios.\nimport std.measurements\n\nfn main() -> Void {\n    ruler_a = measurements.from_quantity_source(4 m, 10 cm, \"shared-ruler\", \"ruler reading A\").unwrap()\n    ruler_b = measurements.from_quantity_source(4 m, 10 cm, \"shared-ruler\", \"ruler reading B\").unwrap()\n\n    combined = measurements.add_quantity(ruler_a, ruler_b).unwrap()\n    combined_u = measurements.quantity_uncertainty(combined).unwrap()\n    print(\"shared readings\")\n    print(combined.value)\n    print(\"standard uncertainty (m) = \" + combined_u.value.to_string())\n\n    area = measurements.mul_quantity(ruler_a, ruler_b).unwrap()\n    area_u = measurements.quantity_uncertainty(area).unwrap()\n    print(\"product dimension = \" + area.value.dimension_key())\n    print(\"product contribution\")\n    print(area.sources[0].contribution)\n    print(\"product standard uncertainty = \" + area_u.value.to_string())\n\n    ratio = measurements.div_quantity_same(ruler_a, ruler_b).unwrap()\n    print(\"same-source ratio = \" + measurements.summary(ratio))\n\n    distance = measurements.from_quantity_source(10 m, 10 cm, \"distance\", \"distance\").unwrap()\n    elapsed = measurements.from_quantity_source(2 s, 0.2 s, \"elapsed\", \"elapsed\").unwrap()\n    speed = measurements.div_quantity(distance, elapsed).unwrap()\n    speed_u = measurements.quantity_uncertainty(speed).unwrap()\n    print(\"cross-dimension ratio = \" + speed.value.to_string())\n    print(\"speed dimension = \" + speed.value.dimension_key())\n    print(\"speed standard uncertainty (m/s) = \" + speed_u.value.to_string())\n}\n"
       },
       "main": "main.ostrin",
       "args": [
@@ -718,7 +718,10 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "product contribution",
         "8000 cm^2",
         "product standard uncertainty = 0.8",
-        "same-source ratio = 1 ± 0"
+        "same-source ratio = 1 ± 0",
+        "cross-dimension ratio = 5 m/s",
+        "speed dimension = Length*Time^-1",
+        "speed standard uncertainty (m/s) = 0.5024937810560445"
       ]
     },
     {
