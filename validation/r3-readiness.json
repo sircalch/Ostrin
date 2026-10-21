@@ -30,7 +30,7 @@
   "captureOpenCount": 29,
   "incompleteEffectBundleCount": 0,
   "closedEntryEffectBundleCount": 29,
-  "knownEffectCallCount": 20589,
+  "knownEffectCallCount": 20593,
   "symbolicEffectCallCount": 74,
   "unresolvedEffectCallCount": 0,
   "gapDiagnostics": {
@@ -413,7 +413,247 @@
         "parameters": 18
       },
       "bundlesMissingSnapshotDeclaration": [],
-      "interpretation": "Counts describe declared provenance inputs, runtime snapshot references and execution capabilities. A path/hash match is structural consistency only; it does not prove that every external input is declared or read, and this report does not re-execute the bundle to verify snapshot bytes."
+      "sourceReadAudit": {
+        "sourceBundleCount": 29,
+        "bundlesWithDirectReadFileCalls": 11,
+        "directReadFileCallCount": 21,
+        "literalReadPathCallCount": 21,
+        "dynamicReadCallCount": 0,
+        "readFileReferenceCount": 0,
+        "undeclaredLiteralReadPaths": [],
+        "declaredSnapshotsWithoutDirectRead": [],
+        "sourceReadsWithoutFilesystemCapability": [],
+        "filesystemCapabilitiesWithoutDirectRead": [],
+        "bundles": [
+          {
+            "bundle": "bars",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 9
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 29
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "boxplot",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "dashboard",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "fft",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 7
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 27
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 51
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "hexbin",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "histogram",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "lines",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "point-cloud",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "scatter-fit",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "surface",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 12
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "violin",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 6
+              },
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 26
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          }
+        ]
+      },
+      "interpretation": "Counts describe declared provenance inputs, runtime snapshot references, source read_file calls and execution capabilities. The source scan identifies direct literal paths and surfaces dynamic calls or references, but cannot detect reads hidden behind aliases, imported helpers, FFI or host code; it is not a runtime trace. A path/hash match is structural consistency only and does not prove that every external input is captured or that snapshot bytes were re-read."
     },
     "notAssessed": [
       "Whether an operation resolves to a typed function or intrinsic",
@@ -493,7 +733,7 @@
       "effectCoverage": {
         "complete": true,
         "count_unit": "distinct_function_operation_edges",
-        "known_calls": 810,
+        "known_calls": 814,
         "symbolic_calls": 1,
         "unresolved_calls": 0
       },
