@@ -336,9 +336,12 @@ en una consola de logs.
    función-operación, por lo que llamadas repetidas a la misma operación dentro de una función
    cuentan una sola vez. No representa el total de sitios de llamada del código fuente;
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
-   haya demostrado pureza. Los bordes de callback simbólicos se reportan aparte y mantienen R3
-   abierto hasta que su efecto también se resuelva; una captura estructuralmente válida no basta
-   para declarar cerrado ese nivel.
+   haya demostrado pureza. Los bordes de callback simbólicos se reportan aparte. R3 evalúa la fila
+   transitiva del entrypoint ejecutado: un callback simbólico fuera de ese recorrido no lo mantiene
+   abierto por sí solo, mientras que un callback desconocido alcanzable desde el entrypoint deja esa
+   fila abierta. Una captura estructuralmente válida no basta: también se exige la fila cerrada del
+   entrypoint y las demás comprobaciones del bundle. Esto no convierte el inventario global en un
+   análisis completo ni demuestra pureza.
    La implementación también reconoce una whitelist pequeña y explícita de operaciones locales
    deterministas —accesos y transformaciones de colecciones, cadenas, mediciones, resultados y
    matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
