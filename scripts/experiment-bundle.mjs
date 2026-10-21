@@ -302,6 +302,92 @@ export function outputPathFor(fixtureId = defaultFixtureId, root = repositoryRoo
 
 export const outputPath = outputPathFor();
 
+// Report direct read_file calls in bundled Ostrin source. This is a lexical
+// inventory, not a complete runtime trace: aliases, imported helpers, FFI and
+// generated source can still read files without appearing as a direct call.
+export function scanReadFileCalls(source) {
+  if (typeof source !== "string") return [];
+  const tokens = [];
+  let index = 0;
+  let line = 1;
+  const addToken = (kind, value, tokenLine) => tokens.push({ kind, value, line: tokenLine });
+
+  while (index < source.length) {
+    const char = source[index];
+    if (/\s/.test(char)) {
+      if (char === "\n") line++;
+      index++;
+      continue;
+    }
+    if (char === "/" && source[index + 1] === "/") {
+      index += 2;
+      while (index < source.length && source[index] !== "\n") index++;
+      continue;
+    }
+    if (char === "/" && source[index + 1] === "*") {
+      index += 2;
+      while (index < source.length && !(source[index] === "*" && source[index + 1] === "/")) {
+        if (source[index] === "\n") line++;
+        index++;
+      }
+      if (index < source.length) index += 2;
+      continue;
+    }
+    if (char === '"') {
+      const tokenLine = line;
+      const start = index++;
+      while (index < source.length) {
+        if (source[index] === "\\") {
+          index += 2;
+          continue;
+        }
+        if (source[index] === '"') {
+          index++;
+          break;
+        }
+        if (source[index] === "\n") line++;
+        index++;
+      }
+      let value = null;
+      try {
+        value = JSON.parse(source.slice(start, index));
+      } catch {
+        // An unsupported string escape cannot be used as a proven path.
+      }
+      addToken("string", value, tokenLine);
+      continue;
+    }
+    const identifier = /^[\p{ID_Start}_][\p{ID_Continue}_]*/u.exec(source.slice(index));
+    if (identifier) {
+      addToken("identifier", identifier[0], line);
+      index += identifier[0].length;
+      continue;
+    }
+    addToken("punctuation", char, line);
+    index++;
+  }
+
+  const reads = [];
+  for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+    const current = tokens[tokenIndex];
+    if (current.kind !== "identifier" || current.value !== "read_file") continue;
+    if (tokens[tokenIndex - 1]?.kind === "identifier" && tokens[tokenIndex - 1]?.value === "fn") continue;
+    if (tokens[tokenIndex + 1]?.kind !== "punctuation" || tokens[tokenIndex + 1]?.value !== "(") {
+      reads.push({ kind: "reference", path: null, line: current.line });
+      continue;
+    }
+    const argument = tokens[tokenIndex + 2];
+    const closing = tokens[tokenIndex + 3];
+    if (argument?.kind === "string" && typeof argument.value === "string"
+      && closing?.kind === "punctuation" && closing.value === ")") {
+      reads.push({ kind: "literal", path: argument.value, line: current.line });
+    } else {
+      reads.push({ kind: "dynamic", path: null, line: current.line });
+    }
+  }
+  return reads;
+}
+
 function normalizedText(root, relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8").replaceAll("\r\n", "\n");
 }

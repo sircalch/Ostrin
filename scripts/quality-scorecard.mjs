@@ -400,6 +400,23 @@ export async function buildScorecard() {
         closedEntryEffectBundleCount: report.closedEntryEffectBundleCount,
         symbolicEffectCallCount: report.symbolicEffectCallCount,
         unresolvedEffectCallCount: report.unresolvedEffectCallCount,
+        sourceReadAudit: (() => {
+          const audit = report.gapDiagnostics.externalInputEvidence.sourceReadAudit;
+          return {
+            sourceBundleCount: audit.sourceBundleCount,
+            bundlesWithDirectReadFileCalls: audit.bundlesWithDirectReadFileCalls,
+            directReadFileCallCount: audit.directReadFileCallCount,
+            literalReadPathCallCount: audit.literalReadPathCallCount,
+            dynamicReadCallCount: audit.dynamicReadCallCount,
+            readFileReferenceCount: audit.readFileReferenceCount,
+            undeclaredLiteralPathCount: audit.undeclaredLiteralReadPaths
+              .reduce((total, entry) => total + entry.paths.length, 0),
+            declaredSnapshotWithoutDirectReadCount: audit.declaredSnapshotsWithoutDirectRead
+              .reduce((total, entry) => total + entry.paths.length, 0),
+            sourceReadsWithoutFilesystemCapabilityCount: audit.sourceReadsWithoutFilesystemCapability.length,
+            filesystemCapabilitiesWithoutDirectReadCount: audit.filesystemCapabilitiesWithoutDirectRead.length,
+          };
+        })(),
       };
     })(),
     linguist: linguistStatus(),

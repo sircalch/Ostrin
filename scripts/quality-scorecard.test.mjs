@@ -136,6 +136,18 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
   assert.equal(scorecard.r3.incompleteEffectBundleCount, 0);
   assert.equal(scorecard.r3.unresolvedEffectCallCount, 0);
   assert.ok(scorecard.r3.symbolicEffectCallCount > 0);
+  assert.deepEqual(scorecard.r3.sourceReadAudit, {
+    sourceBundleCount: scorecard.r3.bundleCount,
+    bundlesWithDirectReadFileCalls: 11,
+    directReadFileCallCount: 21,
+    literalReadPathCallCount: 21,
+    dynamicReadCallCount: 0,
+    readFileReferenceCount: 0,
+    undeclaredLiteralPathCount: 0,
+    declaredSnapshotWithoutDirectReadCount: 0,
+    sourceReadsWithoutFilesystemCapabilityCount: 0,
+    filesystemCapabilitiesWithoutDirectReadCount: 0,
+  });
   assert.ok(scorecard.effectCoverage.knownCalls > 0);
   assert.ok(scorecard.effectCoverage.symbolicCalls > 0);
   assert.equal(scorecard.effectCoverage.unresolvedCalls, 0);
