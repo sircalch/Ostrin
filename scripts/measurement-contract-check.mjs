@@ -16,27 +16,29 @@ function check(errors, condition, message) {
 }
 
 /**
- * Check that the experimental scalar Measurement contract is still source-backed.
- * This gate intentionally verifies evidence and boundaries; it does not enable
- * Array<Measurement>, native dimensional support, covariance, or Monte Carlo.
+ * Check that scalar and bounded dimensional Measurement contracts have evidence.
+ * This gate does not enable Array<Measurement>, covariance, or Monte Carlo.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
   const std = read("compiler/std/measurements.ostrin", root);
   const example = read("examples/measurement_scalar.ostrin", root);
   const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
+  const nativeQuantityExample = read("examples/measurement_quantity_native_smoke.ostrin", root);
   const labExample = read("examples/measurement_lab.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
   const codegen = read("compiler/src/codegen.rs", root);
-  const testsWithQuantityBoundary = tests.includes("measurement_quantity_boundary_is_explicitly_rejected_natively");
-  const testsWithDirectQuantityBoundary = tests.includes("direct_measurement_quantity_boundary_is_explicitly_rejected_natively");
+  const testsWithQuantityNativeSmoke = tests.includes("dimensional_measurement_native_smoke_matches_interpreter_and_wasi");
+  const testsWithQuantityLab = tests.includes("dimensional_measurement_lab_matches_interpreter_and_native");
+  const testsWithDirectQuantityBoundary = tests.includes("dimensional_measurement_full_surface_keeps_explicit_native_gap");
 
   for (const [name, source] of [
     ["compiler/std/measurements.ostrin", std],
     ["examples/measurement_scalar.ostrin", example],
     ["examples/measurement_quantity_direct_shape.ostrin", directQuantityExample],
+    ["examples/measurement_quantity_native_smoke.ostrin", nativeQuantityExample],
     ["compiler/tests/examples.rs", tests],
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
@@ -81,14 +83,18 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
-  check(errors, /dimensioned Measurement prototype[\s\S]{0,260}interpreter\/WASM path/i.test(lab),
-    "scripts/lab-data.mjs: interpreter/WASM dimensional Measurement scope is missing");
-  check(errors, /Native support[\s\S]{0,180}remain planned/i.test(lab),
-    "scripts/lab-data.mjs: native dimensional Measurement boundary is missing");
+  check(errors, /native smoke now has parity[\s\S]{0,300}interpreter\/WASM path/i.test(lab),
+    "scripts/lab-data.mjs: dimensional Measurement native-smoke and interpreter/WASM scope is missing");
+  check(errors, /native type report still shows AST fallback and generic type divergences/i.test(lab),
+    "scripts/lab-data.mjs: native Measurement fallback and type-divergence limitation is missing");
+  check(errors, /equal dimensions[\s\S]{0,120}explicit experimental boundary/i.test(lab),
+    "scripts/lab-data.mjs: remaining dimensional Measurement native boundary is missing");
   check(errors, /Array<Measurement>[\s\S]{0,100}covariance[\s\S]{0,100}Monte Carlo/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
-  check(errors, testsWithQuantityBoundary,
-    "compiler/tests/examples.rs: Measurement<Quantity<D>> native boundary test is missing");
+  check(errors, testsWithQuantityNativeSmoke,
+    "compiler/tests/examples.rs: Measurement<Quantity<D>> native smoke parity test is missing");
+  check(errors, testsWithQuantityLab,
+    "compiler/tests/examples.rs: dimensional Measurement Lab interpreter/native parity test is missing");
   check(errors, testsWithDirectQuantityBoundary,
     "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native boundary test is missing");
   check(errors, /Sensitivity<Quantity<Length>>/.test(directQuantityExample)
@@ -121,8 +127,9 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /source_id\.length\(\) == 0/.test(dimensionalConstructor)
       && /is_finite\(canonical_sigma\)/.test(dimensionalConstructor),
     "compiler/std/measurements.ostrin: dimensional constructor input and canonicalization guards are missing");
-  check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
-    "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
+  check(errors, !/type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen)
+      && /method '\{method_name\}' on \{obj_ty:\?\}/.test(codegen),
+    "compiler/src/codegen.rs: bounded dimensional Measurement native lowering and diagnostic evidence is missing");
 
   const quantityMerge = std.match(/fn merge_quantity_sources<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
   check(errors, /record Sensitivity<T>/.test(std)
@@ -156,8 +163,10 @@ export function validateMeasurementContract(root = repositoryRoot) {
     check(errors, /quantity_uncertainty\(summed\)/.test(directQuantityExample)
         && /quantity_uncertainty\(independent_sum\)/.test(directQuantityExample),
       "examples/measurement_quantity_direct_shape.ostrin: dimensional uncertainty projections are missing");
-    check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
-      "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
+  check(errors, /from_quantity_source\(/.test(nativeQuantityExample)
+      && /mul_quantity\(/.test(nativeQuantityExample)
+        && /sub_quantity\(/.test(nativeQuantityExample),
+      "examples/measurement_quantity_native_smoke.ostrin: native dimensional arithmetic evidence is missing");
 
   const quantitySourceValidation = std.match(/fn validate_quantity_source<D: Dimension>[\s\S]*?\n}\n/)?.[0] ?? "";
   check(errors, /source\.source_dimension\.length\(\) == 0/.test(quantitySourceValidation)

@@ -1,9 +1,11 @@
 # 25 — Mediciones e incertidumbre
 
 **Estado:** propuesta en implementación experimental; `std.measurements` ofrece un API escalar
-funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres,
-mientras `Measurement<Quantity<D>>` tiene una API parcial sólo en el intérprete; la sintaxis estable,
-`Array<Measurement<T>>` y Monte Carlo siguen pendientes.
+funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres.
+`Measurement<Quantity<D>>` tiene pruebas experimentales de paridad de salida en intérprete y nativo
+para construcción, suma/resta correlacionada, productos y propagación de incertidumbre estándar.
+El smoke test nativo actual conserva un fallback AST y divergencias en el reporte de tipos; por ello
+no demuestra lowering tipado completo. `Array<Measurement<T>>` y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -27,12 +29,17 @@ Este documento fija interfaces y contratos para una implementación gradual. La 
 ejecutable vive en `compiler/std/measurements.ostrin`: conserva fuentes de sensibilidad explícitas
 para `Measurement<Float>`, propaga suma/resta/producto/cociente y representa incertidumbre
 desconocida sin convertirla en cero. `exact` y `standard` rechazan valores nominales y sigmas no
-finitos mediante el builtin tipado `is_finite` para `Float`/`Float32`; las sensibilidades y la varianza también se validan al consultar la incertidumbre. La
-superficie sigue siendo experimental y funcional; todavía no declara semántica de operadores ni
-integración nativa completa con `Quantity<T>`. Para `Measurement<Quantity<D>>`, el intérprete ya
-ofrece construcción con fuentes explícitas, suma/resta con correlación por identidad y una proyección
-de incertidumbre estándar en la unidad coherente; esa API sigue siendo un prototipo y no tiene paridad
-nativa ni soporte de memoria verificado.
+finitos mediante el builtin tipado `is_finite` para `Float`/`Float32`; las sensibilidades y la varianza
+también se validan al consultar la incertidumbre. La superficie sigue siendo experimental y todavía
+no declara semántica de operadores ni integración nativa completa con `Quantity<T>`. Para
+`Measurement<Quantity<D>>`, el smoke test registra salida coincidente en intérprete y nativo,
+emisión C para WASI y `live_allocations=0`; su reporte contiene un fallback AST y seis divergencias
+de tipo. El programa `measurement_lab.ostrin` también coincide entre intérprete y nativo con
+`live_allocations=0` para las operaciones que ejecuta, pero su reporte registra un fallback AST y
+divergencias de tipo genérico. Estas pruebas acreditan solo los casos ejecutados, no lowering tipado
+completo ni corrección general de ownership. La ruta directa que instancia `div_quantity` para
+dimensiones iguales aún falla durante el lowering nativo antes de ejecutar la rama que debería
+devolver `Err`.
 
 ### 1.1 Evidencia de las fases escalar y dimensional experimental
 
@@ -66,10 +73,15 @@ del entorno de una tarea para `Measurement<Float>`.
 `examples/measurement_array_shape.ostrin` conserva la frontera explícita de
 `Array<Measurement<Float>>`: el intérprete la rechaza por el contrato actual y
 el backend nativo da un diagnóstico específico que remite a `List`.
-`examples/measurement_quantity_direct_shape.ostrin` cubre también la forma
-concreta `Measurement<Quantity<Length>>`, construcción dimensional, suma/resta de fuentes
-correlacionadas y proyección de incertidumbre estándar; el backend todavía la rechaza antes de entrar
-en el fallback AST que no demuestra ownership de sus campos gestionados.
+`examples/measurement_quantity_native_smoke.ostrin` cubre construcción, suma/resta correlacionada,
+productos entre dimensiones y proyección de incertidumbre estándar con paridad intérprete/native,
+emisión WASI y `live_allocations=0`; el reporte del ejemplo declara un fallback AST y seis
+divergencias de tipo. La prueba de
+`examples/measurement_lab.ostrin` valida además sus productos, el cociente de igual dimensión por
+`div_quantity_same` y el cociente dimensional distinto; mantiene pendiente la eliminación de su
+fallback y de divergencias de tipo genérico. `examples/measurement_quantity_direct_shape.ostrin`
+conserva casos adicionales del intérprete, incluidos el rechazo explícito de `div_quantity` para
+dimensiones iguales y sus validaciones de entrada.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el

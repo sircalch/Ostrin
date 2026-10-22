@@ -35,7 +35,7 @@ visual regression claim.
 
 `scripts/website-check.mjs` now verifies both logo copies are valid 256×256 PNGs, match byte for
 byte, and stay at or below 100,000 bytes. After regenerating the source-backed experiment bundles,
-`node scripts/website-check.mjs` passed with 17 public pages, 303 Ostrin examples and 372
+`node scripts/website-check.mjs` passed with 17 public pages, 304 Ostrin examples and 374
 integration tests. Chromium also loaded both desktop and mobile homepage layouts with the 256 px
 logo and no horizontal overflow.
 
@@ -43,7 +43,7 @@ logo and no horizontal overflow.
 
 | Surface | Evidence | Current state |
 | --- | --- | --- |
-| Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png`, `README-reproduce.md` | Hero with release status derived from `CHANGELOG.md`, twelve-demo Scientific Lab that recomputes repository programs (including scalar measurements) and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, shareable URL state for the active demo and parameters, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, the real playground, direct entry points for animated, tabular and provenance-carrying visual artifacts, and a linked reproduction guide; all public pages share a 1200x630 social preview |
+| Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png`, `README-reproduce.md` | Hero with release status derived from `CHANGELOG.md`, twelve-demo Scientific Lab that recomputes repository programs (including scalar measurements and the experimental dimensioned Measurement demo) and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, shareable URL state for the active demo and parameters, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, the real playground, direct entry points for animated, tabular and provenance-carrying visual artifacts, and a linked reproduction guide; all public pages share a 1200x630 social preview |
 | Cookbook | `website/cookbook.html`, `scripts/lab-data.mjs` | The Lab programs as recipes with source, recorded output, documentation links and stated limits |
 | Viz gallery | `website/viz.html`, `website/viz.js`, `website/lab-data.js`, `scripts/viz-jsonld.mjs` | Twenty-nine repository-backed figures with live WASM reruns, 2D/3D exploration, measurement error bars, animation/table controls, exports and shareable URLs that restore parameters and camera state; downloadable figure manifests now preserve that selected state and expose citation metadata, while the gallery offers a BibTeX handoff; the same catalogue emits a checked JSON-LD `ItemList` with each SVG and its Ostrin source |
 | Featured workflows | `scripts/lab-data.mjs`, `website/viz.html`, `website/viz.js` | Three source-backed paths — simulate, analyze and explore 3D — group existing figures, tables, animations and provenance records behind shareable `?workflow=...` URLs; available and experimental labels remain explicit |
@@ -66,10 +66,10 @@ logo and no horizontal overflow.
 
 ## Verified inventory
 
-- **303** `.ostrin` source files under `examples/`, including package-project sources and
+- **304** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **27** Markdown design documents under `docs/design/`.
-- Compiler suite: **372 integration**, **6 differential** and **30 unit** tests.
+- Compiler suite: **373 integration**, **6 differential** and **30 unit** tests.
 - WASI release smoke matrix: **23 program modules** passed in run [38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359) with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum
