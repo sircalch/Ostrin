@@ -88,6 +88,17 @@ Ese recibo todavía inventaría y reejecuta los 11 bundles R1/R2; los 18 R0 se v
 checkout del workflow, no desde el paquete descargado. Por eso el resultado no promociona R3; la
 extensión del replay R0 aún requiere sus propios checks de CI.
 
+El run posterior de `main` [`bd021d242df94e58cfb4f31b97dc5ece83b3c523` / 39700812531](https://github.com/sircalch/Ostrin/actions/runs/39700812531)
+adjuntó el artefacto host-bound [12393350506](https://github.com/sircalch/Ostrin/actions/runs/39700812531/artifacts/12393350506).
+El artefacto registra captura estructural `READY` para 29/29 bundles y mantiene `reproducibility.R3 = 0`.
+Una reejecución independiente desde los archivos descargados utilizó el WASM incluido y el comando
+`node scripts/experiment-replay.mjs --replay-artifact-all <directorio> --run-id 39700812531 --tested-sha bd021d242df94e58cfb4f31b97dc5ece83b3c523`.
+Los 29 replays dieron `match`; las salidas R0 fueron idénticas y los R1/R2 cumplieron sus comprobaciones
+de sensibilidad/semilla. Las evidencias archivadas de lectura WASI y azar determinista coincidieron
+con las regeneradas. Esto corrige el alcance de replay descrito para el corte anterior, pero es una
+verificación posterior al run sobre ese paquete: no es un job de CI que descargue y reejecute su propio
+artefacto, no prueba equivalencia entre plataformas y no satisface por sí solo todos los criterios R3.
+
 Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles sin validar la
 captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado histórico no basta
 bajo el contrato actual. Las capturas host-bound siguen siendo evidencia útil, pero no sustituyen
