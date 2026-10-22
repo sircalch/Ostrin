@@ -99,12 +99,14 @@ con las regeneradas. En ese corte la reejecución fue posterior al run y no form
 por ello no probó que el workflow descargara y reejecutara su propio artefacto. Tampoco probó
 equivalencia entre plataformas ni satisfizo por sí sola todos los criterios R3.
 
-El workflow se está ampliando para cerrar esa brecha en ejecuciones futuras: primero publica un
-artefacto candidato de corta duración, lo descarga en el mismo run, vuelve a ejecutar desde esos bytes
-los 29 bundles y compara las evidencias WASI archivadas; solo si pasa publica el artefacto host-bound
-final de 90 días. El test `scripts/website-verify-action.test.mjs` comprueba el orden y la ruta de
-estos pasos. Esta implementación aún debe pasar CI en su PR; no cambia retrospectivamente los runs
-anteriores ni eleva por sí sola la madurez R3.
+El workflow se está ampliando para cerrar esa brecha en ejecuciones futuras: primero genera los
+informes WASI run-bound de referencia desde el checkout, los incluye con las capturas en un artefacto
+candidato de corta duración y lo descarga en el mismo run. Después vuelve a ejecutar los 29 bundles
+desde los bytes extraídos y compara los informes archivados; solo si pasa publica el artefacto
+host-bound final de 90 días. El primer replay produce el material de comparación; el replay descargado
+es el que verifica el paquete. El test `scripts/website-verify-action.test.mjs` comprueba el orden y la
+ruta de estos pasos. Esta implementación aún debe pasar CI en su PR; no cambia retrospectivamente los
+runs anteriores ni eleva por sí sola la madurez R3.
 
 Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles sin validar la
 captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado histórico no basta
