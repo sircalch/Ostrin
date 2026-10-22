@@ -8,6 +8,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  compareQuantityFloatOutputs,
+  floatArrayWorkload,
+  quantityArrayWorkload,
+  validateCheckedInQuantityFloatPair,
+} from "./benchmark-pair-contract.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(scriptDir, "..");
@@ -44,6 +50,10 @@ if (!Number.isInteger(iterations) || iterations < 1 || !Number.isInteger(warmups
   throw new Error("--iterations must be >= 1 and --warmups must be >= 0");
 }
 if (workloadPaths.length === 0) throw new Error("--workloads must contain at least one source path");
+const normalizedWorkloadPaths = workloadPaths.map((value) => value.replaceAll("\\", "/"));
+if (normalizedWorkloadPaths.some((value) => value === floatArrayWorkload || value === quantityArrayWorkload)) {
+  validateCheckedInQuantityFloatPair(repo);
+}
 
 const compiler = process.env.OSTRIN_COMPILER || join(repo, "compiler", "target", "release", process.platform === "win32" ? "ostrinc.exe" : "ostrinc");
 if (!existsSync(compiler)) {
@@ -208,6 +218,7 @@ function benchmarkWorkload(sourcePath, index) {
     sourceSha256: outputHash(sourceBytes),
     outputBytes: Buffer.byteLength(expected),
     outputSha256: outputHash(expected),
+    normalizedOutput: expected,
     nativeCompileMs: Number(compile.elapsedMs.toFixed(3)),
     interpreterMs: interpreter.map((value) => Number(value.toFixed(3))),
     nativeMs: native.map((value) => Number(value.toFixed(3))),
@@ -221,10 +232,18 @@ function benchmarkWorkload(sourcePath, index) {
   };
 }
 
+const measuredWorkloads = workloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index));
+const selectedFloatWorkload = measuredWorkloads.find((workload) => workload.workload === floatArrayWorkload);
+const selectedQuantityWorkload = measuredWorkloads.find((workload) => workload.workload === quantityArrayWorkload);
+const quantityFloatPair = selectedFloatWorkload && selectedQuantityWorkload
+  ? compareQuantityFloatOutputs(selectedFloatWorkload.normalizedOutput, selectedQuantityWorkload.normalizedOutput)
+  : null;
+const workloads = measuredWorkloads.map(({ normalizedOutput, ...workload }) => workload);
+
 const git = gitSnapshot();
 const report = {
   schema: 3,
-  workloads: workloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index)),
+  workloads,
   commit: git.commit,
   git,
   compiler: relative(repo, compiler).replaceAll("\\", "/"),
@@ -237,6 +256,7 @@ const report = {
   methodology: {
     clock: "node:perf_hooks performance.now wall-clock process duration",
     outputCheck: "normalized UTF-8 stdout must match interpreter and native output exactly",
+    quantityFloatPair,
     memory: "not captured; peak child RSS and allocation counters are a planned metric",
   },
   iterations,

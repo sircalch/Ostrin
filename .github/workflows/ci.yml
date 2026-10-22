@@ -61,6 +61,8 @@ jobs:
         run: node scripts/numeric-validation.mjs > numeric-validation-report.json
       - name: Test numerical validation tolerances
         run: node --test scripts/numeric-validation.test.mjs
+      - name: Test the Float/Quantity benchmark pair contract
+        run: node --test scripts/benchmark-pair-contract.test.mjs
       - name: Upload numerical validation report
         uses: actions/upload-artifact@v4
         with:

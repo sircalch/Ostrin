@@ -11,9 +11,11 @@ La batería predeterminada cubre [`benchmark_numeric.ostrin`](../examples/benchm
 [`benchmark_float_array.ostrin`](../examples/benchmark_float_array.ostrin) /
 [`benchmark_quantity_array.ostrin`](../examples/benchmark_quantity_array.ostrin),
 `numeric_methods.ostrin` y cargas de álgebra lineal y visualización. El par
-Float/Quantity conserva la misma forma y operaciones para observar el coste
-semántico de las unidades; no es una comparación con otros lenguajes. Cada
-ejecución comprueba que ambos caminos impriman
+Float/Quantity conserva la misma forma y cantidad de operaciones (el control
+Float multiplica explícitamente por `1.0`, donde Quantity multiplica por `1 m`)
+para observar el coste semántico de las unidades; no es una comparación con
+otros lenguajes. El runner comprueba además que sus valores numéricos coincidan
+dentro de una tolerancia declarada. Cada ejecución comprueba que ambos caminos impriman
 exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
 schema 3 incluye el hash exacto de cada fuente, commit y estado del checkout,
 sistema operativo, CPU, compilador C, defaults administrados por el compilador e
