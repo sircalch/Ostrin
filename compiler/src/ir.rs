@@ -493,8 +493,28 @@ impl Builder {
     }
 
     fn lower_collection_element(&mut self, value: &HirExpr, expected: &Ty) -> ValueId {
-        let source = self.lower_expr(value);
-        self.coerce_numeric_value(source, &value.ty, expected)
+        self.lower_expr_expected(value, expected)
+    }
+
+    /// Lower an expression in its destination type when the source spelling
+    /// has no payload type of its own.  In particular, `None` is initially
+    /// represented as `Option<?>` by the HIR checker in assignment contexts;
+    /// keeping that unknown type in IR loses the concrete Option ABI and can
+    /// make subsequent ownership operations unresolved.
+    fn lower_expr_expected(&mut self, expression: &HirExpr, expected: &Ty) -> ValueId {
+        if matches!(&expression.kind, HirKind::Global(name) if name == "None")
+            && matches!(expected, Ty::Applied(name, args) if name == "Option" && args.len() == 1)
+        {
+            let dst = self.fresh();
+            self.emit(IrInstr::Global {
+                dst,
+                name: "None".to_string(),
+                ty: expected.clone(),
+            });
+            return dst;
+        }
+        let value = self.lower_expr(expression);
+        self.coerce_numeric_value(value, &expression.ty, expected)
     }
 
     fn unit(&mut self) -> ValueId {
@@ -886,13 +906,11 @@ impl Builder {
                 value,
                 ..
             } => {
-                let value_id = self.lower_expr(value);
-                let value = declared
+                let expected = declared
                     .as_ref()
                     .map(crate::typeck::resolve_type)
-                    .map_or(value_id, |expected| {
-                        self.coerce_numeric_value(value_id, &value.ty, &expected)
-                    });
+                    .unwrap_or_else(|| value.ty.clone());
+                let value = self.lower_expr_expected(value, &expected);
                 self.emit(IrInstr::StoreLocal {
                     name: name.clone(),
                     value,
@@ -900,7 +918,11 @@ impl Builder {
                 self.bind(name, value);
             }
             HirStmt::Assign { name, value } => {
-                let value = self.lower_expr(value);
+                let expected = self
+                    .lookup(name)
+                    .and_then(|previous| self.known_value_type(previous))
+                    .unwrap_or_else(|| value.ty.clone());
+                let value = self.lower_expr_expected(value, &expected);
                 self.emit(IrInstr::StoreLocal {
                     name: name.clone(),
                     value,
