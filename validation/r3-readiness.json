@@ -193,6 +193,9 @@
       "genericTraitCandidateEdgeCount": 0,
       "localTargetCandidateCount": 9289,
       "multiTargetEdgeCount": 0,
+      "resolvedCallSiteCount": 245,
+      "locatedCallSiteCount": 245,
+      "unlocatedCallSiteCount": 0,
       "categoryCounts": {
         "resolvedLocalOperations": 9289,
         "effectClassifiedOperations": 11458,
@@ -202,7 +205,8 @@
         "unresolvedOperations": 0,
         "symbolicCallbacks": 74
       },
-      "interpretation": "Compiler-emitted resolution categories now associate local function targets with operation spellings and classify effectful, known effect-free, callback, indirect, symbolic and unresolved edges. They are aggregated per function-operation edge; they do not provide per-invocation dispatch traces or prove purity or semantic soundness."
+      "sourceSiteAssociationsValid": true,
+      "interpretation": "Call sites are statically analyzed source occurrences associated with compiler-emitted local targets. They are not runtime traces or proof of runtime dispatch, purity, or semantic soundness."
     },
     "entrypointEffects": {
       "countUnit": "one recorded entry function per experiment bundle",

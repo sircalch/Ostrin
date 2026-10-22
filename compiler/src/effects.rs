@@ -807,6 +807,7 @@ fn resolve_call_site_spans(report: &mut EffectReport) {
     }
 
     let mut candidates = BTreeMap::<(String, String), Vec<(usize, usize)>>::new();
+    let mut lexical_candidates_by_leaf = BTreeMap::<(String, String), Vec<(usize, usize)>>::new();
     for file in files {
         let Ok(source) = std::fs::read_to_string(&file) else {
             continue;
@@ -841,6 +842,10 @@ fn resolve_call_site_spans(report: &mut EffectReport) {
                 .collect::<String>();
             candidates
                 .entry((file.clone(), operation))
+                .or_default()
+                .push((first.line, first.col));
+            lexical_candidates_by_leaf
+                .entry((file.clone(), tokens[index].lexeme.clone()))
                 .or_default()
                 .push((first.line, first.col));
         }
@@ -881,6 +886,75 @@ fn resolve_call_site_spans(report: &mut EffectReport) {
             }
         }
     }
+
+    // Calls through imported module aliases may have a canonical operation
+    // such as `std.viz::figure` in the typed inventory while the source spells
+    // the callee as `viz.figure`. Recover these only when a leaf name identifies
+    // exactly one canonical operation in this file and the complete lexical
+    // occurrence count agrees with the inventory. This deliberately leaves
+    // homonymous methods and incomplete inventories unlocated.
+    let mut operations_by_leaf = BTreeMap::<(String, String), BTreeSet<String>>::new();
+    let mut sites_by_leaf = BTreeMap::<(String, String), Vec<usize>>::new();
+    for (index, site) in report.unresolved_call_site_inventory.iter().enumerate() {
+        let Some(file) = &site.file else {
+            continue;
+        };
+        let leaf = operation_leaf(&site.operation);
+        operations_by_leaf
+            .entry((file.clone(), leaf.clone()))
+            .or_default()
+            .insert(site.operation.clone());
+        sites_by_leaf
+            .entry((file.clone(), leaf))
+            .or_default()
+            .push(index);
+    }
+
+    for (key, operation_names) in operations_by_leaf {
+        if operation_names.len() != 1 {
+            continue;
+        }
+        let Some(site_indices) = sites_by_leaf.get(&key) else {
+            continue;
+        };
+        if site_indices.iter().any(|index| {
+            let site = &report.unresolved_call_site_inventory[*index];
+            site.line != 0 || site.col != 0
+        }) {
+            continue;
+        }
+        let Some(spans) = lexical_candidates_by_leaf.get(&key) else {
+            continue;
+        };
+        if spans.len() != site_indices.len() {
+            continue;
+        }
+        let mut site_indices = site_indices.clone();
+        site_indices.sort_by_key(|index| {
+            let site = &report.unresolved_call_site_inventory[*index];
+            (site.line, site.col)
+        });
+        for (site_index, (line, col)) in site_indices.into_iter().zip(spans) {
+            let site = &mut report.unresolved_call_site_inventory[site_index];
+            site.line = *line;
+            site.col = *col;
+            for resolved in &mut report.resolved_call_sites {
+                if resolved.inventory_index == site_index {
+                    resolved.line = *line;
+                    resolved.col = *col;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn operation_leaf(operation: &str) -> String {
+    operation
+        .rsplit(['.', ':'])
+        .find(|part| !part.is_empty())
+        .unwrap_or(operation)
+        .to_string()
 }
 
 fn follows_call_arguments(tokens: &[Token], mut index: usize) -> bool {
@@ -3171,6 +3245,46 @@ mod tests {
     use super::{is_known_effect_free_global, is_known_effect_free_method};
     use crate::ast::Expr;
 
+    fn report_with_calls(path: &str, operations: &[&str]) -> super::EffectReport {
+        let mut report = super::EffectReport::default();
+        for operation in operations {
+            let inventory_index = report.unresolved_call_site_inventory.len();
+            report
+                .unresolved_call_site_inventory
+                .push(super::UnresolvedCallSite {
+                    operation: (*operation).to_string(),
+                    function: "main".to_string(),
+                    file: Some(path.to_string()),
+                    line: 0,
+                    col: 0,
+                });
+            report.resolved_call_sites.push(super::ResolvedCallSite {
+                operation: (*operation).to_string(),
+                function: "main".to_string(),
+                file: Some(path.to_string()),
+                line: 0,
+                col: 0,
+                generic_trait_candidates: false,
+                targets: [(*operation).to_string()].into_iter().collect(),
+                inventory_index,
+            });
+        }
+        report
+    }
+
+    fn with_source(source: &str, run: impl FnOnce(&str)) {
+        static NEXT_FILE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "ostrin-callsite-span-{}-{}.ostrin",
+            std::process::id(),
+            NEXT_FILE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::write(&path, source).expect("write temporary source");
+        let path = path.to_string_lossy().into_owned();
+        run(&path);
+        std::fs::remove_file(path).expect("remove temporary source");
+    }
+
     #[test]
     fn known_intrinsics_are_exact_and_do_not_match_qualified_host_calls() {
         for operation in [
@@ -3214,5 +3328,47 @@ mod tests {
         assert!(super::is_indirect_function_call(&callee, &report));
         report.function_value_nodes.clear();
         assert!(!super::is_indirect_function_call(&callee, &report));
+    }
+
+    #[test]
+    fn callsite_span_recovery_matches_a_unique_imported_operation_leaf() {
+        with_source(
+            "import std.viz\nfn main() {\n  let fig = viz.figure()\n}\n",
+            |path| {
+                let mut report = report_with_calls(path, &["std.viz::figure"]);
+                super::resolve_call_site_spans(&mut report);
+                assert_eq!(report.unresolved_call_site_inventory[0].line, 3);
+                assert_eq!(report.resolved_call_sites[0].line, 3);
+                assert!(report.unresolved_call_site_inventory[0].col > 0);
+            },
+        );
+    }
+
+    #[test]
+    fn callsite_span_recovery_keeps_homonymous_operations_unlocated() {
+        with_source(
+            "fn main() {\n  viz.figure()\n  other.figure()\n}\n",
+            |path| {
+                let mut report = report_with_calls(path, &["std.viz::figure", "custom::figure"]);
+                super::resolve_call_site_spans(&mut report);
+                assert!(report
+                    .unresolved_call_site_inventory
+                    .iter()
+                    .all(|site| site.line == 0 && site.col == 0));
+            },
+        );
+    }
+
+    #[test]
+    fn callsite_span_recovery_rejects_leaf_occurrence_count_mismatches() {
+        with_source(
+            "fn main() {\n  viz.figure()\n  other.figure()\n}\n",
+            |path| {
+                let mut report = report_with_calls(path, &["std.viz::figure"]);
+                super::resolve_call_site_spans(&mut report);
+                assert_eq!(report.unresolved_call_site_inventory[0].line, 0);
+                assert_eq!(report.resolved_call_sites[0].line, 0);
+            },
+        );
     }
 }

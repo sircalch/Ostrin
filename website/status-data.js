@@ -8,7 +8,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "releaseTag": "v0.2.0",
   "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
   "developmentEvidence": null,
-  "workingTreeDirty": false,
+  "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
@@ -87,8 +87,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
       "localTargetCandidateCount": 9289,
       "multiTargetEdgeCount": 0,
       "resolvedCallSiteCount": 245,
-      "locatedCallSiteCount": 184,
-      "unlocatedCallSiteCount": 61,
+      "locatedCallSiteCount": 245,
+      "unlocatedCallSiteCount": 0,
       "sourceSiteAssociationsValid": true
     },
     "sourceReadAudit": {
