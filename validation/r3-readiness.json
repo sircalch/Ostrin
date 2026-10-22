@@ -30,7 +30,7 @@
   "captureOpenCount": 29,
   "incompleteEffectBundleCount": 0,
   "closedEntryEffectBundleCount": 29,
-  "knownEffectCallCount": 20593,
+  "knownEffectCallCount": 20702,
   "symbolicEffectCallCount": 74,
   "unresolvedEffectCallCount": 0,
   "gapDiagnostics": {
@@ -176,6 +176,37 @@
         "interpretation": "A missing or dynamic call edge can make this direct graph incomplete. Top callbacks summarize available graphs only; numeric totals are null unless every bundle has graph evidence. This is diagnostic, never a substitute for the conservative entry effect row or R3 gate."
       },
       "interpretation": "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity."
+    },
+    "callResolutionEvidence": {
+      "status": "available",
+      "countUnit": "bundle_function_operation_edges",
+      "localTargetAssociationComplete": true,
+      "bundleCount": 29,
+      "availableBundleCount": 29,
+      "unavailableBundleCount": 0,
+      "invalidBundleCount": 0,
+      "edgeCount": 20776,
+      "categorizedEdgeCount": 20776,
+      "uncategorizedEdgeCount": 0,
+      "localFunctionEdgeCount": 9289,
+      "staticLocalFunctionEdgeCount": 9289,
+      "genericTraitCandidateEdgeCount": 0,
+      "localTargetCandidateCount": 9289,
+      "multiTargetEdgeCount": 0,
+      "resolvedCallSiteCount": 245,
+      "locatedCallSiteCount": 245,
+      "unlocatedCallSiteCount": 0,
+      "categoryCounts": {
+        "resolvedLocalOperations": 9289,
+        "effectClassifiedOperations": 11458,
+        "effectFreeIntrinsics": 8670,
+        "compilerBuiltinCallbacks": 0,
+        "indirectOperations": 74,
+        "unresolvedOperations": 0,
+        "symbolicCallbacks": 74
+      },
+      "sourceSiteAssociationsValid": true,
+      "interpretation": "Call sites are statically analyzed source occurrences associated with compiler-emitted local targets. They are not runtime traces or proof of runtime dispatch, purity, or semantic soundness."
     },
     "entrypointEffects": {
       "countUnit": "one recorded entry function per experiment bundle",
@@ -658,7 +689,7 @@
       "interpretation": "Counts describe declared provenance inputs, runtime snapshot references, source read_file calls and execution capabilities. The source scan identifies direct literal paths and surfaces dynamic calls or references, but cannot detect reads hidden behind aliases, imported helpers, FFI or host code; it is not a runtime trace. A path/hash match is structural consistency only and does not prove that every external input is captured or that snapshot bytes were re-read."
     },
     "notAssessed": [
-      "Whether an operation resolves to a typed function or intrinsic",
+      "Whether every invocation, including dynamic dispatch, is resolved at call-site granularity and matches runtime dispatch",
       "Whether external inputs are fully captured and privacy-safe",
       "Whether numerical tolerances are scientifically justified"
     ]
@@ -688,6 +719,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -730,12 +762,13 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
         "complete": true,
         "count_unit": "distinct_function_operation_edges",
-        "known_calls": 814,
+        "known_calls": 923,
         "symbolic_calls": 1,
         "unresolved_calls": 0
       },
@@ -771,6 +804,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -810,6 +844,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -851,6 +886,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -890,6 +926,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -931,6 +968,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -970,6 +1008,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1011,6 +1050,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1052,6 +1092,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1091,6 +1132,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1131,6 +1173,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1170,6 +1213,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1209,6 +1253,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1248,6 +1293,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1287,6 +1333,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1328,6 +1375,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1367,6 +1415,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1406,6 +1455,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1447,6 +1497,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1486,6 +1537,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1525,6 +1577,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1564,6 +1617,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1604,6 +1658,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1642,6 +1697,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1681,6 +1737,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1720,6 +1777,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1761,6 +1819,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {
@@ -1800,6 +1859,7 @@
         "open_calls": [],
         "purity_proven": false,
         "row_closed": true,
+        "type_errors": 0,
         "variables": []
       },
       "effectCoverage": {

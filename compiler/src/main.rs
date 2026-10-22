@@ -404,6 +404,27 @@ fn real_main() -> ExitCode {
                         .cloned()
                         .collect::<Vec<_>>(),
                     "function_calls": report.function_calls,
+                    "resolved_call_targets": report.resolved_call_targets.iter().map(|((function, operation), targets)| serde_json::json!({
+                        "function": function,
+                        "operation": operation,
+                        "dispatch": if report.generic_trait_call_targets(function, operation).is_some() {
+                            "generic-trait-candidates"
+                        } else {
+                            "static"
+                        },
+                        "targets": targets,
+                    })).collect::<Vec<_>>(),
+                    "resolved_call_sites": report.resolved_call_sites.iter().map(|site| serde_json::json!({
+                        "function": site.function,
+                        "operation": site.operation,
+                        "file": site.file,
+                        "line": site.line,
+                        "col": site.col,
+                        "dispatch": if site.generic_trait_candidates { "generic-trait-candidates" } else { "static" },
+                        "targets": site.targets,
+                    })).collect::<Vec<_>>(),
+                    "resolved_call_operations": report.resolved_call_operations,
+                    "builtin_callback_calls": report.builtin_callback_calls,
                     "classified_calls": report.classified_calls,
                     "known_effect_free_calls": report.known_effect_free_calls,
                     "unresolved_calls": report.unresolved_calls,

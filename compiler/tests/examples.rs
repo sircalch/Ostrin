@@ -12875,7 +12875,7 @@ fn experimental_effect_report_resolves_homonymous_methods_by_receiver_type() {
          record Logger { marker: Int }\n\
          impl Output for Console {\n    fn emit(self) -> Void {\n        print(\"console\")\n    }\n}\n\
          impl Output for Logger {\n    fn emit(self) -> Void {\n        print(\"logger\")\n    }\n}\n\
-         fn forward(console: Console) -> Void {\n    console.emit()\n}\n\
+         fn forward(console: Console) -> Void {\n    console.emit()\n    console.emit()\n}\n\
          fn dynamic_forward(console: dyn Output) -> Void {\n    console.emit()\n}\n\
          fn dynamic_wrapper(console: dyn Output) -> Void {\n    dynamic_forward(console)\n}\n",
     );
@@ -12883,6 +12883,27 @@ fn experimental_effect_report_resolves_homonymous_methods_by_receiver_type() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    let forward_sites = report["resolved_call_sites"]
+        .as_array()
+        .expect("resolved source callsites must be reported")
+        .iter()
+        .filter(|site| site["function"] == "forward")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        forward_sites.len(),
+        2,
+        "duplicate calls retain separate sites"
+    );
+    for (site, line) in forward_sites.iter().zip([17, 18]) {
+        assert_eq!(site["operation"], "console.emit");
+        assert_eq!(site["dispatch"], "static");
+        assert_eq!(site["targets"], serde_json::json!(["Console.emit"]));
+        assert_eq!(site["line"], line);
+        assert_eq!(site["col"], 5);
+        assert!(site["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("effects-ambiguous-method.ostrin")));
+    }
     assert_eq!(
         report["function_effects"]["Console.emit"],
         serde_json::json!(["io"])
@@ -12957,6 +12978,25 @@ fn experimental_effect_report_propagates_effects_through_generic_trait_bounds() 
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
 
+    let generic_targets = report["resolved_call_targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|target| target["function"] == "emit_any" && target["operation"] == "value.emit")
+        .expect("generic trait calls must preserve their candidate targets");
+    assert_eq!(generic_targets["dispatch"], "generic-trait-candidates");
+    assert!(generic_targets["targets"]
+        .as_array()
+        .is_some_and(|targets| !targets.is_empty()));
+    let generic_site = report["resolved_call_sites"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|site| site["function"] == "emit_any" && site["operation"] == "value.emit")
+        .expect("generic trait call occurrence must preserve its source location");
+    assert_eq!(generic_site["dispatch"], "generic-trait-candidates");
+    assert_eq!(generic_site["line"], 17);
+    assert_eq!(generic_site["col"], 5);
     assert_eq!(
         report["function_effect_signatures"]["emit_any"]["effects"],
         serde_json::json!(["io"]),
@@ -13073,6 +13113,8 @@ fn experimental_effect_report_closes_only_typed_intrinsics_and_builtin_methods()
          trait Printer {\n    fn print(self) -> Void\n}\n\
          trait Normalizer {\n    fn normal(self) -> Float\n}\n\
          record MutableBox { mut value: Int }\n\
+         fn helper(x: Float) -> Float {\n    x\n}\n\
+         fn calls_helper(x: Float) -> Float {\n    helper(x)\n}\n\
          fn math(x: Float) -> Float {\n    sin(x)\n}\n\
          fn array_read(xs: Array<Float>) -> Float {\n    xs.get(0)\n}\n\
          fn stable_hash(value: Int) -> Int {\n    hash(value)\n}\n\
@@ -13146,6 +13188,18 @@ fn experimental_effect_report_closes_only_typed_intrinsics_and_builtin_methods()
         report["known_effect_free_calls"]["stringify"],
         serde_json::json!(["value.to_string"])
     );
+    let local_target = report["resolved_call_targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|target| target["function"] == "calls_helper" && target["operation"] == "helper")
+        .expect("the report must retain the operation-to-function target association");
+    assert_eq!(local_target["targets"], serde_json::json!(["helper"]));
+    assert_eq!(local_target["dispatch"], "static");
+    assert_eq!(
+        report["resolved_call_operations"]["calls_helper"],
+        serde_json::json!(["helper"])
+    );
 }
 
 #[test]
@@ -13172,6 +13226,7 @@ fn experimental_effect_report_tracks_trait_defaults_and_excludes_overrides() {
     );
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+
     assert_eq!(
         report["function_effects"]["Console.inherited"],
         serde_json::json!(["io"])

@@ -46,7 +46,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "ciRunUrl": null
   },
   "effectCoverage": {
-    "knownCalls": 20593,
+    "knownCalls": 20702,
     "symbolicCalls": 74,
     "unresolvedCalls": 0,
     "countUnit": "distinct_function_operation_edges",
@@ -74,6 +74,23 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "closedEntryEffectBundleCount": 29,
     "symbolicEffectCallCount": 74,
     "unresolvedEffectCallCount": 0,
+    "callResolutionEvidence": {
+      "status": "available",
+      "bundleCount": 29,
+      "availableBundleCount": 29,
+      "invalidBundleCount": 0,
+      "edgeCount": 20776,
+      "categorizedEdgeCount": 20776,
+      "uncategorizedEdgeCount": 0,
+      "staticLocalFunctionEdgeCount": 9289,
+      "genericTraitCandidateEdgeCount": 0,
+      "localTargetCandidateCount": 9289,
+      "multiTargetEdgeCount": 0,
+      "resolvedCallSiteCount": 245,
+      "locatedCallSiteCount": 245,
+      "unlocatedCallSiteCount": 0,
+      "sourceSiteAssociationsValid": true
+    },
     "sourceReadAudit": {
       "sourceBundleCount": 29,
       "bundlesWithDirectReadFileCalls": 11,
