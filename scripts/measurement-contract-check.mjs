@@ -32,7 +32,9 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const codegen = read("compiler/src/codegen.rs", root);
   const testsWithQuantityNativeSmoke = tests.includes("dimensional_measurement_native_smoke_matches_interpreter_and_wasi");
   const testsWithQuantityLab = tests.includes("dimensional_measurement_lab_matches_interpreter_and_native");
-  const testsWithDirectQuantityBoundary = tests.includes("dimensional_measurement_full_surface_keeps_explicit_native_gap");
+  const testsWithDirectQuantityParity = tests.includes("dimensional_measurement_full_surface_matches_native_and_wasi")
+    && tests.includes("direct Measurement<Quantity> must lower main through IR")
+    && tests.includes("direct Measurement<Quantity> leaked");
 
   for (const [name, source] of [
     ["compiler/std/measurements.ostrin", std],
@@ -83,20 +85,23 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
-  check(errors, /native smoke now has parity[\s\S]{0,300}interpreter\/WASM path/i.test(lab),
+  check(errors, /matching interpreter\/native output[\s\S]{0,500}smoke also emits C for WASI[\s\S]{0,160}interpreter\/WASM path/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement native-smoke and interpreter/WASM scope is missing");
-  check(errors, /native type report still shows AST fallback and generic type divergences/i.test(lab),
-    "scripts/lab-data.mjs: native Measurement fallback and type-divergence limitation is missing");
+  check(errors, /IR-generated main functions, zero AST fallback and zero generic type divergences/i.test(lab),
+    "scripts/lab-data.mjs: typed dimensional Measurement smoke evidence is missing");
   check(errors, /equal dimensions[\s\S]{0,120}explicit experimental boundary/i.test(lab),
     "scripts/lab-data.mjs: remaining dimensional Measurement native boundary is missing");
+  check(errors, /direct full-surface fixture now has native IR\/interpreter parity[\s\S]{0,220}div_quantity_same/i.test(lab)
+      && !/direct full-surface fixture still fails native lowering/i.test(lab),
+    "scripts/lab-data.mjs: direct Measurement<Quantity<D>> native evidence is stale or missing");
   check(errors, /Array<Measurement>[\s\S]{0,100}covariance[\s\S]{0,100}Monte Carlo/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
   check(errors, testsWithQuantityNativeSmoke,
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native smoke parity test is missing");
   check(errors, testsWithQuantityLab,
     "compiler/tests/examples.rs: dimensional Measurement Lab interpreter/native parity test is missing");
-  check(errors, testsWithDirectQuantityBoundary,
-    "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native boundary test is missing");
+  check(errors, testsWithDirectQuantityParity,
+    "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native/WASI parity test is missing");
   check(errors, /Sensitivity<Quantity<Length>>/.test(directQuantityExample)
       && /from_quantity_source\(/.test(directQuantityExample)
       && /measurements\.exact_quantity\(/.test(directQuantityExample)

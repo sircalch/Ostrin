@@ -1386,10 +1386,20 @@ fn binary_code(
                 BinOp::Div => {
                     let combined = dim_div(left_dim, right_dim);
                     if dim_is_dimensionless(&combined) {
-                        if *ty != Ty::Float {
-                            return Err(());
+                        if *ty == Ty::Float {
+                            Ok(format!("ostrin_qty_ratio({left}, {right})"))
+                        } else if *ty == Ty::Quantity(combined) {
+                            // A generic signature may promise
+                            // `Quantity<A / B>` even when one monomorphized
+                            // instance has A == B. Preserve that declared
+                            // dimensionless quantity representation; ordinary
+                            // concrete quotients are still typed as Float.
+                            Ok(format!(
+                                "ostrin_qty_from_borrowed(ostrin_qty_ratio({left}, {right}), \"\")"
+                            ))
+                        } else {
+                            Err(())
                         }
-                        Ok(format!("ostrin_qty_ratio({left}, {right})"))
                     } else {
                         if *ty != Ty::Quantity(combined) {
                             return Err(());
