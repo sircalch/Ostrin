@@ -4,6 +4,9 @@
 
 ### Correctness
 
+- IR lowering now preserves the destination `Option<T>` payload type when `None`
+  replaces an existing local, so supported managed options keep their concrete
+  ABI through native and WASI code generation.
 - Native generic calls now apply checker-resolved parameter types before lowering
   arguments, so an empty collection can inherit its element type from another
   argument without introducing an AST fallback.
@@ -76,7 +79,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 304-example, 374-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 304-example, 378-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 

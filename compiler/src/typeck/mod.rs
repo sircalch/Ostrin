@@ -5001,6 +5001,13 @@ fn resolve_type_with_type_subst(
                 if let Some(resolved) = type_subst.get(name) {
                     return resolved.clone();
                 }
+                // Dimension generics are represented internally as a
+                // Quantity carrying that dimension. Preserve that binding
+                // when the generic appears directly as an applied type
+                // argument, for example CoherentUncertainty<D>.
+                if let Some(dimension) = dim_subst.get(name) {
+                    return Ty::Quantity(dimension.clone());
+                }
             }
             match name.as_str() {
                 "Int" | "Int64" => Ty::Int,
@@ -5105,7 +5112,7 @@ fn bind_nested_dimensions(
             Ok(())
         }
         (Type::Named(name, args), Ty::Applied(actual_name, actual_args))
-            if name == actual_name && args.len() == actual_args.len() =>
+            if same_type_name(name, actual_name) && args.len() == actual_args.len() =>
         {
             for (expected, actual) in args.iter().zip(actual_args) {
                 bind_nested_dimensions(expected, actual, dim_generics, dims)?;
@@ -5131,6 +5138,13 @@ fn bind_nested_dimensions(
         }
         _ => Ok(()),
     }
+}
+
+fn same_type_name(left: &str, right: &str) -> bool {
+    // Type names are canonicalized by module loading before type checking.
+    // Comparing only the final segment would conflate unrelated declarations
+    // such as `module_a::Measurement` and `module_b::Measurement`.
+    left == right
 }
 
 fn unify_generic_type(
@@ -5185,6 +5199,21 @@ fn unify_generic_type(
                             subst.insert(dim.clone(), bound);
                             Ok(())
                         }
+                    }
+                }
+                (dimension, Ty::Quantity(actual_dimension))
+                    if dimension_uses_only_known_bases(dimension) =>
+                {
+                    let expected_dimension =
+                        resolve_dimension_with_subst(dimension, &HashMap::new());
+                    if &expected_dimension == actual_dimension {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "Expected '{}', got '{}'.",
+                            resolve_type(param).describe(),
+                            actual.describe()
+                        ))
                     }
                 }
                 _ => Ok(()),
@@ -5785,6 +5814,17 @@ fn is_builtin_hashable(
         variant_fields,
         &mut HashSet::new(),
     )
+}
+
+fn dimension_uses_only_known_bases(ty: &Type) -> bool {
+    match ty {
+        Type::Named(name, args) => args.is_empty() && is_known_base_dimension(name),
+        Type::Mul(left, right) | Type::Div(left, right) => {
+            dimension_uses_only_known_bases(left) && dimension_uses_only_known_bases(right)
+        }
+        Type::Pow(inner, _) => dimension_uses_only_known_bases(inner),
+        _ => false,
+    }
 }
 
 fn check_builtin_call(
@@ -6858,14 +6898,166 @@ fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
 
 #[cfg(test)]
 mod temperature_point_checker_tests {
-    use super::{resolve_type, type_from_ty, Checker};
-    use crate::ast::{BinOp, Expr, UnaryOp};
+    use super::{
+        bind_nested_dimensions, resolve_type, resolve_type_with_type_subst, type_from_ty,
+        unify_generic_type, Checker,
+    };
+    use crate::ast::{BinOp, Expr, Type, UnaryOp};
     use crate::types::{dim_single, Ty};
+    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn temperature_point_type_round_trips_through_source_type_metadata() {
         let declared = type_from_ty(&Ty::TemperaturePoint);
         assert_eq!(resolve_type(&declared), Ty::TemperaturePoint);
+    }
+
+    #[test]
+    fn nested_dimension_substitution_crosses_qualified_record_types() {
+        let quantity_of_d = || {
+            Type::Named(
+                "Quantity".to_string(),
+                vec![Type::Named("D".to_string(), Vec::new())],
+            )
+        };
+        let measured_d = || {
+            Type::Named(
+                "std.measurements::Measurement".to_string(),
+                vec![quantity_of_d()],
+            )
+        };
+        let measured_length = Ty::Applied(
+            "std.measurements::Measurement".to_string(),
+            vec![Ty::Quantity(dim_single("Length"))],
+        );
+        let dimension_generics = HashSet::from(["D".to_string()]);
+        let length = dim_single("Length");
+        let length_quantity = Ty::Quantity(length.clone());
+        let cases = vec![
+            (
+                Type::Named("List".to_string(), vec![quantity_of_d()]),
+                Ty::List(Box::new(length_quantity.clone())),
+            ),
+            (
+                Type::Named("Array".to_string(), vec![quantity_of_d()]),
+                Ty::Applied("Array".to_string(), vec![length_quantity.clone()]),
+            ),
+            (
+                Type::Named("Option".to_string(), vec![measured_d()]),
+                Ty::Applied("Option".to_string(), vec![measured_length.clone()]),
+            ),
+            (
+                Type::Named(
+                    "Result".to_string(),
+                    vec![measured_d(), Type::Named("String".to_string(), Vec::new())],
+                ),
+                Ty::Applied(
+                    "Result".to_string(),
+                    vec![measured_length.clone(), Ty::String],
+                ),
+            ),
+            (
+                Type::Named(
+                    "Map".to_string(),
+                    vec![
+                        Type::Named("String".to_string(), Vec::new()),
+                        quantity_of_d(),
+                    ],
+                ),
+                Ty::Map(Box::new(Ty::String), Box::new(length_quantity.clone())),
+            ),
+        ];
+
+        for (parameter, actual) in cases {
+            let mut dimensions = HashMap::new();
+            bind_nested_dimensions(&parameter, &actual, &dimension_generics, &mut dimensions)
+                .expect("nested collection and wrapper types should bind their dimension");
+            assert_eq!(dimensions.get("D"), Some(&length));
+        }
+
+        let repeated_dimension =
+            Type::Named("Result".to_string(), vec![quantity_of_d(), quantity_of_d()]);
+        let incompatible_actual = Ty::Applied(
+            "Result".to_string(),
+            vec![length_quantity, Ty::Quantity(dim_single("Time"))],
+        );
+        let mut dimensions = HashMap::new();
+        assert!(bind_nested_dimensions(
+            &repeated_dimension,
+            &incompatible_actual,
+            &dimension_generics,
+            &mut dimensions,
+        )
+        .is_err());
+
+        let mut dimensions = HashMap::new();
+        bind_nested_dimensions(
+            &measured_d(),
+            &measured_length,
+            &dimension_generics,
+            &mut dimensions,
+        )
+        .expect("the qualified generic record should bind its nested dimension");
+        assert_eq!(dimensions.get("D"), Some(&length));
+
+        let uncertainty = Type::Named(
+            "CoherentUncertainty".to_string(),
+            vec![Type::Named("D".to_string(), Vec::new())],
+        );
+        assert_eq!(
+            resolve_type_with_type_subst(&uncertainty, &HashMap::new(), &dimensions),
+            Ty::Applied(
+                "CoherentUncertainty".to_string(),
+                vec![Ty::Quantity(dim_single("Length"))]
+            )
+        );
+    }
+
+    #[test]
+    fn nested_dimension_substitution_does_not_conflate_same_named_records() {
+        let parameter = Type::Named(
+            "module_a::Measurement".to_string(),
+            vec![Type::Named(
+                "Quantity".to_string(),
+                vec![Type::Named("D".to_string(), Vec::new())],
+            )],
+        );
+        let argument = Ty::Applied(
+            "module_b::Measurement".to_string(),
+            vec![Ty::Quantity(dim_single("Length"))],
+        );
+        let mut dimensions = HashMap::new();
+        let dimension_generics = HashSet::from(["D".to_string()]);
+
+        bind_nested_dimensions(&parameter, &argument, &dimension_generics, &mut dimensions)
+            .expect("unrelated records should not bind nested dimensions");
+        assert!(dimensions.is_empty());
+    }
+
+    #[test]
+    fn generic_unification_rejects_incompatible_concrete_quantity_dimensions() {
+        let quantity_of_length = Type::Named(
+            "Quantity".to_string(),
+            vec![Type::Named("Length".to_string(), Vec::new())],
+        );
+        let expected = Ty::Quantity(dim_single("Length"));
+        let actual = Ty::Quantity(dim_single("Time"));
+        let mut substitution = HashMap::new();
+
+        assert!(unify_generic_type(
+            &quantity_of_length,
+            &expected,
+            &HashSet::new(),
+            &mut substitution,
+        )
+        .is_ok());
+        assert!(unify_generic_type(
+            &quantity_of_length,
+            &actual,
+            &HashSet::new(),
+            &mut substitution,
+        )
+        .is_err());
     }
 
     #[test]

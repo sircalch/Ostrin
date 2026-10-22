@@ -10147,6 +10147,87 @@ fn main() -> Void {
 }
 
 #[test]
+fn native_ir_option_none_reassignment_keeps_concrete_payload_type() {
+    let file = temp_source(
+        "native-ir-option-none-reassignment.ostrin",
+        r#"
+fn main() -> Void {
+    mut value: Option<String> = Some("old" + " payload")
+    alias = value
+    value = None
+    match alias {
+        Some(text) => print(text),
+        None => print("none"),
+    }
+    drop(value)
+    drop(alias)
+}
+"#,
+    );
+    let expected = "old payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Option<String> reassignment interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Option<String> reassignment native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "Option<String> reassignment must preserve the concrete Option ABI in IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Option<String> reassignment WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Option_String") && !stdout(&wasi).contains("Option_Unknown"),
+        "WASI C did not keep the concrete Option<String> representation"
+    );
+
+    let exe = temp_artifact("native-ir-option-none-reassignment.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "Option<String> reassignment leak-check compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Option<String> reassignment binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "Option<String> reassignment native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Option<String> reassignment leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_list_result_string_ownership() {
     let file = temp_source(
         "native-ir-list-result-string.ostrin",
@@ -12205,12 +12286,10 @@ fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.contains("ast-fallback: 1")
-            && report_text.contains(
-                "ast-fallback-function: examples/measurement_quantity_native_smoke.ostrin::main",
-            )
-            && report_text.contains("divergences: 6"),
-        "dimensional Measurement native smoke must keep its fallback and type divergences visible: {report_text}"
+        report_text.contains("native-source: examples/measurement_quantity_native_smoke.ostrin ir=1 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "dimensional Measurement native smoke must lower main through IR with no type divergence: {report_text}"
     );
 
     let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
@@ -12304,7 +12383,7 @@ fn dimensional_measurement_lab_matches_interpreter_and_native() {
 }
 
 #[test]
-fn dimensional_measurement_full_surface_keeps_explicit_native_gap() {
+fn dimensional_measurement_full_surface_matches_native_and_wasi() {
     let file = example_path("measurement_quantity_direct_shape.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -12319,13 +12398,233 @@ fn dimensional_measurement_full_surface_keeps_explicit_native_gap() {
 
     let native = run(&["--native-type-report", &file]);
     assert!(
-        !native.status.success(),
-        "the full dimensional Measurement surface must not pass through an unsupported lowering"
+        native.status.success(),
+        "the full dimensional Measurement surface should lower through IR: {}",
+        stderr(&native)
+    );
+    let report = stdout(&native);
+    assert!(
+        report.contains("examples/measurement_quantity_direct_shape.ostrin ir=1 hir=0 ast=0")
+            && report.contains("ast-fallback: 0")
+            && report.contains("divergences: 0"),
+        "direct Measurement<Quantity> must lower main through IR with no type divergence: {report}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "direct Measurement<Quantity> WASI emission failed: {}",
+        stderr(&wasi)
     );
     assert!(
-        stderr(&native).contains("method 'value' on Float"),
-        "direct Measurement<Quantity> lowering gap changed: {}",
-        stderr(&native)
+        stdout(&wasi).contains("std_measurements__Measurement__Q_Length"),
+        "direct Measurement<Quantity> WASI output omitted its concrete measurement type"
+    );
+
+    let exe = temp_artifact("measurement-quantity-direct-shape.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "direct Measurement<Quantity> native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run direct Measurement<Quantity> binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "direct Measurement<Quantity> native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n")
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "direct Measurement<Quantity> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn generic_dimensional_measurement_wrapper_matches_native_and_wasi() {
+    let file = example_path("measurement_quantity_shape.ostrin");
+    let expected = "12 m\ntrue\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "generic Measurement<Quantity<D>> interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "generic Measurement<Quantity<D>> IR lowering failed: {}",
+        stderr(&report)
+    );
+    let report = stdout(&report);
+    assert!(
+        report.contains("examples/measurement_quantity_shape.ostrin ir=2 hir=0 ast=0")
+            && report.contains("ast-fallback: 0")
+            && report.contains("divergences: 0"),
+        "generic Measurement<Quantity<D>> must specialize through IR without fallback: {report}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "generic Measurement<Quantity<D>> WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__Q_Length"),
+        "generic Measurement<Quantity<D>> WASI output omitted the concrete dimension"
+    );
+
+    let exe = temp_artifact("measurement-quantity-generic-wrapper.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "generic Measurement<Quantity<D>> native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run generic Measurement<Quantity<D>> native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "generic Measurement<Quantity<D>> native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic Measurement<Quantity<D>> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn nested_measurement_dimension_conflicts_are_rejected_at_call_site() {
+    let source = temp_source(
+        "nested_measurement_dimension_conflict",
+        "import std.measurements\n\
+         fn accept_same_dimension<D: Dimension>(left: Option<Measurement<Quantity<D>>>, right: Option<Measurement<Quantity<D>>>) -> Void {\n\
+             print(\"accepted\")\n\
+         }\n\
+         fn main() -> Void {\n\
+             length = Some(measurements.from_quantity_source(1 m, 0.1 m, \"length\", \"ruler\").unwrap())\n\
+             time = Some(measurements.from_quantity_source(1 s, 0.1 s, \"time\", \"clock\").unwrap())\n\
+             accept_same_dimension(length, time)\n\
+         }\n",
+    );
+    let checked = run(&["--check", &source]);
+    let _ = fs::remove_file(&source);
+    assert!(
+        !checked.status.success(),
+        "the same generic dimension must not accept nested Length and Time measurements"
+    );
+    let diagnostics = stderr(&checked);
+    assert!(
+        diagnostics.contains("OSTRIN-E1042")
+            && diagnostics
+                .contains("Generic dimension 'D' was inferred as both 'Length' and 'Time'"),
+        "expected a dimension conflict diagnostic at the call site: {diagnostics}"
+    );
+}
+
+#[test]
+fn measurement_quantity_record_field_replacement_preserves_alias_ownership() {
+    let source = temp_source(
+        "measurement_quantity_record_field_replacement",
+        r#"import std.measurements
+record Sample { mut reading: Measurement<Quantity<Length>> }
+fn main() -> Void {
+    mut sample = Sample { reading: measurements.from_quantity_source(12 m, 20 cm, "first", "ruler").unwrap() }
+    alias = sample
+    sample.reading = measurements.from_quantity_source(3 m, 10 cm, "second", "scale").unwrap()
+    print(alias.reading.value)
+    print(sample.reading.value)
+    drop(alias)
+    drop(sample)
+}
+"#,
+    );
+    let expected = "3 m\n3 m\n";
+
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement<Quantity> record replacement failed in interpreter: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &source]);
+    assert!(report.status.success(), "stderr: {}", stderr(&report));
+    let report = stdout(&report);
+    assert!(
+        report.contains("ir=1 hir=0 ast=0")
+            && report.contains("ast-fallback: 0")
+            && report.contains("divergences: 0"),
+        "Measurement<Quantity> field replacement must lower through IR without fallback: {report}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &source]);
+    assert!(
+        wasi.status.success(),
+        "Measurement<Quantity> field replacement WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__Q_Length"),
+        "WASI output omitted the concrete Measurement<Quantity<Length>> field type"
+    );
+
+    let exe = temp_artifact("measurement-quantity-record-field-replacement.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    if skip_if_no_c_compiler(&compile) {
+        let _ = fs::remove_file(&source);
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement<Quantity> field replacement native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement<Quantity> field replacement binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&source);
+    assert!(
+        native.status.success(),
+        "Measurement<Quantity> field replacement native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement<Quantity> record replacement leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
