@@ -2632,29 +2632,47 @@ impl Checker {
             .zip(explicit_type_args.unwrap_or_default().iter())
             .map(|(generic, ty)| (generic.name.clone(), self.resolve_type_in_context(ty)))
             .collect();
+        let record_generic_names: HashSet<String> = self
+            .record_generics
+            .get(name)
+            .into_iter()
+            .flatten()
+            .map(|generic| generic.name.clone())
+            .collect();
         let value_types: HashMap<String, Ty> = fields
             .iter()
             .map(|(field_name, value)| {
                 let declared_type = self
                     .record_fields
                     .get(name)
-                    .and_then(|fs| fs.iter().find(|(n, _)| n == field_name).map(|(_, t)| t.clone()))
-                    .map(|t| resolve_type_with_type_subst(&t, &explicit_type_subst, &HashMap::new()));
+                    .and_then(|fs| {
+                        fs.iter()
+                            .find(|(n, _)| n == field_name)
+                            .map(|(_, t)| t.clone())
+                    })
+                    .map(|t| {
+                        resolve_type_with_type_subst(&t, &explicit_type_subst, &HashMap::new())
+                    });
                 let expected = declared_type.as_ref().filter(|t| {
-                    // A lambda learns its parameter types, and an empty
-                    // `[]`/`{}` its element type, from the field.
-                    let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
-                        || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
+                    // Lambdas need a field's callable type to infer their
+                    // parameters. Concrete field types also provide context
+                    // for generic constructors such as `None`; unresolved
+                    // generic fields wait for explicit record type arguments.
                     matches!(t, Ty::Fn(..))
                         || matches!(t, Ty::Dyn(_))
-                        || (empty && !ty_mentions_generic(t))
-                        || explicit_type_args.is_some()
+                        || (!ty_mentions_generic(t)
+                            && !ty_mentions_declared_generic(t, &record_generic_names))
+                        || explicit_type_args
+                            .is_some_and(|args| args.len() == record_generic_names.len())
                 });
                 if let Some(expected @ Ty::Dyn(_)) = expected {
                     self.expected_types_by_node
                         .insert(value as *const Expr as usize, expected.clone());
                 }
-                (field_name.clone(), self.infer_expr_with_expected(value, expected, scope))
+                (
+                    field_name.clone(),
+                    self.infer_expr_with_expected(value, expected, scope),
+                )
             })
             .collect();
         // Untyped integer literals in a field whose declared type is a
@@ -2712,10 +2730,10 @@ impl Checker {
                 );
             }
         }
-        for (field_name, field_type) in declared_fields {
-            if let Some(value_type) = value_types.get(&field_name) {
+        for (field_name, field_type) in &declared_fields {
+            if let Some(value_type) = value_types.get(field_name) {
                 if let Err(message) =
-                    unify_generic_type(&field_type, value_type, &generic_names, &mut type_subst)
+                    unify_generic_type(field_type, value_type, &generic_names, &mut type_subst)
                 {
                     let code = if explicit_type_args.is_some() {
                         "E1042"
@@ -2730,6 +2748,17 @@ impl Checker {
                         ),
                     );
                 }
+            }
+        }
+        // A field such as `Option<T>` may be unresolved when first visited,
+        // then become concrete after another field binds `T`. Feed the
+        // completed record substitution back into those expressions so
+        // constructors like `None` retain the concrete payload type in HIR.
+        for (field_name, field_type) in &declared_fields {
+            if let Some((_, value)) = fields.iter().find(|(name, _)| name == field_name) {
+                let expected =
+                    resolve_type_with_type_subst(field_type, &type_subst, &HashMap::new());
+                self.note_expected(value, &expected);
             }
         }
         Ty::Applied(
@@ -6814,6 +6843,29 @@ fn ty_mentions_generic(ty: &Ty) -> bool {
         Ty::Map(k, v) => ty_mentions_generic(k) || ty_mentions_generic(v),
         Ty::Applied(_, args) => args.iter().any(ty_mentions_generic),
         Ty::Fn(params, ret) => params.iter().any(ty_mentions_generic) || ty_mentions_generic(ret),
+        _ => false,
+    }
+}
+
+/// True when a field type still contains one of its enclosing record's type
+/// parameters. Record declarations represent these as `Ty::Named` until their
+/// literal's field values have inferred a substitution.
+fn ty_mentions_declared_generic(ty: &Ty, names: &HashSet<String>) -> bool {
+    match ty {
+        Ty::Named(name) | Ty::Generic(name) => names.contains(name),
+        Ty::List(t) | Ty::Set(t) => ty_mentions_declared_generic(t, names),
+        Ty::Map(key, value) => {
+            ty_mentions_declared_generic(key, names) || ty_mentions_declared_generic(value, names)
+        }
+        Ty::Applied(_, args) => args
+            .iter()
+            .any(|arg| ty_mentions_declared_generic(arg, names)),
+        Ty::Fn(params, ret) => {
+            params
+                .iter()
+                .any(|param| ty_mentions_declared_generic(param, names))
+                || ty_mentions_declared_generic(ret, names)
+        }
         _ => false,
     }
 }
