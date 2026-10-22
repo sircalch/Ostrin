@@ -555,12 +555,6 @@ fn map_type_with_subst(
                 .map(|a| map_type_with_subst(a, types, subst))
                 .collect::<Result<Vec<_>, _>>()?;
             if name == "Measurement" || name.ends_with("::Measurement") {
-                if concrete.iter().any(|arg| matches!(arg, CType::Quantity(_))) {
-                    return Err(
-                        "type 'Measurement<Quantity<D>>' is not supported by the native backend yet"
-                            .to_string(),
-                    );
-                }
                 if concrete
                     .iter()
                     .any(|arg| matches!(arg, CType::TemperaturePoint))
@@ -2347,12 +2341,6 @@ impl<'a> Codegen<'a> {
 
     fn register_instance(&mut self, base: &str, args: &[CType]) -> Result<(), String> {
         if base == "Measurement" || base.ends_with("::Measurement") {
-            if args.iter().any(|arg| matches!(arg, CType::Quantity(_))) {
-                return Err(
-                    "type 'Measurement<Quantity<D>>' is not supported by the native backend yet"
-                        .to_string(),
-                );
-            }
             if args
                 .iter()
                 .any(|arg| matches!(arg, CType::TemperaturePoint))
@@ -8199,7 +8187,7 @@ impl<'a> Codegen<'a> {
                     )),
                 }
             }
-            _ => Err("method calls are only supported on records, 'dyn Trait' values or List by the native backend yet".to_string()),
+            _ => Err(format!("method '{method_name}' on {obj_ty:?} is only supported on records, 'dyn Trait' values or List by the native backend yet")),
         }
     }
 

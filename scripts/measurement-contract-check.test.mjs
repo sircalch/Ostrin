@@ -9,6 +9,7 @@ const trackedFiles = [
   "compiler/std/measurements.ostrin",
   "examples/measurement_scalar.ostrin",
   "examples/measurement_quantity_direct_shape.ostrin",
+  "examples/measurement_quantity_native_smoke.ostrin",
   "examples/measurement_lab.ostrin",
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
@@ -29,22 +30,26 @@ test("the scalar Measurement contract is aligned with source and parity evidence
   assert.deepEqual(validateMeasurementContract(repositoryRoot).errors, []);
 });
 
-test("the gate requires accurate dimensional web scope and experimental boundaries", () => {
+test("the gate requires accurate dimensional native-smoke scope and experimental boundaries", () => {
   const root = fixtureRoot();
   try {
     const file = path.join(root, "scripts/lab-data.mjs");
     const original = readFileSync(file, "utf8");
-    writeFileSync(file, original.replace("interpreter/WASM path", "native path"));
+    writeFileSync(file, original.replace("native smoke now has parity", "native support"));
     let result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("interpreter/WASM dimensional Measurement scope")));
+    assert.ok(result.errors.some((error) => error.includes("native-smoke and interpreter/WASM scope")));
+
+    writeFileSync(file, original.replace("The native type report still shows AST fallback and generic type divergences, so this is output evidence for those cases, not proof of complete typed lowering.", "Native typed lowering is complete."));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("fallback and type-divergence limitation")));
 
     writeFileSync(file, original.replace("Array<Measurement>, covariance, Monte Carlo", "native support"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
 
-    writeFileSync(file, original.replace("Native support", "Native parity"));
+    writeFileSync(file, original.replace("div_quantity is instantiated with equal dimensions and should return Err; this remains an explicit experimental boundary", "native parity"));
     result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("native dimensional Measurement boundary")));
+    assert.ok(result.errors.some((error) => error.includes("remaining dimensional Measurement native boundary")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

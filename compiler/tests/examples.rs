@@ -12186,30 +12186,125 @@ fn main() -> Void {
 }
 
 #[test]
-fn measurement_quantity_boundary_is_explicitly_rejected_natively() {
-    let file = example_path("measurement_quantity_shape.ostrin");
+fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
+    let file = example_path("measurement_quantity_native_smoke.ostrin");
+    let expected = "24 m\n1\n0.4\n0 m\n0\nLength*Time\n0.8246211251235323\n";
     let interpreted = run(&["--run", &file]);
     assert!(
         interpreted.status.success(),
-        "Measurement<Quantity> interpreter failed: {}",
+        "dimensional Measurement interpreter failed: {}",
         stderr(&interpreted)
     );
-    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12 m\ntrue\n");
-    let native = run(&["--native-type-report", &file]);
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
     assert!(
-        !native.status.success(),
-        "Measurement<Quantity> was enabled without a native ownership contract"
+        report.status.success(),
+        "dimensional Measurement IR lowering failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ast-fallback: 1")
+            && report_text.contains(
+                "ast-fallback-function: examples/measurement_quantity_native_smoke.ostrin::main",
+            )
+            && report_text.contains("divergences: 6"),
+        "dimensional Measurement native smoke must keep its fallback and type divergences visible: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "dimensional Measurement WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "std_measurements__Measurement__Q_Length",
+        "std_measurements__Measurement__Q_Length_Time",
+        "ostrin_drop_std_measurements__Measurement__Q_Length",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "dimensional Measurement WASI ownership marker {marker} is missing"
+        );
+    }
+
+    let exe = temp_artifact("measurement-quantity-native-smoke.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "dimensional Measurement native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dimensional Measurement binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "dimensional Measurement native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
     );
     assert!(
-        stderr(&native)
-            .contains("type 'Measurement<Quantity<D>>' is not supported by the native backend yet"),
-        "native boundary diagnostic changed: {}",
-        stderr(&native)
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dimensional Measurement leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
 #[test]
-fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
+fn dimensional_measurement_lab_matches_interpreter_and_native() {
+    let file = example_path("measurement_lab.ostrin");
+    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "dimensional Measurement Lab interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("measurement-lab.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "dimensional Measurement Lab native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dimensional Measurement Lab binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "dimensional Measurement Lab native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dimensional Measurement Lab leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn dimensional_measurement_full_surface_keeps_explicit_native_gap() {
     let file = example_path("measurement_quantity_direct_shape.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -12225,12 +12320,11 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
     let native = run(&["--native-type-report", &file]);
     assert!(
         !native.status.success(),
-        "direct Measurement<Quantity> was enabled without a native ownership contract"
+        "the full dimensional Measurement surface must not pass through an unsupported lowering"
     );
     assert!(
-        stderr(&native)
-            .contains("type 'Measurement<Quantity<D>>' is not supported by the native backend yet"),
-        "direct Measurement<Quantity> boundary diagnostic changed: {}",
+        stderr(&native).contains("method 'value' on Float"),
+        "direct Measurement<Quantity> lowering gap changed: {}",
         stderr(&native)
     );
 }

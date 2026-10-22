@@ -1,0 +1,23 @@
+import std.measurements
+
+// Native Measurement<Quantity<D>> core: correlated arithmetic and uncertainty.
+// Dimensioned ratios and TemperaturePoint remain outside this native slice.
+fn main() -> Void {
+    shared_a = measurements.from_quantity_source(12 m, 20 cm, "caliper", "ruler").unwrap()
+    shared_b = measurements.from_quantity_source(1200 cm, 0.2 m, "caliper", "same ruler").unwrap()
+
+    summed = measurements.add_quantity(shared_a, shared_b).unwrap()
+    print(summed.value)
+    print(summed.sources.length())
+    print(measurements.quantity_uncertainty(summed).unwrap().value)
+
+    difference = measurements.sub_quantity(shared_a, shared_b).unwrap()
+    print(difference.value)
+    print(measurements.quantity_uncertainty(difference).unwrap().value)
+
+    length = measurements.from_quantity_source(4 m, 10 cm, "ruler", "ruler").unwrap()
+    time = measurements.from_quantity_source(2 s, 0.2 s, "clock", "clock").unwrap()
+    product = measurements.mul_quantity(length, time).unwrap()
+    print(product.value.dimension_key())
+    print(measurements.quantity_uncertainty(product).unwrap().value)
+}
