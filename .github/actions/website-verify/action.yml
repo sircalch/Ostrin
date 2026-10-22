@@ -95,7 +95,7 @@ runs:
       id: upload-host-candidate
       uses: actions/upload-artifact@v4
       with:
-        name: ostrin-r3-host-candidate-${{ github.run_id }}
+        name: ostrin-r3-host-candidate-${{ github.run_id }}-attempt-${{ github.run_attempt }}
         path: |
           validation/r3-readiness.json
           validation/quality-scorecard.json
@@ -110,7 +110,7 @@ runs:
     - name: Download the exact candidate evidence artifact
       uses: actions/download-artifact@v4
       with:
-        name: ostrin-r3-host-candidate-${{ github.run_id }}
+        name: ostrin-r3-host-candidate-${{ github.run_id }}-attempt-${{ github.run_attempt }}
         path: target/r3-ci/downloaded-host-evidence
     - name: Re-run all experiment bundles from downloaded artifact bytes
       shell: bash
@@ -120,7 +120,7 @@ runs:
       id: upload-verified-host-evidence
       uses: actions/upload-artifact@v4
       with:
-        name: ostrin-r3-host-evidence-${{ github.run_id }}
+        name: ostrin-r3-host-evidence-${{ github.run_id }}-attempt-${{ github.run_attempt }}
         path: target/r3-ci/downloaded-host-evidence
         if-no-files-found: error
         retention-days: 90

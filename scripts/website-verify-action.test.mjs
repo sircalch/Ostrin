@@ -26,8 +26,8 @@ test("R3 readiness is replayed from the exact uploaded candidate before official
   assert.ok(candidateDownload > candidateUpload, "candidate artifact must be downloaded after upload");
   assert.ok(artifactReplay > candidateDownload, "the downloaded artifact must be independently replayed");
   assert.ok(verifiedUpload > artifactReplay, "official evidence is published only after replay succeeds");
-  assert.match(action, /name: ostrin-r3-host-candidate-\$\{\{ github\.run_id \}\}/);
-  assert.match(action, /name: ostrin-r3-host-evidence-\$\{\{ github\.run_id \}\}/);
+  assert.match(action, /name: ostrin-r3-host-candidate-\$\{\{ github\.run_id \}\}-attempt-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(action, /name: ostrin-r3-host-evidence-\$\{\{ github\.run_id \}\}-attempt-\$\{\{ github\.run_attempt \}\}/);
   assert.match(action, /--run-id "\$GITHUB_RUN_ID" --tested-sha "\$GITHUB_SHA"/);
   assert.match(action, /path: target\/r3-ci\/downloaded-host-evidence/);
   assert.match(action, /value: \$\{\{ steps\.upload-verified-host-evidence\.outputs\.artifact-url \}\}/);

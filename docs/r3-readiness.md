@@ -59,14 +59,16 @@ los SHA y la URL es metadato estructural del runner, no una firma criptográfica
 independiente.
 La acción conserva además el reporte
 R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
-`ostrin-r3-host-evidence-<run_id>` durante 90 días, y lo sube solo después de que terminen
+`ostrin-r3-host-evidence-<run_id>-attempt-<run_attempt>` durante 90 días, y lo sube solo después de que terminen
 correctamente los replays, las comprobaciones web y los demás gates de distribución de ese job.
 Si una de esas comprobaciones falla, no se publica el paquete como evidencia verificada. La
 verificación local mantiene el campo ausente para que un checkout de desarrollador no se presente
 como una ejecución CI.
 
 El scorecard generado dentro de CI también publica un bloque `developmentEvidence` con el workflow,
-`run_id`, `head_sha`, `tested_sha` y las URLs del run y sus artefactos. Esto permite llegar desde el
+`run_id`, `run_attempt`, `head_sha`, `tested_sha` y las URLs del run y sus artefactos. El número de
+intento se incluye en los nombres de candidate y evidence para evitar colisiones al reintentar una
+ejecución: Actions v4 mantiene los artefactos inmutables. Esto permite llegar desde el
 panel público al paquete host-bound que respalda sus métricas de desarrollo, sin cambiar las
 revisiones históricas del candidato ni la revisión fuente del tag publicado. En una ejecución local,
 el bloque queda en `null`.
