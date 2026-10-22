@@ -5112,8 +5112,10 @@ fn bind_nested_dimensions(
 }
 
 fn same_type_name(left: &str, right: &str) -> bool {
+    // Type names are canonicalized by module loading before type checking.
+    // Comparing only the final segment would conflate unrelated declarations
+    // such as `module_a::Measurement` and `module_b::Measurement`.
     left == right
-        || left.rsplit("::").next().unwrap_or(left) == right.rsplit("::").next().unwrap_or(right)
 }
 
 fn unify_generic_type(
@@ -5168,6 +5170,21 @@ fn unify_generic_type(
                             subst.insert(dim.clone(), bound);
                             Ok(())
                         }
+                    }
+                }
+                (dimension, Ty::Quantity(actual_dimension))
+                    if dimension_uses_only_known_bases(dimension) =>
+                {
+                    let expected_dimension =
+                        resolve_dimension_with_subst(dimension, &HashMap::new());
+                    if &expected_dimension == actual_dimension {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "Expected '{}', got '{}'.",
+                            resolve_type(param).describe(),
+                            actual.describe()
+                        ))
                     }
                 }
                 _ => Ok(()),
@@ -5768,6 +5785,17 @@ fn is_builtin_hashable(
         variant_fields,
         &mut HashSet::new(),
     )
+}
+
+fn dimension_uses_only_known_bases(ty: &Type) -> bool {
+    match ty {
+        Type::Named(name, args) => args.is_empty() && is_known_base_dimension(name),
+        Type::Mul(left, right) | Type::Div(left, right) => {
+            dimension_uses_only_known_bases(left) && dimension_uses_only_known_bases(right)
+        }
+        Type::Pow(inner, _) => dimension_uses_only_known_bases(inner),
+        _ => false,
+    }
 }
 
 fn check_builtin_call(
@@ -6819,7 +6847,8 @@ fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
 #[cfg(test)]
 mod temperature_point_checker_tests {
     use super::{
-        bind_nested_dimensions, resolve_type, resolve_type_with_type_subst, type_from_ty, Checker,
+        bind_nested_dimensions, resolve_type, resolve_type_with_type_subst, type_from_ty,
+        unify_generic_type, Checker,
     };
     use crate::ast::{BinOp, Expr, Type, UnaryOp};
     use crate::types::{dim_single, Ty};
@@ -6834,7 +6863,7 @@ mod temperature_point_checker_tests {
     #[test]
     fn nested_dimension_substitution_crosses_qualified_record_types() {
         let quantity_of_d = Type::Named(
-            "Measurement".to_string(),
+            "std.measurements::Measurement".to_string(),
             vec![Type::Named(
                 "Quantity".to_string(),
                 vec![Type::Named("D".to_string(), Vec::new())],
@@ -6867,6 +6896,53 @@ mod temperature_point_checker_tests {
                 vec![Ty::Quantity(dim_single("Length"))]
             )
         );
+    }
+
+    #[test]
+    fn nested_dimension_substitution_does_not_conflate_same_named_records() {
+        let parameter = Type::Named(
+            "module_a::Measurement".to_string(),
+            vec![Type::Named(
+                "Quantity".to_string(),
+                vec![Type::Named("D".to_string(), Vec::new())],
+            )],
+        );
+        let argument = Ty::Applied(
+            "module_b::Measurement".to_string(),
+            vec![Ty::Quantity(dim_single("Length"))],
+        );
+        let mut dimensions = HashMap::new();
+        let dimension_generics = HashSet::from(["D".to_string()]);
+
+        bind_nested_dimensions(&parameter, &argument, &dimension_generics, &mut dimensions)
+            .expect("unrelated records should not bind nested dimensions");
+        assert!(dimensions.is_empty());
+    }
+
+    #[test]
+    fn generic_unification_rejects_incompatible_concrete_quantity_dimensions() {
+        let quantity_of_length = Type::Named(
+            "Quantity".to_string(),
+            vec![Type::Named("Length".to_string(), Vec::new())],
+        );
+        let expected = Ty::Quantity(dim_single("Length"));
+        let actual = Ty::Quantity(dim_single("Time"));
+        let mut substitution = HashMap::new();
+
+        assert!(unify_generic_type(
+            &quantity_of_length,
+            &expected,
+            &HashSet::new(),
+            &mut substitution,
+        )
+        .is_ok());
+        assert!(unify_generic_type(
+            &quantity_of_length,
+            &actual,
+            &HashSet::new(),
+            &mut substitution,
+        )
+        .is_err());
     }
 
     #[test]

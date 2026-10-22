@@ -35,19 +35,19 @@ test("the gate requires accurate dimensional native-smoke scope and experimental
   try {
     const file = path.join(root, "scripts/lab-data.mjs");
     const original = readFileSync(file, "utf8");
-    writeFileSync(file, original.replace("native smoke now has parity", "native support"));
+    writeFileSync(file, original.replace("matching interpreter/native output", "native support"));
     let result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("native-smoke and interpreter/WASM scope")));
 
-    writeFileSync(file, original.replace("The native type report still shows AST fallback and generic type divergences, so this is output evidence for those cases, not proof of complete typed lowering.", "Native typed lowering is complete."));
+    writeFileSync(file, original.replace("IR-generated main functions, zero AST fallback and zero generic type divergences", "native evidence"));
     result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("fallback and type-divergence limitation")));
+    assert.ok(result.errors.some((error) => error.includes("typed dimensional Measurement smoke evidence")));
 
     writeFileSync(file, original.replace("Array<Measurement>, covariance, Monte Carlo", "native support"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
 
-    writeFileSync(file, original.replace("div_quantity is instantiated with equal dimensions and should return Err; this remains an explicit experimental boundary", "native parity"));
+    writeFileSync(file, original.replace("equal dimensions in div_quantity; this remains an explicit experimental boundary", "native parity"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("remaining dimensional Measurement native boundary")));
   } finally {
