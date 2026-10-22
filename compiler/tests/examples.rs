@@ -10147,6 +10147,87 @@ fn main() -> Void {
 }
 
 #[test]
+fn native_ir_option_none_reassignment_keeps_concrete_payload_type() {
+    let file = temp_source(
+        "native-ir-option-none-reassignment.ostrin",
+        r#"
+fn main() -> Void {
+    mut value: Option<String> = Some("old" + " payload")
+    alias = value
+    value = None
+    match alias {
+        Some(text) => print(text),
+        None => print("none"),
+    }
+    drop(value)
+    drop(alias)
+}
+"#,
+    );
+    let expected = "old payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Option<String> reassignment interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Option<String> reassignment native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "Option<String> reassignment must preserve the concrete Option ABI in IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Option<String> reassignment WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Option_String") && !stdout(&wasi).contains("Option_Unknown"),
+        "WASI C did not keep the concrete Option<String> representation"
+    );
+
+    let exe = temp_artifact("native-ir-option-none-reassignment.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "Option<String> reassignment leak-check compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Option<String> reassignment binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "Option<String> reassignment native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Option<String> reassignment leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_list_result_string_ownership() {
     let file = temp_source(
         "native-ir-list-result-string.ostrin",
