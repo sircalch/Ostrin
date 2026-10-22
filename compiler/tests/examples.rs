@@ -12439,6 +12439,35 @@ fn generic_dimensional_measurement_wrapper_matches_native_and_wasi() {
 }
 
 #[test]
+fn nested_measurement_dimension_conflicts_are_rejected_at_call_site() {
+    let source = temp_source(
+        "nested_measurement_dimension_conflict",
+        "import std.measurements\n\
+         fn accept_same_dimension<D: Dimension>(left: Option<Measurement<Quantity<D>>>, right: Option<Measurement<Quantity<D>>>) -> Void {\n\
+             print(\"accepted\")\n\
+         }\n\
+         fn main() -> Void {\n\
+             length = Some(measurements.from_quantity_source(1 m, 0.1 m, \"length\", \"ruler\").unwrap())\n\
+             time = Some(measurements.from_quantity_source(1 s, 0.1 s, \"time\", \"clock\").unwrap())\n\
+             accept_same_dimension(length, time)\n\
+         }\n",
+    );
+    let checked = run(&["--check", &source]);
+    let _ = fs::remove_file(&source);
+    assert!(
+        !checked.status.success(),
+        "the same generic dimension must not accept nested Length and Time measurements"
+    );
+    let diagnostics = stderr(&checked);
+    assert!(
+        diagnostics.contains("OSTRIN-E1042")
+            && diagnostics
+                .contains("Generic dimension 'D' was inferred as both 'Length' and 'Time'"),
+        "expected a dimension conflict diagnostic at the call site: {diagnostics}"
+    );
+}
+
+#[test]
 fn dimensional_measurements_reject_non_finite_coherent_values() {
     let source = temp_source(
         "measurement_coherent_finiteness",
