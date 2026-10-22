@@ -12468,6 +12468,86 @@ fn nested_measurement_dimension_conflicts_are_rejected_at_call_site() {
 }
 
 #[test]
+fn measurement_quantity_record_field_replacement_preserves_alias_ownership() {
+    let source = temp_source(
+        "measurement_quantity_record_field_replacement",
+        r#"import std.measurements
+record Sample { mut reading: Measurement<Quantity<Length>> }
+fn main() -> Void {
+    mut sample = Sample { reading: measurements.from_quantity_source(12 m, 20 cm, "first", "ruler").unwrap() }
+    alias = sample
+    sample.reading = measurements.from_quantity_source(3 m, 10 cm, "second", "scale").unwrap()
+    print(alias.reading.value)
+    print(sample.reading.value)
+    drop(alias)
+    drop(sample)
+}
+"#,
+    );
+    let expected = "3 m\n3 m\n";
+
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement<Quantity> record replacement failed in interpreter: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &source]);
+    assert!(report.status.success(), "stderr: {}", stderr(&report));
+    let report = stdout(&report);
+    assert!(
+        report.contains("ir=1 hir=0 ast=0")
+            && report.contains("ast-fallback: 0")
+            && report.contains("divergences: 0"),
+        "Measurement<Quantity> field replacement must lower through IR without fallback: {report}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &source]);
+    assert!(
+        wasi.status.success(),
+        "Measurement<Quantity> field replacement WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__Q_Length"),
+        "WASI output omitted the concrete Measurement<Quantity<Length>> field type"
+    );
+
+    let exe = temp_artifact("measurement-quantity-record-field-replacement.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    if skip_if_no_c_compiler(&compile) {
+        let _ = fs::remove_file(&source);
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement<Quantity> field replacement native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement<Quantity> field replacement binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&source);
+    assert!(
+        native.status.success(),
+        "Measurement<Quantity> field replacement native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement<Quantity> record replacement leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn dimensional_measurements_reject_non_finite_coherent_values() {
     let source = temp_source(
         "measurement_coherent_finiteness",
