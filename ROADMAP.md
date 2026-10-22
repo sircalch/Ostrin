@@ -208,11 +208,14 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    resultado para esta rama. La proyección de series `List<Measurement<Float>>` alimenta
    `std.viz.errorbars`. `from_source` ya separa la identidad explícita de la etiqueta; `standard`
    mantiene compatibilidad usando la etiqueta como ID. `Measurement<Quantity<D>>` ya tiene un
-   prototipo sólo de intérprete para fuentes explícitas, suma correlacionada, incertidumbre estándar,
+   prototipo experimental para fuentes explícitas, suma correlacionada, incertidumbre estándar,
    productos entre dimensiones y cocientes entre dimensiones iguales y distintas; el Scientific Lab lo
-   muestra por WASM. Este ciclo añade el rechazo de nominales no finitos al convertir a unidades
-   coherentes. Ownership/ABI nativos, `Array<Measurement<T>>`, covarianzas parciales y Monte Carlo
-   siguen abiertos; la paridad scalar/native no implica paridad dimensional/native.
+   muestra por WASM. Hay smoke tests nativos para operaciones seleccionadas con salida coincidente,
+   pero la ruta conserva un fallback AST y divergencias en el reporte de tipos. No se afirma lowering
+   tipado completo ni ownership general: la instanciación directa de `div_quantity` para dimensiones
+   iguales sigue siendo una frontera nativa. Este ciclo añade el rechazo de nominales no finitos al
+   convertir a unidades coherentes. Ownership/ABI nativos generales, `Array<Measurement<T>>`,
+   covarianzas parciales y Monte Carlo siguen abiertos.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
    reproducible antes de fijar sintaxis pública. `ostrinc --effect-report` ya compone filas experimentales
