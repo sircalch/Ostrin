@@ -10776,6 +10776,83 @@ fn native_hir_handles_generic_records_and_enums() {
 }
 
 #[test]
+fn native_ir_generic_record_quantity_argument_preserves_dimension_and_ownership() {
+    let file = temp_source(
+        "native-generic-record-quantity",
+        r#"record Box<T> { value: T }
+fn main() -> Void {
+    length_box = Box<Quantity<Length>> { value: 12 m }
+    time_box = Box<Quantity<Time>> { value: 3 s }
+    print(length_box.value)
+    print(time_box.value)
+}
+"#,
+    );
+    let expected = "12 m\n3 s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI generic Quantity record emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Box__Q_Length") && wasi_source.contains("Box__Q_Time"),
+        "WASI C did not preserve distinct Quantity record instances"
+    );
+
+    let exe = temp_artifact("native-generic-record-quantity.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run generic Quantity record binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic Quantity record ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_handles_generic_methods_with_ir_for_generic_records() {
     // Generic method instances now lower through the IR pending queue,
     // including concrete generic-record returns.

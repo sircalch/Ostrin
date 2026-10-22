@@ -145,7 +145,11 @@ fn mangle_record_type(ty: &Ty, records: &RecordFields) -> String {
                 .join("_"),
             mangle_record_type(ret, records)
         ),
-        Ty::Quantity(_) => "Quantity".to_string(),
+        // Generic record instances use the same dimension-aware names as the
+        // native backend (`Box__Q_Length`, for example). Collapsing every
+        // Quantity to a single marker makes IR miss the registered concrete
+        // record and silently select the AST fallback.
+        Ty::Quantity(dimension) => mangle_quantity_type(dimension),
         Ty::TemperaturePoint => "TemperaturePoint".to_string(),
         Ty::Dyn(name) => name.clone(),
         Ty::Generic(name) => name.clone(),
