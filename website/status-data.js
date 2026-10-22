@@ -8,7 +8,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "releaseTag": "v0.2.0",
   "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
   "developmentEvidence": null,
-  "workingTreeDirty": true,
+  "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
@@ -112,7 +112,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "indexedPublicFiles": 0,
     "threshold": 2000,
     "readyForUpstreamPullRequest": false,
-    "generatedAt": "2026-10-21T16:52:44.849Z",
+    "generatedAt": "2026-10-22T01:35:46.695Z",
     "queryUrl": "https://github.com/search?q=NOT%20is%3Afork%20extension%3Aostrin%20-repo%3Asircalch%2FOstrin&type=code"
   },
   "releaseReadiness": {
