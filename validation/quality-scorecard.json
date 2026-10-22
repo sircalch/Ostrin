@@ -86,8 +86,8 @@
       "localTargetCandidateCount": 9289,
       "multiTargetEdgeCount": 0,
       "resolvedCallSiteCount": 245,
-      "locatedCallSiteCount": 184,
-      "unlocatedCallSiteCount": 61,
+      "locatedCallSiteCount": 245,
+      "unlocatedCallSiteCount": 0,
       "sourceSiteAssociationsValid": true
     },
     "sourceReadAudit": {
