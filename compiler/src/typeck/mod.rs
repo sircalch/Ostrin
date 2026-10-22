@@ -6862,28 +6862,91 @@ mod temperature_point_checker_tests {
 
     #[test]
     fn nested_dimension_substitution_crosses_qualified_record_types() {
-        let quantity_of_d = Type::Named(
-            "std.measurements::Measurement".to_string(),
-            vec![Type::Named(
+        let quantity_of_d = || {
+            Type::Named(
                 "Quantity".to_string(),
                 vec![Type::Named("D".to_string(), Vec::new())],
-            )],
-        );
+            )
+        };
+        let measured_d = || {
+            Type::Named(
+                "std.measurements::Measurement".to_string(),
+                vec![quantity_of_d()],
+            )
+        };
         let measured_length = Ty::Applied(
             "std.measurements::Measurement".to_string(),
             vec![Ty::Quantity(dim_single("Length"))],
         );
-        let mut dimensions = HashMap::new();
         let dimension_generics = HashSet::from(["D".to_string()]);
+        let length = dim_single("Length");
+        let length_quantity = Ty::Quantity(length.clone());
+        let cases = vec![
+            (
+                Type::Named("List".to_string(), vec![quantity_of_d()]),
+                Ty::List(Box::new(length_quantity.clone())),
+            ),
+            (
+                Type::Named("Array".to_string(), vec![quantity_of_d()]),
+                Ty::Applied("Array".to_string(), vec![length_quantity.clone()]),
+            ),
+            (
+                Type::Named("Option".to_string(), vec![measured_d()]),
+                Ty::Applied("Option".to_string(), vec![measured_length.clone()]),
+            ),
+            (
+                Type::Named(
+                    "Result".to_string(),
+                    vec![measured_d(), Type::Named("String".to_string(), Vec::new())],
+                ),
+                Ty::Applied(
+                    "Result".to_string(),
+                    vec![measured_length.clone(), Ty::String],
+                ),
+            ),
+            (
+                Type::Named(
+                    "Map".to_string(),
+                    vec![
+                        Type::Named("String".to_string(), Vec::new()),
+                        quantity_of_d(),
+                    ],
+                ),
+                Ty::Map(Box::new(Ty::String), Box::new(length_quantity.clone())),
+            ),
+        ];
 
+        for (parameter, actual) in cases {
+            let mut dimensions = HashMap::new();
+            bind_nested_dimensions(&parameter, &actual, &dimension_generics, &mut dimensions)
+                .expect("nested collection and wrapper types should bind their dimension");
+            assert_eq!(dimensions.get("D"), Some(&length));
+        }
+
+        let repeated_dimension =
+            Type::Named("Result".to_string(), vec![quantity_of_d(), quantity_of_d()]);
+        let incompatible_actual = Ty::Applied(
+            "Result".to_string(),
+            vec![length_quantity, Ty::Quantity(dim_single("Time"))],
+        );
+        let mut dimensions = HashMap::new();
+        assert!(bind_nested_dimensions(
+            &repeated_dimension,
+            &incompatible_actual,
+            &dimension_generics,
+            &mut dimensions,
+        )
+        .is_err());
+
+        let mut dimensions = HashMap::new();
         bind_nested_dimensions(
-            &quantity_of_d,
+            &measured_d(),
             &measured_length,
             &dimension_generics,
             &mut dimensions,
         )
         .expect("the qualified generic record should bind its nested dimension");
-        assert_eq!(dimensions.get("D"), Some(&dim_single("Length")));
+        assert_eq!(dimensions.get("D"), Some(&length));
 
         let uncertainty = Type::Named(
             "CoherentUncertainty".to_string(),
