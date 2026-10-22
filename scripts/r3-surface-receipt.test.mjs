@@ -35,9 +35,9 @@ test("Pages deploys when any surface replay evidence producer changes", () => {
   const upload = readFileSync(path.join(repositoryRoot, ".github/actions/website-verify/action.yml"), "utf8");
   assert.ok(upload.split(/\r?\n/).includes("          website/ostrinc.wasm"),
     "the archived receipt needs the exact CI-built WASM bytes");
-  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$OSTRIN_TESTED_SHA"'),
+  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"'),
     "CI must independently execute every archived R1/R2 package from the downloaded candidate before publishing verified evidence");
-  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$OSTRIN_EVIDENCE_HEAD_SHA"'),
+  assert.ok(upload.includes('node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"'),
     "CI must generate the run-bound WASI comparison reports before packaging the candidate");
   assert.ok(upload.split(/\r?\n/).includes("          target/r3-ci/wasi-file-read-evidence.json"),
     "CI must upload validated file-read evidence from the archived replay");

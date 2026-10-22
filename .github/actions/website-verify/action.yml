@@ -80,7 +80,7 @@ runs:
         node --test scripts/experiment-replay.test.mjs
         node scripts/experiment-replay.mjs --fixture surface --write-r3-receipt
         node scripts/r3-surface-receipt.mjs --verify
-        node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$OSTRIN_EVIDENCE_HEAD_SHA"
+        node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"
         node --test scripts/r3-surface-receipt.test.mjs
         node scripts/r3-readiness.mjs --require-ready
         node scripts/quality-scorecard.mjs --write
@@ -114,10 +114,8 @@ runs:
         path: target/r3-ci/downloaded-host-evidence
     - name: Re-run all experiment bundles from downloaded artifact bytes
       shell: bash
-      env:
-        OSTRIN_TESTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
-        node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$OSTRIN_TESTED_SHA"
+        node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"
     - name: Upload verified host evidence artifact
       id: upload-verified-host-evidence
       uses: actions/upload-artifact@v4
