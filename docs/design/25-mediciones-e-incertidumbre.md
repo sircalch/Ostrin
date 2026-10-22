@@ -328,13 +328,17 @@ si el cociente cancela las dimensiones; en ese caso se debe usar `div_quantity_s
 el resultado adimensional como `Measurement<Float>`. El backend nativo mantiene el rechazo explícito
 hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
-Este prototipo no habilita todavía `Array<Measurement<T>>` ni covarianza. El soporte nativo de
-`Measurement<Quantity<D>>` permanece experimental y limitado a los ejemplos y operaciones con
-paridad verificada; no se extiende a la forma directa completa. La propagación deberá mantener la
-dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original. Para ampliar
-el soporte se requieren pruebas adicionales de alias explícito, independencia de etiquetas repetidas,
-reducciones con fuentes compartidas, validación de covarianza, conversiones de unidades y paridad
-intérprete/native/WASM. También se necesitan leak-check, ASan y UBSan para los buffers o grafos
+Este prototipo no habilita todavía `Array<Measurement<T>>` ni covarianza. El soporte de
+`Measurement<Quantity<D>>` sigue siendo experimental y está limitado por la superficie realmente
+verificada. El fixture `examples/measurement_quantity_direct_shape.ostrin` ya cubre su forma directa:
+la prueba exige paridad de salida entre intérprete y binario nativo, lowering por IR (`ir=1`,
+`hir=0`, `ast=0`), cero divergencias de tipo, emisión C para WASI y `live_allocations=0` en la
+ejecución nativa con leak-check. Esta evidencia corresponde a ese fixture y sus operaciones; no
+establece soporte general para toda combinación de dimensiones o contenedores. La propagación debe
+mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.
+Para ampliar el alcance se requieren pruebas adicionales de alias explícito, independencia de
+etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
+unidades y ejecución WASI. También se necesitan leak-check, ASan y UBSan para los buffers o grafos
 gestionados.
 
 ## 6. Operaciones y reglas
@@ -486,8 +490,12 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
 3. Añadir fuentes correlacionadas y pruebas de cancelación. **Disponible para escalares:**
    `from_source` combina por ID explícito y `standard` conserva la semántica histórica por etiqueta;
    intérprete/nativo/WASM tienen pruebas de paridad.
-4. Integrar `Measurement<Quantity<Dim>>` y conversiones de unidades.
-5. Llevar la representación al HIR/IR y comprobar ownership en nativo.
+4. **Implementación experimental para el alcance verificado:** integrar `Measurement<Quantity<Dim>>`
+   y conversiones de unidades; `measurement_quantity_direct_shape.ostrin` fija el comportamiento
+   concreto cubierto por intérprete y nativo.
+5. **Implementado para ese fixture:** lowering a IR tipado, emisión C para WASI y comprobación
+   nativa de paridad y ownership con leak-check. La generalización a todas las estructuras genéricas
+   y contenedores sigue abierta.
 6. **En curso:** proyectar series escalares a valores e incertidumbres para error bars; añadir
    después arrays, covarianza y salida de contribuciones.
 7. Añadir propagación Monte Carlo explícita y semilla reproducible.
