@@ -65,10 +65,7 @@ fn outputs_match(name: &str, interpreted: &str, native: &str) -> bool {
 /// Examples the native backend deliberately does not reproduce, with the
 /// reason. Each entry must *fail* to compile natively — when a gap is closed
 /// the assertion below fires and the entry must be deleted.
-const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[(
-    "measurement_quantity_direct_shape.ostrin",
-    "full Measurement<Quantity<D>> division path still has an unsupported native generic lowering case",
-)];
+const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[];
 
 // These examples intentionally exercise an experimental type boundary that is
 // not part of the typed-core ratchet yet. Keeping them out of the aggregate
