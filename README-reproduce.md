@@ -42,7 +42,7 @@ node --test scripts/experiment-bundle.test.mjs
 - **R0:** fuente, entrada y salida registradas; el replay exacto está limitado a la configuración de CI declarada.
 - **R1:** R0 más semilla, algoritmo y sensibilidad de azar verificadas.
 - **R2:** R0/R1 más snapshot de entrada embebido, capacidades declaradas y sensibilidad de parámetros verificada.
-- **R3:** artefacto auditable con host, dependencias, scheduler, efectos y evidencia ejecutable. La CI genera 29/29 capturas estructurales en su host; ese conteo no promociona los bundles a R3. El primer corte adicional es un recibo de replay WASI para `surface`, ligado al run, al binario ejecutado y a los hashes del bundle. El scorecard conserva R3=0.
+- **R3:** artefacto auditable con host, dependencias, scheduler, efectos y evidencia ejecutable. La CI genera 29/29 capturas estructurales en su host; ese conteo no promociona los bundles a R3. El run de `main` [`bd021d2` / 39700812531](https://github.com/sircalch/Ostrin/actions/runs/39700812531) produjo el artefacto host-bound [12393350506](https://github.com/sircalch/Ostrin/actions/runs/39700812531/artifacts/12393350506). Una reproducción independiente de los bytes descargados ejecutó los 29 bundles con resultado `match` y confirmó las evidencias archivadas de lectura y azar. Esto acredita el WASM y host de ese run; no completa el contrato R3 ni establece equivalencia entre plataformas. El scorecard de ese artefacto conserva R3=0.
 
 ```text
 node scripts/r3-readiness.mjs --write
@@ -77,6 +77,8 @@ ejecuciones carguen el módulo identificado por el recibo de `surface`. Los R0 s
 dos veces y se comparan sus salidas; los R1/R2 validan su evidencia de sensibilidad y semilla.
 El resultado describe cada replay en ese host; no establece equivalencia general entre plataformas.
 El replay ejecutable no promueve por sí solo ningún bundle a R3.
+
+La misma verificación se ejecutó sobre el paquete publicado por el run [`39700812531`](https://github.com/sircalch/Ostrin/actions/runs/39700812531), ligado a `main` en `bd021d242df94e58cfb4f31b97dc5ece83b3c523`. El artefacto [host-bound 12393350506](https://github.com/sircalch/Ostrin/actions/runs/39700812531/artifacts/12393350506) registró 29/29 capturas estructuralmente listas y scorecard R3=0. La reproducción independiente de esos bytes devolvió `match` para los 29 bundles y coincidencia para las evidencias archivadas de lectura/azar. Esta comprobación prueba la reproducción de ese paquete, no la ejecución independiente del replay por un job de GitHub Actions ni la completitud del contrato R3.
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:
 
