@@ -94,7 +94,7 @@ before publication.
 
 ## Remaining constraints
 
-- The site is static GitHub Pages. The experimental `v0.1.0` compiler release is published, but
+- The site is static GitHub Pages. The experimental `v0.2.0` compiler release is published, but
   there is no public package registry or additional distribution channel; installer scripts require
   a maintainer-published matching tag.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
