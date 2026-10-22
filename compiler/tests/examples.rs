@@ -18975,3 +18975,101 @@ fn std_viz_marks_linked_plot_points_and_table_rows() {
     assert!(svg.contains("data-ostrin-bind=\"calibration:hover\""));
     assert!(svg.contains("data-ostrin-bind=\"calibration:select\""));
 }
+
+#[test]
+fn native_ir_record_option_none_uses_the_declared_field_type() {
+    let file = temp_source(
+        "native-ir-record-option-none-context.ostrin",
+        r#"
+record Holder {
+    value: Option<String>
+}
+
+record Bundle<T> {
+    seed: T
+    value: Option<T>
+}
+
+fn main() -> Void {
+    holder: Holder = Holder { value: None }
+    bundle = Bundle { seed: "seed", value: None }
+    print(holder.value.is_none())
+    print(bundle.value.is_none())
+}
+"#,
+    );
+    let expected = "true\ntrue\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "record Option None interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let hir = run(&["--hir", &file]);
+    assert!(
+        hir.status.success(),
+        "record Option None HIR failed: {}",
+        stderr(&hir)
+    );
+    let hir_text = stdout(&hir);
+    assert!(
+        hir_text.contains("Option<String>") && hir_text.contains("Bundle<String>"),
+        "record field contexts were not preserved in HIR: {hir_text}"
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "record Option None type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "record field context should preserve Option<String> in native IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "record Option None WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Option_String") && !wasi_source.contains("Option_Unknown"),
+        "WASI C did not preserve the declared Option<String> field ABI"
+    );
+
+    let exe = temp_artifact("native-ir-record-option-none-context.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "record Option None native compilation failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run record Option None binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "record Option None native execution failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "record Option None leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
