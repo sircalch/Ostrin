@@ -12205,12 +12205,10 @@ fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.contains("ast-fallback: 1")
-            && report_text.contains(
-                "ast-fallback-function: examples/measurement_quantity_native_smoke.ostrin::main",
-            )
-            && report_text.contains("divergences: 6"),
-        "dimensional Measurement native smoke must keep its fallback and type divergences visible: {report_text}"
+        report_text.contains("native-source: examples/measurement_quantity_native_smoke.ostrin ir=1 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "dimensional Measurement native smoke must lower main through IR with no type divergence: {report_text}"
     );
 
     let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);

@@ -83,10 +83,10 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
-  check(errors, /native smoke now has parity[\s\S]{0,300}interpreter\/WASM path/i.test(lab),
+  check(errors, /matching interpreter\/native output[\s\S]{0,500}smoke also emits C for WASI[\s\S]{0,160}interpreter\/WASM path/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement native-smoke and interpreter/WASM scope is missing");
-  check(errors, /native type report still shows AST fallback and generic type divergences/i.test(lab),
-    "scripts/lab-data.mjs: native Measurement fallback and type-divergence limitation is missing");
+  check(errors, /IR-generated main functions, zero AST fallback and zero generic type divergences/i.test(lab),
+    "scripts/lab-data.mjs: typed dimensional Measurement smoke evidence is missing");
   check(errors, /equal dimensions[\s\S]{0,120}explicit experimental boundary/i.test(lab),
     "scripts/lab-data.mjs: remaining dimensional Measurement native boundary is missing");
   check(errors, /Array<Measurement>[\s\S]{0,100}covariance[\s\S]{0,100}Monte Carlo/i.test(lab),

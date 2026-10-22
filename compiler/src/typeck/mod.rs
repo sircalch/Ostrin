@@ -4972,6 +4972,13 @@ fn resolve_type_with_type_subst(
                 if let Some(resolved) = type_subst.get(name) {
                     return resolved.clone();
                 }
+                // Dimension generics are represented internally as a
+                // Quantity carrying that dimension. Preserve that binding
+                // when the generic appears directly as an applied type
+                // argument, for example CoherentUncertainty<D>.
+                if let Some(dimension) = dim_subst.get(name) {
+                    return Ty::Quantity(dimension.clone());
+                }
             }
             match name.as_str() {
                 "Int" | "Int64" => Ty::Int,
@@ -5076,7 +5083,7 @@ fn bind_nested_dimensions(
             Ok(())
         }
         (Type::Named(name, args), Ty::Applied(actual_name, actual_args))
-            if name == actual_name && args.len() == actual_args.len() =>
+            if same_type_name(name, actual_name) && args.len() == actual_args.len() =>
         {
             for (expected, actual) in args.iter().zip(actual_args) {
                 bind_nested_dimensions(expected, actual, dim_generics, dims)?;
@@ -5102,6 +5109,11 @@ fn bind_nested_dimensions(
         }
         _ => Ok(()),
     }
+}
+
+fn same_type_name(left: &str, right: &str) -> bool {
+    left == right
+        || left.rsplit("::").next().unwrap_or(left) == right.rsplit("::").next().unwrap_or(right)
 }
 
 fn unify_generic_type(
@@ -6806,14 +6818,55 @@ fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
 
 #[cfg(test)]
 mod temperature_point_checker_tests {
-    use super::{resolve_type, type_from_ty, Checker};
-    use crate::ast::{BinOp, Expr, UnaryOp};
+    use super::{
+        bind_nested_dimensions, resolve_type, resolve_type_with_type_subst, type_from_ty, Checker,
+    };
+    use crate::ast::{BinOp, Expr, Type, UnaryOp};
     use crate::types::{dim_single, Ty};
+    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn temperature_point_type_round_trips_through_source_type_metadata() {
         let declared = type_from_ty(&Ty::TemperaturePoint);
         assert_eq!(resolve_type(&declared), Ty::TemperaturePoint);
+    }
+
+    #[test]
+    fn nested_dimension_substitution_crosses_qualified_record_types() {
+        let quantity_of_d = Type::Named(
+            "Measurement".to_string(),
+            vec![Type::Named(
+                "Quantity".to_string(),
+                vec![Type::Named("D".to_string(), Vec::new())],
+            )],
+        );
+        let measured_length = Ty::Applied(
+            "std.measurements::Measurement".to_string(),
+            vec![Ty::Quantity(dim_single("Length"))],
+        );
+        let mut dimensions = HashMap::new();
+        let dimension_generics = HashSet::from(["D".to_string()]);
+
+        bind_nested_dimensions(
+            &quantity_of_d,
+            &measured_length,
+            &dimension_generics,
+            &mut dimensions,
+        )
+        .expect("the qualified generic record should bind its nested dimension");
+        assert_eq!(dimensions.get("D"), Some(&dim_single("Length")));
+
+        let uncertainty = Type::Named(
+            "CoherentUncertainty".to_string(),
+            vec![Type::Named("D".to_string(), Vec::new())],
+        );
+        assert_eq!(
+            resolve_type_with_type_subst(&uncertainty, &HashMap::new(), &dimensions),
+            Ty::Applied(
+                "CoherentUncertainty".to_string(),
+                vec![Ty::Quantity(dim_single("Length"))]
+            )
+        );
     }
 
     #[test]
