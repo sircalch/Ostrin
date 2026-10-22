@@ -47,9 +47,39 @@ test("the gate requires accurate dimensional native-smoke scope and experimental
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
 
-    writeFileSync(file, original.replace("equal dimensions in div_quantity; this remains an explicit experimental boundary", "native parity"));
+    writeFileSync(file, original.replace("Equal dimensions in div_quantity reach the explicit experimental boundary error; use div_quantity_same", "native parity"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("remaining dimensional Measurement native boundary")));
+
+    writeFileSync(file, original.replace("direct full-surface fixture now has native IR/interpreter parity", "native support"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("direct Measurement<Quantity<D>> native evidence is stale or missing")));
+
+    writeFileSync(file, original.replace("direct full-surface fixture now has native IR/interpreter parity", "native support")
+      .replace("Equal dimensions in div_quantity reach the explicit experimental boundary error; use div_quantity_same", "equal dimension support"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("direct Measurement<Quantity<D>> native evidence is stale or missing")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate requires direct Measurement<Quantity> native/WASI parity evidence", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/tests/examples.rs");
+    const original = readFileSync(file, "utf8");
+    writeFileSync(file, original.replace("dimensional_measurement_full_surface_matches_native_and_wasi", "direct_shape_test"));
+    let result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("direct Measurement<Quantity<D>> native/WASI parity test")));
+
+    writeFileSync(file, original.replace("direct Measurement<Quantity> must lower main through IR", "direct shape is supported"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("direct Measurement<Quantity<D>> native/WASI parity test")));
+
+    writeFileSync(file, original.replace("direct Measurement<Quantity> leaked", "no leaks"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("direct Measurement<Quantity<D>> native/WASI parity test")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

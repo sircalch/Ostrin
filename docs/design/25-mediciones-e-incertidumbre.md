@@ -4,11 +4,11 @@
 funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres.
 `Measurement<Quantity<D>>` tiene pruebas experimentales de paridad de salida en intérprete y nativo
 para construcción, suma/resta correlacionada, productos y propagación de incertidumbre estándar.
-El smoke y el laboratorio nativos generan sus cuerpos `main` mediante IR y reportan cero fallbacks AST
-y cero divergencias de tipos. Este resultado cubre únicamente las operaciones ejecutadas en esos
-programas: el fixture de superficie directa todavía falla durante lowering nativo. No representa
-soporte general de `Measurement<Quantity<D>>`. `Array<Measurement<T>>`, covarianza y Monte Carlo
-siguen pendientes.
+El smoke, el laboratorio y el fixture de superficie directa generan `main` mediante IR y reportan
+cero fallbacks AST y cero divergencias de tipos en los casos medidos. El fixture directo también
+compara la salida nativa con el intérprete, verifica `live_allocations=0` y emite C para WASI. Esto
+acredita esos programas, no el soporte general de `Measurement<Quantity<D>>` ni la corrección
+universal de ownership. `Array<Measurement<T>>`, covarianza y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -79,9 +79,11 @@ productos entre dimensiones y proyección de incertidumbre estándar con paridad
 emisión WASI, `live_allocations=0`, cuerpo `main` generado por IR y cero divergencias de tipos.
 `examples/measurement_lab.ostrin` valida además productos, el cociente de igual dimensión por
 `div_quantity_same` y el cociente dimensional distinto; también genera `main` por IR y declara cero
-divergencias. `examples/measurement_quantity_direct_shape.ostrin` conserva casos adicionales del
-intérprete, incluidos el rechazo explícito de `div_quantity` para dimensiones iguales y sus
-validaciones de entrada; su compilación nativa sigue siendo una frontera abierta.
+divergencias. `examples/measurement_quantity_direct_shape.ostrin` cubre la superficie directa, sus
+validaciones de entrada y el error explícito de `div_quantity` para dimensiones iguales; su `main`
+también pasa por IR, coincide con la salida del intérprete, emite C para WASI y termina con
+`live_allocations=0`. La frontera restante aquí es de API: el cociente adimensional requiere
+`div_quantity_same`; no se reclama soporte general para otros programas o patrones de ownership.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el

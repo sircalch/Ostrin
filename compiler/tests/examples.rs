@@ -12302,7 +12302,7 @@ fn dimensional_measurement_lab_matches_interpreter_and_native() {
 }
 
 #[test]
-fn dimensional_measurement_full_surface_keeps_explicit_native_gap() {
+fn dimensional_measurement_full_surface_matches_native_and_wasi() {
     let file = example_path("measurement_quantity_direct_shape.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -12317,13 +12317,56 @@ fn dimensional_measurement_full_surface_keeps_explicit_native_gap() {
 
     let native = run(&["--native-type-report", &file]);
     assert!(
-        !native.status.success(),
-        "the full dimensional Measurement surface must not pass through an unsupported lowering"
+        native.status.success(),
+        "the full dimensional Measurement surface should lower through IR: {}",
+        stderr(&native)
+    );
+    let report = stdout(&native);
+    assert!(
+        report.contains("examples/measurement_quantity_direct_shape.ostrin ir=1 hir=0 ast=0")
+            && report.contains("ast-fallback: 0")
+            && report.contains("divergences: 0"),
+        "direct Measurement<Quantity> must lower main through IR with no type divergence: {report}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "direct Measurement<Quantity> WASI emission failed: {}",
+        stderr(&wasi)
     );
     assert!(
-        stderr(&native).contains("method 'value' on Float"),
-        "direct Measurement<Quantity> lowering gap changed: {}",
-        stderr(&native)
+        stdout(&wasi).contains("std_measurements__Measurement__Q_Length"),
+        "direct Measurement<Quantity> WASI output omitted its concrete measurement type"
+    );
+
+    let exe = temp_artifact("measurement-quantity-direct-shape.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "direct Measurement<Quantity> native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run direct Measurement<Quantity> binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "direct Measurement<Quantity> native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n")
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "direct Measurement<Quantity> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
