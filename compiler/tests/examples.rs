@@ -12411,7 +12411,6 @@ fn generic_dimensional_measurement_wrapper_matches_native_and_wasi() {
     let exe = temp_artifact("measurement-quantity-generic-wrapper.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
-        let _ = fs::remove_file(&file);
         return;
     }
     assert!(
@@ -12423,7 +12422,6 @@ fn generic_dimensional_measurement_wrapper_matches_native_and_wasi() {
         .output()
         .expect("run generic Measurement<Quantity<D>> native binary");
     let _ = fs::remove_file(&exe);
-    let _ = fs::remove_file(&file);
     assert!(
         native.status.success(),
         "generic Measurement<Quantity<D>> native run failed: {}",
