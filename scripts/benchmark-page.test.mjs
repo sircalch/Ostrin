@@ -15,7 +15,15 @@ function report() {
     host: { os: { type: "Linux", release: "6", version: "Linux" } },
     git: { clean: true },
     nativeCompile: { compilerManagedDefaults: ["-O2"] },
-    methodology: { memory: "not captured" },
+    methodology: {
+      memory: "not captured",
+      quantityFloatPair: {
+        comparedValues: 2,
+        maximumAbsoluteDifference: 0,
+        absoluteTolerance: 1e-13,
+        relativeTolerance: 1e-12,
+      },
+    },
     workloads: [{
       workload: "examples/benchmark_numeric.ostrin",
       sourceBytes: 10,
@@ -36,6 +44,7 @@ test("benchmark page accepts schema 3 and preserves provenance fields", () => {
   assert.equal(data.schema, 1);
   assert.equal(data.host.os.release, "6");
   assert.deepEqual(data.nativeCompile.compilerManagedDefaults, ["-O2"]);
+  assert.deepEqual(data.methodology.quantityFloatPair, report().methodology.quantityFloatPair);
   assert.match(renderPageData(data), /globalThis\.OSTRIN_BENCHMARK/);
 });
 

@@ -72,7 +72,11 @@ if (!report) {
     const quantityResult = pair[1].result;
     const nativeDelta = ((quantityResult.nativeMedianMs / floatResult.nativeMedianMs) - 1) * 100;
     const direction = nativeDelta <= 0 ? "más rápido" : "más lento";
-    pairSummary.textContent = `En esta ejecución, Quantity fue ${Math.abs(nativeDelta).toFixed(1)}% ${direction} que Float en native (${quantityResult.nativeMedianMs.toFixed(3)} frente a ${floatResult.nativeMedianMs.toFixed(3)} ms); el resultado puede variar con el entorno.`;
+    const parity = report.methodology?.quantityFloatPair;
+    const paritySummary = parity
+      ? ` Los valores numéricos coincidieron en ${parity.comparedValues} resultados (diferencia máxima ${parity.maximumAbsoluteDifference}; tolerancias ${parity.absoluteTolerance} absoluta y ${parity.relativeTolerance} relativa).`
+      : " No se registró la comparación numérica cruzada para este par.";
+    pairSummary.textContent = `En esta ejecución, Quantity fue ${Math.abs(nativeDelta).toFixed(1)}% ${direction} que Float en native (${quantityResult.nativeMedianMs.toFixed(3)} frente a ${floatResult.nativeMedianMs.toFixed(3)} ms).${paritySummary} Los tiempos pueden variar con el entorno.`;
   } else if (pairChart) {
     pairChart.textContent = "El par Float/Quantity todavía no está disponible en este snapshot.";
   }

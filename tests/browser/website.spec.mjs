@@ -241,7 +241,10 @@ test("benchmark page renders the recorded workload report", async ({ page }) => 
   await page.goto("./benchmarks.html", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Measure the work");
   await expect(page.locator("[data-benchmark-state]")).toContainText("Recorded benchmark");
-  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(10);
+  const workloadCount = await page.evaluate(() => globalThis.OSTRIN_BENCHMARK?.workloads.length ?? 0);
+  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(workloadCount);
+  await expect(page.locator("[data-benchmark-pair-summary]"))
+    .toContainText("Los valores numéricos coincidieron en 2 resultados");
   await expect(page.locator("[data-benchmark-commit]")).not.toHaveText("—");
   await expectNoHorizontalOverflow(page, "benchmarks.html", 1280);
   expect(runtimeErrors).toEqual([]);
