@@ -12371,6 +12371,74 @@ fn dimensional_measurement_full_surface_matches_native_and_wasi() {
 }
 
 #[test]
+fn generic_dimensional_measurement_wrapper_matches_native_and_wasi() {
+    let file = example_path("measurement_quantity_shape.ostrin");
+    let expected = "12 m\ntrue\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "generic Measurement<Quantity<D>> interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "generic Measurement<Quantity<D>> IR lowering failed: {}",
+        stderr(&report)
+    );
+    let report = stdout(&report);
+    assert!(
+        report.contains("examples/measurement_quantity_shape.ostrin ir=2 hir=0 ast=0")
+            && report.contains("ast-fallback: 0")
+            && report.contains("divergences: 0"),
+        "generic Measurement<Quantity<D>> must specialize through IR without fallback: {report}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "generic Measurement<Quantity<D>> WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__Q_Length"),
+        "generic Measurement<Quantity<D>> WASI output omitted the concrete dimension"
+    );
+
+    let exe = temp_artifact("measurement-quantity-generic-wrapper.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "generic Measurement<Quantity<D>> native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run generic Measurement<Quantity<D>> native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "generic Measurement<Quantity<D>> native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic Measurement<Quantity<D>> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn dimensional_measurements_reject_non_finite_coherent_values() {
     let source = temp_source(
         "measurement_coherent_finiteness",
