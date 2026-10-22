@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.linguist-usage/v1",
-  "generatedAt": "2026-10-21T16:52:44.849Z",
+  "generatedAt": "2026-10-22T01:35:46.695Z",
   "extension": ".ostrin",
   "query": "NOT is:fork extension:ostrin -repo:sircalch/Ostrin",
   "queryUrl": "https://github.com/search?q=NOT%20is%3Afork%20extension%3Aostrin%20-repo%3Asircalch%2FOstrin&type=code",
