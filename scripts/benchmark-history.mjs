@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
-const snapshots = ["e7eb17c", "310ed6c", "b3c997e"];
+const snapshots = ["e7eb17c", "310ed6c", "b3c997e", "8263d01"];
 
 function readSnapshot(ref) {
   const source = execFileSync("git", ["show", `${ref}:website/benchmark-data.js`], { encoding: "utf8" });
