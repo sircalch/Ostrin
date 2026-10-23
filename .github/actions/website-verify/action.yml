@@ -3,7 +3,7 @@ description: Build the real WASM compiler, run static checks and test the site a
 outputs:
   host-artifact-url:
     description: Exact GitHub URL for the uploaded host evidence artifact.
-    value: ${{ steps.upload-host-evidence.outputs.artifact-url }}
+    value: ${{ steps.upload-verified-host-evidence.outputs.artifact-url }}
 runs:
   using: composite
   steps:
@@ -65,6 +65,7 @@ runs:
         node scripts/fallback-ledger-check.mjs
         node scripts/r3-readiness.mjs --require-capture
         node --test scripts/r3-readiness.test.mjs
+        node --test scripts/website-verify-action.test.mjs
         node --test scripts/quality-scorecard.test.mjs
         node --test scripts/project-plan-check.test.mjs
         node --test scripts/v0.2-readiness-check.test.mjs
@@ -90,11 +91,11 @@ runs:
         node scripts/provenance-page.mjs --check
         node scripts/website-check.mjs --wasm
         node scripts/distribution-check.mjs
-    - name: Upload host capture and the verified surface replay receipt
-      id: upload-host-evidence
+    - name: Upload candidate host evidence for artifact verification
+      id: upload-host-candidate
       uses: actions/upload-artifact@v4
       with:
-        name: ostrin-r3-host-evidence-${{ github.run_id }}
+        name: ostrin-r3-host-candidate-${{ github.run_id }}-attempt-${{ github.run_attempt }}
         path: |
           validation/r3-readiness.json
           validation/quality-scorecard.json
@@ -104,5 +105,22 @@ runs:
           target/r3-ci/surface-replay-receipt.json
           target/r3-ci/wasi-file-read-evidence.json
           target/r3-ci/wasi-random-evidence.json
+        if-no-files-found: error
+        retention-days: 1
+    - name: Download the exact candidate evidence artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ostrin-r3-host-candidate-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+        path: target/r3-ci/downloaded-host-evidence
+    - name: Re-run all experiment bundles from downloaded artifact bytes
+      shell: bash
+      run: |
+        node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"
+    - name: Upload verified host evidence artifact
+      id: upload-verified-host-evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: ostrin-r3-host-evidence-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+        path: target/r3-ci/downloaded-host-evidence
         if-no-files-found: error
         retention-days: 90
