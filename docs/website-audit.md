@@ -35,9 +35,10 @@ visual regression claim.
 
 `scripts/website-check.mjs` now verifies both logo copies are valid 256×256 PNGs, match byte for
 byte, and stay at or below 100,000 bytes. After regenerating the source-backed experiment bundles,
-`node scripts/website-check.mjs` passed with 17 public pages, 304 Ostrin examples and 376
+`node scripts/website-check.mjs` passed with 17 public pages, 304 Ostrin examples and 381
 integration tests. Chromium also loaded both desktop and mobile homepage layouts with the 256 px
-logo and no horizontal overflow.
+logo and no horizontal overflow. The reference now indexes 28 design documents, including the
+contextual reassignment package.
 
 ## Existing surfaces
 
@@ -52,7 +53,7 @@ logo and no horizontal overflow.
 | Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor, experimental effect inventory and site-evidence workflows; every command exists in `ostrinc --help` |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
 | Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
-| Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 27 design documents and the CLI flags, checked against `ostrinc --help` |
+| Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 28 design documents and the CLI flags, checked against `ostrinc --help` |
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations; every displayed output line is verified against its program by `scripts/lab-data.mjs` |
 | Benchmarks | `website/benchmarks.html`, `website/benchmark-data.js`, `scripts/benchmark.mjs` | Ten deterministic workloads compare interpreter and native process medians, including an aligned Float/Quantity semantic-overhead pair; the page publishes commit, environment, sampling and output provenance without cross-language claims |
 | Provenance artifact | `website/provenance.html`, `website/provenance-data.js`, `website/provenance.js`, `scripts/provenance-page.mjs`, `compiler/src/provenance.rs` | Experimental machine-readable source hash, target/WASI, `ostrin.runtime/v1` and available lockfile hashes with explicit replay limitations; the companion experiment bundles add input/output hashes, compiler effects and CI host metadata under their separate R3 gate; regenerated and checked before Pages deployment |
@@ -68,8 +69,8 @@ logo and no horizontal overflow.
 
 - **304** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
-- **27** Markdown design documents under `docs/design/`.
-- Compiler suite: **379 integration**, **6 differential** and **33 unit** tests.
+- **28** Markdown design documents under `docs/design/`.
+- Compiler suite: **381 integration**, **6 differential** and **33 unit** tests.
 - WASI release smoke matrix: **23 program modules** passed in run [38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359) with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum
