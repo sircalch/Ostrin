@@ -1658,15 +1658,9 @@ impl Checker {
                     }
                 }
                 "to_list" if arg_types.is_empty() => Ty::List(Box::new(elem)),
-                "row" | "col" if arg_types.len() == 1 => {
+                "get" if arg_types.len() == 1 => {
                     if arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown {
-                        self.push("E1041", format!("'{method}' expects an Int index."));
-                    }
-                    Ty::Applied("Array".to_string(), vec![elem])
-                }
-                "get" if !arg_types.is_empty() => {
-                    if arg_types.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
-                        self.push("E1041", "'get' expects Int indices.".to_string());
+                        self.push("E1041", "'get' expects one Int index.".to_string());
                     }
                     elem
                 }

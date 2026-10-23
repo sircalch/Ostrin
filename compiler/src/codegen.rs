@@ -8064,8 +8064,7 @@ impl<'a> Codegen<'a> {
                         "rank" if codes.is_empty() => Ok((format!("{n}_rank({obj_code})"), CType::Int)),
                         "size" | "length" | "count" if codes.is_empty() => Ok((format!("{n}_size({obj_code})"), CType::Int)),
                         "to_list" if codes.is_empty() => Ok((format!("{n}_to_list({obj_code})"), CType::List(Box::new(t.clone())))),
-                        "row" | "col" if codes.len() == 1 => Ok((format!("{n}_{method_name}({obj_code}, {})", codes[0]), CType::Array(Box::new(t.clone())))),
-                        "get" if !codes.is_empty() => Ok((format!("{n}_get({obj_code}, (int64_t[]){{ {} }}, {})", codes.join(", "), codes.len()), t.clone())),
+                        "get" if codes.len() == 1 => Ok((format!("{n}_get({obj_code}, (int64_t[]){{ {} }}, 1)", codes[0]), t.clone())),
                         other => Err(format!("Array of Measurement has no method '{other}' in the structural ownership profile")),
                     };
                 }
