@@ -18,6 +18,13 @@ El manifiesto [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.j
 prioridad de desarrollo pasa al hito de efectos científicos estáticos. Cualquier nueva release
 requiere autorización explícita del propietario.
 
+El merge de #229 cerró la integración autorizada hasta `main` `f182fe5`. La validación
+post-merge dejó verdes CI, seguridad, web y browser audit; numeric validation, WASI y el
+contrato de benchmarks también pasan localmente. El siguiente paquete técnico es la
+propagación contextual en reasignaciones mutables, documentada en
+[`docs/design/28-asignaciones-contextuales.md`](docs/design/28-asignaciones-contextuales.md),
+con una prueba de paridad para `Option`, `Result` y records genéricos.
+
 0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** el corte del
    2026-10-07 retiró 49 ramas remotas y 53 referencias locales limpias e integradas.
    Los 29 worktrees limpios asociados quedaron detached con sus archivos preservados.

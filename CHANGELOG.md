@@ -4,6 +4,10 @@
 
 ### Correctness
 
+- Mutable assignments now reuse the binding's existing type as an expected type,
+  refining `Option`, `Result` and generic record constructors without allowing a
+  reassignment to silently change the slot's type. Incompatible values report
+  `E1041`; interpreter/native parity and leak-check coverage are included.
 - IR lowering now preserves the destination `Option<T>` payload type when `None`
   replaces an existing local, so supported managed options keep their concrete
   ABI through native and WASI code generation.
@@ -79,7 +83,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 304-example, 379-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 304-example, 381-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 

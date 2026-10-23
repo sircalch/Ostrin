@@ -965,20 +965,58 @@ impl Checker {
                 scope.insert(name.clone(), (final_ty, *mut_));
             }
             Stmt::Assign { name, value } => {
-                let value_ty = self.infer_expr(value, scope);
-                match scope.get(name) {
-                    Some((_, false)) => {
+                match scope.get(name).cloned() {
+                    Some((binding_ty, false)) => {
+                        self.infer_expr(value, scope);
                         self.push(
                             "E1001",
                             format!(
                                 "Cannot reassign immutable binding '{name}'. Declare it as 'mut {name} = ...' if reassignment is intended."
                             ),
                         );
+                        // Keep checking the right-hand side so nested diagnostics are still
+                        // reported, but leave the binding's type and mutability unchanged.
+                        scope.insert(name.clone(), (binding_ty, false));
                     }
-                    Some((_, true)) => {
-                        scope.insert(name.clone(), (value_ty, true));
+                    Some((binding_ty, true)) => {
+                        // A mutable binding is a stable slot: its existing type is the
+                        // expected type for every later assignment. This matters for
+                        // partially inferred ADTs such as `Option<T>` and `Result<T, E>`
+                        // because constructors like `None` and `Err(value)` only become
+                        // concrete when the surrounding slot supplies the missing side.
+                        let value_ty =
+                            self.infer_expr_with_expected(value, Some(&binding_ty), scope);
+                        let adapted = self.adapt_literals(value, &binding_ty, &value_ty);
+                        if !adapted && !compatible(&binding_ty, &value_ty) {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "Cannot assign a value of type '{}' to mutable binding '{}: {}'.",
+                                    value_ty.describe(),
+                                    name,
+                                    binding_ty.describe()
+                                ),
+                            );
+                        }
+                        let next_ty = if adapted {
+                            // Literal adaptation proves the value belongs to the existing
+                            // slot even though its pre-adaptation type is intentionally
+                            // broader (`Int` or `Float`).
+                            binding_ty
+                        } else if compatible(&binding_ty, &value_ty) {
+                            // Fill only the unknown slots that the new value resolves. A
+                            // declaration such as `mut result = Ok("value")` starts as
+                            // `Result<String, ?>`; assigning `Err("message")` should refine
+                            // that same slot to `Result<String, String>` without changing its
+                            // identity on subsequent assignments.
+                            refine_expected_type(&value_ty, &binding_ty)
+                        } else {
+                            binding_ty
+                        };
+                        scope.insert(name.clone(), (next_ty, true));
                     }
                     None => {
+                        let value_ty = self.infer_expr(value, scope);
                         self.editor_bindings.push(EditorBinding {
                             name: name.clone(),
                             type_name: value_ty.describe(),

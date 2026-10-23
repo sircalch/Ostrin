@@ -1,0 +1,58 @@
+{
+  "schema": "ostrin.program-state/v1",
+  "goal": "M1",
+  "updatedAt": "2026-10-23",
+  "release": {
+    "version": "v0.2.0",
+    "status": "published-and-frozen",
+    "tag": "v0.2.0",
+    "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
+  },
+  "checkpoint": {
+    "mainRevision": "f182fe5a57a9c65e13f8d40e759166a44d67d62d",
+    "sourceRevision": "f182fe5a57a9c65e13f8d40e759166a44d67d62d",
+    "evidenceRevision": "f182fe5a57a9c65e13f8d40e759166a44d67d62d",
+    "releaseTag": "v0.2.0"
+  },
+  "completed": [
+    "integrated-authorized-prs-225-230-231-227-226-229",
+    "post-merge-ci-linux-macos-windows",
+    "post-merge-website-browser-codeql-security",
+    "local-numeric-validation",
+    "local-wasi-program-check",
+    "local-benchmark-contract-check"
+  ],
+  "currentPackage": {
+    "name": "contextual-reassignment-types",
+    "branch": "codex/contextual-reassignment-types",
+    "status": "in-progress",
+    "scope": [
+      "expected-type propagation for mutable assignments",
+      "Option and Result constructor refinement",
+      "generic record reassignment",
+      "interpreter-native parity and leak check"
+    ],
+    "evidence": [
+      "compiler/tests/examples.rs::mutable_reassignment_uses_existing_adt_type_context",
+      "docs/design/28-asignaciones-contextuales.md"
+    ]
+  },
+  "pending": [
+    "complete focused package validation",
+    "publish package branch for review",
+    "ownership over remaining aggregates and escapes",
+    "Measurement<T> arrays and covariance",
+    "R3 host provenance and static effects"
+  ],
+  "lastCi": {
+    "workflow": "Ostrin CI",
+    "runId": 39995566260,
+    "status": "success",
+    "head": "f182fe5a57a9c65e13f8d40e759166a44d67d62d"
+  },
+  "blockers": [
+    "R3 remains OPEN until provenance.runtime.host is captured for all 29 bundles",
+    "v0.2.0 is frozen; no new release or tag is authorized"
+  ],
+  "next": "validate and review contextual reassignment package, then move to ownership of nested aggregates"
+}

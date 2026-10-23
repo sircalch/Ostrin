@@ -10228,6 +10228,112 @@ fn main() -> Void {
 }
 
 #[test]
+fn mutable_reassignment_uses_existing_adt_type_context() {
+    let file = temp_source(
+        "mutable-reassignment-adt-context.ostrin",
+        r#"
+record Envelope<T> {
+    value: T
+}
+
+fn main() -> Void {
+    mut maybe = Some("old")
+    maybe = None
+    match maybe {
+        Some(text) => print(text),
+        None => print("none"),
+    }
+
+    mut result = Ok("ok")
+    result = Err("bad")
+    match result {
+        Ok(text) => print(text),
+        Err(text) => print(text),
+    }
+
+    mut envelope = Envelope { value: 1 }
+    envelope = Envelope { value: 2 }
+    print(envelope.value)
+}
+"#,
+    );
+    let expected = "none\nbad\n2\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "contextual reassignment interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "contextual reassignment native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "contextual reassignment should stay on typed IR: {report_text}"
+    );
+
+    let exe = temp_artifact("mutable-reassignment-adt-context.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "contextual reassignment native compilation failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run contextual reassignment binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "contextual reassignment native execution failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "contextual reassignment leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn mutable_reassignment_rejects_incompatible_adt_value() {
+    let file = temp_source(
+        "mutable-reassignment-adt-error.ostrin",
+        r#"
+fn main() -> Void {
+    mut maybe = Some("text")
+    maybe = Some(42)
+}
+"#,
+    );
+    let out = run(&[&file]);
+    let _ = fs::remove_file(&file);
+    assert!(
+        !out.status.success(),
+        "incompatible reassignment unexpectedly passed"
+    );
+    let err = stderr(&out);
+    assert!(
+        err.contains("E1041") && err.contains("mutable binding 'maybe"),
+        "missing contextual reassignment diagnostic: {err}"
+    );
+}
+
+#[test]
 fn native_ir_list_result_string_ownership() {
     let file = temp_source(
         "native-ir-list-result-string.ostrin",
