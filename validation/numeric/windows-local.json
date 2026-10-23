@@ -9,7 +9,7 @@
   "inputs": {
     "contractSha256": "149e5f467447e2f98439b66daec7fad30f05d5ebbfefe9d20d1699aa4af8537b",
     "fixtureSha256": "55b46ea3ce062a6307b515ae41f89ee4809d2e57bd59647bc74b3277c80b258a",
-    "compilerSha256": "12fa596b4d24c2b822b21302a36a25f2054ba69793ac9b81edcc9d7029cbd692"
+    "compilerSha256": "51484d6e5b3956d05e196540ce2c6b38f49f3412312db552a59b5aa65cf5d2b4"
   },
   "environment": {
     "platform": "win32",
