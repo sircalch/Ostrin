@@ -38,6 +38,7 @@ export function buildDevelopmentEvidence(environment = process.env) {
 
   const repository = environment.GITHUB_REPOSITORY ?? "";
   const runId = environment.GITHUB_RUN_ID ?? "";
+  const runAttempt = environment.GITHUB_RUN_ATTEMPT ?? "";
   const testedSha = environment.GITHUB_SHA ?? "";
   const headSha = environment.OSTRIN_EVIDENCE_HEAD_SHA ?? testedSha;
   const ref = environment.GITHUB_REF ?? "";
@@ -45,6 +46,7 @@ export function buildDevelopmentEvidence(environment = process.env) {
   const server = environment.GITHUB_SERVER_URL ?? "https://github.com";
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
     || !/^\d+$/.test(runId)
+    || !/^[1-9][0-9]*$/.test(runAttempt)
     || !/^[a-f0-9]{40}$/.test(testedSha)
     || !/^[a-f0-9]{40}$/.test(headSha)
     || !/^refs\/.+/.test(ref)
@@ -83,12 +85,13 @@ export function buildDevelopmentEvidence(environment = process.env) {
     repository,
     workflow,
     runId,
+    runAttempt,
     ref,
     headSha,
     testedSha,
     runUrl,
     artifactUrl,
-    artifactName: `ostrin-r3-host-evidence-${runId}`,
+    artifactName: `ostrin-r3-host-evidence-${runId}-attempt-${runAttempt}`,
   };
 }
 

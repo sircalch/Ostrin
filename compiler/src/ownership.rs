@@ -908,6 +908,11 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         // array. Restrict this to the concrete array element types handled by
         // IR/C so scalar or future non-native unary instructions stay
         // conservative.
+        IrInstr::Unary {
+            op: UnaryOp::Neg,
+            ty: Ty::Quantity(_),
+            ..
+        } => true,
         IrInstr::Unary { .. } if safe_unary_array(instruction) => true,
         IrInstr::StoreLocal { .. }
         | IrInstr::Spawn { .. }

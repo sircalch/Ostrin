@@ -59,14 +59,16 @@ los SHA y la URL es metadato estructural del runner, no una firma criptográfica
 independiente.
 La acción conserva además el reporte
 R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
-`ostrin-r3-host-evidence-<run_id>` durante 90 días, y lo sube solo después de que terminen
+`ostrin-r3-host-evidence-<run_id>-attempt-<run_attempt>` durante 90 días, y lo sube solo después de que terminen
 correctamente los replays, las comprobaciones web y los demás gates de distribución de ese job.
 Si una de esas comprobaciones falla, no se publica el paquete como evidencia verificada. La
 verificación local mantiene el campo ausente para que un checkout de desarrollador no se presente
 como una ejecución CI.
 
 El scorecard generado dentro de CI también publica un bloque `developmentEvidence` con el workflow,
-`run_id`, `head_sha`, `tested_sha` y las URLs del run y sus artefactos. Esto permite llegar desde el
+`run_id`, `run_attempt`, `head_sha`, `tested_sha` y las URLs del run y sus artefactos. El número de
+intento se incluye en los nombres de candidate y evidence para evitar colisiones al reintentar una
+ejecución: Actions v4 mantiene los artefactos inmutables. Esto permite llegar desde el
 panel público al paquete host-bound que respalda sus métricas de desarrollo, sin cambiar las
 revisiones históricas del candidato ni la revisión fuente del tag publicado. En una ejecución local,
 el bloque queda en `null`.
@@ -95,9 +97,23 @@ Una reejecución independiente desde los archivos descargados utilizó el WASM i
 `node scripts/experiment-replay.mjs --replay-artifact-all <directorio> --run-id 39700812531 --tested-sha bd021d242df94e58cfb4f31b97dc5ece83b3c523`.
 Los 29 replays dieron `match`; las salidas R0 fueron idénticas y los R1/R2 cumplieron sus comprobaciones
 de sensibilidad/semilla. Las evidencias archivadas de lectura WASI y azar determinista coincidieron
-con las regeneradas. Esto corrige el alcance de replay descrito para el corte anterior, pero es una
-verificación posterior al run sobre ese paquete: no es un job de CI que descargue y reejecute su propio
-artefacto, no prueba equivalencia entre plataformas y no satisface por sí solo todos los criterios R3.
+con las regeneradas. En ese corte la reejecución fue posterior al run y no formó parte de su job de CI;
+por ello no probó que el workflow descargara y reejecutara su propio artefacto. Tampoco probó
+equivalencia entre plataformas ni satisfizo por sí sola todos los criterios R3.
+
+El flujo de artefacto descargado quedó implementado y pasó en el run de CI
+[39720503645, intento 1](https://github.com/sircalch/Ostrin/actions/runs/39720503645): head
+`1bd88e812cfc66aaa2811b22943ef0924aeb90c8`, `tested_sha`
+`439967808915ddab07b8ab846245dee30f72e6e1`. El job subió el candidate
+[`ostrin-r3-host-candidate-39720503645-attempt-1`](https://github.com/sircalch/Ostrin/actions/runs/39720503645/artifacts/12400744313),
+lo descargó y reejecutó los 29 bundles desde sus bytes; después publicó el evidence oficial
+[`ostrin-r3-host-evidence-39720503645-attempt-1`](https://github.com/sircalch/Ostrin/actions/runs/39720503645/artifacts/12401445156).
+Los dos paquetes contienen 36 archivos idénticos byte por byte. El intento quedó además cubierto por
+los checks multiplataforma, website/browser, ASan, UBSan, CodeQL y dependencias de ese head.
+El test `scripts/website-verify-action.test.mjs` protege el orden candidate → descarga → replay →
+publicación, y los nombres incluyen `run_attempt` para que un rerun no choque con artefactos v4
+inmutables. Este resultado cierra la brecha de replay del artefacto en ese run; no cambia la evidencia
+histórica ni eleva por sí solo la madurez R3.
 
 Una ejecución CI anterior (`38162721694`) informó `READY` para 29/29 bundles sin validar la
 captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado histórico no basta
@@ -197,7 +213,10 @@ se incluye en el artefacto host-bound. `target/r3-ci/wasi-random-evidence.json` 
 prueba; su semilla deriva del ID y hash completo del bundle y permanece igual en las pasadas de
 baseline, repetición y sensibilidad. Este proveedor reemplaza la entropía del host y **no sirve para
 uso criptográfico**; la evidencia describe un input de replay controlado, no azar del sistema.
-El recibo de `surface` ancla el hash del módulo que cargan todos los replays. La lectura limita el
+El recibo de `surface` ancla el hash del módulo que cargan todos los replays. En las ejecuciones
+posteriores al cambio de workflow, el proceso consume los archivos extraídos del artefacto candidato,
+no los archivos equivalentes del checkout; el artefacto host-bound oficial se publica después de que
+la comparación archivada termine con éxito. La lectura limita el
 tamaño de cada archivo y rechaza rutas que escapen del directorio descargado. Website CI ejecuta
 este replay completo antes de subir el paquete como evidencia. La captura de CI no es una atestación criptográfica:
 el éxito acredita las salidas bajo ese WASM y host, no equivalencia numérica universal.

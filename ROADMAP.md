@@ -104,11 +104,15 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    agregados anidados para ciclos posteriores. `List<Array<Quantity<D>>>` ya reutiliza el backing
    `Array_Float`, conserva la etiqueta de unidad y libera cada array desde el destructor de la lista,
    con paridad intérprete/nativo/WASI y `live_allocations=0` en la prueba dedicada.
-   La representación de arrays consume ahora sus temporales de texto; `quantity_arrays.ostrin`
-   registra `live_allocations=4` bajo leak-check nativo. `Array<Quantity<D>>.to_list()` retiene
-   ahora las etiquetas dinámicas por elemento y las libera con el destructor de la lista; las
-   expresiones escalares y las etiquetas que escapan a valores escalares siguen como deuda de
-   ownership para un pase posterior.
+   La representación de arrays consume sus temporales de texto y
+   `Array<Quantity<D>>.to_list()` retiene las etiquetas dinámicas por elemento para liberarlas con
+   el destructor de la lista. La prueba `arrays_of_quantities_keep_one_unit_and_check_dimensions`
+   exige paridad intérprete/nativo, `ir-generated: 2`, cero fallbacks AST y
+   `live_allocations=0`, incluso para expresiones escalares y etiquetas que escapan a escalares.
+   `List<Array<Quantity<D>>>` también tiene paridad intérprete/nativo/WASI y cero allocations vivas
+   en `native_list_of_quantity_arrays_matches_interpreter_and_wasi`. La copia y aliasing generales
+   de arrays y los agregados gestionados dentro de arrays siguen sin cobertura general; consultar
+   la [matriz de ownership](docs/ownership-matrix.md).
    `Rng` y sus métodos escalares y de muestreo (`rand`, `randn`, `randint`, `permutation`) ya
    comparten IR/C con ownership explícito y paridad intérprete/nativo. Los combinadores de listas
    (`map`, `filter`, `fold`, `any`, `all`, `find`) también cruzan IR/C, incluidos cierres con
