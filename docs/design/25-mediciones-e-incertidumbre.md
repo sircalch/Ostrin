@@ -4,8 +4,11 @@
 funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres.
 `Measurement<Quantity<D>>` tiene pruebas experimentales de paridad de salida en intérprete y nativo
 para construcción, suma/resta correlacionada, productos y propagación de incertidumbre estándar.
-El smoke test nativo actual conserva un fallback AST y divergencias en el reporte de tipos; por ello
-no demuestra lowering tipado completo. `Array<Measurement<T>>` y Monte Carlo siguen pendientes.
+El smoke, el laboratorio y el fixture de superficie directa generan `main` mediante IR y reportan
+cero fallbacks AST y cero divergencias de tipos en los casos medidos. El fixture directo también
+compara la salida nativa con el intérprete, verifica `live_allocations=0` y emite C para WASI. Esto
+acredita esos programas, no el soporte general de `Measurement<Quantity<D>>` ni la corrección
+universal de ownership. `Array<Measurement<T>>`, covarianza y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -32,14 +35,12 @@ desconocida sin convertirla en cero. `exact` y `standard` rechazan valores nomin
 finitos mediante el builtin tipado `is_finite` para `Float`/`Float32`; las sensibilidades y la varianza
 también se validan al consultar la incertidumbre. La superficie sigue siendo experimental y todavía
 no declara semántica de operadores ni integración nativa completa con `Quantity<T>`. Para
-`Measurement<Quantity<D>>`, el smoke test registra salida coincidente en intérprete y nativo,
-emisión C para WASI y `live_allocations=0`; su reporte contiene un fallback AST y seis divergencias
-de tipo. El programa `measurement_lab.ostrin` también coincide entre intérprete y nativo con
-`live_allocations=0` para las operaciones que ejecuta, pero su reporte registra un fallback AST y
-divergencias de tipo genérico. Estas pruebas acreditan solo los casos ejecutados, no lowering tipado
-completo ni corrección general de ownership. La ruta directa que instancia `div_quantity` para
-dimensiones iguales aún falla durante el lowering nativo antes de ejecutar la rama que debería
-devolver `Err`.
+`Measurement<Quantity<D>>`, el smoke y `measurement_lab.ostrin` registran salida coincidente en
+intérprete y nativo, emisión C para WASI en el smoke, `live_allocations=0`, cero fallbacks AST y cero
+divergencias de tipos; `main` se genera mediante IR en ambos reportes. Estas pruebas acreditan solo
+los casos ejecutados, no soporte nativo general ni corrección universal de ownership. La ruta directa
+que instancia `div_quantity` para dimensiones iguales aún falla durante el lowering nativo antes de
+ejecutar la rama que debería devolver `Err`.
 
 ### 1.1 Evidencia de las fases escalar y dimensional experimental
 
@@ -75,13 +76,14 @@ del entorno de una tarea para `Measurement<Float>`.
 el backend nativo da un diagnóstico específico que remite a `List`.
 `examples/measurement_quantity_native_smoke.ostrin` cubre construcción, suma/resta correlacionada,
 productos entre dimensiones y proyección de incertidumbre estándar con paridad intérprete/native,
-emisión WASI y `live_allocations=0`; el reporte del ejemplo declara un fallback AST y seis
-divergencias de tipo. La prueba de
-`examples/measurement_lab.ostrin` valida además sus productos, el cociente de igual dimensión por
-`div_quantity_same` y el cociente dimensional distinto; mantiene pendiente la eliminación de su
-fallback y de divergencias de tipo genérico. `examples/measurement_quantity_direct_shape.ostrin`
-conserva casos adicionales del intérprete, incluidos el rechazo explícito de `div_quantity` para
-dimensiones iguales y sus validaciones de entrada.
+emisión WASI, `live_allocations=0`, cuerpo `main` generado por IR y cero divergencias de tipos.
+`examples/measurement_lab.ostrin` valida además productos, el cociente de igual dimensión por
+`div_quantity_same` y el cociente dimensional distinto; también genera `main` por IR y declara cero
+divergencias. `examples/measurement_quantity_direct_shape.ostrin` cubre la superficie directa, sus
+validaciones de entrada y el error explícito de `div_quantity` para dimensiones iguales; su `main`
+también pasa por IR, coincide con la salida del intérprete, emite C para WASI y termina con
+`live_allocations=0`. La frontera restante aquí es de API: el cociente adimensional requiere
+`div_quantity_same`; no se reclama soporte general para otros programas o patrones de ownership.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
@@ -326,12 +328,18 @@ si el cociente cancela las dimensiones; en ese caso se debe usar `div_quantity_s
 el resultado adimensional como `Measurement<Float>`. El backend nativo mantiene el rechazo explícito
 hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
-Este prototipo no habilita todavía `Array<Measurement<T>>`, covarianza ni soporte nativo de
-`Measurement<Quantity<D>>`. La propagación deberá mantener la dimensión del resultado en
-`contribution` y la sigma de fuente en su dimensión original. Antes de habilitar soporte nativo se
-requieren pruebas de alias explícito, independencia de etiquetas repetidas, reducciones con fuentes
-compartidas, validación de covarianza, conversiones de unidades y paridad intérprete/native/WASM.
-También se necesitan leak-check, ASan y UBSan para los buffers o grafos gestionados.
+Este prototipo no habilita todavía `Array<Measurement<T>>` ni covarianza. El soporte de
+`Measurement<Quantity<D>>` sigue siendo experimental y está limitado por la superficie realmente
+verificada. El fixture `examples/measurement_quantity_direct_shape.ostrin` ya cubre su forma directa:
+la prueba exige paridad de salida entre intérprete y binario nativo, lowering por IR (`ir=1`,
+`hir=0`, `ast=0`), cero divergencias de tipo, emisión C para WASI y `live_allocations=0` en la
+ejecución nativa con leak-check. Esta evidencia corresponde a ese fixture y sus operaciones; no
+establece soporte general para toda combinación de dimensiones o contenedores. La propagación debe
+mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.
+Para ampliar el alcance se requieren pruebas adicionales de alias explícito, independencia de
+etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
+unidades y ejecución WASI. También se necesitan leak-check, ASan y UBSan para los buffers o grafos
+gestionados.
 
 ## 6. Operaciones y reglas
 
@@ -482,8 +490,12 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
 3. Añadir fuentes correlacionadas y pruebas de cancelación. **Disponible para escalares:**
    `from_source` combina por ID explícito y `standard` conserva la semántica histórica por etiqueta;
    intérprete/nativo/WASM tienen pruebas de paridad.
-4. Integrar `Measurement<Quantity<Dim>>` y conversiones de unidades.
-5. Llevar la representación al HIR/IR y comprobar ownership en nativo.
+4. **Implementación experimental para el alcance verificado:** integrar `Measurement<Quantity<Dim>>`
+   y conversiones de unidades; `measurement_quantity_direct_shape.ostrin` fija el comportamiento
+   concreto cubierto por intérprete y nativo.
+5. **Implementado para ese fixture:** lowering a IR tipado, emisión C para WASI y comprobación
+   nativa de paridad y ownership con leak-check. La generalización a todas las estructuras genéricas
+   y contenedores sigue abierta.
 6. **En curso:** proyectar series escalares a valores e incertidumbres para error bars; añadir
    después arrays, covarianza y salida de contribuciones.
 7. Añadir propagación Monte Carlo explícita y semilla reproducible.
