@@ -9,50 +9,53 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "checkpoint": {
-    "mainRevision": "f182fe5a57a9c65e13f8d40e759166a44d67d62d",
-    "sourceRevision": "f182fe5a57a9c65e13f8d40e759166a44d67d62d",
-    "evidenceRevision": "f182fe5a57a9c65e13f8d40e759166a44d67d62d",
+    "mainRevision": "39b7ad5975a14ac00d2cc2e61f09b25e5382f395",
+    "sourceRevision": "53e36bdc49eb0e67bf2eea561403f20e577044f2",
+    "evidenceRevision": "2a511bd1e5603888b00e70ea89b63c27c774480d",
     "releaseTag": "v0.2.0"
   },
   "completed": [
     "integrated-authorized-prs-225-230-231-227-226-229",
     "post-merge-ci-linux-macos-windows",
     "post-merge-website-browser-codeql-security",
+    "contextual-mutable-reassignment-integrated-pr-232",
+    "measurement-array-structural-profile-validated-locally",
     "local-numeric-validation",
     "local-wasi-program-check",
     "local-benchmark-contract-check"
   ],
   "currentPackage": {
-    "name": "contextual-reassignment-types",
-    "branch": "codex/contextual-reassignment-types",
-    "status": "in-progress",
+    "name": "measurement-array-structural-ownership",
+    "branch": "codex/measurement-array-ownership",
+    "status": "ready-for-review",
     "scope": [
-      "expected-type propagation for mutable assignments",
-      "Option and Result constructor refinement",
-      "generic record reassignment",
-      "interpreter-native parity and leak check"
+      "Array<Measurement<Float>> structural construction and access",
+      "per-element retain/release through array, slice and list conversion",
+      "typed IR/C lowering without AST fallback",
+      "interpreter-native-WASI parity and leak check"
     ],
     "evidence": [
-      "compiler/tests/examples.rs::mutable_reassignment_uses_existing_adt_type_context",
-      "docs/design/28-asignaciones-contextuales.md"
+      "compiler/tests/examples.rs::measurement_array_structural_ownership_matches_interpreter_native_and_wasi",
+      "docs/design/25-mediciones-e-incertidumbre.md",
+      "docs/ownership-matrix.md"
     ]
   },
   "pending": [
-    "complete focused package validation",
     "publish package branch for review",
+    "run package CI and integrate only after new-head checks pass",
     "ownership over remaining aggregates and escapes",
-    "Measurement<T> arrays and covariance",
+    "numeric Measurement<T> arrays, covariance and aggregate operations",
     "R3 host provenance and static effects"
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 39995566260,
-    "status": "success",
-    "head": "f182fe5a57a9c65e13f8d40e759166a44d67d62d"
+    "runId": 40003870179,
+    "status": "in_progress",
+    "head": "39b7ad5975a14ac00d2cc2e61f09b25e5382f395"
   },
   "blockers": [
     "R3 remains OPEN until provenance.runtime.host is captured for all 29 bundles",
     "v0.2.0 is frozen; no new release or tag is authorized"
   ],
-  "next": "validate and review contextual reassignment package, then move to ownership of nested aggregates"
+  "next": "publish and validate the Measurement array structural ownership package, then move to covariance and remaining aggregate escapes"
 }

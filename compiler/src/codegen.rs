@@ -531,10 +531,11 @@ fn map_type_with_subst(
             if matches!(
                 elem,
                 CType::Int | CType::Float | CType::Float32 | CType::Bool | CType::Quantity(_)
-            ) {
+            ) || matches!(&elem, CType::Record(record) if record.contains("Measurement"))
+            {
                 Ok(CType::Array(Box::new(elem)))
             } else {
-                Err("Array<T> is only supported by the native backend for Int, Float, Float32 and Bool elements yet".to_string())
+                Err("Array<T> is only supported by the native backend for numeric, Bool, quantity or Measurement elements yet".to_string())
             }
         }
         Type::Named(name, args) if name == "Set" && args.len() == 1 => Ok(CType::Set(Box::new(
@@ -2913,6 +2914,17 @@ impl<'a> Codegen<'a> {
         }
         if body.contains("List_Array_Float") {
             self.register_list_types(&CType::List(Box::new(CType::Array(Box::new(CType::Float)))));
+        }
+        let measurement_records: Vec<String> = self
+            .records
+            .keys()
+            .filter(|record| record.contains("Measurement"))
+            .cloned()
+            .collect();
+        for record in measurement_records {
+            if record.contains("Measurement") && body.contains(&format!("Array_{record}")) {
+                self.register_list_types(&CType::Array(Box::new(CType::Record(record))));
+            }
         }
     }
 }
@@ -8046,6 +8058,16 @@ impl<'a> Codegen<'a> {
                     let _ = this;
                     if codes.len() == want { Ok(()) } else { Err(format!("Array.{method_name} expects {want} argument(s)")) }
                 };
+                if matches!(&t, CType::Record(record) if record.contains("Measurement")) {
+                    return match method_name {
+                        "shape" if codes.is_empty() => Ok((format!("{n}_shape({obj_code})"), CType::List(Box::new(CType::Int)))),
+                        "rank" if codes.is_empty() => Ok((format!("{n}_rank({obj_code})"), CType::Int)),
+                        "size" | "length" | "count" if codes.is_empty() => Ok((format!("{n}_size({obj_code})"), CType::Int)),
+                        "to_list" if codes.is_empty() => Ok((format!("{n}_to_list({obj_code})"), CType::List(Box::new(t.clone())))),
+                        "get" if codes.len() == 1 => Ok((format!("{n}_get({obj_code}, (int64_t[]){{ {} }}, 1)", codes[0]), t.clone())),
+                        other => Err(format!("Array of Measurement has no method '{other}' in the structural ownership profile")),
+                    };
+                }
                 match method_name {
                     "shape" => Ok((format!("{n}_shape({obj_code})"), CType::List(Box::new(CType::Int)))),
                     "rank" => Ok((format!("{n}_rank({obj_code})"), CType::Int)),
@@ -9004,9 +9026,12 @@ impl<'a> Codegen<'a> {
                 if depth == 1
                     && matches!(ty, CType::Record(name) if name.contains("Measurement"))
                 {
-                    return Err(
-                        "'array' of Measurement<T> is not supported by the native backend yet; use List<Measurement<T>> until the array ownership and source-identity contract is implemented".to_string(),
-                    );
+                    let array_ty = CType::Array(Box::new(ty.clone()));
+                    self.register_list_types(&array_ty);
+                    return Ok(Some((
+                        format!("{}_from1({})", mangle_ctype(&array_ty), codes[0]),
+                        array_ty,
+                    )));
                 }
                 if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
                     return Err("'array' supports nested lists (up to 3 deep) of Int, Float, Float32 or Bool in the native backend".to_string());
@@ -10433,6 +10458,36 @@ fn generate_impl(
                 let tc = c_type_name(elem);
                 list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* data;\n    int64_t* shape;\n    int64_t rank;\n    int64_t size;\n    const char* unit;\n}};\n\n"));
                 let lt = list_struct_name(elem);
+                if matches!(**elem, CType::Record(ref record) if record.contains("Measurement")) {
+                    // Measurement arrays are deliberately structural. Their elements
+                    // are owning record pointers, so every copy/slice/list conversion
+                    // retains each item and the array destructor releases each item.
+                    // Numeric operations are not emitted for this representation.
+                    let show_elem = codegen.show_expr("a->data[off]", elem)?;
+                    let text = format!(
+                        "static void {name}_drop(void* raw) {{\n    {name}* a = ({name}*)raw;\n    if (!a) return;\n    if (a->data) {{ for (int64_t i = 0; i < a->size; i++) if (a->data[i]) ostrin_release((void*)a->data[i]); ostrin_free(a->data); }}\n    if (a->shape) ostrin_free(a->shape);\n}}\n\n\
+                         static {name}* {name}_alloc(int64_t rank, const int64_t* shape) {{\n    {name}* r = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), {name}_drop);\n    if (!r) OSTRIN_OOM();\n    int64_t size = 1; for (int64_t i = 0; i < rank; i++) size *= shape[i];\n    r->rank = rank; r->size = size;\n    r->shape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);\n    r->data = ({tc}*)ostrin_calloc((size_t)size, sizeof({tc}));\n    if (!r->shape || !r->data) OSTRIN_OOM();\n    memcpy(r->shape, shape, sizeof(int64_t) * (size_t)rank);\n    return r;\n}}\n\n\
+                         static {name}* {name}_from1({lt}* list) {{\n    if (!list || list->length < 1) OSTRIN_FAIL(\"an array can't be empty\");\n    int64_t shape[1] = {{ list->length }}; {name}* r = {name}_alloc(1, shape);\n    for (int64_t i = 0; i < list->length; i++) {{ r->data[i] = list->items[i]; if (r->data[i]) ostrin_retain((void*)r->data[i]); }}\n    return r;\n}}\n\n\
+                         static int64_t {name}_rank({name}* a) {{ return a->rank; }}\n                         static int64_t {name}_size({name}* a) {{ return a->size; }}\n                         static {lt}* {name}_to_list({name}* a) {{ return {lt}_new_from_array(a->data, a->size); }}\n                         static List_Int* {name}_shape({name}* a) {{ return List_Int_new_from_array(a->shape, a->rank); }}\n                         static {tc} {name}_index1({name}* a, int64_t i) {{\n    if (a->rank != 1) OSTRIN_FAIL(\"a[i] needs a one-dimensional array\");\n    if (i < 0 || i >= a->shape[0]) OSTRIN_FAIL(\"array index out of bounds\");\n    if (a->data[i]) ostrin_retain((void*)a->data[i]);\n    return a->data[i];\n}}\n\n\
+                         static {name}* {name}_slice({name}* a, int64_t lo, int64_t hi) {{\n    if (a->rank != 1) OSTRIN_FAIL(\"slicing needs a one-dimensional array\");\n    if (lo < 0 || hi > a->shape[0] || lo >= hi) OSTRIN_FAIL(\"invalid slice for this array\");\n    int64_t shape[1] = {{ hi - lo }}; {name}* r = {name}_alloc(1, shape);\n    for (int64_t i = lo; i < hi; i++) {{ r->data[i - lo] = a->data[i]; if (r->data[i - lo]) ostrin_retain((void*)r->data[i - lo]); }}\n    return r;\n}}\n\n\
+                         static {name}* {name}_row({name}* a, int64_t i) {{\n    if (a->rank != 2) OSTRIN_FAIL(\"row needs a two-dimensional array\");\n    if (i < 0 || i >= a->shape[0]) OSTRIN_FAIL(\"array row out of bounds\");\n    int64_t shape[1] = {{ a->shape[1] }}; {name}* r = {name}_alloc(1, shape);\n    for (int64_t j = 0; j < a->shape[1]; j++) {{ r->data[j] = a->data[i * a->shape[1] + j]; if (r->data[j]) ostrin_retain((void*)r->data[j]); }}\n    return r;\n}}\n\n\
+                         static {name}* {name}_col({name}* a, int64_t j) {{\n    if (a->rank != 2) OSTRIN_FAIL(\"col needs a two-dimensional array\");\n    if (j < 0 || j >= a->shape[1]) OSTRIN_FAIL(\"array column out of bounds\");\n    int64_t shape[1] = {{ a->shape[0] }}; {name}* r = {name}_alloc(1, shape);\n    for (int64_t i = 0; i < a->shape[0]; i++) {{ r->data[i] = a->data[i * a->shape[1] + j]; if (r->data[i]) ostrin_retain((void*)r->data[i]); }}\n    return r;\n}}\n\n\
+                         static {name}* {name}_mask({name}* a, Array_Bool* mask) {{\n    if (a->rank != mask->rank || a->size != mask->size) OSTRIN_FAIL(\"the mask shape doesn't match the array shape\");\n    int64_t count = 0; for (int64_t i = 0; i < a->size; i++) if (mask->data[i]) count++;\n    if (count < 1) OSTRIN_FAIL(\"the mask selects no elements\");\n    int64_t shape[1] = {{ count }}; {name}* r = {name}_alloc(1, shape); int64_t k = 0;\n    for (int64_t i = 0; i < a->size; i++) if (mask->data[i]) {{ r->data[k] = a->data[i]; if (r->data[k]) ostrin_retain((void*)r->data[k]); k++; }}\n    return r;\n}}\n\n\
+                         static const char* {name}_show_rec({name}* a, int64_t dim, int64_t off) {{\n    if (dim == a->rank - 1) {{ const char* s = \"[\"; for (int64_t i = 0; i < a->shape[dim]; i++) {{ if (i > 0) s = ostrin_show_cat(s, \", \"); s = ostrin_show_catf(s, {show_elem}); }} return ostrin_show_cat(s, \"]\"); }}\n    const char* s = \"[\"; int64_t stride = 1; for (int64_t d = dim + 1; d < a->rank; d++) stride *= a->shape[d];\n    for (int64_t i = 0; i < a->shape[dim]; i++) {{ if (i > 0) s = ostrin_show_cat(s, \", \"); s = ostrin_show_catf(s, {name}_show_rec(a, dim + 1, off + i * stride)); }}\n    return ostrin_show_cat(s, \"]\");\n}}\n\n"
+                    );
+                    let text = text.replace(
+                        &format!("static {tc} {name}_index1"),
+                        &format!(
+                            "static int64_t {name}_offset({name}* a, const int64_t* idx, int64_t n) {{\n    if (n != a->rank) OSTRIN_FAIL(\"the number of indices doesn't match the array's dimensions\");\n    int64_t linear = 0; for (int64_t d = 0; d < n; d++) {{ if (idx[d] < 0 || idx[d] >= a->shape[d]) OSTRIN_FAIL(\"array index out of bounds\"); linear = linear * a->shape[d] + idx[d]; }}\n    return linear;\n}}\nstatic {tc} {name}_get({name}* a, const int64_t* idx, int64_t n) {{ return a->data[{name}_offset(a, idx, n)]; }}\nstatic {tc} {name}_index1"
+                        )
+                    )
+                    .replace(
+                        "    if (a->data[i]) ostrin_retain((void*)a->data[i]);\n    return a->data[i];",
+                        "    return a->data[i];",
+                    );
+                    array_blocks.push(text);
+                    continue;
+                }
                 let rows = CType::List(elem.clone());
                 let llt = list_struct_name(&rows);
                 let lllt = list_struct_name(&CType::List(Box::new(rows)));
