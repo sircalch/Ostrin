@@ -5,5 +5,9 @@ fn main() -> Void {
         measurements.exact(2.0),
         measurements.exact(3.0)
     ])
+    print(values.length())
     print(measurements.summary(values[0]))
+    print(measurements.summary(values.get(1)))
+    print(values[0 until 1].length())
+    print(values.to_list().length())
 }

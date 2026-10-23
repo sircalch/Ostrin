@@ -1295,6 +1295,12 @@ impl Checker {
                     depth += 1;
                 }
                 // Quantities make an `Array<Quantity<D>>` in the first element's unit.
+                // Measurement arrays are intentionally limited to one-dimensional
+                // structural storage for now. Their elements retain source identity;
+                // arithmetic and broadcasting remain outside this contract.
+                if depth == 1 && is_measurement_type(ty) {
+                    return Some(array_of(ty.clone()));
+                }
                 if depth == 0 || !(is_array_scalar(ty) || matches!(ty, Ty::Quantity(_))) {
                     if *ty != Ty::Unknown {
                         self.push("E1041", format!("'array' expects a (nested) List of numbers or quantities, got '{}'.", arg_types[0].describe()));
@@ -1641,6 +1647,40 @@ impl Checker {
 
     fn check_array_method(&mut self, receiver: &Ty, method: &str, arg_types: &[Ty]) -> Ty {
         let elem = array_elem(receiver).expect("called for arrays only");
+        if is_measurement_type(&elem) {
+            let list_int = Ty::List(Box::new(Ty::Int));
+            return match method {
+                "shape" | "rank" | "size" | "length" | "count" if arg_types.is_empty() => {
+                    if method == "shape" {
+                        list_int
+                    } else {
+                        Ty::Int
+                    }
+                }
+                "to_list" if arg_types.is_empty() => Ty::List(Box::new(elem)),
+                "row" | "col" if arg_types.len() == 1 => {
+                    if arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown {
+                        self.push("E1041", format!("'{method}' expects an Int index."));
+                    }
+                    Ty::Applied("Array".to_string(), vec![elem])
+                }
+                "get" if !arg_types.is_empty() => {
+                    if arg_types.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
+                        self.push("E1041", "'get' expects Int indices.".to_string());
+                    }
+                    elem
+                }
+                other => {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Array method '{other}' is not available for arrays of Measurement; use structural access only."
+                        ),
+                    );
+                    Ty::Unknown
+                }
+            };
+        }
         if let Ty::Quantity(dim) = &elem {
             // Array<Quantity<D>>: reductions keep the unit (var squares it).
             let quantity = elem.clone();
@@ -6714,6 +6754,15 @@ fn is_array_scalar(ty: &Ty) -> bool {
     matches!(
         ty,
         Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool
+    )
+}
+
+fn is_measurement_type(ty: &Ty) -> bool {
+    matches!(
+        ty,
+        Ty::Applied(name, args)
+            if args.len() == 1
+                && (name == "Measurement" || name.ends_with("::Measurement"))
     )
 }
 

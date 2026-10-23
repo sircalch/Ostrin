@@ -13240,30 +13240,68 @@ fn temperature_point_conversion_rejects_overflow_in_interpreter_and_native() {
 }
 
 #[test]
-fn measurement_array_boundary_has_actionable_diagnostic() {
+fn measurement_array_structural_ownership_matches_interpreter_native_and_wasi() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(
-        !interpreted.status.success(),
-        "Array<Measurement<Float>> unexpectedly became interpreter-supported"
-    );
-    assert!(
-        stderr(&interpreted).contains("'array' expects a (nested) List of numbers or quantities"),
-        "interpreter array boundary diagnostic changed: {}",
+        interpreted.status.success(),
+        "Measurement array interpreter failed: {}",
         stderr(&interpreted)
     );
-
-    let native = run(&["--native-type-report", &file]);
+    let expected = stdout(&interpreted);
     assert!(
-        !native.status.success(),
-        "Array<Measurement<Float>> unexpectedly became native-supported"
+        expected.contains("2\n"),
+        "unexpected Measurement array output: {expected}"
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement array native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ast-fallback: 0") && report_text.contains("divergences: 0"),
+        "Measurement array must lower through typed IR: {report_text}"
+    );
+
+    let exe = temp_artifact("measurement_array_structural.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compiled.status.success(),
+        "native Measurement array compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement array binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native Measurement array failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native Measurement array diverged"
     );
     assert!(
-        stderr(&native).contains(
-            "'array' of Measurement<T> is not supported by the native backend yet; use List<Measurement<T>>"
-        ),
-        "native array boundary diagnostic changed: {}",
-        stderr(&native)
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement array leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement array WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Array_std_measurements__Measurement__Float"),
+        "WASI output omitted Measurement array runtime"
     );
 }
 

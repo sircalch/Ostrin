@@ -8,7 +8,9 @@ El smoke, el laboratorio y el fixture de superficie directa generan `main` media
 cero fallbacks AST y cero divergencias de tipos en los casos medidos. El fixture directo también
 compara la salida nativa con el intérprete, verifica `live_allocations=0` y emite C para WASI. Esto
 acredita esos programas, no el soporte general de `Measurement<Quantity<D>>` ni la corrección
-universal de ownership. `Array<Measurement<T>>`, covarianza y Monte Carlo siguen pendientes.
+universal de ownership. `Array<Measurement<T>>` tiene ahora un perfil estructural experimental
+para construcción, acceso y conversión a lista; las operaciones numéricas sobre arrays,
+covarianza y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -71,9 +73,10 @@ loop y la liberación del valor final.
 en las ramas `Ok` y `Err`, con `match`, emisión WASI y `live_allocations=0`.
 `examples/measurement_task.ostrin` cubre captura diferida, `join` y destrucción
 del entorno de una tarea para `Measurement<Float>`.
-`examples/measurement_array_shape.ostrin` conserva la frontera explícita de
-`Array<Measurement<Float>>`: el intérprete la rechaza por el contrato actual y
-el backend nativo da un diagnóstico específico que remite a `List`.
+`examples/measurement_array_shape.ostrin` cubre el perfil estructural de
+`Array<Measurement<Float>>`: construcción desde lista, longitud, indexación, slicing y conversión
+a `List<Measurement<Float>>`, con paridad intérprete/native, lowering por IR, emisión WASI y
+`live_allocations=0`. El perfil no habilita aritmética, broadcasting, reducciones ni covarianza.
 `examples/measurement_quantity_native_smoke.ostrin` cubre construcción, suma/resta correlacionada,
 productos entre dimensiones y proyección de incertidumbre estándar con paridad intérprete/native,
 emisión WASI, `live_allocations=0`, cuerpo `main` generado por IR y cero divergencias de tipos.
@@ -91,7 +94,7 @@ ejemplo escalar con `ostrinc.wasm`. La prueba `std_measurements_scalar_matches_i
 verifica además `live_allocations=0` en nativo y que el C emitido para WASI incluya la destrucción
 recursiva de `Measurement<Float>`, `Sensitivity`, las etiquetas y las listas de fuentes. ASan/UBSan
 ejecutaron esta prueba mediante `sanitizers.yml` en CI y terminaron correctamente en el run
-`38173152897`. Esta evidencia no habilita todavía `Array<Measurement<T>>`, integración nativa con `Quantity`,
+`38173152897`. Esta evidencia no habilita todavía operaciones numéricas sobre `Array<Measurement<T>>`, integración nativa con `Quantity`,
 intervalos de cobertura ni Monte Carlo.
 
 ## 2. Revisión de antecedentes
@@ -249,7 +252,8 @@ La representación futura debe separar tres conceptos:
 `from_source` crea o reutiliza la fuente según el `source_id` que entregue el usuario; repetirlo es
 una declaración explícita de correlación y requiere conservar la misma `sigma`. Una etiqueta
 repetida no crea alias con este constructor. `standard(value, sigma, label)` conserva la regla
-escalar vigente como conveniencia experimental; arrays y covarianzas siguen pendientes. La clave
+escalar vigente como conveniencia experimental; los arrays se limitan al perfil estructural y las
+covarianzas siguen pendientes. La clave
 estable suministrada por el usuario no se interpreta como identidad global entre ejecuciones.
 
 Para `Array<Measurement<T>>` se adopta el siguiente contrato de composición:
@@ -328,7 +332,8 @@ si el cociente cancela las dimensiones; en ese caso se debe usar `div_quantity_s
 el resultado adimensional como `Measurement<Float>`. El backend nativo mantiene el rechazo explícito
 hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
-Este prototipo no habilita todavía `Array<Measurement<T>>` ni covarianza. El soporte de
+Este prototipo habilita un perfil estructural acotado para `Array<Measurement<T>>`, pero no
+operaciones numéricas sobre esos arrays ni covarianza. El soporte de
 `Measurement<Quantity<D>>` sigue siendo experimental y está limitado por la superficie realmente
 verificada. El fixture `examples/measurement_quantity_direct_shape.ostrin` ya cubre su forma directa:
 la prueba exige paridad de salida entre intérprete y binario nativo, lowering por IR (`ir=1`,
@@ -395,9 +400,9 @@ tolerancia documentados.
 
 ### 6.4 Arrays y matrices
 
-`Array<Measurement<T>>` puede ser la primera superficie de arrays después de fijar el contrato de
-identidad de §5.5. La API de series ya ofrece una proyección explícita para
-`List<Measurement<Float>>`; la API de arrays debe ofrecer después:
+`Array<Measurement<T>>` ya tiene un perfil estructural experimental después de fijar el contrato de
+identidad de §5.5. La API de series sigue ofreciendo una proyección explícita para
+`List<Measurement<Float>>`; la siguiente fase de arrays debe añadir:
 
 - valores nominales;
 - incertidumbres por elemento;
