@@ -655,6 +655,16 @@ fn array_supported(ty: &Ty) -> bool {
     ) || array_element(ty).is_some_and(measurement_type)
 }
 
+/// Numeric array kernels are deliberately narrower than the structural array
+/// runtime. Measurement arrays own managed records and currently expose only
+/// construction, indexing, slicing and shape operations.
+fn array_operator_supported(ty: &Ty) -> bool {
+    matches!(
+        array_element(ty),
+        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
+    )
+}
+
 /// Lists of arrays use the generated pointer-backed list runtime. Quantity
 /// arrays share the `Array_Float` backing and carry their unit tag in the
 /// array header, so the existing retain/release contract applies to them too.
@@ -2356,7 +2366,10 @@ fn emit_instruction(
                         _ => return Err(()),
                     };
                 if *ty != result_ty
-                    || !array_supported(&Ty::Applied("Array".to_string(), vec![element.clone()]))
+                    || !array_operator_supported(&Ty::Applied(
+                        "Array".to_string(),
+                        vec![element.clone()],
+                    ))
                 {
                     return Err(());
                 }

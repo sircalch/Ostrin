@@ -13306,6 +13306,43 @@ fn measurement_array_structural_ownership_matches_interpreter_native_and_wasi() 
 }
 
 #[test]
+fn measurement_array_numeric_operators_are_rejected_explicitly() {
+    for (case, expression) in [
+        ("addition", "values + values"),
+        ("comparison", "values < values"),
+    ] {
+        let source = format!(
+            r#"import std.measurements
+
+fn main() -> Void {{
+    values: Array<Measurement<Float>> = array([
+        measurements.exact(2.0),
+        measurements.exact(3.0)
+    ])
+    result = {expression}
+}}
+"#
+        );
+        let path = temp_source(&format!("measurement-array-{case}-error.ostrin"), &source);
+        let checked = run(&[&path]);
+        let _ = fs::remove_file(&path);
+        assert!(
+            !checked.status.success(),
+            "numeric Measurement array operator '{expression}' unexpectedly compiled"
+        );
+        let diagnostics = stderr(&checked);
+        assert!(
+            diagnostics.contains("E1042"),
+            "missing structural-only diagnostic for '{expression}': {diagnostics}"
+        );
+        assert!(
+            diagnostics.contains("structural access only"),
+            "diagnostic did not explain the supported profile for '{expression}': {diagnostics}"
+        );
+    }
+}
+
+#[test]
 fn experimental_effect_report_propagates_to_callers() {
     let out = run(&[
         "--effect-report",

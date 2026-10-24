@@ -3113,6 +3113,16 @@ impl Checker {
                 return result;
             }
             let (left_elem, right_elem) = (array_elem(&lt), array_elem(&rt));
+            if left_elem.as_ref().is_some_and(is_measurement_type)
+                || right_elem.as_ref().is_some_and(is_measurement_type)
+            {
+                self.push(
+                    "E1042",
+                    "Arrays of Measurement expose structural access only; arithmetic and comparisons are not available yet."
+                        .to_string(),
+                );
+                return Ty::Unknown;
+            }
             let same = match (&left_elem, &right_elem) {
                 (Some(a), Some(b)) => a == b,
                 (Some(a), None) => rt == *a,
