@@ -22,9 +22,13 @@
 
 - Added experimental dense `SourceCovariance` propagation for at most 64
   dimensionless scalar sources using `J·Σ·Jᵀ`. The implementation checks shape,
-  finite values, bounded symmetry/PSD tolerance and source variances. Analytical
-  oracle, interpreter/native parity, leak-check and WASI execution are covered;
-  covariance for `Quantity` and measurement arrays remains unsupported.
+  finite values, bounded symmetry/PSD tolerance and source variances. It factors
+  the validated matrix and sums compensated projections before squaring, so
+  large correlated cancellation retains small residual variance. `ostrinc
+  --compile` disables C multiply-add contraction to preserve these rounding
+  steps. Analytical oracle, interpreter/native parity, leak-check and optimized
+  WASI execution are covered; covariance for `Quantity` and measurement arrays
+  remains unsupported.
 
 ## 0.2.0 (2026-10-15)
 

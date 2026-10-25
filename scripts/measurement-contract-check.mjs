@@ -81,7 +81,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: scalar Measurement parity test is missing");
   check(errors, tests.includes("std_measurements_series_feeds_reproducible_error_bars"),
     "compiler/tests/examples.rs: Measurement-to-error-bars parity test is missing");
-  check(errors, /measurement_source\.contains\([\s\S]*ir=28[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
+  check(errors, /measurement_source\.contains\([\s\S]*ir=30[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
     "compiler/tests/examples.rs: scalar Measurement IR ratchet is missing");
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),
@@ -106,13 +106,15 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /its relative tolerance is at most 1e-6 \(default 1e-12\)/i.test(lab)
       && /nonzero source sigma whose square underflows Float is rejected/i.test(lab)
       && /matrix is normalized by its largest finite entry only for the symmetry and positive-semidefinite checks/i.test(lab)
-      && /propagation\s+averages original entries before multiplying by gradients/i.test(lab)
+      && /propagation averages original entries before factoring/i.test(lab)
       && /midpoint calculation preserves subnormal symmetric covariance entries/i.test(lab)
-      && /quadratic form uses compensated row and outer sums to retain small residuals after large correlated cancellation/i.test(lab)
+      && /quadratic form uses a semidefinite factor and compensated linear projections before summing squares/i.test(lab)
+      && /covariance matrix that cannot be stably factored is rejected explicitly/i.test(lab)
       && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
   const covariancePropagation = std.match(/pub fn variance_with_covariance\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covarianceFactorization = std.match(/fn covariance_semidefinite_factor\([\s\S]*?\n}\n/)?.[0] ?? "";
   const covarianceMidpoint = std.match(/fn covariance_midpoint\([\s\S]*?\n}\n/)?.[0] ?? "";
   check(errors, /record SourceCovariance/.test(std)
       && /pub fn covariance\(/.test(std)
@@ -126,32 +128,33 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /numeric\.eigen\(symmetric, relative_tolerance\)/.test(covarianceValidation)
       && /factors\.values\[0\] < 0\.0 - relative_tolerance/.test(covarianceValidation)
       && /covariance_validation_error\(model\.source_ids, model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
-      && /covariance_midpoint\([\s\S]*?model\.matrix\.get\(j, i\)[\s\S]*?model\.matrix\.get\(i, j\)[\s\S]*?\)/.test(covariancePropagation)
       && !/covariance_scale/.test(covariancePropagation)
       && /expected_variance = source\.source_sigma \* source\.source_sigma/.test(covariancePropagation)
       && /source\.source_sigma != 0\.0 and expected_variance == 0\.0/.test(covariancePropagation)
       && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
-      && /row_correction = row_correction \+/.test(covariancePropagation)
-      && /variance_correction = variance_correction \+/.test(covariancePropagation)
-      && /variance = variance \+ variance_correction/.test(covariancePropagation)
-      && /next_row_sum = row_sum \+ row_term/.test(covariancePropagation)
-      && /next_variance = variance \+ outer_term/.test(covariancePropagation)
-      && /term = gradient\[i\] \* row_term/.test(covariancePropagation)
-      && /variance is negative/.test(covariancePropagation),
-    "compiler/std/measurements.ostrin: bounded covariance validation and J·Σ·Jᵀ propagation contract is incomplete");
+      && /covariance_semidefinite_factor\(model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
+      && /gradient_scale/.test(covariancePropagation)
+      && /factor\.get\(row, column\)/.test(covariancePropagation)
+      && /projection_correction = projection_correction \+ residual/.test(covariancePropagation)
+      && /contribution_variance = propagated_sigma \* propagated_sigma/.test(covariancePropagation)
+      && /propagated covariance projection underflows Float range/.test(covariancePropagation)
+      && /covariance matrix could not be stably factorized/.test(covarianceFactorization),
+    "compiler/std/measurements.ostrin: bounded covariance validation and factorized J·Σ·Jᵀ propagation contract is incomplete");
   check(errors, /lower \+ \(upper - lower\) \* 0\.5/.test(covarianceMidpoint)
       && /lower < 0\.0 and upper >= 0\.0/.test(covarianceMidpoint)
       && /upper < 0\.0 and lower >= 0\.0/.test(covarianceMidpoint)
       && /if lower > upper/.test(covarianceMidpoint)
       && /vista\s+normalizada por la entrada máxima finita/i.test(design)
-      && /La propagación promedia las entradas originales antes de\s+multiplicarlas por el gradiente/i.test(design)
-      && /sumas compensadas por fila y en la acumulación exterior/i.test(design)
-      && /residuos pequeños después de cancelar contribuciones grandes/i.test(design)
+      && /La propagación promedia las entradas originales antes de\s+factorizar/i.test(design)
+      && /forma cuadrática se calcula una\s+factorización semidefinida[\s\S]{0,200}proyecciones[\s\S]{0,100}suma compensada/i.test(design)
+      && /factorización numéricamente estable/i.test(design)
       && /El punto\s+medio evita perder covarianzas subnormales/i.test(design),
     "Measurement covariance: normalized PSD analysis and underflow-safe midpoint are missing");
-  check(errors, /SourceCovariance` valida entre 1 y 64 IDs[\s\S]{0,1200}tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\][\s\S]{0,1600}J · Σ · Jᵀ/i.test(design)
+  check(errors, /SourceCovariance` valida entre 1 y 64 IDs/i.test(design)
+      && /tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\]/i.test(design)
+      && /J · Σ · Jᵀ/i.test(design)
       && /los pares simétricos que difieren dentro de esa\s+tolerancia se promedian explícitamente/i.test(design)
-      && /La matriz se vuelve a validar al propagar/i.test(design)
+      && /La matriz se vuelve a\s+validar al propagar/i.test(design)
       && /subdesborda[\s\S]{0,120}la propagación se rechaza explícitamente/i.test(design)
       && /no acepta[\s\S]{0,140}covarianza entre elementos/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: scalar covariance contract, mutation guard or scope boundary is incomplete");
@@ -162,6 +165,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /wide-scale covariance cancellation variance = 0/.test(tests)
       && /rank-three compensated variance = 1/.test(tests)
       && /rank-three reordered compensated variance = 1/.test(tests)
+      && /nonuniform rank-one covariance variance = 0\.01/.test(tests)
       && /large finite PSD covariance = accepted/.test(tests)
       && /large indefinite covariance = covariance matrix must be positive semidefinite/.test(tests)
       && covarianceExample.includes("measurements.covariance")
@@ -171,6 +175,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && covarianceExample.includes("wide-scale covariance cancellation variance")
       && covarianceExample.includes("rank-three compensated variance")
       && covarianceExample.includes("rank-three reordered compensated variance")
+      && covarianceExample.includes("nonuniform rank-one covariance variance")
       && covarianceExample.includes("large finite PSD covariance")
       && covarianceExample.includes("large indefinite covariance")
       && covarianceExample.includes("excessive covariance tolerance")

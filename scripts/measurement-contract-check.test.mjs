@@ -320,9 +320,7 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
-    writeFileSync(stdFile, std
-      .replaceAll("row_correction = row_correction +", "row_correction = 0.0 +")
-      .replaceAll("variance_correction = variance_correction +", "variance_correction = 0.0 +"));
+    writeFileSync(stdFile, std.replace("factor.get(row, column)", "factor.get(row, row)"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
@@ -342,8 +340,8 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
     writeFileSync(stdFile, std.replace(
-      "covariance_entry = covariance_midpoint(",
-      "covariance_entry = covariance_scale * covariance_midpoint(",
+      "covariance_semidefinite_factor(model.matrix, model.relative_tolerance)",
+      "covariance_semidefinite_factor(covariance_scale * model.matrix, model.relative_tolerance)",
     ));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));

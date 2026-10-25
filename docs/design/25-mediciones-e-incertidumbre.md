@@ -84,7 +84,11 @@ nativo, verifican lowering por IR sin fallback, emiten C para WASI y terminan co
 `live_allocations=0`. El perfil no habilita aritmética, broadcasting, reducciones ni covarianza.
 `examples/measurement_covariance.ostrin` cubre la matriz densa acotada para mediciones escalares
 adimensionales, incluyendo `J·Σ·Jᵀ`, diagonal consistente con sigma, matriz singular y rechazos
-de entradas inválidas. Su prueba compara los valores con una oracle analítica, corre en intérprete y
+de entradas inválidas. La propagación factoriza la matriz semidefinida y suma proyecciones al
+cuadrado; esto conserva, por ejemplo, una varianza de `0.01` cuando contribuciones grandes se
+cancelan en una covarianza de rango uno no uniforme. Si la matriz validada no admite una
+factorización numéricamente estable, la API devuelve un error explícito. Su prueba compara los
+valores con una oracle analítica, corre en intérprete y
 nativo, confirma lowering tipado, emite C para WASI y termina con `live_allocations=0`; no valida
 covarianza dimensional ni sobre arrays.
 `examples/measurement_quantity_native_smoke.ostrin` cubre construcción, suma/resta correlacionada,
@@ -288,17 +292,23 @@ este ajuste acotado para que el resultado no dependa de cuál mitad de la matriz
 normalizada por la entrada máxima finita se usa solo para comparar simetría y comprobar la
 semidefinitud con el eigensolver; así, las comparaciones usan la tolerancia relativa sin sumar
 magnitudes que puedan desbordarse. La propagación promedia las entradas originales antes de
-multiplicarlas por el gradiente, de modo que una entrada grande sin usar no borra correlaciones
-pequeñas de las fuentes usadas. El punto medio evita perder covarianzas subnormales cuando ambas
-entradas tienen el mismo signo y evita desbordarse cuando tienen signos opuestos. Las diagonales
-de cada fuente usada deben coincidir con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y subdesborda
-a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente como exacta.
-Las fuentes declaradas pero no usadas tienen gradiente cero. La matriz se vuelve a validar al propagar,
-porque sus arrays pueden cambiar después de la construcción. La fórmula es `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`; una varianza negativa
-mayor que el error de redondeo relativo se rechaza y solo se trunca a cero una negativa pequeña
-dentro de tolerancia. La forma cuadrática usa sumas compensadas por fila y en la acumulación exterior,
-para conservar residuos pequeños después de cancelar contribuciones grandes; los intermedios no
-finitos se rechazan. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
+factorizar, de modo que una entrada grande sin usar no borra correlaciones pequeñas de las fuentes
+usadas. El punto medio evita perder covarianzas subnormales cuando ambas entradas tienen el mismo
+signo y evita desbordarse cuando tienen signos opuestos. Las diagonales de cada fuente usada deben
+coincidir con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y
+subdesborda a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente
+como exacta. Las fuentes declaradas pero no usadas tienen gradiente cero. La matriz se vuelve a
+validar al propagar, porque sus arrays pueden cambiar después de la construcción. La fórmula es
+`J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`. Para evaluar la forma cuadrática se calcula una
+factorización semidefinida `Σ = L · Lᵀ` y se suman los cuadrados de las proyecciones `Lᵀ · J`;
+cada proyección usa suma compensada. Así, las contribuciones grandes se cancelan antes de elevar el
+residuo al cuadrado, incluso para la regresión no uniforme de rango uno con resultado `0.01`. Si la
+factorización encuentra cancelación numéricamente irresuelta o una proyección subdesbordada, se
+devuelve un error explícito en vez de informar una incertidumbre exacta. Los intermedios no finitos
+también se rechazan. `ostrinc --compile` desactiva la contracción de multiplicación-suma del
+compilador C (`-ffp-contract=off`): el backend WASI optimizado había fusionado operaciones y borrado
+residuos que la suma compensada necesita preservar. La matriz Node WASI incluye estos casos de
+cancelación. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
 `Measurement<Quantity<D>>`, `Array<Measurement<T>>`, covarianza entre elementos ni reducciones.
 `examples/measurement_covariance.ostrin` comprueba sumas, diferencias, escalado, fuentes
 independientes, una matriz singular, entradas de escalas muy distintas, cancelación de rango uno,
