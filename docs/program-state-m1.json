@@ -94,7 +94,7 @@
     "name": "dimensional-source-correlation",
     "branch": "codex/dimensional-measurement-correlation",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "locally-validated-source-c1a4281-evidence-9ac3446-dashboard-84b6c04-ready-for-pr-exact-head-checks",
+    "status": "pr-235-open-awaiting-checkpoint-update-and-exact-head-checks-review",
     "scope": [
       "experimental dense dimensionless SourceCorrelation matrices for one to 64 source identities",
       "scalar quantity_uncertainty_with_correlation for Measurement<Quantity<D>> with sources of different input dimensions",
@@ -115,14 +115,16 @@
       "Local full Cargo suite was interrupted after several hours with no useful progress in the differential test compiling viz_isosurface via GCC; the focused Measurement test passed. New exact-head CI remains required.",
       "Main 69c962 post-merge validation completed 8/8 checks successfully, including compiler tests on Windows/Linux/macOS, browser audit, CodeQL, dependency/security checks and website deployment."
     ],
-    "activePullRequests": [],
+    "activePullRequests": [
+      235
+    ],
     "sourceRevision": "c1a4281e4d4fdac81eab6249cbc04707433eef0d",
     "evidenceRevision": "9ac34469d37c34ff745f16124c4c80fc4bc2858f",
     "dashboardRevision": "84b6c0470821e42a288e76b62637d14ea4f32a35"
   },
   "pending": [
-    "Push the source, evidence and dashboard commits, then open one PR for dimensional SourceCorrelation.",
-    "Require checks and fresh review on the exact final PR head, including all supported compiler platforms, ASan/UBSan, browser, CodeQL and security workflows; do not treat checks from older heads as approval.",
+    "Push the checkpoint-only PR 235 metadata update; then validate the resulting current PR head, not the initial fc59407 head.",
+    "Require all current-head checks, native sanitizers and fresh review with no substantive findings before integration.",
     "Continue R3 host capture and broader inspect/validate/replay/compare work; current readiness is OPEN with 0/29 host captures and experiment levels R0-R2.",
     "Keep unit-carrying covariance matrices, Measurement arrays and array reductions outside the supported profile until separately typed and validated.",
     "Keep v0.2.0 tag and published release unchanged."
@@ -161,45 +163,18 @@
     "R3 remains OPEN: all 29 bundles have base evidence, but host capture is missing from 29/29; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized by this program step."
   ],
-  "next": "Push source c1a4281, evidence 9ac3446 and dashboard 84b6c04, open a single PR for dimensional SourceCorrelation, then validate the exact final PR head and fresh review before considering integration.",
+  "next": "Push the checkpoint-only update to PR #235, then validate every required check and fresh review on the resulting exact head before considering integration.",
   "latestPullRequestValidation": {
-    "number": 234,
-    "url": "https://github.com/sircalch/Ostrin/pull/234",
-    "remoteHead": "e30c1358953cb34d1408a6b62847bef9f2e7baa6",
-    "base": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "mergeCommit": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "merged",
-    "postMergeChecks": {
-      "total": 8,
-      "passed": 8,
-      "failed": 0
-    },
+    "number": 235,
+    "url": "https://github.com/sircalch/Ostrin/pull/235",
+    "remoteHead": "fc59407cd70074e6d20f5b5f860776c615df7842",
+    "base": "69c962dee40a4b12606d131df0e8655b90924516",
+    "mergeCommit": null,
+    "state": "open-before-checkpoint-update",
     "reviewThreads": {
-      "total": 24,
+      "total": 0,
       "unresolved": 0
     },
-    "runs": {
-      "ostrinCi": {
-        "id": 40230630708,
-        "status": "success"
-      },
-      "browserAudit": {
-        "id": 40230630645,
-        "status": "success"
-      },
-      "securityAudit": {
-        "id": 40230630640,
-        "status": "success"
-      },
-      "codeql": {
-        "id": 40230630661,
-        "status": "success"
-      },
-      "websiteDeploy": {
-        "id": 40230630648,
-        "status": "success"
-      }
-    },
-    "note": "PR #234 was merged as 69c962d; exact PR-head review found no major issues, and all eight checks on the merge commit passed. The new dimensional SourceCorrelation work is separate and has not yet been reviewed remotely."
+    "note": "PR #235 was created from the validated local source, evidence and dashboard commits. This checkpoint-only commit will advance the PR head; any checks on fc59407 are superseded and must not be treated as approval. The full local Cargo suite did not complete, so current-head CI and a fresh review remain required."
   }
 }
