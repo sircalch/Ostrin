@@ -14,6 +14,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot, validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
 import { runWasmWithFilesystemEvidence } from "./lab-data.mjs";
 import { createSurfaceReceipt, readArchivedFile, receiptPath, verifySurfaceArtifact } from "./r3-surface-receipt.mjs";
+import {
+  canonicalJson as canonicalR3ProfileJson,
+  createR3WasiHostReplayReceipt,
+  r3WasiHostReplayArtifactPaths,
+  r3WasiHostReplayReceiptPath,
+  sameR3WasiHostReplayReceipt,
+} from "./r3-replay-profile.mjs";
 import { inspectBundle } from "./r3-readiness.mjs";
 
 const schema = "ostrin.experiment/v0";
@@ -729,10 +736,18 @@ export function readArchivedReplayBundle(directory, id, expectedRun) {
 async function main() {
   const args = process.argv.slice(2);
   if (args[0] === "--replay-artifact-all") {
-    const [mode, directory, runFlag, runId, shaFlag, testedSha] = args;
-    if (args.length !== 6 || mode !== "--replay-artifact-all" || runFlag !== "--run-id"
-      || shaFlag !== "--tested-sha" || !/^\d+$/.test(runId ?? "") || !/^[a-f0-9]{40}$/.test(testedSha ?? "")) {
-      throw new Error("usage: node scripts/experiment-replay.mjs --replay-artifact-all <directory> --run-id <id> --tested-sha <sha>");
+    const [mode, directory, runFlag, runId, shaFlag, testedSha, profileMode] = args;
+    if (args.length < 6 || args.length > 7 || mode !== "--replay-artifact-all" || runFlag !== "--run-id"
+      || shaFlag !== "--tested-sha" || !/^\d+$/.test(runId ?? "") || !/^[a-f0-9]{40}$/.test(testedSha ?? "")
+      || (profileMode !== undefined && !["--write-profile-receipt", "--require-profile-receipt"].includes(profileMode))) {
+      throw new Error("usage: node scripts/experiment-replay.mjs --replay-artifact-all <directory> --run-id <id> --tested-sha <sha> [--write-profile-receipt|--require-profile-receipt]");
+    }
+    if (profileMode === "--write-profile-receipt"
+      && (realpathSync(directory) !== realpathSync(repositoryRoot) || process.env.GITHUB_ACTIONS !== "true")) {
+      throw new Error("--write-profile-receipt is restricted to CI evidence generated in the current checkout");
+    }
+    if (profileMode === "--require-profile-receipt" && realpathSync(directory) === realpathSync(repositoryRoot)) {
+      throw new Error("--require-profile-receipt requires the downloaded artifact directory");
     }
     const expectedRun = { runId, testedSha };
     const surface = verifySurfaceArtifact(directory, expectedRun);
@@ -742,8 +757,10 @@ async function main() {
     if (!ids.includes("surface")) throw new Error("surface must be in the executable replay registry to bind the archived WASM");
     const moduleSha256 = surface.receipt.compilerWasmSha256;
     const replayResults = [];
+    const bundleRecords = [];
     for (const id of ids) {
       const artifact = id === "surface" ? surface : readArchivedReplayBundle(directory, id, expectedRun);
+      const bundle = artifact.bundle ?? JSON.parse(artifact.bundleText);
       const level = expectedRun.replayBundles[id]?.level;
       const result = level === "R0"
         ? await replayRecordedR0(id, {
@@ -764,6 +781,7 @@ async function main() {
           !== JSON.stringify(surface.receipt)) {
         throw new Error("surface: fresh replay differs from the archived receipt");
       }
+      bundleRecords.push({ id, level, bundle, bundleText: artifact.bundleText, result });
       const replayDetails = level === "R0"
         ? `${result.baseline}; ${result.repeatability}`
         : `${result.baseline}; ${result.sensitivity}${result.seeded ? `; ${result.seeded}` : ""}`;
@@ -781,6 +799,42 @@ async function main() {
     } else {
       verifyArchivedReplayEvidence(directory, readEvidence, randomEvidence);
       console.log(`experiment-replay: archived file-read and deterministic random evidence match all ${ids.length} replays`);
+    }
+    if (profileMode) {
+      const profileFiles = Object.fromEntries(r3WasiHostReplayArtifactPaths.map((relativePath) => [
+        relativePath,
+        readArchivedFile(directory, relativePath, 64 * 1024 * 1024),
+      ]));
+      const receipt = createR3WasiHostReplayReceipt({
+        runId,
+        testedSha,
+        replayBundles: expectedRun.replayBundles,
+        replayResults,
+        bundleRecords,
+        files: profileFiles,
+      });
+      if (profileMode === "--write-profile-receipt") {
+        const artifactRoot = realpathSync(directory);
+        const destination = path.join(artifactRoot, r3WasiHostReplayReceiptPath);
+        mkdirSync(path.dirname(destination), { recursive: true });
+        const resolvedDirectory = realpathSync(path.dirname(destination));
+        const relativeDirectory = path.relative(artifactRoot, resolvedDirectory);
+        if (relativeDirectory === ".." || relativeDirectory.startsWith(`..${path.sep}`) || path.isAbsolute(relativeDirectory)) {
+          throw new Error("R3 profile receipt destination escapes the artifact directory");
+        }
+        if (existsSync(destination)) {
+          const existingReceipt = readArchivedFile(artifactRoot, r3WasiHostReplayReceiptPath, 4 * 1024 * 1024);
+          sameR3WasiHostReplayReceipt(existingReceipt.bytes, receipt);
+          console.log(`experiment-replay: existing bounded R3 WASI host replay receipt matches ${ids.length} bundles`);
+        } else {
+          writeFileSync(destination, canonicalR3ProfileJson(receipt), "utf8");
+          console.log(`experiment-replay: wrote bounded R3 WASI host replay receipt for ${ids.length} bundles`);
+        }
+      } else {
+        const archivedReceipt = readArchivedFile(directory, r3WasiHostReplayReceiptPath, 4 * 1024 * 1024);
+        sameR3WasiHostReplayReceipt(archivedReceipt.bytes, receipt);
+        console.log(`experiment-replay: verified bounded R3 WASI host replay receipt for ${ids.length} bundles`);
+      }
     }
     console.log(`experiment-replay: independently replayed all ${ids.length} bundles in the archived R0/R1/R2 inventory`);
     return;

@@ -11,6 +11,8 @@ on:
       - 'scripts/status-page.mjs'
       - 'scripts/experiment-bundle.mjs'
       - 'scripts/r3-readiness.mjs'
+      - 'scripts/r3-replay-profile.mjs'
+      - 'scripts/r3-replay-profile.test.mjs'
       - 'scripts/r3-surface-receipt.mjs'
       - 'scripts/experiment-replay.mjs'
       - 'scripts/lab-data.mjs'

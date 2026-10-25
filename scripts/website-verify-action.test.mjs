@@ -10,12 +10,12 @@ const actionPath = path.join(repositoryRoot, ".github/actions/website-verify/act
 test("R3 readiness is replayed from the exact uploaded candidate before official evidence publication", () => {
   const action = readFileSync(actionPath, "utf8");
   const prepareEvidence = action.indexOf(
-    '--replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"',
+    '--replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA" --write-profile-receipt',
   );
   const candidateUpload = action.indexOf("id: upload-host-candidate");
   const candidateDownload = action.indexOf("uses: actions/download-artifact@v4", candidateUpload);
   const artifactReplay = action.indexOf(
-    "--replay-artifact-all target/r3-ci/downloaded-host-evidence",
+    "--replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id \"$GITHUB_RUN_ID\" --tested-sha \"$GITHUB_SHA\" --require-profile-receipt",
     candidateDownload,
   );
   const verifiedUpload = action.indexOf("id: upload-verified-host-evidence", artifactReplay);
@@ -30,5 +30,6 @@ test("R3 readiness is replayed from the exact uploaded candidate before official
   assert.match(action, /name: ostrin-r3-host-evidence-\$\{\{ github\.run_id \}\}-attempt-\$\{\{ github\.run_attempt \}\}/);
   assert.match(action, /--run-id "\$GITHUB_RUN_ID" --tested-sha "\$GITHUB_SHA"/);
   assert.match(action, /path: target\/r3-ci\/downloaded-host-evidence/);
+  assert.match(action, /target\/r3-ci\/r3-replay-profile-receipt\.json/);
   assert.match(action, /value: \$\{\{ steps\.upload-verified-host-evidence\.outputs\.artifact-url \}\}/);
 });
