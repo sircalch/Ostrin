@@ -1026,6 +1026,12 @@ fn source_correlation_validation_error(
             if abs(upper) > 1.0 or abs(lower) > 1.0 or abs(coefficient) > 1.0 {
                 return "correlation coefficients must be within [-1, 1]"
             }
+            // Do not canonicalize a tolerated asymmetric pair to exact
+            // dependence when Float rounding erases its residual distance
+            // from +/-1. The covariance kernel cannot recover that evidence.
+            if abs(coefficient) == 1.0 and (upper != coefficient or lower != coefficient) {
+                return "correlation coefficient is numerically unresolved"
+            }
         }
     }
     canonical = source_correlation_canonical_matrix(source_ids, matrix)

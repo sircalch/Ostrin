@@ -86,4 +86,23 @@ fn main() -> Void {
         Ok(_) => print("missing correlation source = accepted"),
         Err(message) => print("missing correlation source = " + message),
     }
+
+    near_length = measurements.from_quantity_source(-1 m, 1e16 m, "near-length", "large length uncertainty").unwrap()
+    near_time = measurements.from_quantity_source(1 s, 1e16 s, "near-time", "large time uncertainty").unwrap()
+    near_product = measurements.mul_quantity(near_length, near_time).unwrap()
+    print("near-perfect contributions")
+    for source in near_product.sources {
+        print(source.source_id + " = " + source.contribution.value().to_string())
+    }
+    near_perfect_correlation = measurements.source_correlation(
+        ["near-length", "near-time"],
+        array([
+            [1.0, 1.0],
+            [0.9999999999999999, 1.0]
+        ])
+    )
+    match near_perfect_correlation {
+        Ok(_) => print("rounded perfect correlation = accepted"),
+        Err(message) => print("rounded perfect correlation = " + message),
+    }
 }
