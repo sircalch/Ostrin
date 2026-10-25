@@ -4,8 +4,8 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
     "effect_coverage": {
       "complete": true,
       "count_unit": "distinct_function_operation_edges",
-      "known_calls": 189,
-      "symbolic_calls": 0,
+      "known_calls": 487,
+      "symbolic_calls": 9,
       "unresolved_calls": 0
     },
     "effects": [
@@ -38,6 +38,44 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "variables": []
       },
       "std.measurements::add_quantity": {
+        "effects": [
+          "state(local)",
+          "measurement"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.measurements::covariance": {
+        "effects": [
+          "state(local)",
+          "measurement"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.measurements::covariance_midpoint": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.measurements::covariance_source_index": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.measurements::covariance_validation_error": {
         "effects": [
           "state(local)",
           "measurement"
@@ -341,6 +379,17 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "type_errors": 0,
         "variables": []
       },
+      "std.measurements::uncertainty_with_covariance": {
+        "effects": [
+          "state(local)",
+          "measurement"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
       "std.measurements::unknown": {
         "effects": [],
         "open_calls": [],
@@ -408,9 +457,749 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "row_closed": true,
         "type_errors": 0,
         "variables": []
+      },
+      "std.measurements::variance_with_covariance": {
+        "effects": [
+          "state(local)",
+          "measurement"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Cholesky.reconstruct": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Cholesky.solve": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.add": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.conjugate": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.div": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.equals": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.imag": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.magnitude": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.mul": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.neg": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.radd": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.rdiv": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.real": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.rmul": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.rsub": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Complex.sub": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexMatrix.at": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexMatrix.conjugate_transpose": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexMatrix.matmul": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexMatrix.mul_vector": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexMatrix.solve": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexVector.at": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexVector.length": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::ComplexVector.magnitude": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Eigen.reconstruct": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Lu.determinant": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Lu.reconstruct": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Lu.solve": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Qr.orthogonality": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Qr.reconstruct": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Solution.component": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Solution.final_state": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Solution.length": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Spectrum.length": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Spectrum.magnitude": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Spline.at": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Spline.sample": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Svd.condition_number": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Svd.rank": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Svd.reconstruct": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::Svd.solve": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::amplitude": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::bisect": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::cholesky": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::cis": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::complex": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::complex_matrix": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::complex_vector": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::derivative": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::eigen": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::eigen_order": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::eigen_order_ascending": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::fft": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::frequencies": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::golden_min": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::ifft": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::interp": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::interp_all": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::lu": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::mark_used": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::newton": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_df",
+          "ε_f"
+        ]
+      },
+      "std.numeric::polar": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::pow2": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::power_of_two": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::powi": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::qr": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::rk4": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::rk45": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::secant": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::segment": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::simpson": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::solution": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::spline": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::svd": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::symmetric_eigen": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::transform": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::trapz": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::unit_cumtrapz": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::unit_gradient": {
+        "effects": [
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::unit_interp": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "std.numeric::unit_trapz": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
       }
     },
     "functions_without_known_effects": [
+      "std.measurements::covariance_midpoint",
+      "std.measurements::covariance_source_index",
       "std.measurements::exact_quantity",
       "std.measurements::from_quantity_source",
       "std.measurements::from_source",
@@ -423,17 +1212,167 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
       "std.measurements::unknown_quantity_from",
       "std.measurements::validate_quantity_source",
       "std.measurements::value",
-      "std.measurements::variance"
+      "std.measurements::variance",
+      "std.numeric::Cholesky.reconstruct",
+      "std.numeric::Complex.add",
+      "std.numeric::Complex.conjugate",
+      "std.numeric::Complex.div",
+      "std.numeric::Complex.equals",
+      "std.numeric::Complex.imag",
+      "std.numeric::Complex.magnitude",
+      "std.numeric::Complex.mul",
+      "std.numeric::Complex.neg",
+      "std.numeric::Complex.radd",
+      "std.numeric::Complex.rdiv",
+      "std.numeric::Complex.real",
+      "std.numeric::Complex.rmul",
+      "std.numeric::Complex.rsub",
+      "std.numeric::Complex.sub",
+      "std.numeric::ComplexMatrix.at",
+      "std.numeric::ComplexVector.at",
+      "std.numeric::ComplexVector.length",
+      "std.numeric::ComplexVector.magnitude",
+      "std.numeric::Lu.determinant",
+      "std.numeric::Qr.orthogonality",
+      "std.numeric::Qr.reconstruct",
+      "std.numeric::Solution.component",
+      "std.numeric::Solution.final_state",
+      "std.numeric::Solution.length",
+      "std.numeric::Spectrum.length",
+      "std.numeric::Spectrum.magnitude",
+      "std.numeric::Spline.at",
+      "std.numeric::Svd.condition_number",
+      "std.numeric::Svd.rank",
+      "std.numeric::bisect",
+      "std.numeric::cis",
+      "std.numeric::complex",
+      "std.numeric::complex_matrix",
+      "std.numeric::complex_vector",
+      "std.numeric::derivative",
+      "std.numeric::golden_min",
+      "std.numeric::interp",
+      "std.numeric::newton",
+      "std.numeric::polar",
+      "std.numeric::pow2",
+      "std.numeric::power_of_two",
+      "std.numeric::powi",
+      "std.numeric::secant",
+      "std.numeric::segment",
+      "std.numeric::simpson",
+      "std.numeric::solution",
+      "std.numeric::trapz",
+      "std.numeric::unit_interp",
+      "std.numeric::unit_trapz"
     ],
-    "indirect_calls": [],
-    "open_effect_calls": [],
+    "indirect_calls": [
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::derivative"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::golden_min"
+      },
+      {
+        "calls": [
+          "df",
+          "f"
+        ],
+        "function": "std.numeric::newton"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::rk4"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::rk45"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::secant"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::simpson"
+      }
+    ],
+    "open_effect_calls": [
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::derivative"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::golden_min"
+      },
+      {
+        "calls": [
+          "df",
+          "f"
+        ],
+        "function": "std.numeric::newton"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::rk4"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::rk45"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::secant"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::simpson"
+      }
+    ],
     "sites": [
       {
         "col": 16,
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::exact",
-        "line": 32,
+        "line": 41,
         "operation": "std.measurements::unknown"
       },
       {
@@ -441,7 +1380,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 179,
+        "line": 188,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -449,7 +1388,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 186,
+        "line": 195,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -457,7 +1396,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 203,
+        "line": 212,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -465,7 +1404,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 207,
+        "line": 216,
         "operation": "merged.push"
       },
       {
@@ -473,7 +1412,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 210,
+        "line": 219,
         "operation": "merged.push"
       },
       {
@@ -481,7 +1420,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 221,
+        "line": 230,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -489,7 +1428,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_quantity_sources",
-        "line": 225,
+        "line": 234,
         "operation": "merged.push"
       },
       {
@@ -497,7 +1436,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_by_right",
-        "line": 256,
+        "line": 265,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -505,7 +1444,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_by_right",
-        "line": 267,
+        "line": 276,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -513,7 +1452,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_by_right",
-        "line": 271,
+        "line": 280,
         "operation": "output.push"
       },
       {
@@ -521,7 +1460,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_by_left",
-        "line": 282,
+        "line": 291,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -529,7 +1468,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_by_left",
-        "line": 293,
+        "line": 302,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -537,7 +1476,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_by_left",
-        "line": 297,
+        "line": 306,
         "operation": "output.push"
       },
       {
@@ -545,7 +1484,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul_quantity",
-        "line": 313,
+        "line": 322,
         "operation": "std.measurements::unknown_quantity_from"
       },
       {
@@ -553,7 +1492,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul_quantity",
-        "line": 315,
+        "line": 324,
         "operation": "std.measurements::scale_quantity_sources_by_right"
       },
       {
@@ -561,7 +1500,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul_quantity",
-        "line": 316,
+        "line": 325,
         "operation": "std.measurements::scale_quantity_sources_by_left"
       },
       {
@@ -569,7 +1508,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul_quantity",
-        "line": 317,
+        "line": 326,
         "operation": "std.measurements::merge_quantity_sources"
       },
       {
@@ -577,7 +1516,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::divide_quantity_sources_by_right",
-        "line": 338,
+        "line": 347,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -585,7 +1524,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::divide_quantity_sources_by_right",
-        "line": 349,
+        "line": 358,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -593,7 +1532,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::divide_quantity_sources_by_right",
-        "line": 353,
+        "line": 362,
         "operation": "output.push"
       },
       {
@@ -601,7 +1540,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::divide_quantity_sources_by_left",
-        "line": 365,
+        "line": 374,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -609,7 +1548,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::divide_quantity_sources_by_left",
-        "line": 376,
+        "line": 385,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -617,7 +1556,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::divide_quantity_sources_by_left",
-        "line": 380,
+        "line": 389,
         "operation": "output.push"
       },
       {
@@ -625,7 +1564,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity",
-        "line": 408,
+        "line": 417,
         "operation": "std.measurements::unknown_quantity_from"
       },
       {
@@ -633,7 +1572,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity",
-        "line": 410,
+        "line": 419,
         "operation": "std.measurements::divide_quantity_sources_by_right"
       },
       {
@@ -641,7 +1580,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity",
-        "line": 411,
+        "line": 420,
         "operation": "std.measurements::divide_quantity_sources_by_left"
       },
       {
@@ -649,7 +1588,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity",
-        "line": 412,
+        "line": 421,
         "operation": "std.measurements::merge_quantity_sources"
       },
       {
@@ -657,7 +1596,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_to_float",
-        "line": 436,
+        "line": 445,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -665,7 +1604,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale_quantity_sources_to_float",
-        "line": 445,
+        "line": 454,
         "operation": "output.push"
       },
       {
@@ -673,7 +1612,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity_same",
-        "line": 473,
+        "line": 482,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -681,7 +1620,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity_same",
-        "line": 477,
+        "line": 486,
         "operation": "std.measurements::scale_quantity_sources_to_float"
       },
       {
@@ -689,7 +1628,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity_same",
-        "line": 478,
+        "line": 487,
         "operation": "std.measurements::scale_quantity_sources_to_float"
       },
       {
@@ -697,7 +1636,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div_quantity_same",
-        "line": 479,
+        "line": 488,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -705,7 +1644,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add_quantity",
-        "line": 512,
+        "line": 521,
         "operation": "std.measurements::unknown_quantity_from"
       },
       {
@@ -713,7 +1652,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add_quantity",
-        "line": 514,
+        "line": 523,
         "operation": "std.measurements::merge_quantity_sources"
       },
       {
@@ -721,7 +1660,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add_quantity",
-        "line": 515,
+        "line": 524,
         "operation": "std.measurements::merge_quantity_sources"
       },
       {
@@ -729,7 +1668,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub_quantity",
-        "line": 537,
+        "line": 546,
         "operation": "std.measurements::unknown_quantity_from"
       },
       {
@@ -737,7 +1676,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub_quantity",
-        "line": 539,
+        "line": 548,
         "operation": "std.measurements::merge_quantity_sources"
       },
       {
@@ -745,7 +1684,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub_quantity",
-        "line": 540,
+        "line": 549,
         "operation": "std.measurements::merge_quantity_sources"
       },
       {
@@ -753,7 +1692,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::quantity_uncertainty",
-        "line": 566,
+        "line": 575,
         "operation": "std.measurements::validate_quantity_source"
       },
       {
@@ -761,7 +1700,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::values",
-        "line": 621,
+        "line": 630,
         "operation": "output.push"
       },
       {
@@ -769,7 +1708,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::uncertainties",
-        "line": 631,
+        "line": 640,
         "operation": "std.measurements::uncertainty"
       },
       {
@@ -777,7 +1716,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::uncertainties",
-        "line": 632,
+        "line": 641,
         "operation": "output.push"
       },
       {
@@ -785,7 +1724,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sum",
-        "line": 645,
+        "line": 654,
         "operation": "std.measurements::exact"
       },
       {
@@ -793,7 +1732,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sum",
-        "line": 647,
+        "line": 656,
         "operation": "std.measurements::add"
       },
       {
@@ -801,7 +1740,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mean",
-        "line": 662,
+        "line": 671,
         "operation": "std.measurements::sum"
       },
       {
@@ -809,7 +1748,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mean",
-        "line": 663,
+        "line": 672,
         "operation": "std.measurements::scale"
       },
       {
@@ -817,7 +1756,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::uncertainty",
-        "line": 675,
+        "line": 684,
         "operation": "std.measurements::variance"
       },
       {
@@ -825,16 +1764,8 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::summary",
-        "line": 682,
+        "line": 691,
         "operation": "std.measurements::uncertainty"
-      },
-      {
-        "col": 17,
-        "effect": "state(local)",
-        "file": "<ostrin-std>/measurements.ostrin",
-        "function": "std.measurements::merge_scaled",
-        "line": 732,
-        "operation": "merged.push"
       },
       {
         "col": 17,
@@ -845,11 +1776,19 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "operation": "merged.push"
       },
       {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::merge_scaled",
+        "line": 750,
+        "operation": "merged.push"
+      },
+      {
         "col": 13,
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::merge_scaled",
-        "line": 745,
+        "line": 754,
         "operation": "merged.push"
       },
       {
@@ -857,7 +1796,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::unknown_from",
-        "line": 759,
+        "line": 768,
         "operation": "std.measurements::unknown"
       },
       {
@@ -865,7 +1804,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale",
-        "line": 764,
+        "line": 773,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -873,7 +1812,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale",
-        "line": 766,
+        "line": 775,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -881,7 +1820,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::scale",
-        "line": 773,
+        "line": 782,
         "operation": "std.measurements::unknown"
       },
       {
@@ -889,7 +1828,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add",
-        "line": 779,
+        "line": 788,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -897,7 +1836,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add",
-        "line": 782,
+        "line": 791,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -905,7 +1844,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add",
-        "line": 784,
+        "line": 793,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -913,7 +1852,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::add",
-        "line": 785,
+        "line": 794,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -921,7 +1860,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub",
-        "line": 800,
+        "line": 809,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -929,7 +1868,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub",
-        "line": 803,
+        "line": 812,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -937,7 +1876,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub",
-        "line": 805,
+        "line": 814,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -945,7 +1884,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::sub",
-        "line": 806,
+        "line": 815,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -953,7 +1892,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul",
-        "line": 822,
+        "line": 831,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -961,7 +1900,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul",
-        "line": 824,
+        "line": 833,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -969,7 +1908,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::mul",
-        "line": 825,
+        "line": 834,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -977,7 +1916,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div",
-        "line": 844,
+        "line": 853,
         "operation": "std.measurements::unknown_from"
       },
       {
@@ -985,7 +1924,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div",
-        "line": 848,
+        "line": 857,
         "operation": "std.measurements::merge_scaled"
       },
       {
@@ -993,8 +1932,824 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::div",
-        "line": 849,
+        "line": 858,
         "operation": "std.measurements::merge_scaled"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::covariance_validation_error",
+        "line": 931,
+        "operation": "symmetric.set"
+      },
+      {
+        "col": 23,
+        "effect": "measurement",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::covariance_validation_error",
+        "line": 938,
+        "operation": "std.measurements::covariance_midpoint"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::covariance_validation_error",
+        "line": 939,
+        "operation": "symmetric.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::covariance_validation_error",
+        "line": 940,
+        "operation": "symmetric.set"
+      },
+      {
+        "col": 13,
+        "effect": "measurement",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::covariance",
+        "line": 971,
+        "operation": "std.measurements::covariance_validation_error"
+      },
+      {
+        "col": 13,
+        "effect": "measurement",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::variance_with_covariance",
+        "line": 1004,
+        "operation": "std.measurements::covariance_validation_error"
+      },
+      {
+        "col": 17,
+        "effect": "measurement",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::variance_with_covariance",
+        "line": 1026,
+        "operation": "std.measurements::covariance_source_index"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::variance_with_covariance",
+        "line": 1051,
+        "operation": "gradient.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::variance_with_covariance",
+        "line": 1057,
+        "operation": "gradient.set"
+      },
+      {
+        "col": 36,
+        "effect": "measurement",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::variance_with_covariance",
+        "line": 1070,
+        "operation": "std.measurements::covariance_midpoint"
+      },
+      {
+        "col": 11,
+        "effect": "measurement",
+        "file": "<ostrin-std>/measurements.ostrin",
+        "function": "std.measurements::uncertainty_with_covariance",
+        "line": 1133,
+        "operation": "std.measurements::variance_with_covariance"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::interp_all",
+        "line": 177,
+        "operation": "out.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::spline",
+        "line": 197,
+        "operation": "c.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::spline",
+        "line": 198,
+        "operation": "d.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::spline",
+        "line": 204,
+        "operation": "c.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::spline",
+        "line": 205,
+        "operation": "d.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::spline",
+        "line": 209,
+        "operation": "m.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Spline.sample",
+        "line": 228,
+        "operation": "out.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::unit_cumtrapz",
+        "line": 255,
+        "operation": "out.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::unit_gradient",
+        "line": 267,
+        "operation": "out.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::qr",
+        "line": 357,
+        "operation": "r.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::qr",
+        "line": 364,
+        "operation": "r.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::qr",
+        "line": 366,
+        "operation": "q.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Cholesky.solve",
+        "line": 393,
+        "operation": "y.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Cholesky.solve",
+        "line": 402,
+        "operation": "x.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::cholesky",
+        "line": 437,
+        "operation": "l.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::cholesky",
+        "line": 439,
+        "operation": "l.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::mark_used",
+        "line": 456,
+        "operation": "out.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 469,
+        "operation": "matrix.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 490,
+        "operation": "matrix.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 491,
+        "operation": "matrix.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 496,
+        "operation": "matrix.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 497,
+        "operation": "matrix.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 502,
+        "operation": "vectors.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 503,
+        "operation": "vectors.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::symmetric_eigen",
+        "line": 513,
+        "operation": "values.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::eigen_order",
+        "line": 523,
+        "operation": "used.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::eigen_order",
+        "line": 536,
+        "operation": "order.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::eigen_order_ascending",
+        "line": 548,
+        "operation": "used.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::eigen_order_ascending",
+        "line": 561,
+        "operation": "order.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Eigen.reconstruct",
+        "line": 586,
+        "operation": "out.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::eigen",
+        "line": 616,
+        "operation": "values.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::eigen",
+        "line": 618,
+        "operation": "vectors.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Svd.reconstruct",
+        "line": 648,
+        "operation": "out.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Svd.solve",
+        "line": 693,
+        "operation": "projected.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Svd.solve",
+        "line": 701,
+        "operation": "solution.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::svd",
+        "line": 728,
+        "operation": "gram.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::svd",
+        "line": 740,
+        "operation": "singular.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::svd",
+        "line": 742,
+        "operation": "vt.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::svd",
+        "line": 750,
+        "operation": "u.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Lu.reconstruct",
+        "line": 780,
+        "operation": "out.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Lu.solve",
+        "line": 795,
+        "operation": "y.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::Lu.solve",
+        "line": 804,
+        "operation": "x.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 834,
+        "operation": "u.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 840,
+        "operation": "permutation.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 860,
+        "operation": "u.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 861,
+        "operation": "u.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 865,
+        "operation": "l.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 866,
+        "operation": "l.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 870,
+        "operation": "reordered.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 875,
+        "operation": "l.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 879,
+        "operation": "l.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 880,
+        "operation": "u.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::lu",
+        "line": 882,
+        "operation": "u.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::rk4",
+        "line": 895,
+        "operation": "states.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::rk4",
+        "line": 906,
+        "operation": "times.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::rk4",
+        "line": 908,
+        "operation": "states.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::rk45",
+        "line": 920,
+        "operation": "states.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::rk45",
+        "line": 947,
+        "operation": "times.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::rk45",
+        "line": 949,
+        "operation": "states.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.conjugate_transpose",
+        "line": 1107,
+        "operation": "out_re.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.conjugate_transpose",
+        "line": 1108,
+        "operation": "out_im.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.matmul",
+        "line": 1131,
+        "operation": "out_re.push"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.matmul",
+        "line": 1132,
+        "operation": "out_im.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.mul_vector",
+        "line": 1154,
+        "operation": "out_re.push"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.mul_vector",
+        "line": 1155,
+        "operation": "out_im.push"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1191,
+        "operation": "ar.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1192,
+        "operation": "ai.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1193,
+        "operation": "ar.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1194,
+        "operation": "ai.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1198,
+        "operation": "br.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1199,
+        "operation": "bi.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1200,
+        "operation": "br.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1201,
+        "operation": "bi.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1207,
+        "operation": "ar.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1208,
+        "operation": "ai.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1211,
+        "operation": "ar.set"
+      },
+      {
+        "col": 21,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1212,
+        "operation": "ai.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1215,
+        "operation": "br.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1216,
+        "operation": "bi.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1229,
+        "operation": "xr.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::ComplexMatrix.solve",
+        "line": 1230,
+        "operation": "xi.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1288,
+        "operation": "out_re.set"
+      },
+      {
+        "col": 13,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1289,
+        "operation": "out_im.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1307,
+        "operation": "ar.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1308,
+        "operation": "ai.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1323,
+        "operation": "ar.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1324,
+        "operation": "ai.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1325,
+        "operation": "ar.set"
+      },
+      {
+        "col": 17,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::transform",
+        "line": 1326,
+        "operation": "ai.set"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::frequencies",
+        "line": 1358,
+        "operation": "out.push"
+      },
+      {
+        "col": 9,
+        "effect": "state(local)",
+        "file": "<ostrin-std>/numeric.ostrin",
+        "function": "std.numeric::amplitude",
+        "line": 1369,
+        "operation": "out.push"
       },
       {
         "col": 0,
@@ -1605,9 +3360,92 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "operation": "print"
       }
     ],
-    "symbolic_effect_calls": [],
+    "symbolic_effect_calls": [
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::derivative"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::golden_min"
+      },
+      {
+        "calls": [
+          "df",
+          "f"
+        ],
+        "function": "std.numeric::newton"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::rk4"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::rk45"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::secant"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::simpson"
+      }
+    ],
     "unresolved_call_sites": [],
-    "unresolved_calls": []
+    "unresolved_calls": [
+      {
+        "calls": [],
+        "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::derivative"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::golden_min"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::newton"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::rk4"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::rk45"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::secant"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::simpson"
+      }
+    ]
   },
   "compiler": {
     "commit": "unknown",
@@ -1633,11 +3471,36 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
       "functions": {
         "main": [
           "captured_outputs_and_hashes"
+        ],
+        "std.numeric::bisect": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::derivative": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::golden_min": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::newton": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::rk4": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::rk45": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::secant": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::simpson": [
+          "callback_effect_rows"
         ]
       },
       "guarantee": false,
       "model": "constraints-only",
       "requirements": [
+        "callback_effect_rows",
         "captured_outputs_and_hashes"
       ]
     },
