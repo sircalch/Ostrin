@@ -19194,7 +19194,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=27")
+        measurement_source.contains("ir=28")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -19269,7 +19269,10 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          within-tolerance symmetric variance = {}\n\
          independent sum uncertainty = {}\n\
          rank-deficient cancellation uncertainty = 0\n\
+         subnormal covariance cancellation variance = 0\n\
+         large finite PSD covariance = accepted\n\
          indefinite covariance = covariance matrix must be positive semidefinite\n\
+         large indefinite covariance = covariance matrix must be positive semidefinite\n\
          nonsymmetric covariance = covariance matrix must be symmetric within tolerance\n\
          duplicate covariance id = covariance source ids must be unique\n\
          non-finite covariance = covariance entries must be finite\n\

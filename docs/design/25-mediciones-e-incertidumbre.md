@@ -284,8 +284,11 @@ El perfil implementado `SourceCovariance` valida entre 1 y 64 IDs no vacíos y �
 `n × n`, entradas finitas, simetría y semidefinitud positiva. La tolerancia relativa está acotada a
 `(0, 1e-6]` y su valor predeterminado es `1e-12`; los pares simétricos que difieren dentro de esa
 tolerancia se promedian explícitamente antes de validar la semidefinitud y propagar. Se documenta
-este ajuste acotado para que el resultado no dependa de cuál mitad de la matriz se lea. Las
-diagonales de cada fuente usada deben coincidir
+este ajuste acotado para que el resultado no dependa de cuál mitad de la matriz se lea. La matriz
+se normaliza por su entrada máxima finita antes de comprobar simetría y semidefinitud; así, las
+comparaciones usan la tolerancia relativa sin sumar magnitudes que puedan desbordarse. El punto
+medio evita perder covarianzas subnormales cuando ambas entradas tienen el mismo signo y evita
+desbordarse cuando tienen signos opuestos. Las diagonales de cada fuente usada deben coincidir
 con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y subdesborda
 a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente como exacta.
 Las fuentes declaradas pero no usadas tienen gradiente cero. La matriz se vuelve a validar al propagar,

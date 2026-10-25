@@ -54,9 +54,47 @@ fn main() -> Void {
     cancelled = measurements.sub(shared_a.unwrap(), shared_b.unwrap()).unwrap()
     print("rank-deficient cancellation uncertainty = " + rounded(measurements.uncertainty_with_covariance(cancelled, rank_deficient).unwrap()).to_string())
 
+    subnormal_sigma = sqrt(5e-324)
+    subnormal_scale = 1.0 / subnormal_sigma
+    subnormal_covariance = measurements.covariance(
+        ["subnormal-a", "subnormal-b"],
+        array([
+            [5e-324, 5e-324],
+            [5e-324, 5e-324]
+        ])
+    ).unwrap()
+    subnormal_a = measurements.from_source(0.0, subnormal_sigma, "subnormal-a", "tiny source A")
+    subnormal_b = measurements.from_source(0.0, subnormal_sigma, "subnormal-b", "tiny source B")
+    subnormal_a_scaled = measurements.scale(subnormal_a.unwrap(), subnormal_scale)
+    subnormal_b_scaled = measurements.scale(subnormal_b.unwrap(), subnormal_scale)
+    subnormal_difference = measurements.sub(subnormal_a_scaled, subnormal_b_scaled).unwrap()
+    print("subnormal covariance cancellation variance = " + measurements.variance_with_covariance(subnormal_difference, subnormal_covariance).unwrap().to_string())
+
+    large_psd = measurements.covariance(
+        ["large-psd-a", "large-psd-b"],
+        array([
+            [1e308, 1e308],
+            [1e308, 1e308]
+        ])
+    )
+    match large_psd {
+        Ok(_) => print("large finite PSD covariance = accepted"),
+        Err(message) => print("large finite PSD covariance = " + message),
+    }
+
     match measurements.covariance(["caliper", "reference"], array([[1.0, 2.0], [2.0, 1.0]])) {
         Ok(_) => print("indefinite covariance accepted"),
         Err(message) => print("indefinite covariance = " + message),
+    }
+    match measurements.covariance(
+        ["large-a", "large-b"],
+        array([
+            [1e308, 1.5e308],
+            [1.5e308, 1e308]
+        ])
+    ) {
+        Ok(_) => print("large indefinite covariance accepted"),
+        Err(message) => print("large indefinite covariance = " + message),
     }
     match measurements.covariance(["caliper", "reference"], array([[1.0, 0.5], [0.25, 1.0]])) {
         Ok(_) => print("nonsymmetric covariance accepted"),

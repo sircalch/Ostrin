@@ -868,6 +868,13 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     }
 }
 
+fn covariance_midpoint_normalized(lower: Float, upper: Float) -> Float {
+    if (lower < 0.0 and upper > 0.0) or (lower > 0.0 and upper < 0.0) {
+        return lower * 0.5 + upper * 0.5
+    }
+    lower + (upper - lower) * 0.5
+}
+
 fn covariance_validation_error(
     source_ids: List<String>,
     matrix: Array<Float>,
@@ -916,26 +923,22 @@ fn covariance_validation_error(
     if scale == 0.0 {
         scale = 1.0
     }
-    absolute_tolerance = relative_tolerance * scale
-    if not is_finite(absolute_tolerance) {
-        return "covariance tolerance scale must be finite"
-    }
     mut symmetric = zeros([n, n])
     for i in 0 until n {
-        symmetric.set(i, i, matrix.get(i, i))
+        symmetric.set(i, i, matrix.get(i, i) / scale)
         for j in i + 1 until n {
-            upper = matrix.get(i, j)
-            lower = matrix.get(j, i)
-            if abs(upper - lower) > absolute_tolerance {
+            upper = matrix.get(i, j) / scale
+            lower = matrix.get(j, i) / scale
+            if abs(upper - lower) > relative_tolerance {
                 return "covariance matrix must be symmetric within tolerance"
             }
-            average = upper * 0.5 + lower * 0.5
+            average = covariance_midpoint_normalized(lower, upper)
             symmetric.set(i, j, average)
             symmetric.set(j, i, average)
         }
     }
 
-    match numeric.eigen(symmetric, absolute_tolerance) {
+    match numeric.eigen(symmetric, relative_tolerance) {
         Ok(factors) => {
             for i in 0 until n {
                 value = factors.values[i]
@@ -943,7 +946,7 @@ fn covariance_validation_error(
                     return "covariance eigenvalues must be finite"
                 }
             }
-            if factors.values[0] < 0.0 - absolute_tolerance {
+            if factors.values[0] < 0.0 - relative_tolerance {
                 return "covariance matrix must be positive semidefinite"
             }
         },
@@ -1001,6 +1004,18 @@ pub fn variance_with_covariance(
     }
 
     n = model.source_ids.length()
+    mut covariance_scale = 0.0
+    for i in 0 until n {
+        for j in 0 until n {
+            entry = model.matrix.get(i, j)
+            if abs(entry) > covariance_scale {
+                covariance_scale = abs(entry)
+            }
+        }
+    }
+    if covariance_scale == 0.0 {
+        covariance_scale = 1.0
+    }
     mut gradient = zeros([n])
     for i in 0 until measurement.sources.length() {
         source = measurement.sources[i]
@@ -1058,8 +1073,12 @@ pub fn variance_with_covariance(
         for j in 0 until n {
             mut covariance_entry = model.matrix.get(i, j)
             if i != j {
-                covariance_entry = model.matrix.get(i, j) * 0.5
-                    + model.matrix.get(j, i) * 0.5
+                normalized_upper = model.matrix.get(i, j) / covariance_scale
+                normalized_lower = model.matrix.get(j, i) / covariance_scale
+                covariance_entry = covariance_midpoint_normalized(
+                    normalized_lower,
+                    normalized_upper
+                ) * covariance_scale
             }
             term = gradient[i] * covariance_entry * gradient[j]
             if not is_finite(term) {

@@ -328,6 +328,21 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
     writeFileSync(stdFile, std);
+    writeFileSync(stdFile, std.replace(
+      "matrix.get(i, i) / scale",
+      "matrix.get(i, i)",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "lower + (upper - lower) * 0.5",
+      "lower * 0.5 + upper * 0.5",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("normalized PSD analysis and underflow-safe midpoint")));
+
+    writeFileSync(stdFile, std);
     const labFile = path.join(root, "scripts/lab-data.mjs");
     const lab = readFileSync(labFile, "utf8");
     writeFileSync(labFile, lab.replace("using J·Σ·Jᵀ", "using independent variances"));
@@ -338,6 +353,10 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     const testFile = path.join(root, "compiler/tests/examples.rs");
     const tests = readFileSync(testFile, "utf8");
     writeFileSync(testFile, tests.replace("rank-deficient cancellation uncertainty = 0", "rank case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("subnormal covariance cancellation variance = 0", "subnormal case removed"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
   } finally {
