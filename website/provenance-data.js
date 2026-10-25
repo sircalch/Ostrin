@@ -2172,7 +2172,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1361,
+        "line": 1370,
         "operation": "contribution_adjustments.set"
       },
       {
@@ -2180,7 +2180,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1362,
+        "line": 1371,
         "operation": "contribution_adjustment_flags.set"
       },
       {
@@ -2188,7 +2188,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1388,
+        "line": 1397,
         "operation": "std.measurements::covariance_correlation_matrix"
       },
       {
@@ -2196,7 +2196,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1394,
+        "line": 1403,
         "operation": "std.measurements::covariance_semidefinite_factor"
       },
       {
@@ -2204,7 +2204,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::uncertainty_with_covariance",
-        "line": 1505,
+        "line": 1514,
         "operation": "std.measurements::variance_with_covariance"
       },
       {

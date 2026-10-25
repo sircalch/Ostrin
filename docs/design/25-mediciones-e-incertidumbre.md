@@ -301,7 +301,10 @@ como exacta. Cuando `sigma²` es subnormal, la coincidencia se comprueba mediant
 `sqrt(Σₛₛ) / sigmaₛ`; la igualdad entre cuadrados subnormales redondeados no basta para validar la
 diagonal. Si la diagonal coincide exactamente con `sigma²`, se conserva el aporte almacenado sin
 reconstruirlo; si solo coincide dentro de tolerancia, se escala el aporte por
-`sqrt(Σₛₛ) / sigmaₛ` para mantener la diagonal del modelo. Las fuentes declaradas pero no usadas
+`sqrt(Σₛₛ) / sigmaₛ` para mantener la diagonal del modelo. Si dos raíces subnormales distintas
+producen el mismo cuadrado `Float`, se conserva el ajuste detectado en espacio de raíces aunque los
+cuadrados comparen iguales; una cancelación que dependa de ese ajuste se rechaza como numéricamente
+irresuelta. Las fuentes declaradas pero no usadas
 tienen gradiente cero. La matriz se vuelve a
 validar al propagar, porque sus arrays pueden cambiar después de la construcción. La fórmula es
 `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`. Para evitar perder bits al dividir una contribución
