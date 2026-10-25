@@ -85,7 +85,7 @@
     "branch": "codex/r3-profile-contract",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-source-lineage",
     "baseRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "status": "source-committed-local-validation-passed-pending-push-and-exact-head-ci-artifact-replay",
+    "status": "pr-236-open-local-gates-passed-exact-head-github-checks-pending",
     "scope": [
       "adds a bounded single-runner Node WASI Preview 1 replay receipt for the full registered visualization fixture inventory",
       "binds source, inputs, outputs, manifests, effect signatures, compiler WASM digest, run identity, tested SHA and evidence files",
@@ -99,7 +99,8 @@
       "project-plan-check passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
       "main 69c962dee40a4b12606d131df0e8655b90924516 has all five main workflows successful: Deploy website, CodeQL, Security audit, Browser audit, Ostrin CI",
       "PR #235 head a4a17eef19ee89ad059d6821c772e124ca6971c5 has 10/10 checks green and is mergeable, but two current-head P2 covariance review threads remain unresolved; no merge authorization recorded",
-      "implementation source commit 0b1ce988b6010430d933abb73c31024ec94162d8 contains the profile implementation, tests, workflow, documentation and synchronized bars bundle; local test results are recorded in this checkpoint, GitHub artifact evidence is pending"
+      "implementation source commit 0b1ce988b6010430d933abb73c31024ec94162d8 contains the profile implementation, tests, workflow, documentation and synchronized bars bundle; local test results are recorded in this checkpoint, GitHub artifact evidence is pending",
+      "PR #236 opened from the two local commits; initial head 6206839034d9e383ca4e2e86c3f2e2b1bea7b110 is awaiting GitHub Actions and real artifact replay"
     ],
     "staticReproducibility": {
       "R0": 18,
@@ -110,11 +111,19 @@
     "sourceRevision": "0b1ce988b6010430d933abb73c31024ec94162d8",
     "evidenceRevision": null,
     "activePullRequests": [
-      235
-    ]
+      235,
+      236
+    ],
+    "pullRequest": {
+      "number": 236,
+      "url": "https://github.com/sircalch/Ostrin/pull/236",
+      "observedHead": "6206839034d9e383ca4e2e86c3f2e2b1bea7b110",
+      "observedBase": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-checks-pending"
+    }
   },
   "pending": [
-    "Push source 0b1ce988b6010430d933abb73c31024ec94162d8 on codex/r3-profile-contract and open a non-draft PR; require exact-head CI to create and replay the real downloaded artifact before treating the profile as verified.",
+    "Update PR #236 checkpoint with its current head, then require exact-head GitHub Actions to create and replay the real downloaded artifact before treating the bounded profile as verified.",
     "Fix and reproduce PR #235 review findings 4372396523 (midpoint rounding and perfect correlation) and 4372490005 (unit-conversion residual lost before cancellation); rerun exact-head tests, sanitizers, WASI and request fresh review before considering integration.",
     "Keep static R3 maturity at 0; this bounded single-host workflow receipt is not a cross-platform reproducibility claim.",
     "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0."
@@ -153,7 +162,7 @@
     "The bounded R3 replay profile is locally validated but has not run in GitHub Actions against a real candidate artifact; static fixture maturity remains R3=0 and no cross-platform claim is made.",
     "Published v0.2.0 remains frozen; do not create a new release or tag."
   ],
-  "next": "Publish the source-committed bounded R3 profile for exact-head artifact CI, then fix the two current-head P2 findings on PR #235 and require fresh validation/review before any integration.",
+  "next": "Require fresh exact-head artifact CI for PR #236 while fixing the two current-head P2 findings on PR #235; do not integrate either PR until its checks and review are clean and the applicable authorization exists.",
   "latestPullRequestValidation": {
     "number": 235,
     "url": "https://github.com/sircalch/Ostrin/pull/235",
