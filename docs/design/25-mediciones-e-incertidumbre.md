@@ -325,8 +325,11 @@ cancelaciones grandes, incluida la regresión no uniforme de rango uno con resul
 cancelación exacta con sigma `sqrt(3)` y un residuo de varianza `16`. Si la factorización encuentra
 un pivote negativo, cancelación numéricamente irresuelta o una proyección subdesbordada, devuelve
 un error explícito en vez de informar una incertidumbre incorrecta. Las contribuciones se
-normalizan usando una potencia de dos exacta para conservar diferencias representables. Los
-pivotes positivos numéricamente irresueltos también se rechazan en vez de introducir una componente
+normalizan usando una potencia de dos exacta para conservar diferencias representables. Los ajustes
+tolerados de diagonal se aplican después de normalizar las contribuciones; si sus factores difieren
+y su redondeo hace irresoluble una cancelación, la propagación devuelve un error explícito. Una
+cancelación exacta que permanece en cero antes y después de un factor común sigue siendo válida.
+Los pivotes positivos numéricamente irresueltos también se rechazan en vez de introducir una componente
 espuria en matrices casi singulares. La normalización que convierte una contribución no nula en
 subnormal se rechaza porque puede perder una fracción significativa de su valor. En cada proyección
 con coeficientes no exactos, también se rechaza una cancelación cuyo residuo sea menor que la
