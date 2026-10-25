@@ -202,6 +202,7 @@ export const GALLERY = [
   { id: "volume-slices", title: "3D volume slices", file: "examples/viz_volume_slices.ostrin", blurb: "Three orthogonal scalar-field cuts, extracted from an Array<Float> volume and depth-sorted as interactive SVG cells.", bundle: "assets/experiments/volume-slices.ostrin-experiment.json" },
   { id: "isosurface", title: "3D isosurface", file: "examples/viz_isosurface.ostrin", blurb: "A scalar shell polygonized from a 3D Float volume with deterministic marching tetrahedra and depth-sorted triangles.", bundle: "assets/experiments/isosurface.ostrin-experiment.json" },
   { id: "scatter-fit", title: "Scatter and fit", file: "examples/viz_scatter_fit.ostrin", blurb: "Calibration data, a least-squares line and its ±2σ band.", bundle: "assets/experiments/scatter-fit.ostrin-experiment.json" },
+  { id: "pendulum-calibration", title: "Dimensional pendulum calibration", file: "examples/viz_pendulum_calibration.ostrin", blurb: "Six synthetic length/period readings become typed Measurements, an OLS estimate of g, a shared-source covariance, uncertainty bars and a source-linked table.", bundle: "assets/experiments/pendulum-calibration.ostrin-experiment.json" },
   { id: "units", title: "Unit-aware axes", file: "examples/viz_units.ostrin", blurb: "Quantities converted to km/h: the axis labels come from the units in the data.", bundle: "assets/experiments/units.ostrin-experiment.json" },
   { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means with standard uncertainties projected from Measurement<Float> sources.", bundle: "assets/experiments/bars.ostrin-experiment.json" },
   { id: "ode", title: "Adaptive ODE solver", file: "examples/viz_ode.ostrin", blurb: "A pendulum solved with std.numeric.rk45: angle over time and the phase portrait, side by side.", bundle: "assets/experiments/ode.ostrin-experiment.json" },
@@ -235,8 +236,9 @@ export const WORKFLOWS = [
     id: "analyze",
     title: "Analyze data",
     status: "experimental",
-    summary: "Move from observations to a fitted figure, a sortable table and explicit uncertainty evidence.",
+    summary: "Move from dimensional observations to a physical model, a fitted figure, a data table and explicit source-based uncertainty evidence.",
     steps: [
+      { figure: "pendulum-calibration", kind: "figure", title: "Estimate a physical constant", detail: "Typed length and period measurements feed a T²-versus-L regression, an analytical first-order uncertainty propagation and a declared covariance between shared calibration offsets." },
       { figure: "scatter-fit", kind: "figure", title: "Fit the observations", detail: "Calibration points, a least-squares line and its ±2σ band are computed in Ostrin." },
       { figure: "table", kind: "table", title: "Inspect the rows", detail: "Filter and sort an SVG table while keeping the values visible and source-linked." },
       { figure: "bars", kind: "figure", title: "Show uncertainty", detail: "Measurement-derived standard uncertainties become error bars in the figure." },

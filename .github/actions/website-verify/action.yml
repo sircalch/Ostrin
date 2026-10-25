@@ -78,6 +78,7 @@ runs:
         node --test scripts/lab-data-replay.test.mjs
         node scripts/experiment-replay.mjs --all
         node --test scripts/experiment-replay.test.mjs
+        node --test scripts/pendulum-calibration-oracle.test.mjs
         node scripts/experiment-replay.mjs --fixture surface --write-r3-receipt
         node scripts/r3-surface-receipt.mjs --verify
         node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"

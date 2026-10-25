@@ -12561,6 +12561,102 @@ fn dimensional_measurement_lab_matches_interpreter_and_native() {
 }
 
 #[test]
+fn pendulum_calibration_workflow_matches_interpreter_native_and_wasi_emission() {
+    let work =
+        std::env::temp_dir().join(format!("ostrin_pendulum_workflow_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&work);
+    fs::create_dir_all(&work).expect("failed to create pendulum workflow input directory");
+    let source = example_path("viz_pendulum_calibration.ostrin");
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../experiments/pendulum-calibration.inputs.json");
+    fs::copy(&data, work.join("data.json")).expect("failed to stage pendulum input snapshot");
+    let expected = "workflow = dimensional pendulum calibration; synthetic data\n\
+observations = 6, repeatability sources = 12, shared sources = 2\n\
+fit: T² = 4.025 L + 0.0006 s²; R² = 0.999979\n\
+g = 9.8084 m/s²; linearized standard uncertainty = 0.0485 m/s²\n\
+shared-source correlation (ruler zero, clock zero) = 0.2\n\
+independent variance contribution = 0.04826689993418455 m/s²\n";
+
+    let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .arg("--run")
+        .arg(&source)
+        .output()
+        .expect("failed to run pendulum workflow in the interpreter");
+    assert!(
+        interpreted.status.success(),
+        "pendulum workflow interpreter failed: {}",
+        String::from_utf8_lossy(&interpreted.stderr)
+    );
+    let interpreted_stdout = String::from_utf8_lossy(&interpreted.stdout).replace("\r\n", "\n");
+    let (interpreted_report, interpreted_svg) = interpreted_stdout
+        .split_once("<svg")
+        .expect("pendulum workflow should render the fit and input table as SVG");
+    assert_eq!(interpreted_report, expected);
+    assert!(interpreted_svg.contains("Pendulum calibration · linearized model"));
+    assert!(interpreted_svg.contains("Synthetic pendulum calibration inputs"));
+    assert!(interpreted_svg.contains("data-table-row=\"5\""));
+
+    let wasi_c = work.join("pendulum-wasi.c");
+    let wasi_emit = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .args(["--emit-c", "--target", "wasm32-wasi", "--out"])
+        .arg(&wasi_c)
+        .arg(&source)
+        .output()
+        .expect("failed to emit pendulum workflow for WASI");
+    assert!(
+        wasi_emit.status.success(),
+        "pendulum workflow WASI emission failed: {}",
+        String::from_utf8_lossy(&wasi_emit.stderr)
+    );
+    let wasi_source = fs::read_to_string(&wasi_c).expect("missing emitted WASI C source");
+    assert!(wasi_source.contains("data.json"));
+
+    let exe = work.join(if cfg!(windows) {
+        "pendulum-native.exe"
+    } else {
+        "pendulum-native"
+    });
+    let exe_text = exe.to_string_lossy().to_string();
+    let native_compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .args(["--compile", "--leak-check", "--out", &exe_text])
+        .arg(&source)
+        .output()
+        .expect("failed to compile pendulum workflow natively");
+    if skip_if_no_c_compiler(&native_compile) {
+        let _ = fs::remove_dir_all(&work);
+        return;
+    }
+    assert!(
+        native_compile.status.success(),
+        "pendulum workflow native compile failed: {}",
+        String::from_utf8_lossy(&native_compile.stderr)
+    );
+    let native = Command::new(&exe)
+        .current_dir(&work)
+        .output()
+        .expect("failed to run native pendulum workflow");
+    assert!(
+        native.status.success(),
+        "pendulum workflow native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        interpreted_stdout,
+        "interpreter and native figure/report should match byte-for-byte"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "pendulum workflow leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    let _ = fs::remove_dir_all(&work);
+}
+
+#[test]
 fn dimensional_measurement_full_surface_matches_native_and_wasi() {
     let file = example_path("measurement_quantity_direct_shape.ostrin");
     let interpreted = run(&["--run", &file]);
