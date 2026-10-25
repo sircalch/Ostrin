@@ -123,6 +123,38 @@ fn main() -> Void {
     print("rank-three 1e16 compensated variance = " + measurements.variance_with_covariance(extreme_first_order, rank_three).unwrap().to_string())
     print("rank-three 1e16 reordered compensated variance = " + measurements.variance_with_covariance(extreme_second_order, rank_three_reordered).unwrap().to_string())
 
+    gradient_residual_covariance = measurements.covariance(
+        ["gradient-a", "gradient-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    gradient_a = measurements.from_source(0.0, 1.0, "gradient-a", "gradient source A")
+    gradient_b = measurements.from_source(0.0, 1.0, "gradient-b", "gradient source B")
+    gradient_a_scaled = measurements.scale(gradient_a.unwrap(), 1e16)
+    gradient_b_scaled = measurements.scale(gradient_b.unwrap(), -9999999999999998.0)
+    gradient_residual = measurements.add(gradient_a_scaled, gradient_b_scaled).unwrap()
+    print("power-of-two gradient normalization variance = " + rounded(measurements.variance_with_covariance(gradient_residual, gradient_residual_covariance).unwrap()).to_string())
+
+    unresolved_pivot_covariance = measurements.covariance(
+        ["pivot-a", "pivot-b"],
+        array([
+            [2.0, 2.0],
+            [2.0, 2.0]
+        ])
+    ).unwrap()
+    pivot_sigma = sqrt(2.0)
+    pivot_a = measurements.from_source(0.0, pivot_sigma, "pivot-a", "pivot source A")
+    pivot_b = measurements.from_source(0.0, pivot_sigma, "pivot-b", "pivot source B")
+    pivot_a_scaled = measurements.scale(pivot_a.unwrap(), 1e8)
+    pivot_b_scaled = measurements.scale(pivot_b.unwrap(), 1e8)
+    pivot_difference = measurements.sub(pivot_a_scaled, pivot_b_scaled).unwrap()
+    match measurements.variance_with_covariance(pivot_difference, unresolved_pivot_covariance) {
+        Ok(value) => print("unresolved positive pivot = " + rounded(value).to_string()),
+        Err(message) => print("unresolved positive pivot = " + message),
+    }
+
     nonuniform_rank_one = measurements.covariance(
         ["rank-a", "rank-b", "rank-c", "rank-d"],
         array([

@@ -1046,6 +1046,11 @@ fn covariance_semidefinite_factor(
             }
             pivot = 0.0
         }
+        if pivot > 0.0 and pivot_scale > 0.0
+            and pivot <= relative_tolerance * pivot_scale
+        {
+            return Err("covariance matrix could not be stably factorized")
+        }
 
         if pivot == 0.0 {
             lower.set(i, i, 0.0)
@@ -1202,6 +1207,18 @@ pub fn variance_with_covariance(
     if gradient_scale == 0.0 {
         return Ok(0.0)
     }
+    // Normalize by a power of two so binary scaling does not round away
+    // small, representable differences between large source gradients.
+    mut gradient_power_scale = 1.0
+    if gradient_scale >= 1.0 {
+        while gradient_power_scale <= gradient_scale * 0.5 {
+            gradient_power_scale = gradient_power_scale * 2.0
+        }
+    } else {
+        while gradient_power_scale > gradient_scale {
+            gradient_power_scale = gradient_power_scale * 0.5
+        }
+    }
     factor = match covariance_semidefinite_factor(model.matrix, model.relative_tolerance) {
         Ok(value) => value,
         Err(message) => {
@@ -1213,7 +1230,7 @@ pub fn variance_with_covariance(
         mut projection = 0.0
         mut projection_correction = 0.0
         for row in column until n {
-            normalized_gradient = gradient[row] / gradient_scale
+            normalized_gradient = gradient[row] / gradient_power_scale
             factor_entry = factor.get(row, column)
             term = factor_entry * normalized_gradient
             if not is_finite(term) {
@@ -1238,7 +1255,7 @@ pub fn variance_with_covariance(
             }
         }
         scaled_projection = projection + projection_correction
-        propagated_sigma = scaled_projection * gradient_scale
+        propagated_sigma = scaled_projection * gradient_power_scale
         contribution_variance = propagated_sigma * propagated_sigma
         if not is_finite(scaled_projection) or not is_finite(propagated_sigma)
             or not is_finite(contribution_variance)
