@@ -16,6 +16,7 @@ const trackedFiles = [
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
   "scripts/lab-data.mjs",
+  "scripts/wasi-program-check.mjs",
 ];
 
 function fixtureRoot() {
@@ -451,6 +452,15 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     writeFileSync(stdFile, std.replace(
       "variance == 0.0 and has_nonzero_original_contribution and has_lossy_coherent_conversion",
       "variance == 0.0 and has_nonzero_original_contribution and false",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));
+
+    const wasiFile = path.join(root, "scripts/wasi-program-check.mjs");
+    const wasi = readFileSync(wasiFile, "utf8");
+    writeFileSync(wasiFile, wasi.replace(
+      "unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion",
+      "unit-conversion cancellation = 0",
     ));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));

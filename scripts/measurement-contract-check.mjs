@@ -32,6 +32,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
+  const wasiMatrix = read("scripts/wasi-program-check.mjs", root);
   const codegen = read("compiler/src/codegen.rs", root);
   const testsWithQuantityNativeSmoke = tests.includes("dimensional_measurement_native_smoke_matches_interpreter_and_wasi");
   const testsWithQuantityLab = tests.includes("dimensional_measurement_lab_matches_interpreter_and_native");
@@ -50,6 +51,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
     ["scripts/lab-data.mjs", lab],
+    ["scripts/wasi-program-check.mjs", wasiMatrix],
   ]) check(errors, source.length > 0, `${name}: missing or empty`);
 
   for (const symbol of ["record Sensitivity", "record Measurement<T>", "exact(", "standard(", "from_source(", "unknown(", "uncertainty(", "values(", "uncertainties(", "sum(", "mean(", "summary("]) {
@@ -146,6 +148,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /rounded perfect correlation = correlation coefficient is numerically unresolved/.test(tests)
       && /unit-conversion cancellation/.test(labExample)
       && /unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion/.test(tests)
+      && /unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion/.test(wasiMatrix)
       && /length-source/.test(labExample) && /time-source/.test(labExample),
     "Measurement<Quantity<D>> correlation: dimensionless model, coherent sensitivities and dimensional result are missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
