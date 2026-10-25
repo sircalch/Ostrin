@@ -1263,6 +1263,8 @@ pub fn variance_with_covariance(
     n = model.source_ids.length()
     mut standardized_contributions = zeros([n])
     mut source_sigmas = zeros([n])
+    mut contribution_adjustments = zeros([n])
+    mut contribution_adjustment_flags = zeros([n])
     for i in 0 until measurement.sources.length() {
         source = measurement.sources[i]
         if source.source_id.length() == 0 or source.source_dimension != "dimensionless" {
@@ -1325,8 +1327,9 @@ pub fn variance_with_covariance(
     }
 
     // The diagonal match is tolerance-based. Preserve the stored contribution
-    // exactly for a bitwise match; otherwise adjust only by the accepted sigma
-    // ratio so the result still reflects the covariance model's exact diagonal.
+    // exactly for a bitwise match; otherwise retain the accepted sigma ratio
+    // and apply it after power-of-two normalization. This avoids rounding a
+    // large contribution before cancellation is assessed.
     for i in 0 until n {
         source_sigma = source_sigmas[i]
         if source_sigma != 0.0 {
@@ -1346,7 +1349,8 @@ pub fn variance_with_covariance(
                 if standardized_contributions[i] != 0.0 and adjusted_contribution == 0.0 {
                     return Err("standardized measurement source contribution underflows Float range")
                 }
-                standardized_contributions.set(i, adjusted_contribution)
+                contribution_adjustments.set(i, adjustment)
+                contribution_adjustment_flags.set(i, 1.0)
             }
         }
     }
@@ -1390,23 +1394,40 @@ pub fn variance_with_covariance(
         mut projection_correction = 0.0
         mut projection_term_magnitude = 0.0
         mut projection_has_inexact_factor = false
+        mut projection_has_adjusted_contribution = false
+        mut projection_adjustments_uniform = true
+        mut projection_adjustment_value = 0.0
+        mut unadjusted_projection = 0.0
+        mut unadjusted_projection_correction = 0.0
         for row in column until n {
             normalized_contribution = standardized_contributions[row] / contribution_power_scale
+            mut projection_adjustment = contribution_adjustments[row]
+            if projection_adjustment == 0.0 {
+                projection_adjustment = 1.0
+            }
+            adjusted_normalized_contribution = normalized_contribution * projection_adjustment
             factor_entry = factor.get(row, column)
+            if factor_entry != 0.0 and normalized_contribution != 0.0 {
+                if projection_adjustment_value == 0.0 {
+                    projection_adjustment_value = projection_adjustment
+                } else if projection_adjustment_value != projection_adjustment {
+                    projection_adjustments_uniform = false
+                }
+            }
             // Scaling by a power of two is exact for normal binary floats, but
             // can discard significant bits when a nonzero value becomes
             // subnormal. Refuse that lossy normalization explicitly.
-            if contribution_power_scale > 1.0 and normalized_contribution != 0.0
-                and abs(normalized_contribution) < 2.2250738585072014e-308
+            if contribution_power_scale > 1.0 and adjusted_normalized_contribution != 0.0
+                and abs(adjusted_normalized_contribution) < 2.2250738585072014e-308
             {
                 return Err("propagated covariance contribution normalization loses subnormal precision")
             }
-            term = factor_entry * normalized_contribution
+            term = factor_entry * adjusted_normalized_contribution
             if not is_finite(term) {
                 return Err("propagated covariance variance must be finite")
             }
-            if (standardized_contributions[row] != 0.0 and normalized_contribution == 0.0)
-                or (factor_entry != 0.0 and normalized_contribution != 0.0 and term == 0.0)
+            if (standardized_contributions[row] != 0.0 and adjusted_normalized_contribution == 0.0)
+                or (factor_entry != 0.0 and adjusted_normalized_contribution != 0.0 and term == 0.0)
             {
                 return Err("propagated covariance projection underflows Float range")
             }
@@ -1414,10 +1435,15 @@ pub fn variance_with_covariance(
             if not is_finite(projection_term_magnitude) {
                 return Err("propagated covariance variance must be finite")
             }
-            if factor_entry != 0.0 and normalized_contribution != 0.0
+            if factor_entry != 0.0 and adjusted_normalized_contribution != 0.0
                 and factor_entry != 1.0 and factor_entry != -1.0
             {
                 projection_has_inexact_factor = true
+            }
+            if factor_entry != 0.0 and normalized_contribution != 0.0
+                and contribution_adjustment_flags[row] != 0.0
+            {
+                projection_has_adjusted_contribution = true
             }
             next_projection = projection + term
             mut residual = 0.0
@@ -1428,16 +1454,32 @@ pub fn variance_with_covariance(
             }
             projection_correction = projection_correction + residual
             projection = next_projection
+            base_term = factor_entry * normalized_contribution
+            next_unadjusted_projection = unadjusted_projection + base_term
+            mut base_residual = 0.0
+            if abs(unadjusted_projection) >= abs(base_term) {
+                base_residual = (unadjusted_projection - next_unadjusted_projection) + base_term
+            } else {
+                base_residual = (base_term - next_unadjusted_projection) + unadjusted_projection
+            }
+            unadjusted_projection_correction = unadjusted_projection_correction + base_residual
+            unadjusted_projection = next_unadjusted_projection
+            if not is_finite(unadjusted_projection) or not is_finite(unadjusted_projection_correction) {
+                return Err("propagated covariance variance must be finite")
+            }
             if not is_finite(projection) or not is_finite(projection_correction) {
                 return Err("propagated covariance variance must be finite")
             }
         }
         scaled_projection = projection + projection_correction
-        if projection_has_inexact_factor and projection_term_magnitude > 0.0 {
+        scaled_unadjusted_projection = unadjusted_projection + unadjusted_projection_correction
+        if (projection_has_inexact_factor or projection_has_adjusted_contribution)
+            and projection_term_magnitude > 0.0
+        {
             // The input tolerance bounds accepted covariance perturbations.
-            // Use at least 64 Float epsilons for the factor, products, and
-            // compensated accumulation; smaller cancellation residuals cannot
-            // be distinguished reliably from their rounding error.
+            // Use at least 64 Float epsilons for factors, diagonal-adjustment
+            // products, and compensated accumulation; smaller cancellation
+            // residuals cannot be distinguished reliably from rounding error.
             mut projection_resolution = model.relative_tolerance
             if projection_resolution < 1.4210854715202004e-14 {
                 projection_resolution = 1.4210854715202004e-14
@@ -1446,7 +1488,15 @@ pub fn variance_with_covariance(
             if not is_finite(projection_limit) {
                 return Err("propagated covariance variance must be finite")
             }
-            if abs(scaled_projection) <= projection_limit {
+            if abs(scaled_projection) <= projection_limit
+                and not (
+                    projection_has_adjusted_contribution
+                    and projection_adjustments_uniform
+                    and not projection_has_inexact_factor
+                    and scaled_projection == 0.0
+                    and scaled_unadjusted_projection == 0.0
+                )
+            {
                 return Err("propagated covariance projection is numerically unresolved")
             }
         }

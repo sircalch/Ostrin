@@ -287,6 +287,23 @@ fn main() -> Void {
     }
     print("direct contribution cancellation variance = " + rounded(measurements.variance_with_covariance(division_loss_measurement, division_loss_covariance).unwrap()).to_string())
 
+    adjusted_contribution_covariance = measurements.covariance(
+        ["adjusted-a", "adjusted-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    adjusted_contribution_a = measurements.from_source(0.0, 1.0000000000000002, "adjusted-a", "rounded diagonal adjustment")
+    adjusted_contribution_b = measurements.from_source(0.0, 1.0, "adjusted-b", "matching diagonal")
+    adjusted_contribution_a_scaled = measurements.scale(adjusted_contribution_a.unwrap(), 9999999999999998.0)
+    adjusted_contribution_b_scaled = measurements.scale(adjusted_contribution_b.unwrap(), -9999999999999998.0)
+    adjusted_contribution_pair = measurements.add(adjusted_contribution_a_scaled, adjusted_contribution_b_scaled).unwrap()
+    match measurements.variance_with_covariance(adjusted_contribution_pair, adjusted_contribution_covariance) {
+        Ok(value) => print("adjusted contribution cancellation = " + rounded(value).to_string()),
+        Err(message) => print("adjusted contribution cancellation = " + message),
+    }
+
     // Exact correlation-factor projections are 0 and -16 (variance 256), but
     // the rounded coefficients cannot resolve that residual safely.
     rounded_factor_covariance = measurements.covariance(

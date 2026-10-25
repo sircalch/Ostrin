@@ -19281,6 +19281,11 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     // 90-digit Decimal oracle computed from the exact binary Float inputs.
     let rounded_geometric_mean_oracle = 1.158_751_715_360_156_3_f64;
     assert!(rounded_geometric_mean_oracle > 1.15 && rounded_geometric_mean_oracle < 1.17);
+    // Exact integer ratio for the binary source sigma 1 + 2^-52 and stored
+    // contributions 1e16 and -9999999999999998 under an all-ones covariance.
+    let adjusted_contribution_residual_oracle =
+        (-992_800_745_259_006_i64 as f64 / 4_503_599_627_370_497_i64 as f64).powi(2);
+    assert!((adjusted_contribution_residual_oracle - 0.048_596_460_630_071_24).abs() < 1e-15);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19306,6 +19311,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          review subnormal geometric covariance = covariance correlation is numerically unresolved\n\
          rounded geometric covariance = covariance correlation is numerically unresolved\n\
          direct contribution cancellation variance = 16\n\
+         adjusted contribution cancellation = propagated covariance projection is numerically unresolved\n\
          rounded factor projection = propagated covariance projection is numerically unresolved\n\
          subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\
          nonuniform rank-one covariance variance = 0.01\n\
