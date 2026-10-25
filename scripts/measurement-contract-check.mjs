@@ -16,8 +16,8 @@ function check(errors, condition, message) {
 }
 
 /**
- * Check that scalar, bounded dimensional, scalar covariance, and structural
- * Measurement array contracts have evidence. Dimensional/array covariance and
+ * Check that scalar, bounded dimensional, scalar covariance/correlation, and
+ * structural Measurement array contracts have evidence. Array covariance and
  * Monte Carlo remain open.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
@@ -32,6 +32,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
+  const wasiMatrix = read("scripts/wasi-program-check.mjs", root);
   const codegen = read("compiler/src/codegen.rs", root);
   const testsWithQuantityNativeSmoke = tests.includes("dimensional_measurement_native_smoke_matches_interpreter_and_wasi");
   const testsWithQuantityLab = tests.includes("dimensional_measurement_lab_matches_interpreter_and_native");
@@ -50,6 +51,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
     ["scripts/lab-data.mjs", lab],
+    ["scripts/wasi-program-check.mjs", wasiMatrix],
   ]) check(errors, source.length > 0, `${name}: missing or empty`);
 
   for (const symbol of ["record Sensitivity", "record Measurement<T>", "exact(", "standard(", "from_source(", "unknown(", "uncertainty(", "values(", "uncertainties(", "sum(", "mean(", "summary("]) {
@@ -81,7 +83,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: scalar Measurement parity test is missing");
   check(errors, tests.includes("std_measurements_series_feeds_reproducible_error_bars"),
     "compiler/tests/examples.rs: Measurement-to-error-bars parity test is missing");
-  check(errors, /measurement_source\.contains\([\s\S]*ir=31[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
+  check(errors, /measurement_source\.contains\([\s\S]*ir=34[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
     "compiler/tests/examples.rs: scalar Measurement IR ratchet is missing");
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),
@@ -90,7 +92,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "docs/design/25-mediciones-e-incertidumbre.md: bounded structural array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
-  check(errors, /matching interpreter\/native output[\s\S]{0,500}smoke also emits C for WASI[\s\S]{0,160}interpreter\/WASM path/i.test(lab),
+  check(errors, /matching interpreter\/native output[\s\S]{0,500}emits C and executes under Node WASI Preview 1[\s\S]{0,160}browser runs the Lab through the interpreter\/WASM path/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement native-smoke and interpreter/WASM scope is missing");
   check(errors, /IR-generated main functions, zero AST fallback and zero generic type divergences/i.test(lab),
     "scripts/lab-data.mjs: typed dimensional Measurement smoke evidence is missing");
@@ -100,9 +102,9 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && !/direct full-surface fixture still fails native lowering/i.test(lab),
     "scripts/lab-data.mjs: direct Measurement<Quantity<D>> native evidence is stale or missing");
   check(errors, /One-dimensional Array<Measurement<Float>> has an experimental structural profile[\s\S]{0,300}Numeric array operations, Monte Carlo and coverage intervals remain planned/i.test(lab),
-    "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
-  check(errors, /bounded SourceCovariance API for dimensionless scalar measurements using J·Σ·Jᵀ/i.test(lab)
-      && /SourceCovariance is experimental and limited to dense covariance matrices for at most 64 dimensionless scalar sources/i.test(lab)
+    "scripts/lab-data.mjs: dimensional Measurement arrays and Monte Carlo boundary is missing");
+  check(errors, /bounded SourceCovariance propagation for dimensionless scalar measurements with J·Σ·Jᵀ/i.test(lab)
+      && /SourceCovariance remains experimental and limited to dense covariance matrices for at most 64 dimensionless scalar sources/i.test(lab)
       && /its relative tolerance is at most 1e-6 \(default 1e-12\)/i.test(lab)
       && /nonzero source sigma whose square underflows Float is rejected/i.test(lab)
       && /propagation derives a scale-safe correlation matrix and applies it directly to the stored source contributions/i.test(lab)
@@ -117,8 +119,38 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /Subnormal sigma roots that differ despite equal rounded squares retain their adjustment/i.test(lab)
       && /negative and numerically unresolved positive pivots are rejected/i.test(lab)
       && /covariance matrix that cannot be stably factored is rejected explicitly/i.test(lab)
-      && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
+      && /separate SourceCorrelation profile accepts a dimensionless matrix with unit diagonal/i.test(lab)
+      && /experimentally verified for a Length×Time product/i.test(lab)
+      && /Near-perfect asymmetric entries are rejected when tolerance canonicalization would round them to exact dependence/i.test(lab)
+      && /A zero uncertainty result is rejected when coherent-unit conversion is not reversible for any nonzero contribution/i.test(lab)
+      && /Covariance propagation for arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
+  const sourceCorrelationValidation = std.match(/fn source_correlation_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const quantityCorrelationPropagation = std.match(/pub fn quantity_uncertainty_with_correlation<D: Dimension>\([\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /record SourceCorrelation/.test(std)
+      && /pub fn source_correlation\(/.test(std)
+      && /pub fn quantity_uncertainty_with_correlation<D: Dimension>/.test(std)
+      && /abs\(diagonal - 1\.0\) > relative_tolerance/.test(sourceCorrelationValidation)
+      && /correlation matrix diagonal must equal one/.test(sourceCorrelationValidation)
+      && /abs\(coefficient\) == 1\.0 and \(upper != coefficient or lower != coefficient\)/.test(sourceCorrelationValidation)
+      && /correlation coefficient is numerically unresolved/.test(sourceCorrelationValidation)
+      && /original_contribution = source\.contribution\.value\(\)/.test(quantityCorrelationPropagation)
+      && /contribution = original_contribution \* unit_scale/.test(quantityCorrelationPropagation)
+      && /contribution \/ unit_scale != original_contribution/.test(quantityCorrelationPropagation)
+      && /variance == 0\.0 and has_nonzero_original_contribution and has_lossy_coherent_conversion/.test(quantityCorrelationPropagation)
+      && /correlated measurement uncertainty is numerically unresolved after unit conversion/.test(quantityCorrelationPropagation)
+      && /source\.source_sigma == 0\.0 and contribution != 0\.0/.test(quantityCorrelationPropagation)
+      && /correlation model is missing a measurement source id/.test(quantityCorrelationPropagation)
+      && /CoherentUncertainty<D>/.test(quantityCorrelationPropagation)
+      && /dimensioned source correlation/.test(labExample)
+      && /rounded perfect correlation/.test(labExample)
+      && /near-length/.test(labExample) && /near-time/.test(labExample)
+      && /rounded perfect correlation = correlation coefficient is numerically unresolved/.test(tests)
+      && /unit-conversion cancellation/.test(labExample)
+      && /unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion/.test(tests)
+      && /unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion/.test(wasiMatrix)
+      && /length-source/.test(labExample) && /time-source/.test(labExample),
+    "Measurement<Quantity<D>> correlation: dimensionless model, coherent sensitivities and dimensional result are missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
   const covarianceCorrelation = std.match(/fn covariance_correlation_matrix\([\s\S]*?\n}\n/)?.[0] ?? "";
   const covariancePropagation = std.match(/pub fn variance_with_covariance\([\s\S]*?\n}\n/)?.[0] ?? "";
@@ -196,7 +228,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /los pares simétricos que difieren dentro de esa\s+tolerancia se promedian explícitamente/i.test(design)
       && /La matriz se vuelve a\s+validar al propagar/i.test(design)
       && /subdesborda[\s\S]{0,120}la propagación se rechaza explícitamente/i.test(design)
-      && /no acepta[\s\S]{0,140}covarianza entre elementos/i.test(design),
+      && /Matrices de covarianza con unidades, arrays de mediciones, covarianza entre elementos y\s+reducciones continúan sin soporte/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: scalar covariance contract, mutation guard or scope boundary is incomplete");
   check(errors, tests.includes("std_measurements_covariance_matches_analytic_oracle_and_wasi")
       && /correlated sum variance = \{\}/.test(tests)

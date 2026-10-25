@@ -9,12 +9,12 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "checkpoint": {
-    "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
-    "evidenceRevision": "79087bffe3ef8f0706850f3e560ae6dba09c048a",
-    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "4dcdaa7f3fcef3b2d7634ff0dce4250a958b1893",
-    "lastObservedRemotePullRequestHead": "192824a72b34b881813ffd08967cd88c83fc18eb",
+    "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+    "sourceRevision": "c20b087dd727992c40a7871887dff9b9cb5624d1",
+    "evidenceRevision": "537e58f0ff402de764b81605d57c645ccbf160cd",
+    "dashboardRevision": "537e58f0ff402de764b81605d57c645ccbf160cd",
+    "lastValidatedRemotePullRequestHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
+    "lastObservedRemotePullRequestHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -76,220 +76,142 @@
     "measurement-covariance-unequal-subnormal-midpoint-p2-4372155934-reproduced-192824a",
     "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
-    "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed"
+    "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
+    "pr-234-merged-into-main-69c962-and-all-eight-post-merge-checks-green",
+    "measurement-dimensional-source-correlation-implemented-at-source-c1a4281",
+    "measurement-correlation-analytic-oracle-variance-0.37-uncertainty-0.6082762530298219-interpreter-native-parity-live-allocations-zero",
+    "measurement-correlation-wasi-preview1-matrix-33-programs-green",
+    "measurement-correlation-lab-12-demos-29-figure-replays-generated-and-verified",
+    "measurement-correlation-website-17-pages-305-examples-383-integration-tests-green",
+    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-fallbacks",
+    "measurement-correlation-contract-gate-and-18-mutation-tests-green",
+    "measurement-correlation-numeric-validation-80-reports-136-emitted-values-exact",
+    "measurement-correlation-linguist-distribution-and-v0.2-readiness-12-of-12-green",
+    "measurement-correlation-evidence-9ac3446-and-dashboard-84b6c04-recorded",
+    "measurement-correlation-rounded-endpoint-p2-fixed-source-6c6c3aa-with-exact-rational-regression",
+    "measurement-correlation-p2-focused-interpreter-native-test-wasi33-and-contract18-green",
+    "measurement-scalar-native-lowering-ratchet-updated-31-to-34-after-three-sourcecorrelation-ir-bodies",
+    "stale-remote-pr235-failures-diagnosed-and-fixed-provenance-page-regenerated-website383-green",
+    "numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero-after-p2",
+    "project-plan-linguist-distribution-ownership-v0.2-readiness-and-scorecard-tests-green-after-p2",
+    "r3-bars-bundle-regenerated-effect-coverage-21063-r3-open-zero-host-captures",
+    "measurement-correlation-lossy-unit-conversion-cancellation-rejected-source-c20b087",
+    "unit-conversion-cancellation-exact-rational-residual-32-over-25-meters",
+    "measurement-correlation-full-cargo-422-tests-green-current-source-tree",
+    "measurement-correlation-wasi-33-programs-green-after-release-compiler-rebuild",
+    "measurement-correlation-contract-18-website-383-lab-replays-29-and-provenance-green",
+    "measurement-correlation-numeric-80-and-136-values-exact-live-allocations-zero",
+    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green"
   ],
   "currentPackage": {
-    "name": "bounded-scalar-measurement-covariance",
-    "branch": "codex/measurement-scalar-covariance",
+    "name": "dimensional-source-correlation",
+    "branch": "codex/dimensional-measurement-correlation",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "p2-4372155934-fixed-in-source-354f02c-evidence-79087bf-local-validation-passed-pending-push-and-exact-head-ci-review",
+    "status": "local-source-and-evidence-validated-awaiting-push-and-exact-head-ci-review",
     "scope": [
-      "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
-      "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
-      "diagonal variance matching against each used source sigma and J·Σ·Jᵀ scalar propagation",
-      "rejects nonzero source sigmas whose squared variance underflows Float rather than treating them as exact",
-      "normalizes covariance entries by the largest finite entry before relative-tolerance PSD analysis",
-      "uses an underflow-safe midpoint for canonicalization and covariance propagation, including subnormal entries",
-      "explicit refusal of covariance for Measurement<Quantity<D>>, Measurement arrays, array reductions and unsupported measurement states",
-      "Scientific Lab example, documentation, generated website data and an actual Node WASI Preview 1 smoke entry",
-      "preserves original-scale off-diagonal entries for propagation across widely separated covariance magnitudes",
-      "uses compensated row and outer sums so large correlated cancellation preserves small residual variance",
-      "normalizes stored source contributions by exact powers of two to preserve representable cancellation residuals",
-      "builds a scale-safe correlation matrix and applies stored source contributions directly without lossy division and reconstruction",
-      "adjusts contributions only when an accepted covariance diagonal differs from the recorded sigma squared",
-      "rejects negative and relative-tolerance-unresolved positive factorization pivots instead of changing the covariance result",
-      "subnormal source variances compare sqrt(covariance diagonal) against source sigma in root space so rounded subnormal squares cannot accept a materially mismatched diagonal",
-      "rejects correlations numerically indistinguishable from perfect dependence instead of rounding away a representable residual variance",
-      "reject near-unit unequal-variance correlations unless Float roots reproduce both diagonal values and the geometric product reproduces the covariance entry",
-      "explicitly return numerically unresolved for subnormal and normal rounded-geometric-mean precision loss",
-      "rejects near-unit unequal-variance correlations unless the Float roots are bounded small integers and their exact squares and cross product reproduce the supplied covariance",
-      "rejects every near-zero factor projection containing adjusted contributions; rounded-equal adjustment factors do not establish exact uniformity",
-      "applies diagonal adjustments after exact power-of-two normalization and preserves root-space subnormal adjustments even when rounded sigma squares compare equal",
-      "rejects every near-zero factor projection containing adjusted contributions; rounded-equal adjustment factors do not establish exact uniformity",
-      "rejects near-unit unequal-variance correlations unless bounded small-integer roots and their exact products reproduce the supplied covariance",
-      "normalizes each raw off-diagonal entry by the local geometric scale before averaging so unequal subnormal pairs retain the correct correlation"
+      "experimental dense dimensionless SourceCorrelation matrices for one to 64 source identities",
+      "scalar quantity_uncertainty_with_correlation for Measurement<Quantity<D>> with sources of different input dimensions",
+      "coherent-unit source contributions and statically dimensioned CoherentUncertainty<D> result",
+      "finite, shape, unique-ID, symmetry, unit-diagonal, coefficient-bound and PSD validation",
+      "analytical Length*Time product oracle: contribution terms 0.09 + 0.16 + 0.12 = variance 0.37",
+      "reject symmetry-tolerant asymmetric coefficients when Float midpoint rounding would erase residual uncertainty at +/-1",
+      "reject zero propagated variance when lossy coherent-unit conversion affected nonzero original contributions",
+      "unit-conversion regression: 128 cm exact residual equals 32/25 m, but unresolved Float conversion/cancellation is reported explicitly",
+      "unit-carrying covariance matrices, measurement arrays and array reductions remain unsupported"
     ],
     "evidence": [
-      "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
-      "examples/measurement_covariance.ostrin: correlated sum/difference, scaling, independence, singular PSD matrix, tolerance and invalid-input cases",
-      "scripts/wasi-program-check.mjs: 32 programs passed locally, including measurement_covariance under Node WASI Preview 1",
-      "cargo test after the underflow fix: 6 differential, 383 integration and 33 unit tests passed",
-      "scripts/measurement-contract-check.mjs and 18 contract tests passed",
-      "scripts/project-plan-check.mjs: 7,261 HIR/IR bodies, 7,220 IR + 41 HIR, 0 AST fallback",
-      "scripts/website-check.mjs: 17 public pages, 305 examples, 383 integration tests",
-      "scripts/lab-data.mjs: 12 demos and 29 Viz figures verified with ostrinc.wasm",
-      "scripts/linguist-check.mjs: proposal, grammar, 7 sample candidates and 305 Ostrin examples pass",
-      "scripts/distribution-check.mjs: release matrix, checksums and installers pass",
-      "Codex P2 review: underflow case from tiny source sigma plus 1e200 scale now returns an explicit error; native and WASI example cover it",
-      "Three fresh Codex P2 findings were reproduced and fixed locally: an underflow-safe symmetric midpoint, normalized large-matrix PSD analysis, and preservation of tiny correlations beside a huge unused covariance entry; the regression confirms cancellation variance 0.",
-      "Focused covariance interpreter/native/leak test, 32-program WASI matrix, measurement contract checker and all 18 contract tests passed after these fixes",
-      "Full cargo suite passed: 33 unit, 6 differential and 383 integration tests; the scalar Measurement IR ratchet is now 28 IR, 0 HIR, 0 AST",
-      "The bars R2 experiment bundle regenerated its compiler-derived effect graph and passed verification after the new standard-library helper changed that graph",
-      "Local Chromium browser suite: 34/34 passed on an isolated test port; the provenance mobile screenshot baseline now reflects the existing public page copy",
-      "Local WebKit smoke: 2/2 passed; Firefox local launch remains unverified on Windows and will be covered by exact-head CI",
-      "Independent numeric validation after the fixes: 80 report values and 136 emitted values match interpreter/native exactly; live_allocations=0",
-      "node scripts/experiment-replay.mjs --all verified all 11 R1/R2 replay bundles after refreshing the bars effect provenance",
-      "R3 host artifact 12581253033 from run 40146766218: all 29 bundles declare head/tested SHA 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714; all 116 manifest byte counts/SHA-256 values recomputed without mismatch",
-      "R3 readiness and scorecard: 29/29 bundle entries ready, 0 open, unresolved effect calls 0; each experiment's declared level remains R0-R2 and no cross-platform guarantee is claimed",
-      "Source and regression changes committed at 96596637dc1edd60efdd25554fd76ee2329b29db; local validations recorded above ran against this exact source tree before the separate checkpoint commit.",
-      "Source commit 5a8e434de1d9a8b4e8714df250c2daf0f28b6a47 passes the full Cargo suite (33 unit, 6 differential, 383 integration; 422 total), all 32 WASI programs, focused interpreter/native covariance with live_allocations=0, 18 contract tests, generated Lab/website, numeric validation, 11 R1/R2 replays, Linguist and distribution checks. The mixed-scale regression uses an unused 1e300 diagonal and a used rank-one 1e-100 covariance block.",
-      "Source commit f3a54f25f911c61fb9fd8b6c3ca2c720cece5977 passes the full Cargo suite (33 unit, 6 differential, 383 integration; 422 total). The rank-one covariance regression returns analytic variance 1 for both contribution orders [1e8, 1, -1e8] and [1e8, -1e8, 1] in interpreter/native parity; all 32 WASI programs, 18 contract mutation tests, 34 Chromium browser tests, 2 WebKit smoke tests, generated Lab, numeric validation, 11 R1/R2 replays, Linguist, distribution and website checks pass.",
-      "Fresh Codex P2 review findings from prior PR head e9a203d were fixed in source commit f5d8bc35: exact binary gradient scaling preserves the all-ones covariance cancellation variance 4, and an unresolved positive rank-one Cholesky pivot now returns an explicit stability error.",
-      "Full cargo test on exact source f5d8bc35 passed: 33 unit, 6 differential and 383 integration tests (422 total); focused covariance interpreter/native/leak and WASI expectations pass.",
-      "Optimized Node WASI Preview 1 matrix passed all 32 programs on the updated covariance implementation.",
-      "Measurement contract checker and all 18 contract mutation tests passed; project-plan remains 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback; Linguist and distribution checks passed.",
-      "Generated Scientific Lab and provenance data after source commit f5d8bc35; refreshed all 29 experiment bundles. Website check passed (17 pages, 305 examples, 383 integration tests, WASM); all 11 R1/R2 experiment replays passed.",
-      "Playwright on Windows: Chromium 34/34 and WebKit 2/2 passed; Firefox could not launch with spawn UNKNOWN and remains unverified locally. New-head GitHub browser workflow is still required.",
-      "Independent numerical validation: 80 report values and 136 emitted values match interpreter/native exactly, maximum absolute difference 0, live_allocations=0.",
-      "Benchmark report SHA-256 05b7c1991e00ebcf7a5e293fe3d2cbbb354f80a84cae28a8ce5cdad6e0cd110; 7 samples, 1 warmup, Windows x64, clean benchmark commit 82352d7b. Measurement covariance medians: interpreter 74.164 ms, native 7.911 ms, ratio 9.375; memory/RSS is not captured and no cross-platform performance claim is made.",
-      "The three-commit source/evidence/checkpoint update was pushed to PR #234; both prior P2 review threads were answered with regression details and resolved. New-head CI, native sanitizers and a new review are pending. main remains 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714.",
-      "Fresh review 5641749562 on exact PR head 391be4a found two further P2 precision failures. Both were reproduced in interpreter and native execution: singular covariance [[3,3],[3,3]] with sigma sqrt(3) produced variance 4 instead of 0, and exact stored contributions 30000000000000004 and -30000000000000000 under perfect correlation produced 64 instead of 16.",
-      "Source commit 7fc21cdf7c574edf3fdf417573bea2c3b5d03619 fixes both review cases by factoring a scale-safe correlation matrix and projecting stored source contributions directly. The diagonal-tolerance path preserves bitwise matches and adjusts only accepted non-identical diagonals; every negative pivot now returns a stability error. Regression output is variance 0 for the sqrt(3) singular cancellation and variance 16 for the direct-contribution residual.",
-      "Exact source 7fc21cd full Cargo suite passed: 33 unit, 6 differential and 383 integration tests (422 total). Focused covariance interpreter/native/leak and WASI emission passed; Node WASI Preview 1 matrix passed all 32 programs. Measurement contract checker and all 18 mutation tests, project-plan (7,261 HIR/IR bodies: 7,220 IR + 41 HIR, 0 AST), Linguist (305 examples), distribution, and website check (17 pages, 305 examples, 383 integration tests) passed. Lab data verified 29 experiment replays; the bars bundle was refreshed.",
-      "Benchmark run on clean commit 5bf8a47afb869f26b29eec0816ec66a2b8d52c01 includes 15 workloads, 7 samples and 1 warmup on Windows 11 x64; covariance medians are 89.504 ms interpreter and 8.912 ms native (10.042 ratio). Raw report SHA-256 d366ffc6b0187bc5da6077b9af4ca8bf295e70190fc7fbccc85509cd6f4230f2 is retained at validation/benchmark-m1-covariance-windows.json and the generated benchmark website data includes the new workload. Peak memory/RSS was not measured; no cross-platform or cross-language performance claim is made.",
-      "Evidence commit 93cf67a records the raw benchmark, generated 15-workload website snapshot and validation results; a later checkpoint records subsequent evidence revisions separately.",
-      "Exact-head Website and browser checks on 687400f failed because generated website/provenance-data.js still described 500 known operation edges and omitted covariance_correlation_matrix after the scalar covariance implementation changed the compiler provenance graph.",
-      "Regenerated website/provenance-data.js in evidence commit d5eae7625606637a480dc8ce7baaf0513a0cdf15. The generator now records 513 known operation edges, the correlation helper and current standard-library line mappings; node scripts/provenance-page.mjs and node scripts/website-check.mjs --wasm pass locally (17 public pages, 305 examples, 383 integration tests).",
-      "Fresh PR #234 review P2: a rank-two covariance with analytic variance 256 now returns an explicit numerically-unresolved projection error instead of zero; interpreter/native regression and WASI oracle agree.",
-      "Fresh PR #234 review P2: power-of-two contribution normalization now explicitly rejects nonzero values rounded into the subnormal range; interpreter/native regression and WASI oracle agree.",
-      "Full Cargo suite on exact source tree 9d416938f7829ed1c800243e68790d326a97aac6 passed: 33 unit, 6 differential and 383 integration tests (422 total). Cargo fmt check passed.",
-      "Optimized host compiler and browser WASI compiler were rebuilt from source 9d416938f7829ed1c800243e68790d326a97aac6; Node WASI Preview 1 matrix passed all 32 programs.",
-      "Measurement contract checker and 18 mutation tests passed; project-plan passed with 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback; independent numeric validation matched 80 report values and 136 emitted values exactly with live_allocations=0.",
-      "Generated provenance and benchmark web data were synchronized; Scientific Lab replay verified all 29 R1/R2 figures; website-check passed (17 pages, 305 examples, 383 integration tests, WASM); Linguist and distribution checks passed. Refreshed bars effect bundle passes verification.",
-      "Windows 11 x64 benchmark report validation/benchmark-m1-covariance-windows-9d41693.json has SHA-256 67a537590941e9c9510078112b28d051487a44b4f8db2ec70432da67706fb250; 15 workloads, 7 samples and 1 warmup on clean source 9d41693. Covariance median: 74.607 ms interpreter, 7.787 ms native, ratio 9.581. RSS is not measured; no cross-platform claim.",
-      "R3 readiness after bundle regeneration remains OPEN: 29/29 base bundles inventoried, 0/29 host captures, 21,026 known effect references, 83 symbolic callbacks, 0 unresolved references. Declared experiment levels remain R0-R2; no cross-platform reproducibility claim.",
-      "PR #234 current remote head remains 6b1352be1bc9b6911c5bd12bd10e9c5a2cc0415a, base main 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714, open and mergeable. Its earlier checks/review are superseded by the pending source/evidence/checkpoint commits.",
-      "Source d4cbd6f2eb37d94f80cf70814435c26605e0fd24 fixes PR #234 review P2 for [[5e-324]] with sigma 2e-162 by comparing sqrt(diagonal)/sigma against half the relative tolerance; the existing valid sqrt(5e-324) cancellation remains accepted. The example is asserted in interpreter/native parity and in the WASI exact-output oracle.",
-      "After source d4cbd6f2eb37d94f80cf70814435c26605e0fd24: full Cargo suite passed (33 unit, 6 differential, 383 integration; 422 total); focused covariance regression passed; Node WASI Preview 1 matrix passed 32/32; Measurement contract checker and 18 tests passed; cargo fmt check passed; project-plan check reported 7,261 HIR/IR bodies and 0 AST fallback; website check passed (17 pages, 305 examples, 383 integration tests, WASM); provenance page regenerated and validated; numeric validation compared 80 values plus 136 emitted values exactly with live_allocations=0.",
-      "R3 source-lineage reconciliation was preserved in local commit 88ccfc8 on codex/r3-source-lineage after its prior 13/13 bundle tests, 29 replay checks and website/R3 gates passed; it remains unpushed and unmerged pending covariance integration.",
-      "Source commit 59987174444b03df5c1fd310bacc5386436b232b fixes PR #234 review thread 4370000879. It computes correlation from a scale-safe geometric mean and explicitly rejects sub-unit coefficients within max(relative tolerance, 64 Float epsilons) of perfect dependence when the covariance entry is below that scale; the 9/25 diagonal regression with covariance 14.999999999999998 has an independent analytic residual variance of 21.316282072803006 and returns an explicit unresolved result in interpreter, native and WASI.",
-      "Full Cargo test on exact source 59987174444b03df5c1fd310bacc5386436b232b passed: 33 unit, 6 differential and 383 integration tests (422 total). Focused Measurement covariance interpreter/native/leak/WASI test passed; all 32 WASI programs passed.",
-      "Measurement contract checker and 18 mutation tests passed; project-plan remains 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallback; Linguist and distribution checks passed; v0.2-readiness-check remains READY with 12/12 criteria.",
-      "Scientific Lab generated data passed 12 demo checks and 29/29 replay comparisons. Provenance page regenerated. Website check passed with 17 public pages, 305 examples, 383 integration tests and the WASM artifact. Browser projects Chromium and WebKit passed 36/36 tests; Firefox could not launch on this Windows host (spawn UNKNOWN), so its two smoke tests remain unverified locally. The updated status dashboard test passed.",
-      "Independent numeric validation compared 80 report values and 136 emitted values exactly (maximum absolute difference 0) with live_allocations=0.",
-      "Benchmark report validation passed for 15 workloads, 7 samples and 1 warmup on Windows 11 x64; report SHA-256 189fd80377da23adbce55173324045237625891df4aee618dc0137f0173f98cc records clean source commit 59987174444b03df5c1fd310bacc5386436b232b. Measurement covariance medians were 84.802 ms interpreted and 8.272 ms native (10.252 ratio); peak RSS/memory is not measured and no cross-platform or cross-language claim is made.",
-      "Regenerated the benchmark page, Scientific Lab copy, provenance data and public quality scorecard. The scorecard now records 389 Rust-marked tests, 21,026 known effect edges, 83 symbolic callbacks and 0 unresolved calls. R3 readiness remains OPEN with 29/29 base bundles, 0/29 host captures; levels remain R0-R2 and no cross-platform reproducibility claim is made.",
-      "Remote main is still 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714. PR #234 remote head is still 46c72a321be5f626aa1542316041df98685e55d6; its checks and review predate source 5998717 and are superseded. The local source and evidence commits have not yet been pushed.",
-      "PR #234 P2 discussion_r4370078465 fixed in source 140a53d: geometric scale now multiplies the already validated standard deviations, avoiding a lossy subnormal variance ratio. Regression oracle expects correlation 0.5 and propagated variance 3. Evidence manifest validation/measurement-covariance-subnormal-ratio.json at 19f599b records the 422-test suite, 32 WASI programs, 18 contract mutations, 7,261 HIR/IR bodies with zero AST fallbacks, website/Lab replay, exact numeric parity, v0.2 readiness, and R3 limits. Exact final PR-head CI, fresh review, ASan and UBSan remain pending.",
-      "PR #234 covariance precision: source 6c4d1c8 avoids subnormal variance-ratio loss and rejects unequal-variance correlations when the geometric scale itself is subnormal; equal diagonal variances use the diagonal directly. The independent 1/sqrt(3) case would have variance 3.1547005383792515 and is now explicitly unresolved instead of reporting 3. Evidence manifest validation/measurement-covariance-subnormal-ratio.json at 40cc0d0 records local full-suite, WASI, contract, website/Lab, numerical and readiness results. Exact final-head CI, fresh review, ASan and UBSan are pending.",
-      "Fresh PR #234 P2 4370131337 fixed in source 931bfc62: the exact subnormal matrix [[1e-323,5e-324],[5e-324,1.5e-323]] returns an explicit unresolved result; independent oracle correlation 1/sqrt(6), variance 2.816496580927726; interpreter, native and WASI output agree.",
-      "Fresh PR #234 P2 4370174603 fixed in source 931bfc62: unequal-variance normal covariance [[1,1.7320508075688772],[1.7320508075688772,3]] no longer rounds a positive residual to zero; 90-digit Decimal oracle from the exact binary Float entry is 1.1587517153601563, and Ostrin returns an explicit unresolved error. Existing exact nonuniform rank-one regression remains 0.01.",
-      "Exact source tree later committed as 931bfc62 passed Cargo fmt, all 422 Cargo tests, the focused covariance interpreter/native/WASI/leak test, and all 32 Node WASI programs after rebuilding the release compiler.",
-      "Source 931bfc62 validation: measurement contract plus 18 tests, project-plan 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallbacks, Linguist, distribution and v0.2 readiness 12/12 pass.",
-      "Source 931bfc62 web validation: provenance page synchronized; website check 17 pages, 305 examples, 383 integration tests and WASM passes; Scientific Lab 12 demos and 29 Viz replays pass; all 11 R1/R2 experiment replays pass. Chromium 34/34 and WebKit 2/2 browser tests pass locally; Firefox was not run on Windows and remains for exact-head CI.",
-      "Independent numeric validation compared 80 report values and 136 emitted values exactly, maximum absolute difference 0, with live_allocations=0.",
-      "Evidence commit 702a55fb records both new P2 regressions and regenerates website/lab-data.js plus website/provenance-data.js for source 931bfc62.",
-      "Source 06849b5453fd3bfa3bc573f280abee1440ea387c fixes PR #234 P2 4371782448: all-ones covariance with sigmas [1.0000000000000002, 1] and contributions [1e16, -9999999999999998] now returns an explicit unresolved-projection error. Independent exact rational oracle (992800745259006 / 4503599627370497)^2 = 0.048596460630071246; the previous rounded adjustment incorrectly reported zero.",
-      "The latest source tree passed cargo fmt, the focused covariance interpreter/native/leak test, and the full Cargo suite (33 unit, 6 differential, 383 integration; 422 total). The full suite was run on the exact source tree immediately before it was committed as 06849b5; source content was unchanged by the commit.",
-      "After rebuilding release compiler from 06849b5453fd3bfa3bc573f280abee1440ea387c, all 32 Node WASI Preview 1 programs passed. Lab verified 12 demos and 29 figure replays; all 11 R1/R2 bundles replayed.",
-      "Website WASM gate passed (17 pages, 305 examples, 383 integration tests); numeric validation compared 80 report and 136 emitted values exactly with live_allocations=0; project-plan remains 7,261 HIR/IR bodies and 0 AST fallback; contract 18/18, Linguist, distribution, and v0.2 readiness 12/12 pass.",
-      "Evidence commit 493edec06bac6df209244c2936a1c7ce8cf6d999 records the P2 oracle, implementation boundary, docs and generated Lab/provenance data. Dashboard commit 9bbbf097c20104e852ec54c6920113101491c89b refreshes the quality scorecard and website status data; workingTreeDirty=false, effect calls 21,028, R3 OPEN.",
-      "Source 469b11a covers PR #234 P2 4371912834 and 4371912837: rounded equal adjustment ratios no longer exempt cancellation, and rounded sqrt(11) products no longer certify exact dependence; both cases return explicit numerically unresolved errors against independent rational/Decimal oracles.",
-      "Focused interpreter/native/WASI-emission/leak test passed 1/1; cargo fmt, Measurement contract gate and 18/18 mutation tests passed on the final bound change.",
-      "Full Cargo suite passed 422 tests after both review fixes but immediately before the final conservative integer-root bound tightening; the focused test and 32-program WASI suite passed after that final source change.",
-      "Website check passed 17 pages, 305 examples, 383 integration tests and WASM; Lab verified 12 demos and 29 figures; 29 experiment bundles were regenerated and all 11 R1/R2 bundles replayed.",
-      "Numeric validation matched 80 report and 136 emitted values exactly on win32 x64 Node v24.19.0; maximum absolute difference 0 and live_allocations=0.",
-      "Linguist, distribution and v0.2 readiness 12/12 passed; the quality dashboard now reports 21,029 known effect edges and 21,112 total edges. v0.2.0 metadata/tag remains frozen.",
-      "Source ae9aaaa fixes PR #234 P2 4372112598: distinct sigmas 2.2227587494850775e-162 and 2.222758749485078 square to the same subnormal Float, but propagation now detects their unequal roots and returns an unresolved-projection error instead of zero.",
-      "Independent 100-digit Python Decimal oracle over exact binary64 inputs gives variance 4.930380657631321594294453025491469876732940681265340385533900437194739968246941064944820066295584278.",
-      "Focused interpreter/native/WASI-emission/leak test passed 1/1; cargo fmt, Measurement contract gate and 18/18 mutation tests passed on source ae9aaaa.",
-      "Rebuilt release compiler from ae9aaaa; all 32 Node WASI Preview 1 programs passed.",
-      "Website WASM check passed (17 pages, 305 examples, 383 integration tests); Lab verified 12 demos and 29 figures, and all 11 R1/R2 bundles replayed.",
-      "Numeric validation on win32 x64 / Node v24.19.0 matched 80 report and 136 emitted values exactly, maximum absolute difference 0, live_allocations=0, compiler SHA-256 fcf6a1b6a73f4cca324207237f643933f9282b387b112800bdb855b418e134d0.",
-      "Linguist, distribution and v0.2 readiness (12/12) passed; v0.2.0 remains frozen. Full Cargo, browser, ASan and UBSan must pass on the next exact PR head.",
-      "Fresh review P2 4372155934 on 192824a was reproduced: the covariance matrix [[1,0,0],[0,4u,u],[0,2u,4u]] with u=5e-324 returned 2.5 because halving the one-u difference rounded to zero; independent normalized ratio is 3/8 and analytic variance is 2.75.",
-      "Source revision 354f02cb1a6a4ee57f45310d44e6d7aeacd02de0 normalizes each asymmetric off-diagonal entry by its local geometric scale before averaging; the same repro now returns 2.75. The midpoint helper sums first when finite and halves first only to avoid overflow.",
-      "Focused interpreter/native/WASI-emission/leak covariance test passed 1/1 with output 2.75; cargo fmt and Measurement contract gate plus 18/18 mutation tests passed. The full local Cargo suite was stopped while the exact-head CI suite was running and is not claimed locally.",
-      "Release build and all 32 Node WASI programs passed on source 354f02c. Website WASM check passed 17 pages, 305 examples and 383 integration tests; Lab regenerated 12 demos/29 figures, 29 bundles were refreshed and all 11 R1/R2 replays passed.",
-      "Numeric validation passed: 80 report and 136 emitted values matched exactly, maximum absolute difference 0 and live_allocations=0. Project plan remains 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallback; Linguist, distribution, v0.2 readiness 12/12 and provenance page checks passed.",
-      "ASan, UBSan, complete Cargo suite and fresh review on the next pushed exact PR head are pending; R3 remains OPEN and no performance claim is added. v0.2.0 remains frozen."
+      "Source fix commit c20b087dd727992c40a7871887dff9b9cb5624d1 adds a conservative error for conversion-induced cancellation; documentation and regression oracle are in commit 6741a4c.",
+      "The regression uses distinct sources with sigmas 1000000000000000128 cm and 1000000000000000256 cm; the independent exact residual is 128/100 m = 32/25 m, while rounded coherent contributions would cancel. The API returns correlated measurement uncertainty is numerically unresolved after unit conversion.",
+      "Focused dimensional_measurement_lab_matches_interpreter_and_native test passed; interpreter/native output agrees and native leak-check reports live_allocations=0.",
+      "Full cargo suite passed on the exact source/evidence tree: 33 unit, 6 differential, and 383 integration tests (422 total).",
+      "After rebuilding compiler/target/release/ostrinc.exe from the current source, Node WASI Preview 1 passed all 33 programs, including the new unresolved-conversion error.",
+      "Measurement contract gate and 18/18 mutation tests passed, including enforcement of the WASI expected output. cargo fmt check passed.",
+      "Lab generated 4 static outputs and replayed 29 figures; website-check passed 17 pages, 305 examples, and 383 integration checks. Provenance and status page checks passed.",
+      "Numeric validation matched 80 report values and 136 emitted values exactly; maximum absolute difference was 0 and live_allocations=0.",
+      "Project plan reports 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallbacks. Linguist, distribution, ownership, and v0.2 readiness checks passed.",
+      "PR #235 old remote head f58ed2e is CLEAN/MERGEABLE with 10/10 checks green, including Linux/macOS/Windows, browser audit, ASan, UBSan, CodeQL, and dependency checks. This head predates the new source/evidence commits and does not validate them.",
+      "Two P2 review findings remain unresolved on GitHub, both addressed in the local source change; fresh review and exact new-head CI are pending.",
+      "v0.2.0 remains published and frozen; main is still 69c962dee40a4b12606d131df0e8655b90924516."
     ],
     "activePullRequests": [
-      234
+      235
     ],
-    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
-    "evidenceRevision": "79087bffe3ef8f0706850f3e560ae6dba09c048a",
-    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
+    "sourceRevision": "c20b087dd727992c40a7871887dff9b9cb5624d1",
+    "evidenceRevision": "537e58f0ff402de764b81605d57c645ccbf160cd",
+    "dashboardRevision": "537e58f0ff402de764b81605d57c645ccbf160cd"
   },
   "pending": [
-    "Confirm PR #234 still has remote head 192824a, then push source 354f02c, evidence 79087bf and this checkpoint as one fast-forward update.",
-    "After the push, reply to and resolve P2 thread 4372155934, request a fresh Codex review, and require Ostrin CI, Browser audit, Native sanitizers (ASan/UBSan), CodeQL and Security audit on the exact new PR head.",
-    "Integrate PR #234 only when the exact current head remains mergeable, all required workflows are green and fresh review has no substantive findings; merge authorization remains conditional.",
-    "Continue R3 work beyond current evidence; R3 host captures remain 0/29 and experiment records remain R0-R2, so no cross-platform reproducibility guarantee is claimed.",
-    "Continue static-effects closure and broader R3 inspect/validate/replay/compare evidence.",
-    "Extend Measurement covariance only with a separately typed and ownership-verified ABI and analytical evidence.",
-    "Continue profiling the reference scientific workflow and improve reproducibility and scientific visualization."
+    "Push the locally validated source and evidence commits to PR #235; run all required checks on its exact new head.",
+    "Obtain fresh review on the new PR head and verify both P2 findings are no longer substantive before considering integration; no merge has been authorized for PR #235.",
+    "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
+    "Keep unit-carrying covariance matrices, Measurement arrays, and array reductions outside the supported profile until separately typed and validated.",
+    "Keep published v0.2.0 unchanged; do not create or publish a new release."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40146766244,
+    "runId": 40230630708,
     "status": "success",
-    "head": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
+    "head": "69c962dee40a4b12606d131df0e8655b90924516",
     "relatedRuns": [
       {
-        "workflow": "Deploy website",
-        "runId": 40146766218,
+        "workflow": "Deploy Ostrin website",
+        "runId": 40230630648,
         "status": "success"
       },
       {
         "workflow": "Browser audit",
-        "runId": 40146766130,
+        "runId": 40230630645,
         "status": "success"
       },
       {
-        "workflow": "Security audit",
-        "runId": 40146766195,
+        "workflow": "Rust dependency advisories",
+        "runId": 40230630640,
         "status": "success"
       },
       {
         "workflow": "CodeQL",
-        "runId": 40146766125,
+        "runId": 40230630661,
         "status": "success"
       }
     ],
-    "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
+    "note": "All eight post-merge check runs for main SHA 69c962dee40a4b12606d131df0e8655b90924516 completed successfully. GitHub confirms PR #234 is merged and its head is contained in main. These runs validate the merged #234 tree, not the current dimensional SourceCorrelation commits."
   },
   "blockers": [
-    "PR #234 head 192824a received P2 4372155934. It is fixed locally in source 354f02c with a regression and evidence commit 79087bf; those commits and the checkpoint are not pushed yet. Exact new-head CI, sanitizers and fresh review are required.",
-    "R3 host captures remain absent; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
-    "Published v0.2.0 remains frozen; do not create a new release or tag."
+    "PR #235 has two P2 review threads on old head f58ed2e. Their fixes are locally validated, but the branch has not yet been updated and no exact-head CI or fresh review exists for the fixes.",
+    "R3 remains OPEN: host capture is missing from 29/29 bundles; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
+    "The broader M1 acceptance gates for performance, end-to-end reproducibility, visual quality, and multi-platform execution remain incomplete.",
+    "Published v0.2.0 remains frozen."
   ],
-  "next": "Confirm PR #234 still points to 192824a, then push source 354f02c, evidence 79087bf and the checkpoint. Resolve the P2 after the fix is visible and require fresh review plus all five green workflows on the exact new head.",
+  "next": "Push the validated commits to PR #235, verify all checks and obtain a fresh review on that exact head, then continue the M1 workflow without merging absent specific authorization.",
   "latestPullRequestValidation": {
-    "number": 234,
-    "url": "https://github.com/sircalch/Ostrin/pull/234",
-    "remoteHead": "192824a72b34b881813ffd08967cd88c83fc18eb",
-    "base": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
+    "number": 235,
+    "url": "https://github.com/sircalch/Ostrin/pull/235",
+    "remoteHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
+    "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "mergeCommit": null,
-    "state": "open-mergeable",
-    "runs": {
-      "ostrinCi": {
-        "id": 40227151533,
-        "status": "in_progress"
-      },
-      "browserAudit": {
-        "id": 40227151524,
-        "status": "in_progress"
-      },
-      "nativeSanitizers": {
-        "id": 40227151598,
-        "status": "in_progress"
-      },
-      "codeql": {
-        "id": 40227151612,
-        "conclusion": "success"
-      },
-      "securityAudit": {
-        "id": 40227151529,
-        "conclusion": "success"
-      }
+    "state": "open-f58-clean-10-checks-green-local-fixes-awaiting-new-head-ci-and-review",
+    "checks": {
+      "successful": 10,
+      "failing": 0,
+      "pending": 0,
+      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
     },
-    "openReviewThreads": [
-      4372155934
-    ],
-    "resolvedReviewThreads": [
-      4372112598
-    ],
-    "note": "GitHub reviewed 192824a and found P2 4372155934; that head's CI, Browser and sanitizer runs were still in progress when last observed, while CodeQL and Security passed. All those results are superseded by the local fix. Source 354f02c and evidence 79087bf correct the midpoint defect and pass focused/local gates, but are not pushed yet. Fresh exact-head checks and review are required."
+    "reviewThreads": {
+      "total": 2,
+      "unresolved": 2,
+      "comments": [
+        {
+          "id": 4372396523,
+          "priority": "P2",
+          "status": "fixed-locally-not-revalidated"
+        },
+        {
+          "id": 4372490005,
+          "priority": "P2",
+          "status": "fixed-locally-not-revalidated"
+        }
+      ]
+    },
+    "note": "Remote head f58ed2e has all ten checks green and is CLEAN/MERGEABLE. Its two P2 review findings are fixed in local source commit c20b087 and validated locally, but the source/evidence updates remain unpushed. Require exact-new-head CI and fresh review; do not merge without PR-specific authorization."
   }
 }

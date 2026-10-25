@@ -53,4 +53,71 @@ fn main() -> Void {
     print("dimensionless scalar covariance")
     print("sum variance = " + measurements.variance_with_covariance(scalar_sum, source_covariance).unwrap().to_string())
     print("sum uncertainty = " + rounded(measurements.uncertainty_with_covariance(scalar_sum, source_covariance).unwrap()).to_string())
+
+    measured_length = measurements.from_quantity_source(2 m, 0.1 m, "length-source", "length reading").unwrap()
+    measured_time = measurements.from_quantity_source(3 s, 0.2 s, "time-source", "time reading").unwrap()
+    measured_product = measurements.mul_quantity(measured_length, measured_time).unwrap()
+    product_correlation = measurements.source_correlation(
+        ["length-source", "time-source"],
+        array([
+            [1.0, 0.5],
+            [0.5, 1.0]
+        ])
+    ).unwrap()
+    correlated_product_u = measurements.quantity_uncertainty_with_correlation(measured_product, product_correlation).unwrap()
+    print("dimensioned source correlation")
+    print("product dimension = " + measured_product.value.dimension_key())
+    print("product standard uncertainty = " + correlated_product_u.value.to_string())
+
+    invalid_correlation = measurements.source_correlation(
+        ["length-source", "time-source"],
+        array([
+            [1.0, 0.2],
+            [0.2, 0.9]
+        ])
+    )
+    match invalid_correlation {
+        Ok(_) => print("invalid correlation diagonal = accepted"),
+        Err(message) => print("invalid correlation diagonal = " + message),
+    }
+
+    incomplete_correlation = measurements.source_correlation(["length-source"], array([[1.0]])).unwrap()
+    match measurements.quantity_uncertainty_with_correlation(measured_product, incomplete_correlation) {
+        Ok(_) => print("missing correlation source = accepted"),
+        Err(message) => print("missing correlation source = " + message),
+    }
+
+    near_length = measurements.from_quantity_source(-1 m, 1e16 m, "near-length", "large length uncertainty").unwrap()
+    near_time = measurements.from_quantity_source(1 s, 1e16 s, "near-time", "large time uncertainty").unwrap()
+    near_product = measurements.mul_quantity(near_length, near_time).unwrap()
+    print("near-perfect contributions")
+    for source in near_product.sources {
+        print(source.source_id + " = " + source.contribution.value().to_string())
+    }
+    near_perfect_correlation = measurements.source_correlation(
+        ["near-length", "near-time"],
+        array([
+            [1.0, 1.0],
+            [0.9999999999999999, 1.0]
+        ])
+    )
+    match near_perfect_correlation {
+        Ok(_) => print("rounded perfect correlation = accepted"),
+        Err(message) => print("rounded perfect correlation = " + message),
+    }
+
+    converted_a = measurements.from_quantity_source(1 cm, 1000000000000000128 cm, "converted-a", "large centimeter uncertainty").unwrap()
+    converted_b = measurements.from_quantity_source(1 cm, 1000000000000000256 cm, "converted-b", "second large centimeter uncertainty").unwrap()
+    converted_difference = measurements.sub_quantity(converted_a, converted_b).unwrap()
+    converted_correlation = measurements.source_correlation(
+        ["converted-a", "converted-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    match measurements.quantity_uncertainty_with_correlation(converted_difference, converted_correlation) {
+        Ok(value) => print("unit-conversion cancellation = " + value.value.to_string()),
+        Err(message) => print("unit-conversion cancellation = " + message),
+    }
 }
