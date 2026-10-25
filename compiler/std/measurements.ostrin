@@ -1071,17 +1071,26 @@ fn covariance_correlation_matrix(
                 if row_variance != column_variance
                     and coefficient_magnitude >= 1.0 - correlation_resolution
                 {
-                    // A rounded geometric mean can make an unequal-variance,
-                    // positive-definite covariance look perfectly correlated.
-                    // Establish exact roots and their product before treating
-                    // a rounded unit coefficient as a true singular edge.
-                    // If Float arithmetic cannot reproduce all three inputs,
-                    // do not erase a positive residual variance.
+                    // Rounded square roots and products cannot prove exact
+                    // dependence (for example, sqrt(11) * sqrt(11) rounds to
+                    // 11). Certify only small integer roots whose squares and
+                    // product are exactly representable; otherwise preserve
+                    // the positive-definite residual by rejecting the case.
+                    max_exact_integer_root = 94906265.0
+                    roots_are_integers = floor(row_sigma) == row_sigma
+                        and floor(column_sigma) == column_sigma
+                    if not roots_are_integers
+                        or row_sigma > max_exact_integer_root
+                        or column_sigma > max_exact_integer_root
+                    {
+                        return Err("covariance correlation is numerically unresolved")
+                    }
                     row_root_square = row_sigma * row_sigma
                     column_root_square = column_sigma * column_sigma
+                    exact_root_product = row_sigma * column_sigma
                     if row_root_square != row_variance
                         or column_root_square != column_variance
-                        or covariance_scale != abs(entry)
+                        or exact_root_product != abs(entry)
                     {
                         return Err("covariance correlation is numerically unresolved")
                     }
@@ -1395,10 +1404,6 @@ pub fn variance_with_covariance(
         mut projection_term_magnitude = 0.0
         mut projection_has_inexact_factor = false
         mut projection_has_adjusted_contribution = false
-        mut projection_adjustments_uniform = true
-        mut projection_adjustment_value = 0.0
-        mut unadjusted_projection = 0.0
-        mut unadjusted_projection_correction = 0.0
         for row in column until n {
             normalized_contribution = standardized_contributions[row] / contribution_power_scale
             mut projection_adjustment = contribution_adjustments[row]
@@ -1407,13 +1412,6 @@ pub fn variance_with_covariance(
             }
             adjusted_normalized_contribution = normalized_contribution * projection_adjustment
             factor_entry = factor.get(row, column)
-            if factor_entry != 0.0 and normalized_contribution != 0.0 {
-                if projection_adjustment_value == 0.0 {
-                    projection_adjustment_value = projection_adjustment
-                } else if projection_adjustment_value != projection_adjustment {
-                    projection_adjustments_uniform = false
-                }
-            }
             // Scaling by a power of two is exact for normal binary floats, but
             // can discard significant bits when a nonzero value becomes
             // subnormal. Refuse that lossy normalization explicitly.
@@ -1454,25 +1452,11 @@ pub fn variance_with_covariance(
             }
             projection_correction = projection_correction + residual
             projection = next_projection
-            base_term = factor_entry * normalized_contribution
-            next_unadjusted_projection = unadjusted_projection + base_term
-            mut base_residual = 0.0
-            if abs(unadjusted_projection) >= abs(base_term) {
-                base_residual = (unadjusted_projection - next_unadjusted_projection) + base_term
-            } else {
-                base_residual = (base_term - next_unadjusted_projection) + unadjusted_projection
-            }
-            unadjusted_projection_correction = unadjusted_projection_correction + base_residual
-            unadjusted_projection = next_unadjusted_projection
-            if not is_finite(unadjusted_projection) or not is_finite(unadjusted_projection_correction) {
-                return Err("propagated covariance variance must be finite")
-            }
             if not is_finite(projection) or not is_finite(projection_correction) {
                 return Err("propagated covariance variance must be finite")
             }
         }
         scaled_projection = projection + projection_correction
-        scaled_unadjusted_projection = unadjusted_projection + unadjusted_projection_correction
         if (projection_has_inexact_factor or projection_has_adjusted_contribution)
             and projection_term_magnitude > 0.0
         {
@@ -1488,15 +1472,7 @@ pub fn variance_with_covariance(
             if not is_finite(projection_limit) {
                 return Err("propagated covariance variance must be finite")
             }
-            if abs(scaled_projection) <= projection_limit
-                and not (
-                    projection_has_adjusted_contribution
-                    and projection_adjustments_uniform
-                    and not projection_has_inexact_factor
-                    and scaled_projection == 0.0
-                    and scaled_unadjusted_projection == 0.0
-                )
-            {
+            if abs(scaled_projection) <= projection_limit {
                 return Err("propagated covariance projection is numerically unresolved")
             }
         }

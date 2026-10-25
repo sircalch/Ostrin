@@ -149,14 +149,15 @@ fn main() -> Void {
     pivot_a_scaled = measurements.scale(pivot_a.unwrap(), 1e8)
     pivot_b_scaled = measurements.scale(pivot_b.unwrap(), 1e8)
     pivot_difference = measurements.sub(pivot_a_scaled, pivot_b_scaled).unwrap()
+    sqrt_three_sigma = sqrt(3.0)
+    sqrt_three_variance = sqrt_three_sigma * sqrt_three_sigma
     sqrt_three_covariance = measurements.covariance(
         ["sqrt-three-a", "sqrt-three-b"],
         array([
-            [3.0, 3.0],
-            [3.0, 3.0]
+            [sqrt_three_variance, sqrt_three_variance],
+            [sqrt_three_variance, sqrt_three_variance]
         ])
     ).unwrap()
-    sqrt_three_sigma = sqrt(3.0)
     sqrt_three_a = measurements.from_source(0.0, sqrt_three_sigma, "sqrt-three-a", "rank-one source A")
     sqrt_three_b = measurements.from_source(0.0, sqrt_three_sigma, "sqrt-three-b", "rank-one source B")
     sqrt_three_a_scaled = measurements.scale(sqrt_three_a.unwrap(), 1e16)
@@ -257,6 +258,24 @@ fn main() -> Void {
         Err(message) => print("rounded geometric covariance = " + message),
     }
 
+    rounded_root_product_covariance = measurements.covariance(
+        ["rounded-root-product-unit", "rounded-root-product-eleven"],
+        array([
+            [1.0, 3.3166247903554],
+            [3.3166247903554, 11.0]
+        ])
+    ).unwrap()
+    rounded_root_product_unit = measurements.from_source(0.0, 1.0, "rounded-root-product-unit", "unit variance")
+    rounded_root_product_eleven_sigma = sqrt(11.0)
+    rounded_root_product_eleven = measurements.from_source(0.0, rounded_root_product_eleven_sigma, "rounded-root-product-eleven", "variance eleven")
+    rounded_root_product_unit_scaled = measurements.scale(rounded_root_product_unit.unwrap(), 1e8)
+    rounded_root_product_eleven_scaled = measurements.scale(rounded_root_product_eleven.unwrap(), -1e8 / rounded_root_product_eleven_sigma)
+    rounded_root_product_pair = measurements.add(rounded_root_product_unit_scaled, rounded_root_product_eleven_scaled).unwrap()
+    match measurements.variance_with_covariance(rounded_root_product_pair, rounded_root_product_covariance) {
+        Ok(value) => print("rounded root product covariance = " + rounded(value).to_string()),
+        Err(message) => print("rounded root product covariance = " + message),
+    }
+
     division_loss_covariance = measurements.covariance(
         ["division-loss-a", "division-loss-b"],
         array([
@@ -302,6 +321,23 @@ fn main() -> Void {
     match measurements.variance_with_covariance(adjusted_contribution_pair, adjusted_contribution_covariance) {
         Ok(value) => print("adjusted contribution cancellation = " + rounded(value).to_string()),
         Err(message) => print("adjusted contribution cancellation = " + message),
+    }
+
+    equal_adjustment_a = measurements.from_source(0.0, 0.9999999999999999, "equal-adjustment-a", "rounded ratio source A")
+    equal_adjustment_b = measurements.from_source(0.0, 0.9999999999999998, "equal-adjustment-b", "rounded ratio source B")
+    equal_adjustment_covariance = measurements.covariance(
+        ["equal-adjustment-a", "equal-adjustment-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    equal_adjustment_a_scaled = measurements.scale(equal_adjustment_a.unwrap(), 10000000000000002.0)
+    equal_adjustment_b_scaled = measurements.scale(equal_adjustment_b.unwrap(), -10000000000000002.0)
+    equal_adjustment_pair = measurements.add(equal_adjustment_a_scaled, equal_adjustment_b_scaled).unwrap()
+    match measurements.variance_with_covariance(equal_adjustment_pair, equal_adjustment_covariance) {
+        Ok(value) => print("equal rounded adjustment cancellation = " + rounded(value).to_string()),
+        Err(message) => print("equal rounded adjustment cancellation = " + message),
     }
 
     // Exact correlation-factor projections are 0 and -16 (variance 256), but

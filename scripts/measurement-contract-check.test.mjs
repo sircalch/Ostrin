@@ -354,6 +354,20 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
     writeFileSync(stdFile, std.replace(
+      "max_exact_integer_root = 94906265.0",
+      "max_exact_integer_root = 0.0",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "if abs(scaled_projection) <= projection_limit {",
+      "if false {",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
       "lower + (upper - lower) * 0.5",
       "lower * 0.5 + upper * 0.5",
     ));
@@ -372,7 +386,7 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
 
     writeFileSync(labFile, lab.replace(
-      "negative and numerically unresolved positive pivots are rejected rather than changing the covariance result",
+      "Negative and numerically unresolved positive pivots are rejected rather than changing the covariance result",
       "negative pivots are accepted",
     ));
     result = validateMeasurementContract(root);

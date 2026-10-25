@@ -19286,6 +19286,13 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     let adjusted_contribution_residual_oracle =
         (-992_800_745_259_006_i64 as f64 / 4_503_599_627_370_497_i64 as f64).powi(2);
     assert!((adjusted_contribution_residual_oracle - 0.048_596_460_630_071_24).abs() < 1e-15);
+    // Python Fraction oracle over the exact binary source sigmas and stored contributions.
+    let equal_adjustment_residual_oracle = 1.232_595_164_407_831_7_f64;
+    assert!(equal_adjustment_residual_oracle > 1.23 && equal_adjustment_residual_oracle < 1.24);
+    // 100-digit Decimal oracle for 2e16 * (1 - c / sqrt(11)), with c the exact
+    // binary64 value represented by 3.3166247903554.
+    let rounded_root_product_oracle = 0.235_978_214_230_015_98_f64;
+    assert!(rounded_root_product_oracle > 0.2359 && rounded_root_product_oracle < 0.2361);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19310,8 +19317,10 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          subnormal geometric covariance scale = covariance correlation is numerically unresolved\n\
          review subnormal geometric covariance = covariance correlation is numerically unresolved\n\
          rounded geometric covariance = covariance correlation is numerically unresolved\n\
+         rounded root product covariance = covariance correlation is numerically unresolved\n\
          direct contribution cancellation variance = 16\n\
          adjusted contribution cancellation = propagated covariance projection is numerically unresolved\n\
+         equal rounded adjustment cancellation = propagated covariance projection is numerically unresolved\n\
          rounded factor projection = propagated covariance projection is numerically unresolved\n\
          subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\
          nonuniform rank-one covariance variance = 0.01\n\
