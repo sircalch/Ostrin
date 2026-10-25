@@ -362,6 +362,11 @@ de 33 smoke tests ejecutados bajo Node WASI Preview 1. Este perfil sigue siendo 
 evidencia no demuestra soporte nativo general para toda combinación `Measurement<Quantity<D>>`.
 La entrada, las derivadas, los términos de varianza, el resultado analítico y las salidas observadas
 se registran en [`validation/measurement-quantity-correlation.json`](../../validation/measurement-quantity-correlation.json).
+La canonicalización rechaza una pareja de coeficientes simétricos dentro de tolerancia si su promedio
+Float redondea a `+1` o `-1` aunque alguno de los dos valores difiera del extremo; ese redondeo no debe
+borrar una incertidumbre residual. La regresión usa coeficientes `1.0` y `0.9999999999999999` con
+contribuciones `+1e16` y `-1e16`: el promedio racional exacto implica una incertidumbre de
+`105367121.277235079...`, por lo que el constructor devuelve un error explícito.
 Matrices de covarianza con unidades, arrays de mediciones, covarianza entre elementos y
 reducciones continúan sin soporte.
 

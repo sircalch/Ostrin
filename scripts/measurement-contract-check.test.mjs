@@ -429,6 +429,17 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     writeFileSync(testFile, tests.replace("direct contribution cancellation variance = 16", "direct contribution case removed"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace(
+      "rounded perfect correlation = correlation coefficient is numerically unresolved",
+      "rounded perfect correlation = accepted",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));
+
+    writeFileSync(stdFile, std.replace("correlation coefficient is numerically unresolved", "correlation coefficient accepted"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

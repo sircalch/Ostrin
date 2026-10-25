@@ -119,6 +119,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /covariance matrix that cannot be stably factored is rejected explicitly/i.test(lab)
       && /separate SourceCorrelation profile accepts a dimensionless matrix with unit diagonal/i.test(lab)
       && /experimentally verified for a Length×Time product/i.test(lab)
+      && /Near-perfect asymmetric entries are rejected when tolerance canonicalization would round them to exact dependence/i.test(lab)
       && /Covariance propagation for arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
   const sourceCorrelationValidation = std.match(/fn source_correlation_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
@@ -128,11 +129,16 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /pub fn quantity_uncertainty_with_correlation<D: Dimension>/.test(std)
       && /abs\(diagonal - 1\.0\) > relative_tolerance/.test(sourceCorrelationValidation)
       && /correlation matrix diagonal must equal one/.test(sourceCorrelationValidation)
+      && /abs\(coefficient\) == 1\.0 and \(upper != coefficient or lower != coefficient\)/.test(sourceCorrelationValidation)
+      && /correlation coefficient is numerically unresolved/.test(sourceCorrelationValidation)
       && /source\.contribution\.value\(\) \* source\.contribution\.unit_scale\(\)/.test(quantityCorrelationPropagation)
       && /source\.source_sigma == 0\.0 and contribution != 0\.0/.test(quantityCorrelationPropagation)
       && /correlation model is missing a measurement source id/.test(quantityCorrelationPropagation)
       && /CoherentUncertainty<D>/.test(quantityCorrelationPropagation)
       && /dimensioned source correlation/.test(labExample)
+      && /rounded perfect correlation/.test(labExample)
+      && /near-length/.test(labExample) && /near-time/.test(labExample)
+      && /rounded perfect correlation = correlation coefficient is numerically unresolved/.test(tests)
       && /length-source/.test(labExample) && /time-source/.test(labExample),
     "Measurement<Quantity<D>> correlation: dimensionless model, coherent sensitivities and dimensional result are missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
