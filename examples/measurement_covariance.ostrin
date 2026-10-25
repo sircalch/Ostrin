@@ -168,6 +168,23 @@ fn main() -> Void {
         Err(message) => print("unresolved positive pivot = " + message),
     }
 
+    near_perfect_covariance = measurements.covariance(
+        ["near-perfect-a", "near-perfect-b"],
+        array([
+            [9.0, 14.999999999999998],
+            [14.999999999999998, 25.0]
+        ])
+    ).unwrap()
+    near_perfect_a = measurements.from_source(0.0, 3.0, "near-perfect-a", "near-perfect source A")
+    near_perfect_b = measurements.from_source(0.0, 5.0, "near-perfect-b", "near-perfect source B")
+    near_perfect_a_scaled = measurements.scale(near_perfect_a.unwrap(), 1e8)
+    near_perfect_b_scaled = measurements.scale(near_perfect_b.unwrap(), -6e7)
+    near_perfect_measurement = measurements.add(near_perfect_a_scaled, near_perfect_b_scaled).unwrap()
+    match measurements.variance_with_covariance(near_perfect_measurement, near_perfect_covariance) {
+        Ok(value) => print("near-perfect covariance residual variance = " + rounded(value).to_string()),
+        Err(message) => print("near-perfect covariance residual variance = " + message),
+    }
+
     division_loss_covariance = measurements.covariance(
         ["division-loss-a", "division-loss-b"],
         array([

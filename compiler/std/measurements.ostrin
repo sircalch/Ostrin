@@ -1025,34 +1025,69 @@ fn covariance_correlation_matrix(
                     return Err("covariance matrix could not be stably factorized")
                 }
             } else {
-                mut partial = 0.0
+                row_sigma = sqrt(row_variance)
+                column_sigma = sqrt(column_variance)
+                mut variance_ratio = 0.0
                 if row_variance >= column_variance {
-                    row_sigma = sqrt(row_variance)
-                    column_sigma = sqrt(column_variance)
-                    partial = entry / row_variance
-                    if entry != 0.0 and partial == 0.0 {
-                        return Err("covariance correlation underflows Float range")
-                    }
-                    sigma_ratio = column_sigma / row_sigma
-                    if sigma_ratio == 0.0 {
-                        return Err("covariance correlation underflows Float range")
-                    }
-                    coefficient = partial / sigma_ratio
+                    variance_ratio = column_variance / row_variance
                 } else {
-                    row_sigma = sqrt(row_variance)
-                    column_sigma = sqrt(column_variance)
-                    partial = entry / column_variance
-                    if entry != 0.0 and partial == 0.0 {
+                    variance_ratio = row_variance / column_variance
+                }
+                mut covariance_scale = 0.0
+                if variance_ratio > 0.0 {
+                    if row_variance >= column_variance {
+                        covariance_scale = row_variance * sqrt(variance_ratio)
+                    } else {
+                        covariance_scale = column_variance * sqrt(variance_ratio)
+                    }
+                }
+                if covariance_scale > 0.0 and is_finite(covariance_scale) {
+                    // Divide by the scale-safe geometric mean directly. Two
+                    // successive divisions can round a sub-unit correlation
+                    // up to exactly 1 and erase its positive residual.
+                    coefficient = entry / covariance_scale
+                    if entry != 0.0 and coefficient == 0.0 {
                         return Err("covariance correlation underflows Float range")
                     }
-                    sigma_ratio = row_sigma / column_sigma
-                    if sigma_ratio == 0.0 {
-                        return Err("covariance correlation underflows Float range")
+                } else {
+                    // Keep the fallback for variance ratios outside Float
+                    // range; an unscaled perfect-looking result is unresolved.
+                    mut partial = 0.0
+                    if row_variance >= column_variance {
+                        partial = entry / row_variance
+                        if entry != 0.0 and partial == 0.0 {
+                            return Err("covariance correlation underflows Float range")
+                        }
+                        sigma_ratio = column_sigma / row_sigma
+                        if sigma_ratio == 0.0 {
+                            return Err("covariance correlation underflows Float range")
+                        }
+                        coefficient = partial / sigma_ratio
+                    } else {
+                        partial = entry / column_variance
+                        if entry != 0.0 and partial == 0.0 {
+                            return Err("covariance correlation underflows Float range")
+                        }
+                        sigma_ratio = row_sigma / column_sigma
+                        if sigma_ratio == 0.0 {
+                            return Err("covariance correlation underflows Float range")
+                        }
+                        coefficient = partial / sigma_ratio
                     }
-                    coefficient = partial / sigma_ratio
                 }
                 if not is_finite(coefficient) {
                     return Err("covariance matrix could not be stably factorized")
+                }
+                mut correlation_resolution = relative_tolerance
+                if correlation_resolution < 1.4210854715202004e-14 {
+                    correlation_resolution = 1.4210854715202004e-14
+                }
+                coefficient_magnitude = abs(coefficient)
+                if coefficient_magnitude <= 1.0
+                    and 1.0 - coefficient_magnitude <= correlation_resolution
+                    and (covariance_scale == 0.0 or abs(entry) < covariance_scale)
+                {
+                    return Err("covariance correlation is numerically unresolved")
                 }
                 coefficient_scale = abs(coefficient)
                 if coefficient_scale > 1.0 {

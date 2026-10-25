@@ -19263,6 +19263,8 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
         (350_000_000_000_000_000.0_f64 - 35.0 * 10_000_000_000_000_000.0).powi(2)
             + (119_999_999_999_999_984.0_f64 - 12.0 * 10_000_000_000_000_000.0).powi(2);
     assert_eq!(rounded_factor_projection_oracle, 256.0);
+    let near_perfect_correlation_oracle = 12.0e15_f64 * (15.0_f64 - 14.999_999_999_999_998_f64);
+    assert!((near_perfect_correlation_oracle - 21.316_282_072_803_006).abs() < 1e-12);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19281,7 +19283,8 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          rank-three 1e16 reordered compensated variance = 1\n\
          power-of-two gradient normalization variance = 4\n\
          sqrt-three rank-one cancellation variance = 0\n\
-         unresolved positive pivot = covariance matrix could not be stably factorized\n\
+         unresolved positive pivot = covariance correlation is numerically unresolved\n\
+         near-perfect covariance residual variance = covariance correlation is numerically unresolved\n\
          direct contribution cancellation variance = 16\n\
          rounded factor projection = propagated covariance projection is numerically unresolved\n\
          subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\

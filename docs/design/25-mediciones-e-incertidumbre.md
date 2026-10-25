@@ -307,8 +307,12 @@ validar al propagar, porque sus arrays pueden cambiar después de la construcci�
 `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`. Para evitar perder bits al dividir una contribución
 grande entre su sigma y reconstruirla, la propagación forma una matriz de correlación `R` y opera
 directamente con las contribuciones guardadas `cₛ = Jₛ · sigmaₛ`: `c · R · cᵀ`. Las correlaciones
-se calculan dividiendo primero por la varianza mayor y luego por la razón de sigmas, sin formar el
-producto de sigmas. La matriz `R = L · Lᵀ` se factoriza y cada proyección `Lᵀ · c` usa suma
+se convierten dividiendo por una media geométrica escalada
+`max(Σᵢᵢ, Σⱼⱼ) · sqrt(min(Σᵢᵢ, Σⱼⱼ) / max(Σᵢᵢ, Σⱼⱼ))`, que evita formar el producto de
+diagonales y preserva residuos que se perderían con divisiones sucesivas. Si un coeficiente menor
+que `1` queda dentro de la tolerancia numérica de una dependencia perfecta, se rechaza como
+irresuelto en vez de redondearlo a `1` y borrar la varianza residual. La matriz `R = L · Lᵀ` se
+factoriza y cada proyección `Lᵀ · c` usa suma
 compensada antes de elevar el resultado al cuadrado. Así se conservan residuos representables en
 cancelaciones grandes, incluida la regresión no uniforme de rango uno con resultado `0.01`, la
 cancelación exacta con sigma `sqrt(3)` y un residuo de varianza `16`. Si la factorización encuentra
