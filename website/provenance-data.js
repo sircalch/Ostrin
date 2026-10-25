@@ -2020,7 +2020,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::uncertainty_with_covariance",
-        "line": 1133,
+        "line": 1137,
         "operation": "std.measurements::variance_with_covariance"
       },
       {
