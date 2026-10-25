@@ -8,11 +8,12 @@ El smoke, el laboratorio y el fixture de superficie directa generan `main` media
 cero fallbacks AST y cero divergencias de tipos en los casos medidos. El fixture directo también
 compara la salida nativa con el intérprete, verifica `live_allocations=0` y emite C para WASI. Esto
 acredita esos programas, no el soporte general de `Measurement<Quantity<D>>` ni la corrección
-universal de ownership. `Array<Measurement<T>>` tiene ahora un perfil estructural experimental
-para construcción, acceso y conversión a lista; las operaciones numéricas sobre arrays,
-covarianza y Monte Carlo siguen pendientes.
+universal de ownership. `Array<Measurement<Float>>` tiene ahora un perfil estructural experimental
+de una dimensión para construcción, indexación, `get`, slicing, selección por máscara booleana,
+conversión a lista y visualización; cada límite probado conserva y libera los elementos. Las
+operaciones numéricas sobre arrays, covarianza y Monte Carlo siguen pendientes.
 
-**Fecha:** 2026-09-29
+**Fecha:** 2026-10-24
 
 ## 1. Propósito
 
@@ -73,9 +74,11 @@ loop y la liberación del valor final.
 en las ramas `Ok` y `Err`, con `match`, emisión WASI y `live_allocations=0`.
 `examples/measurement_task.ostrin` cubre captura diferida, `join` y destrucción
 del entorno de una tarea para `Measurement<Float>`.
-`examples/measurement_array_shape.ostrin` cubre el perfil estructural de
-`Array<Measurement<Float>>`: construcción desde lista, longitud, indexación, slicing y conversión
-a `List<Measurement<Float>>`, con paridad intérprete/native, lowering por IR, emisión WASI y
+`examples/measurement_array_shape.ostrin` cubre el perfil estructural unidimensional de
+`Array<Measurement<Float>>`: construcción desde lista, longitud, indexación, `get`, slicing,
+selección por máscara booleana, conversión a `List<Measurement<Float>>`, retorno de un elemento
+desde una función y visualización de elementos distintos. Las pruebas comparan intérprete y
+nativo, verifican lowering por IR sin fallback, emiten C para WASI y terminan con
 `live_allocations=0`. El perfil no habilita aritmética, broadcasting, reducciones ni covarianza.
 `examples/measurement_quantity_native_smoke.ostrin` cubre construcción, suma/resta correlacionada,
 productos entre dimensiones y proyección de incertidumbre estándar con paridad intérprete/native,
@@ -332,8 +335,10 @@ si el cociente cancela las dimensiones; en ese caso se debe usar `div_quantity_s
 el resultado adimensional como `Measurement<Float>`. El backend nativo mantiene el rechazo explícito
 hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
-Este prototipo habilita un perfil estructural acotado para `Array<Measurement<T>>`, pero no
-operaciones numéricas sobre esos arrays ni covarianza. El soporte de
+Este prototipo habilita un perfil estructural unidimensional acotado para `Array<Measurement<Float>>`,
+incluidos acceso por `get`, selección booleana, escape de elementos y visualización, pero no
+operaciones numéricas sobre esos arrays ni covarianza. La evidencia de esta fase no generaliza el
+perfil a otros payloads `Measurement<T>`, que requieren sus propias pruebas de paridad y ownership. El soporte de
 `Measurement<Quantity<D>>` sigue siendo experimental y está limitado por la superficie realmente
 verificada. El fixture `examples/measurement_quantity_direct_shape.ostrin` ya cubre su forma directa:
 la prueba exige paridad de salida entre intérprete y binario nativo, lowering por IR (`ir=1`,
@@ -400,9 +405,9 @@ tolerancia documentados.
 
 ### 6.4 Arrays y matrices
 
-`Array<Measurement<T>>` ya tiene un perfil estructural experimental después de fijar el contrato de
-identidad de §5.5. La API de series sigue ofreciendo una proyección explícita para
-`List<Measurement<Float>>`; la siguiente fase de arrays debe añadir:
+`Array<Measurement<Float>>` ya tiene un perfil estructural experimental después de fijar el contrato
+de identidad de §5.5. La API de series sigue ofreciendo una proyección explícita para
+`List<Measurement<Float>>`; la siguiente fase debe ampliar el perfil a otros payloads y añadir:
 
 - valores nominales;
 - incertidumbres por elemento;

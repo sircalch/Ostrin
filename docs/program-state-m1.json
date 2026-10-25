@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-23",
+  "updatedAt": "2026-10-24",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -20,6 +20,7 @@
     "post-merge-website-browser-codeql-security",
     "contextual-mutable-reassignment-integrated-pr-232",
     "measurement-array-structural-profile-validated-locally",
+    "measurement-array-review-fixes-validated-locally",
     "local-numeric-validation",
     "local-wasi-program-check",
     "local-benchmark-contract-check"
@@ -27,31 +28,45 @@
   "currentPackage": {
     "name": "measurement-array-structural-ownership",
     "branch": "codex/measurement-array-ownership",
-    "status": "ready-for-review",
+    "status": "local-validation-passed-awaiting-new-head-ci",
     "scope": [
-      "Array<Measurement<Float>> structural construction and access",
-      "per-element retain/release through array, slice and list conversion",
+      "one-dimensional Array<Measurement<Float>> structural construction, indexing, get, slicing, boolean-mask selection, to_list and display",
+      "per-element retain/release through array/list copies, escaped get results, slices and masks",
+      "explicit rejection of numeric operators outside the measured array profile",
       "typed IR/C lowering without AST fallback",
       "interpreter-native-WASI parity and leak check"
     ],
     "evidence": [
       "compiler/tests/examples.rs::measurement_array_structural_ownership_matches_interpreter_native_and_wasi",
+      "compiler/tests/examples.rs::measurement_array_numeric_operators_are_rejected_explicitly",
+      "compiler/tests/differential.rs::every_example_agrees_between_interpreter_and_native",
+      "scripts/measurement-contract-check.mjs and 17 contract tests",
+      "scripts/project-plan-check.mjs: 7,261 HIR/IR bodies, 0 AST fallback",
+      "scripts/website-check.mjs: 17 public pages, 304 examples, 382 integration tests",
       "docs/design/25-mediciones-e-incertidumbre.md",
-      "docs/ownership-matrix.md"
+      "docs/ownership-matrix.md",
+      "website Scientific Lab and roadmap"
     ]
   },
   "pending": [
-    "publish package branch for review",
-    "run package CI and integrate only after new-head checks pass",
+    "publish corrected package head and request fresh review",
+    "run package CI on the corrected head and integrate PR #233 only after all required checks pass",
     "ownership over remaining aggregates and escapes",
     "numeric Measurement<T> arrays, covariance and aggregate operations",
     "R3 host provenance and static effects"
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40003870179,
-    "status": "in_progress",
-    "head": "39b7ad5975a14ac00d2cc2e61f09b25e5382f395"
+    "runId": 40142639342,
+    "status": "failure",
+    "head": "c55c00632384a2c6473fafaff8e106549f12df7a",
+    "relatedRuns": [
+      { "workflow": "Browser audit", "runId": 40142639339, "status": "failure" },
+      { "workflow": "Native sanitizers", "runId": 40142639346, "status": "success" },
+      { "workflow": "Security audit", "runId": 40142639405, "status": "success" },
+      { "workflow": "CodeQL", "runId": 40142639425, "status": "success" }
+    ],
+    "note": "The old head used stale website metadata; regenerated metadata and site data pass locally. Awaiting checks for the corrected head."
   },
   "blockers": [
     "R3 remains OPEN until provenance.runtime.host is captured for all 29 bundles",

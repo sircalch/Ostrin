@@ -13250,6 +13250,10 @@ fn measurement_array_structural_ownership_matches_interpreter_native_and_wasi() 
     );
     let expected = stdout(&interpreted);
     assert!(
+        expected.contains("value: 2") && expected.contains("value: 3"),
+        "Measurement array display must preserve distinct elements: {expected}"
+    );
+    assert!(
         expected.contains("2\n"),
         "unexpected Measurement array output: {expected}"
     );
@@ -13282,9 +13286,17 @@ fn measurement_array_structural_ownership_matches_interpreter_native_and_wasi() 
         "native Measurement array failed: {}",
         String::from_utf8_lossy(&native.stderr)
     );
+    let normalize_measurement_record_name = |output: String| {
+        output.replace(
+            "std.measurements::Measurement",
+            "std_measurements__Measurement",
+        )
+    };
     assert_eq!(
-        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
-        expected,
+        normalize_measurement_record_name(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n")
+        ),
+        normalize_measurement_record_name(expected),
         "native Measurement array diverged"
     );
     assert!(

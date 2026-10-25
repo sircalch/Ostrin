@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-23 · `main` está en `f182fe5a57a9c65e13f8d40e759166a44d67d62d`, con #225, #230, #231, #227, #226 y #229 integrados · 6 pruebas diferenciales, 381 de integración y 33 unitarias en verde. El CI post-merge de ese commit pasó en Linux, macOS, Windows, web, browser audit, CodeQL y seguridad; numeric validation, WASI y el contrato de benchmarks pasan en el worktree limpio. `v0.2.0` permanece publicada desde el tag `29c24c0bd607822dbc2609a54bfcce545ca563f6`. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59`. Este desarrollo posterior añade propagación contextual en reasignaciones mutables para `Option`, `Result` y records genéricos; el lowering tipado completo y ownership general siguen abiertos.*
+*Corte de trabajo: 2026-10-24 · PR #233 añade el perfil estructural experimental unidimensional de `Array<Measurement<Float>>` y sigue en validación · 6 pruebas diferenciales, 382 de integración y 33 unitarias en verde. `main` remoto permanece en `39b7ad5975a14ac00d2cc2e61f09b25e5382f395`. `v0.2.0` permanece publicada e intacta desde el tag `29c24c0bd607822dbc2609a54bfcce545ca563f6`; no se prepara un nuevo tag. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59`. El ownership general, las operaciones numéricas de arrays de medición y la covarianza siguen abiertos.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -619,7 +619,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 381 de integración + 33 unitarias
+    cargo test                                   # 6 diferenciales + 382 de integración + 33 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

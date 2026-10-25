@@ -10,6 +10,7 @@ const trackedFiles = [
   "examples/measurement_scalar.ostrin",
   "examples/measurement_quantity_direct_shape.ostrin",
   "examples/measurement_quantity_native_smoke.ostrin",
+  "examples/measurement_array_shape.ostrin",
   "examples/measurement_lab.ostrin",
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
@@ -43,7 +44,10 @@ test("the gate requires accurate dimensional native-smoke scope and experimental
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("typed dimensional Measurement smoke evidence")));
 
-    writeFileSync(file, original.replace("Array<Measurement>, covariance, Monte Carlo", "native support"));
+    writeFileSync(file, original.replace(
+      "One-dimensional Array<Measurement<Float>> has an experimental structural profile",
+      "Array<Measurement<Float>> has complete numeric support",
+    ));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
 
@@ -285,16 +289,17 @@ test("the gate rejects equating a source dimension with a propagated product dim
   }
 });
 
-test("the gate rejects documentation that enables arrays prematurely", () => {
+test("the gate rejects claims that exceed the structural Measurement array profile", () => {
   const root = fixtureRoot();
   try {
     const file = path.join(root, "docs/design/25-mediciones-e-incertidumbre.md");
-    const source = readFileSync(file, "utf8")
-      .replaceAll("no habilita todavía", "habilita")
-      .replaceAll("siguen pendientes", "ya están habilitados");
+    const source = readFileSync(file, "utf8").replace(
+      /pero no\s+operaciones numéricas sobre esos arrays ni covarianza/,
+      "con operaciones numéricas sobre esos arrays y covarianza habilitadas",
+    );
     writeFileSync(file, source);
     const result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("array Measurement boundary")));
+    assert.ok(result.errors.some((error) => error.includes("bounded structural array Measurement boundary")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

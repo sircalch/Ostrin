@@ -22,16 +22,28 @@ fn loop_alias(values: Array<Measurement<Float>>) -> Array<Measurement<Float>> {
     current
 }
 
+fn last_measurement() -> Measurement<Float> {
+    values: Array<Measurement<Float>> = array([
+        measurements.exact(2.0),
+        measurements.exact(3.0)
+    ])
+    values.get(1)
+}
+
 fn main() -> Void {
     values: Array<Measurement<Float>> = array([
         measurements.exact(2.0),
         measurements.exact(3.0)
     ])
+    print(values)
     print(values.length())
     print(measurements.summary(values[0]))
     print(measurements.summary(values.get(1)))
     print(values[0 until 1].length())
     print(values.to_list().length())
+    selected_by_mask = values[array([false, true])]
+    print(measurements.summary(selected_by_mask[0]))
+    print(measurements.summary(last_measurement()))
     forwarded = forward(clone(values))
     mut box = MeasurementBox { values: forwarded }
     box.values = clone(values)

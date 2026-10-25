@@ -16,8 +16,8 @@ function check(errors, condition, message) {
 }
 
 /**
- * Check that scalar and bounded dimensional Measurement contracts have evidence.
- * This gate does not enable Array<Measurement>, covariance, or Monte Carlo.
+ * Check that scalar, bounded dimensional, and structural Measurement array
+ * contracts have evidence. Numeric arrays, covariance, and Monte Carlo remain open.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
@@ -25,6 +25,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const example = read("examples/measurement_scalar.ostrin", root);
   const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
   const nativeQuantityExample = read("examples/measurement_quantity_native_smoke.ostrin", root);
+  const measurementArrayExample = read("examples/measurement_array_shape.ostrin", root);
   const labExample = read("examples/measurement_lab.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
@@ -41,6 +42,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     ["examples/measurement_scalar.ostrin", example],
     ["examples/measurement_quantity_direct_shape.ostrin", directQuantityExample],
     ["examples/measurement_quantity_native_smoke.ostrin", nativeQuantityExample],
+    ["examples/measurement_array_shape.ostrin", measurementArrayExample],
     ["compiler/tests/examples.rs", tests],
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
@@ -81,8 +83,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: scalar phase evidence is missing");
-  check(errors, /(?:no habilita todavía|siguen pendientes)[\s\S]{0,80}Array<Measurement<T>>/i.test(design),
-    "docs/design/25-mediciones-e-incertidumbre.md: array Measurement boundary is missing");
+  check(errors, /perfil estructural unidimensional[\s\S]{0,180}Array<Measurement<Float>>[\s\S]{0,220}pero no[\s\S]{0,100}(?:operaciones numéricas|aritmética)[\s\S]{0,80}covarianza/i.test(design),
+    "docs/design/25-mediciones-e-incertidumbre.md: bounded structural array Measurement boundary is missing");
   check(errors, /sensibilidad de cada fuente[\s\S]*?b·cₐ,s \+ a·c_b,s[\s\S]*?NIST TN 1297/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: analytical propagation model or reference is missing");
   check(errors, /matching interpreter\/native output[\s\S]{0,500}smoke also emits C for WASI[\s\S]{0,160}interpreter\/WASM path/i.test(lab),
@@ -94,8 +96,14 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /direct full-surface fixture now has native IR\/interpreter parity[\s\S]{0,220}div_quantity_same/i.test(lab)
       && !/direct full-surface fixture still fails native lowering/i.test(lab),
     "scripts/lab-data.mjs: direct Measurement<Quantity<D>> native evidence is stale or missing");
-  check(errors, /Array<Measurement>[\s\S]{0,100}covariance[\s\S]{0,100}Monte Carlo/i.test(lab),
+  check(errors, /One-dimensional Array<Measurement<Float>> has an experimental structural profile[\s\S]{0,240}Numeric array operations, reductions, covariance, Monte Carlo and coverage intervals remain planned/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
+  check(errors, tests.includes("measurement_array_structural_ownership_matches_interpreter_native_and_wasi")
+      && tests.includes("measurement_array_numeric_operators_are_rejected_explicitly")
+      && measurementArrayExample.includes("values[array([false, true])]")
+      && measurementArrayExample.includes("fn last_measurement()")
+      && measurementArrayExample.includes("print(values)"),
+    "Array<Measurement<Float>>: structural feature, display, escaping-get and numeric boundary evidence is missing");
   check(errors, testsWithQuantityNativeSmoke,
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native smoke parity test is missing");
   check(errors, testsWithQuantityLab,

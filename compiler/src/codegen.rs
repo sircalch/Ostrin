@@ -4159,10 +4159,16 @@ impl<'a> Codegen<'a> {
             Ty::Named(n) if n == "Rng" => CType::Rng,
             Ty::Applied(n, args) if n == "Array" && args.len() == 1 => {
                 let elem = self.ty_to_ctype(&args[0])?;
-                matches!(
+                let measurement_element = matches!(
+                    &args[0],
+                    Ty::Applied(name, payload)
+                        if payload.len() == 1
+                            && (name == "Measurement" || name.ends_with("::Measurement"))
+                );
+                (matches!(
                     elem,
                     CType::Int | CType::Float | CType::Float32 | CType::Bool
-                )
+                ) || (measurement_element && matches!(elem, CType::Record(_))))
                 .then(|| CType::Array(Box::new(elem)))?
             }
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
@@ -10463,7 +10469,7 @@ fn generate_impl(
                     // are owning record pointers, so every copy/slice/list conversion
                     // retains each item and the array destructor releases each item.
                     // Numeric operations are not emitted for this representation.
-                    let show_elem = codegen.show_expr("a->data[off]", elem)?;
+                    let show_elem = codegen.show_expr("a->data[off + i]", elem)?;
                     let text = format!(
                         "static void {name}_drop(void* raw) {{\n    {name}* a = ({name}*)raw;\n    if (!a) return;\n    if (a->data) {{ for (int64_t i = 0; i < a->size; i++) if (a->data[i]) ostrin_release((void*)a->data[i]); ostrin_free(a->data); }}\n    if (a->shape) ostrin_free(a->shape);\n}}\n\n\
                          static {name}* {name}_alloc(int64_t rank, const int64_t* shape) {{\n    {name}* r = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), {name}_drop);\n    if (!r) OSTRIN_OOM();\n    int64_t size = 1; for (int64_t i = 0; i < rank; i++) size *= shape[i];\n    r->rank = rank; r->size = size;\n    r->shape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);\n    r->data = ({tc}*)ostrin_calloc((size_t)size, sizeof({tc}));\n    if (!r->shape || !r->data) OSTRIN_OOM();\n    memcpy(r->shape, shape, sizeof(int64_t) * (size_t)rank);\n    return r;\n}}\n\n\
@@ -10478,7 +10484,7 @@ fn generate_impl(
                     let text = text.replace(
                         &format!("static {tc} {name}_index1"),
                         &format!(
-                            "static int64_t {name}_offset({name}* a, const int64_t* idx, int64_t n) {{\n    if (n != a->rank) OSTRIN_FAIL(\"the number of indices doesn't match the array's dimensions\");\n    int64_t linear = 0; for (int64_t d = 0; d < n; d++) {{ if (idx[d] < 0 || idx[d] >= a->shape[d]) OSTRIN_FAIL(\"array index out of bounds\"); linear = linear * a->shape[d] + idx[d]; }}\n    return linear;\n}}\nstatic {tc} {name}_get({name}* a, const int64_t* idx, int64_t n) {{ return a->data[{name}_offset(a, idx, n)]; }}\nstatic {tc} {name}_index1"
+                            "static int64_t {name}_offset({name}* a, const int64_t* idx, int64_t n) {{\n    if (n != a->rank) OSTRIN_FAIL(\"the number of indices doesn't match the array's dimensions\");\n    int64_t linear = 0; for (int64_t d = 0; d < n; d++) {{ if (idx[d] < 0 || idx[d] >= a->shape[d]) OSTRIN_FAIL(\"array index out of bounds\"); linear = linear * a->shape[d] + idx[d]; }}\n    return linear;\n}}\nstatic {tc} {name}_get({name}* a, const int64_t* idx, int64_t n) {{ {tc} value = a->data[{name}_offset(a, idx, n)]; if (value) ostrin_retain((void*)value); return value; }}\nstatic {tc} {name}_index1"
                         )
                     )
                     .replace(
