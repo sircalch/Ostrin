@@ -336,6 +336,13 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
     writeFileSync(stdFile, std.replace(
+      "covariance_entry = covariance_midpoint(",
+      "covariance_entry = covariance_scale * covariance_midpoint(",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
       "lower + (upper - lower) * 0.5",
       "lower * 0.5 + upper * 0.5",
     ));
@@ -357,6 +364,10 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
 
     writeFileSync(testFile, tests.replace("subnormal covariance cancellation variance = 0", "subnormal case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("wide-scale covariance cancellation variance = 0", "wide-scale case removed"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
   } finally {

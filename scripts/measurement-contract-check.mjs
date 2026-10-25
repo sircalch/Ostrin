@@ -105,13 +105,14 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /SourceCovariance is experimental and limited to dense covariance matrices for at most 64 dimensionless scalar sources/i.test(lab)
       && /its relative tolerance is at most 1e-6 \(default 1e-12\)/i.test(lab)
       && /nonzero source sigma whose square underflows Float is rejected/i.test(lab)
-      && /matrix is normalized by its largest finite entry before the positive-semidefinite check/i.test(lab)
+      && /matrix is normalized by its largest finite entry only for the symmetry and positive-semidefinite checks/i.test(lab)
+      && /propagation\s+averages original entries before multiplying by gradients/i.test(lab)
       && /midpoint calculation preserves subnormal symmetric covariance entries/i.test(lab)
       && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
   const covariancePropagation = std.match(/pub fn variance_with_covariance\([\s\S]*?\n}\n/)?.[0] ?? "";
-  const covarianceMidpoint = std.match(/fn covariance_midpoint_normalized\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covarianceMidpoint = std.match(/fn covariance_midpoint\([\s\S]*?\n}\n/)?.[0] ?? "";
   check(errors, /record SourceCovariance/.test(std)
       && /pub fn covariance\(/.test(std)
       && /n > 64/.test(covarianceValidation)
@@ -124,9 +125,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /numeric\.eigen\(symmetric, relative_tolerance\)/.test(covarianceValidation)
       && /factors\.values\[0\] < 0\.0 - relative_tolerance/.test(covarianceValidation)
       && /covariance_validation_error\(model\.source_ids, model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
-      && /normalized_upper = model\.matrix\.get\(i, j\) \/ covariance_scale/.test(covariancePropagation)
-      && /normalized_lower = model\.matrix\.get\(j, i\) \/ covariance_scale/.test(covariancePropagation)
-      && /covariance_midpoint_normalized\([\s\S]*?\) \* covariance_scale/.test(covariancePropagation)
+      && /covariance_midpoint\([\s\S]*?model\.matrix\.get\(j, i\)[\s\S]*?model\.matrix\.get\(i, j\)[\s\S]*?\)/.test(covariancePropagation)
+      && !/covariance_scale/.test(covariancePropagation)
       && /expected_variance = source\.source_sigma \* source\.source_sigma/.test(covariancePropagation)
       && /source\.source_sigma != 0\.0 and expected_variance == 0\.0/.test(covariancePropagation)
       && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
@@ -134,12 +134,14 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /variance is negative/.test(covariancePropagation),
     "compiler/std/measurements.ostrin: bounded covariance validation and J·Σ·Jᵀ propagation contract is incomplete");
   check(errors, /lower \+ \(upper - lower\) \* 0\.5/.test(covarianceMidpoint)
-      && /lower < 0\.0 and upper > 0\.0/.test(covarianceMidpoint)
-      && /lower > 0\.0 and upper < 0\.0/.test(covarianceMidpoint)
-      && /se normaliza por su entrada máxima finita/i.test(design)
+      && /lower < 0\.0 and upper >= 0\.0/.test(covarianceMidpoint)
+      && /upper < 0\.0 and lower >= 0\.0/.test(covarianceMidpoint)
+      && /if lower > upper/.test(covarianceMidpoint)
+      && /vista\s+normalizada por la entrada máxima finita/i.test(design)
+      && /La propagación promedia las entradas originales antes de\s+multiplicarlas por el gradiente/i.test(design)
       && /El punto\s+medio evita perder covarianzas subnormales/i.test(design),
     "Measurement covariance: normalized PSD analysis and underflow-safe midpoint are missing");
-  check(errors, /SourceCovariance` valida entre 1 y 64 IDs[\s\S]{0,720}tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\][\s\S]{0,1200}J · Σ · Jᵀ/i.test(design)
+  check(errors, /SourceCovariance` valida entre 1 y 64 IDs[\s\S]{0,1200}tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\][\s\S]{0,1600}J · Σ · Jᵀ/i.test(design)
       && /los pares simétricos que difieren dentro de esa\s+tolerancia se promedian explícitamente/i.test(design)
       && /La matriz se vuelve a validar al propagar/i.test(design)
       && /subdesborda[\s\S]{0,120}la propagación se rechaza explícitamente/i.test(design)
@@ -149,12 +151,14 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /correlated sum variance = \{\}/.test(tests)
       && /rank-deficient cancellation uncertainty = 0/.test(tests)
       && /subnormal covariance cancellation variance = 0/.test(tests)
+      && /wide-scale covariance cancellation variance = 0/.test(tests)
       && /large finite PSD covariance = accepted/.test(tests)
       && /large indefinite covariance = covariance matrix must be positive semidefinite/.test(tests)
       && covarianceExample.includes("measurements.covariance")
       && covarianceExample.includes("measurements.variance_with_covariance")
       && covarianceExample.includes("indefinite covariance")
       && covarianceExample.includes("subnormal covariance cancellation variance")
+      && covarianceExample.includes("wide-scale covariance cancellation variance")
       && covarianceExample.includes("large finite PSD covariance")
       && covarianceExample.includes("large indefinite covariance")
       && covarianceExample.includes("excessive covariance tolerance")

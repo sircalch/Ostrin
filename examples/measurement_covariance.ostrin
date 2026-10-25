@@ -70,6 +70,21 @@ fn main() -> Void {
     subnormal_difference = measurements.sub(subnormal_a_scaled, subnormal_b_scaled).unwrap()
     print("subnormal covariance cancellation variance = " + measurements.variance_with_covariance(subnormal_difference, subnormal_covariance).unwrap().to_string())
 
+    wide_scale_covariance = measurements.covariance(
+        ["unused-large", "wide-a", "wide-b"],
+        array([
+            [1e300, 0.0, 0.0],
+            [0.0, 1e-100, 1e-100],
+            [0.0, 1e-100, 1e-100]
+        ])
+    ).unwrap()
+    wide_a = measurements.from_source(0.0, 1e-50, "wide-a", "tiny source A")
+    wide_b = measurements.from_source(0.0, 1e-50, "wide-b", "tiny source B")
+    wide_a_scaled = measurements.scale(wide_a.unwrap(), 1e50)
+    wide_b_scaled = measurements.scale(wide_b.unwrap(), 1e50)
+    wide_difference = measurements.sub(wide_a_scaled, wide_b_scaled).unwrap()
+    print("wide-scale covariance cancellation variance = " + measurements.variance_with_covariance(wide_difference, wide_scale_covariance).unwrap().to_string())
+
     large_psd = measurements.covariance(
         ["large-psd-a", "large-psd-b"],
         array([

@@ -868,9 +868,12 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     }
 }
 
-fn covariance_midpoint_normalized(lower: Float, upper: Float) -> Float {
-    if (lower < 0.0 and upper > 0.0) or (lower > 0.0 and upper < 0.0) {
+fn covariance_midpoint(lower: Float, upper: Float) -> Float {
+    if (lower < 0.0 and upper >= 0.0) or (upper < 0.0 and lower >= 0.0) {
         return lower * 0.5 + upper * 0.5
+    }
+    if lower > upper {
+        return upper + (lower - upper) * 0.5
     }
     lower + (upper - lower) * 0.5
 }
@@ -932,7 +935,7 @@ fn covariance_validation_error(
             if abs(upper - lower) > relative_tolerance {
                 return "covariance matrix must be symmetric within tolerance"
             }
-            average = covariance_midpoint_normalized(lower, upper)
+            average = covariance_midpoint(lower, upper)
             symmetric.set(i, j, average)
             symmetric.set(j, i, average)
         }
@@ -1004,18 +1007,6 @@ pub fn variance_with_covariance(
     }
 
     n = model.source_ids.length()
-    mut covariance_scale = 0.0
-    for i in 0 until n {
-        for j in 0 until n {
-            entry = model.matrix.get(i, j)
-            if abs(entry) > covariance_scale {
-                covariance_scale = abs(entry)
-            }
-        }
-    }
-    if covariance_scale == 0.0 {
-        covariance_scale = 1.0
-    }
     mut gradient = zeros([n])
     for i in 0 until measurement.sources.length() {
         source = measurement.sources[i]
@@ -1073,12 +1064,10 @@ pub fn variance_with_covariance(
         for j in 0 until n {
             mut covariance_entry = model.matrix.get(i, j)
             if i != j {
-                normalized_upper = model.matrix.get(i, j) / covariance_scale
-                normalized_lower = model.matrix.get(j, i) / covariance_scale
-                covariance_entry = covariance_midpoint_normalized(
-                    normalized_lower,
-                    normalized_upper
-                ) * covariance_scale
+                covariance_entry = covariance_midpoint(
+                    model.matrix.get(j, i),
+                    model.matrix.get(i, j)
+                )
             }
             term = gradient[i] * covariance_entry * gradient[j]
             if not is_finite(term) {
