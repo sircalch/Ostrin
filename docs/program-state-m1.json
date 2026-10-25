@@ -9,68 +9,74 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "checkpoint": {
-    "mainRevision": "39b7ad5975a14ac00d2cc2e61f09b25e5382f395",
-    "sourceRevision": "53e36bdc49eb0e67bf2eea561403f20e577044f2",
-    "evidenceRevision": "2a511bd1e5603888b00e70ea89b63c27c774480d",
+    "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
+    "sourceRevision": "17fa9654df3bb1a84c3d3237dbb076255f47ab28",
+    "evidenceRevision": "17fa9654df3bb1a84c3d3237dbb076255f47ab28",
     "releaseTag": "v0.2.0"
   },
   "completed": [
     "integrated-authorized-prs-225-230-231-227-226-229",
-    "post-merge-ci-linux-macos-windows",
-    "post-merge-website-browser-codeql-security",
-    "contextual-mutable-reassignment-integrated-pr-232",
-    "measurement-array-structural-profile-validated-locally",
-    "measurement-array-review-fixes-validated-locally",
+    "measurement-array-structural-profile-merged-pr-233",
+    "main-pr-233-post-merge-ci-eight-checks-green",
+    "measurement-scalar-covariance-analytical-native-parity-leak-and-wasi-emission",
+    "measurement-covariance-added-to-32-program-wasi-execution-matrix",
+    "full-cargo-test-6-differential-383-integration-33-unit-green",
+    "measurement-contract-gate-and-18-tests-green",
+    "project-plan-linguist-distribution-and-website-checks-green",
+    "scientific-lab-covariance-demo-and-generated-website-metadata-synchronized",
     "local-numeric-validation",
-    "local-wasi-program-check",
     "local-benchmark-contract-check"
   ],
   "currentPackage": {
-    "name": "measurement-array-structural-ownership",
-    "branch": "codex/measurement-array-ownership",
-    "status": "local-validation-passed-awaiting-new-head-ci",
+    "name": "bounded-scalar-measurement-covariance",
+    "branch": "codex/measurement-scalar-covariance",
+    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
+    "status": "local-validation-passed-awaiting-new-head-ci-and-review",
     "scope": [
-      "one-dimensional Array<Measurement<Float>> structural construction, indexing, get, slicing, boolean-mask selection, to_list and display",
-      "per-element retain/release through array/list copies, escaped get results, slices and masks",
-      "explicit rejection of numeric operators outside the measured array profile",
-      "typed IR/C lowering without AST fallback",
-      "interpreter-native-WASI parity and leak check"
+      "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
+      "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
+      "diagonal variance matching against each used source sigma and J·Σ·Jᵀ scalar propagation",
+      "explicit refusal of covariance for Measurement<Quantity<D>>, Measurement arrays, array reductions and unsupported measurement states",
+      "Scientific Lab example, documentation, generated website data and an actual Node WASI Preview 1 smoke entry"
     ],
     "evidence": [
-      "compiler/tests/examples.rs::measurement_array_structural_ownership_matches_interpreter_native_and_wasi",
-      "compiler/tests/examples.rs::measurement_array_numeric_operators_are_rejected_explicitly",
-      "compiler/tests/differential.rs::every_example_agrees_between_interpreter_and_native",
-      "scripts/measurement-contract-check.mjs and 17 contract tests",
-      "scripts/project-plan-check.mjs: 7,261 HIR/IR bodies, 0 AST fallback",
-      "scripts/website-check.mjs: 17 public pages, 304 examples, 382 integration tests",
-      "docs/design/25-mediciones-e-incertidumbre.md",
-      "docs/ownership-matrix.md",
-      "website Scientific Lab and roadmap"
-    ]
+      "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
+      "examples/measurement_covariance.ostrin: correlated sum/difference, scaling, independence, singular PSD matrix, tolerance and invalid-input cases",
+      "scripts/wasi-program-check.mjs: 32 programs passed locally, including measurement_covariance under Node WASI Preview 1",
+      "cargo test --manifest-path compiler/Cargo.toml: 6 differential, 383 integration and 33 unit tests passed",
+      "scripts/measurement-contract-check.mjs and 18 contract tests passed",
+      "scripts/project-plan-check.mjs: 7,261 HIR/IR bodies, 7,220 IR + 41 HIR, 0 AST fallback",
+      "scripts/website-check.mjs: 17 public pages, 305 examples, 383 integration tests",
+      "scripts/lab-data.mjs: 12 demos and 29 Viz figures verified with ostrinc.wasm",
+      "scripts/linguist-check.mjs: proposal, grammar, 7 sample candidates and 305 Ostrin examples pass",
+      "scripts/distribution-check.mjs: release matrix, checksums and installers pass"
+    ],
+    "activePullRequests": []
   },
   "pending": [
-    "publish corrected package head and request fresh review",
-    "run package CI on the corrected head and integrate PR #233 only after all required checks pass",
-    "ownership over remaining aggregates and escapes",
-    "numeric Measurement<T> arrays, covariance and aggregate operations",
-    "R3 host provenance and static effects"
+    "push this validated package as one reviewable PR and verify CI, ASan, UBSan, security and a fresh review on the exact new head",
+    "integrate the package only after its exact-head checks pass and review has no substantive findings",
+    "download and inspect main R3 host evidence artifact 12581253033 from run 40146766218 (sha256:b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3); confirm all 29 bundles against main SHA 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714 before changing R3 status",
+    "continue static-effects closure and R3 inspect/validate/replay/compare evidence",
+    "extend Measurement covariance to dimensions or arrays only with a separate typed ABI, ownership and analytical evidence package",
+    "continue profiling the reference scientific workflow and improve reproducibility and scientific visualization"
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40142639342,
-    "status": "failure",
-    "head": "c55c00632384a2c6473fafaff8e106549f12df7a",
+    "runId": 40146766244,
+    "status": "success",
+    "head": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
     "relatedRuns": [
-      { "workflow": "Browser audit", "runId": 40142639339, "status": "failure" },
-      { "workflow": "Native sanitizers", "runId": 40142639346, "status": "success" },
-      { "workflow": "Security audit", "runId": 40142639405, "status": "success" },
-      { "workflow": "CodeQL", "runId": 40142639425, "status": "success" }
+      { "workflow": "Deploy website", "runId": 40146766218, "status": "success" },
+      { "workflow": "Browser audit", "runId": 40146766130, "status": "success" },
+      { "workflow": "Security audit", "runId": 40146766195, "status": "success" },
+      { "workflow": "CodeQL", "runId": 40146766125, "status": "success" }
     ],
-    "note": "The old head used stale website metadata; regenerated metadata and site data pass locally. Awaiting checks for the corrected head."
+    "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. The main deploy run uploaded R3 host-candidate and R3 host-evidence artifacts; the per-bundle evidence is not yet inspected, so R3 remains open."
   },
   "blockers": [
-    "R3 remains OPEN until provenance.runtime.host is captured for all 29 bundles",
-    "v0.2.0 is frozen; no new release or tag is authorized"
+    "R3 remains OPEN until the current-main host-evidence artifact is inspected and its 29 bundle records are verified",
+    "the published v0.2.0 tag/assets remain frozen; no new release or tag is authorized"
   ],
-  "next": "publish and validate the Measurement array structural ownership package, then move to covariance and remaining aggregate escapes"
+  "next": "publish the validated scalar covariance package for exact-head CI and review, then verify the main R3 host artifact and continue the scientific workflow"
 }
