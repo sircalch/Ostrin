@@ -313,6 +313,16 @@ fn main() -> Void {
         Ok(_) => print("underflowed source variance accepted"),
         Err(message) => print("underflowed source variance = " + message),
     }
+    subnormal_source = measurements.from_source(0.0, 2e-162, "subnormal-source", "subnormal source")
+    scaled_subnormal_source = measurements.scale(subnormal_source.unwrap(), 1e162)
+    subnormal_source_covariance = measurements.covariance(
+        ["subnormal-source"],
+        array([[5e-324]])
+    ).unwrap()
+    match measurements.variance_with_covariance(scaled_subnormal_source, subnormal_source_covariance) {
+        Ok(_) => print("subnormal source variance accepted"),
+        Err(message) => print("subnormal source variance = " + message),
+    }
     mismatch = measurements.covariance(["caliper", "reference"], array([[9.0, 1.0], [1.0, 1.0]])).unwrap()
     match measurements.uncertainty_with_covariance(total, mismatch) {
         Ok(_) => print("source variance mismatch accepted"),

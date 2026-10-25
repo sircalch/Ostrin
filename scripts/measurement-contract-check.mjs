@@ -202,6 +202,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && covarianceExample.includes("large indefinite covariance")
       && covarianceExample.includes("excessive covariance tolerance")
       && covarianceExample.includes("underflowed source variance")
+      && covarianceExample.includes("subnormal source variance")
       && covarianceExample.includes("source variance mismatch"),
     "Measurement covariance: analytical oracle, runtime parity and validation regressions are missing");
   check(errors, tests.includes("measurement_array_structural_ownership_matches_interpreter_native_and_wasi")

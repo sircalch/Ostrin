@@ -1252,6 +1252,18 @@ pub fn variance_with_covariance(
             return Err("measurement source variance underflows Float range")
         }
         diagonal = model.matrix.get(index, index)
+        if expected_variance > 0.0 and expected_variance < 2.2250738585072014e-308 {
+            // Compare in root space; rounded subnormal squares cannot establish this match.
+            if diagonal <= 0.0 {
+                return Err("covariance diagonal must match the measurement source sigma")
+            }
+            subnormal_sigma_ratio = sqrt(diagonal) / source.source_sigma
+            if not is_finite(subnormal_sigma_ratio)
+                or abs(subnormal_sigma_ratio - 1.0) > model.relative_tolerance * 0.5
+            {
+                return Err("covariance diagonal must match the measurement source sigma")
+            }
+        }
         mut diagonal_scale = abs(expected_variance)
         if abs(diagonal) > diagonal_scale {
             diagonal_scale = abs(diagonal)
