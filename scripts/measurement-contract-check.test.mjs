@@ -375,11 +375,11 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
     writeFileSync(stdFile, std.replace(
-      "lower + (upper - lower) * 0.5",
-      "lower * 0.5 + upper * 0.5",
+      "sum = lower + upper",
+      "sum = lower - upper",
     ));
     result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("normalized PSD analysis and underflow-safe midpoint")));
+    assert.ok(result.errors.some((error) => error.includes("normalized PSD analysis and scale-safe midpoint")));
 
     writeFileSync(stdFile, std);
     const labFile = path.join(root, "scripts/lab-data.mjs");

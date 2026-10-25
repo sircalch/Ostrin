@@ -70,6 +70,24 @@ fn main() -> Void {
     subnormal_difference = measurements.sub(subnormal_a_scaled, subnormal_b_scaled).unwrap()
     print("subnormal covariance cancellation variance = " + measurements.variance_with_covariance(subnormal_difference, subnormal_covariance).unwrap().to_string())
 
+    subnormal_midpoint_unit = 5e-324
+    subnormal_midpoint_sigma = sqrt(4.0 * subnormal_midpoint_unit)
+    subnormal_midpoint_scale = 1.0 / subnormal_midpoint_sigma
+    subnormal_midpoint_covariance = measurements.covariance(
+        ["unused-midpoint", "midpoint-a", "midpoint-b"],
+        array([
+            [1.0, 0.0, 0.0],
+            [0.0, 4.0 * subnormal_midpoint_unit, subnormal_midpoint_unit],
+            [0.0, 2.0 * subnormal_midpoint_unit, 4.0 * subnormal_midpoint_unit]
+        ])
+    ).unwrap()
+    subnormal_midpoint_a = measurements.from_source(0.0, subnormal_midpoint_sigma, "midpoint-a", "subnormal source A").unwrap()
+    subnormal_midpoint_b = measurements.from_source(0.0, subnormal_midpoint_sigma, "midpoint-b", "subnormal source B").unwrap()
+    subnormal_midpoint_a_scaled = measurements.scale(subnormal_midpoint_a, subnormal_midpoint_scale)
+    subnormal_midpoint_b_scaled = measurements.scale(subnormal_midpoint_b, subnormal_midpoint_scale)
+    subnormal_midpoint_sum = measurements.add(subnormal_midpoint_a_scaled, subnormal_midpoint_b_scaled).unwrap()
+    print("unequal subnormal covariance midpoint variance = " + measurements.variance_with_covariance(subnormal_midpoint_sum, subnormal_midpoint_covariance).unwrap().to_string())
+
     wide_scale_covariance = measurements.covariance(
         ["unused-large", "wide-a", "wide-b"],
         array([

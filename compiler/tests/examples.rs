@@ -19297,6 +19297,10 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     let subnormal_rounded_square_adjustment_oracle = 4.930_380_657_631_321_6_f64;
     assert!(subnormal_rounded_square_adjustment_oracle > 4.9);
     assert!(subnormal_rounded_square_adjustment_oracle < 5.0);
+    // Exact ratio oracle for averaging adjacent subnormal entries before
+    // correlation conversion: ((1u + 2u) / 2) / (4u) = 3/8.
+    let unequal_subnormal_midpoint_oracle = 2.0 + 2.0 * (3.0 / 8.0);
+    assert_eq!(unequal_subnormal_midpoint_oracle, 2.75);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19308,6 +19312,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          independent sum uncertainty = {}\n\
          rank-deficient cancellation uncertainty = 0\n\
          subnormal covariance cancellation variance = 0\n\
+         unequal subnormal covariance midpoint variance = {}\n\
          wide-scale covariance cancellation variance = 0\n\
          rank-three compensated variance = 1\n\
          rank-three reordered compensated variance = 1\n\
@@ -19348,6 +19353,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
         rounded(4.0 * correlated_sum_variance),
         rounded(correlated_sum_variance),
         rounded(independent_sum_variance.sqrt()),
+         unequal_subnormal_midpoint_oracle,
     );
     assert_eq!(
         interpreter_and_native_agree("measurement_covariance.ostrin"),

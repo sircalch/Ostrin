@@ -869,13 +869,15 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
 }
 
 fn covariance_midpoint(lower: Float, upper: Float) -> Float {
-    if (lower < 0.0 and upper >= 0.0) or (upper < 0.0 and lower >= 0.0) {
-        return lower * 0.5 + upper * 0.5
+    sum = lower + upper
+    if is_finite(sum) {
+        // Adding first preserves adjacent subnormal entries: halving their
+        // subnormal difference can round to zero before the midpoint is formed.
+        return sum * 0.5
     }
-    if lower > upper {
-        return upper + (lower - upper) * 0.5
-    }
-    lower + (upper - lower) * 0.5
+    // Only same-sign, large finite entries can overflow their sum. Halving
+    // first keeps their midpoint finite without changing the subnormal path.
+    lower * 0.5 + upper * 0.5
 }
 
 fn covariance_validation_error(
@@ -1016,14 +1018,16 @@ fn covariance_correlation_matrix(
         }
         for j in 0 until i {
             column_variance = covariance_symmetric_entry(matrix, j, j)
-            entry = covariance_symmetric_entry(matrix, i, j)
+            upper_entry = matrix.get(i, j)
+            lower_entry = matrix.get(j, i)
+            entry_is_nonzero = upper_entry != 0.0 or lower_entry != 0.0
             mut coefficient = 0.0
             mut covariance_scale = 0.0
             if not is_finite(column_variance) or column_variance < 0.0 {
                 return Err("covariance matrix could not be stably factorized")
             }
             if row_variance == 0.0 or column_variance == 0.0 {
-                if entry != 0.0 {
+                if entry_is_nonzero {
                     return Err("covariance matrix could not be stably factorized")
                 }
             } else {
@@ -1039,24 +1043,32 @@ fn covariance_correlation_matrix(
                     covariance_scale = row_sigma * column_sigma
                 }
                 if covariance_scale > 0.0 and is_finite(covariance_scale) {
-                    if entry != 0.0 and row_variance != column_variance
+                    if entry_is_nonzero and row_variance != column_variance
                         and covariance_scale < 2.2250738585072014e-308
                     {
                         // A subnormal geometric scale has too few significant
                         // bits to resolve an unequal-variance correlation.
                         return Err("covariance correlation is numerically unresolved")
                     }
-                    // Divide by the scale-safe geometric mean directly. Two
-                    // successive divisions can round a sub-unit correlation
-                    // up to exactly 1 and erase its positive residual.
-                    coefficient = entry / covariance_scale
-                    if entry != 0.0 and coefficient == 0.0 {
+                    // Normalize each raw entry before averaging. Averaging
+                    // adjacent subnormals first can discard half of their
+                    // difference; here their local geometric scale makes the
+                    // midpoint representable before correlation conversion.
+                    lower_coefficient = lower_entry / covariance_scale
+                    upper_coefficient = upper_entry / covariance_scale
+                    if not is_finite(lower_coefficient) or not is_finite(upper_coefficient) {
+                        return Err("covariance matrix could not be stably factorized")
+                    }
+                    if (lower_entry != 0.0 and lower_coefficient == 0.0)
+                        or (upper_entry != 0.0 and upper_coefficient == 0.0)
+                    {
                         return Err("covariance correlation underflows Float range")
                     }
+                    coefficient = covariance_midpoint(lower_coefficient, upper_coefficient)
                 } else {
                     // A nonzero covariance cannot be resolved against a zero
                     // or non-finite geometric mean in Float range.
-                    if entry != 0.0 {
+                    if entry_is_nonzero {
                         return Err("covariance correlation underflows Float range")
                     }
                 }
@@ -1090,14 +1102,17 @@ fn covariance_correlation_matrix(
                     exact_root_product = row_sigma * column_sigma
                     if row_root_square != row_variance
                         or column_root_square != column_variance
-                        or exact_root_product != abs(entry)
+                        or exact_root_product != abs(upper_entry)
+                        or exact_root_product != abs(lower_entry)
                     {
                         return Err("covariance correlation is numerically unresolved")
                     }
                 }
                 if coefficient_magnitude <= 1.0
                     and 1.0 - coefficient_magnitude <= correlation_resolution
-                    and (covariance_scale == 0.0 or abs(entry) < covariance_scale)
+                    and (covariance_scale == 0.0
+                        or abs(upper_entry) < covariance_scale
+                        or abs(lower_entry) < covariance_scale)
                 {
                     return Err("covariance correlation is numerically unresolved")
                 }
