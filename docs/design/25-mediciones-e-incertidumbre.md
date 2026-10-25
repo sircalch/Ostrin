@@ -297,7 +297,9 @@ usadas. El punto medio evita perder covarianzas subnormales cuando ambas entrada
 signo y evita desbordarse cuando tienen signos opuestos. Las diagonales de cada fuente usada deben
 coincidir con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y
 subdesborda a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente
-como exacta. Si la diagonal coincide exactamente con `sigma²`, se conserva el aporte almacenado sin
+como exacta. Cuando `sigma²` es subnormal, la coincidencia se comprueba mediante la razón estable
+`sqrt(Σₛₛ) / sigmaₛ`; la igualdad entre cuadrados subnormales redondeados no basta para validar la
+diagonal. Si la diagonal coincide exactamente con `sigma²`, se conserva el aporte almacenado sin
 reconstruirlo; si solo coincide dentro de tolerancia, se escala el aporte por
 `sqrt(Σₛₛ) / sigmaₛ` para mantener la diagonal del modelo. Las fuentes declaradas pero no usadas
 tienen gradiente cero. La matriz se vuelve a
