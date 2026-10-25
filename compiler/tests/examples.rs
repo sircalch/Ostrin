@@ -19257,8 +19257,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
 fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     let file = example_path("measurement_covariance.ostrin");
     let correlated_sum_variance = 1.0_f64 * 4.0 * 1.0 + 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
-    let correlated_difference_variance =
-        1.0_f64 * 4.0 * 1.0 - 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let correlated_difference_variance = 1.0_f64 * 4.0 * 1.0 - 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
     let independent_sum_variance = 1.0_f64 * 4.0 * 1.0 + 1.0 * 1.0 * 1.0;
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
