@@ -10,8 +10,8 @@
   },
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "59987174444b03df5c1fd310bacc5386436b232b",
-    "evidenceRevision": "a8a87aa4fb4cfdf2b5e558729959fe60dd733e13",
+    "sourceRevision": "140a53dea5ef46f92dc687c657c5b37988ddf3c4",
+    "evidenceRevision": "19f599be9546a4bf545f4307b7b188c398c0fab5",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -46,13 +46,15 @@
     "website-lab-provenance-benchmark-status-data-regenerated-and-verified-source-5998717",
     "chromium-and-webkit-36-browser-tests-green-firefox-launch-unavailable-source-5998717",
     "numeric-validation-80-report-and-136-emitted-values-exact-live-allocations-zero-source-5998717",
-    "v0.2-readiness-12-of-12-ready-r3-open-0-of-29-host-captures-source-5998717"
+    "v0.2-readiness-12-of-12-ready-r3-open-0-of-29-host-captures-source-5998717",
+    "measurement-covariance-subnormal-variance-ratio-p2-fixed-source-140a53d",
+    "source-140a53d-full-validation-and-evidence-recorded-19f599b"
   ],
   "currentPackage": {
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "local-source-and-evidence-validation-passed-exact-pr-head-checks-and-fresh-review-pending",
+    "status": "subnormal-variance-ratio-p2-fixed-local-validation-passed-exact-pr-head-ci-and-review-pending",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -131,19 +133,20 @@
       "Independent numeric validation compared 80 report values and 136 emitted values exactly (maximum absolute difference 0) with live_allocations=0.",
       "Benchmark report validation passed for 15 workloads, 7 samples and 1 warmup on Windows 11 x64; report SHA-256 189fd80377da23adbce55173324045237625891df4aee618dc0137f0173f98cc records clean source commit 59987174444b03df5c1fd310bacc5386436b232b. Measurement covariance medians were 84.802 ms interpreted and 8.272 ms native (10.252 ratio); peak RSS/memory is not measured and no cross-platform or cross-language claim is made.",
       "Regenerated the benchmark page, Scientific Lab copy, provenance data and public quality scorecard. The scorecard now records 389 Rust-marked tests, 21,026 known effect edges, 83 symbolic callbacks and 0 unresolved calls. R3 readiness remains OPEN with 29/29 base bundles, 0/29 host captures; levels remain R0-R2 and no cross-platform reproducibility claim is made.",
-      "Remote main is still 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714. PR #234 remote head is still 46c72a321be5f626aa1542316041df98685e55d6; its checks and review predate source 5998717 and are superseded. The local source and evidence commits have not yet been pushed."
+      "Remote main is still 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714. PR #234 remote head is still 46c72a321be5f626aa1542316041df98685e55d6; its checks and review predate source 5998717 and are superseded. The local source and evidence commits have not yet been pushed.",
+      "PR #234 P2 discussion_r4370078465 fixed in source 140a53d: geometric scale now multiplies the already validated standard deviations, avoiding a lossy subnormal variance ratio. Regression oracle expects correlation 0.5 and propagated variance 3. Evidence manifest validation/measurement-covariance-subnormal-ratio.json at 19f599b records the 422-test suite, 32 WASI programs, 18 contract mutations, 7,261 HIR/IR bodies with zero AST fallbacks, website/Lab replay, exact numeric parity, v0.2 readiness, and R3 limits. Exact final PR-head CI, fresh review, ASan and UBSan remain pending."
     ],
     "activePullRequests": [
       234
     ]
   },
   "pending": [
-    "Push source 59987174444b03df5c1fd310bacc5386436b232b, evidence a8a87aa4fb4cfdf2b5e558729959fe60dd733e13 and the updated checkpoint to the existing PR #234 branch; require CI and a fresh review on the exact new head.",
-    "Integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; the user's authorization is conditional on those gates.",
-    "continue R3 work beyond the verified host-evidence readiness gate; the experiment records remain at R0-R2 and do not establish cross-platform reproducibility",
-    "continue static-effects closure and broader R3 inspect/validate/replay/compare evidence",
-    "extend Measurement covariance to dimensions or arrays only with a separate typed ABI, ownership and analytical evidence package",
-    "continue profiling the reference scientific workflow and improve reproducibility and scientific visualization"
+    "Push source 140a53dea5ef46f92dc687c657c5b37988ddf3c4, evidence 19f599be9546a4bf545f4307b7b188c398c0fab5 and the updated checkpoint to the existing PR #234 branch; require CI and fresh review on the exact final head.",
+    "Integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; the user authorization remains conditional on those gates.",
+    "Continue R3 work beyond verified host-evidence readiness; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
+    "Continue static-effects closure and broader R3 inspect/validate/replay/compare evidence.",
+    "Extend Measurement covariance only with a separately typed and ownership-verified ABI and analytical evidence.",
+    "Continue profiling the reference scientific workflow and improve reproducibility and scientific visualization."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
@@ -175,9 +178,9 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #234 remote HEAD 46c72a321be5f626aa1542316041df98685e55d6 has not been updated with the local P2 correction at source 59987174444b03df5c1fd310bacc5386436b232b. Existing checks/review are superseded; push the completed checkpoint and require green exact-head CI, sanitizers and fresh review before the conditionally authorized merge.",
+    "PR #234 has a new covariance precision P2; source fix 140a53d and its local regression evidence are recorded, but exact final-head CI, sanitizer checks and fresh review have not run yet.",
     "R3 host captures remain absent; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
-    "The published v0.2.0 tag and assets remain frozen; no new release or tag is authorized."
+    "Published v0.2.0 remains frozen; do not create a new release or tag."
   ],
-  "next": "Commit the updated docs/program-state-m1.json checkpoint with sourceRevision 59987174444b03df5c1fd310bacc5386436b232b and evidenceRevision a8a87aa4fb4cfdf2b5e558729959fe60dd733e13, then push the complete branch to PR #234 and wait for exact-head checks and fresh review."
+  "next": "Push the complete source, evidence and checkpoint branch to PR #234; then require CI, ASan, UBSan and fresh review on its exact head before the conditionally authorized merge."
 }
