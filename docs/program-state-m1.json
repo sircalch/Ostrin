@@ -10,8 +10,8 @@
   },
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "6c4d1c87c3eff8452a55dc89a08c4beae3dfc2e3",
-    "evidenceRevision": "40cc0d0d815f74cb39b5e240ada3c2cbf108e9ff",
+    "sourceRevision": "931bfc62ccdece3da5ef5e5e385946451b1d0687",
+    "evidenceRevision": "702a55fb0ef352ebf0981b4179ba4c1965c2e71b",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -56,7 +56,7 @@
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "subnormal-covariance-boundaries-fixed-local-validation-passed-final-pr-head-checks-and-review-pending",
+    "status": "rounded-geometric-correlation-p2s-fixed-local-validation-passed-exact-head-ci-and-review-pending",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -73,7 +73,9 @@
       "adjusts contributions only when an accepted covariance diagonal differs from the recorded sigma squared",
       "rejects negative and relative-tolerance-unresolved positive factorization pivots instead of changing the covariance result",
       "subnormal source variances compare sqrt(covariance diagonal) against source sigma in root space so rounded subnormal squares cannot accept a materially mismatched diagonal",
-      "rejects correlations numerically indistinguishable from perfect dependence instead of rounding away a representable residual variance"
+      "rejects correlations numerically indistinguishable from perfect dependence instead of rounding away a representable residual variance",
+      "reject near-unit unequal-variance correlations unless Float roots reproduce both diagonal values and the geometric product reproduces the covariance entry",
+      "explicitly return numerically unresolved for subnormal and normal rounded-geometric-mean precision loss"
     ],
     "evidence": [
       "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
@@ -137,14 +139,60 @@
       "Regenerated the benchmark page, Scientific Lab copy, provenance data and public quality scorecard. The scorecard now records 389 Rust-marked tests, 21,026 known effect edges, 83 symbolic callbacks and 0 unresolved calls. R3 readiness remains OPEN with 29/29 base bundles, 0/29 host captures; levels remain R0-R2 and no cross-platform reproducibility claim is made.",
       "Remote main is still 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714. PR #234 remote head is still 46c72a321be5f626aa1542316041df98685e55d6; its checks and review predate source 5998717 and are superseded. The local source and evidence commits have not yet been pushed.",
       "PR #234 P2 discussion_r4370078465 fixed in source 140a53d: geometric scale now multiplies the already validated standard deviations, avoiding a lossy subnormal variance ratio. Regression oracle expects correlation 0.5 and propagated variance 3. Evidence manifest validation/measurement-covariance-subnormal-ratio.json at 19f599b records the 422-test suite, 32 WASI programs, 18 contract mutations, 7,261 HIR/IR bodies with zero AST fallbacks, website/Lab replay, exact numeric parity, v0.2 readiness, and R3 limits. Exact final PR-head CI, fresh review, ASan and UBSan remain pending.",
-      "PR #234 covariance precision: source 6c4d1c8 avoids subnormal variance-ratio loss and rejects unequal-variance correlations when the geometric scale itself is subnormal; equal diagonal variances use the diagonal directly. The independent 1/sqrt(3) case would have variance 3.1547005383792515 and is now explicitly unresolved instead of reporting 3. Evidence manifest validation/measurement-covariance-subnormal-ratio.json at 40cc0d0 records local full-suite, WASI, contract, website/Lab, numerical and readiness results. Exact final-head CI, fresh review, ASan and UBSan are pending."
+      "PR #234 covariance precision: source 6c4d1c8 avoids subnormal variance-ratio loss and rejects unequal-variance correlations when the geometric scale itself is subnormal; equal diagonal variances use the diagonal directly. The independent 1/sqrt(3) case would have variance 3.1547005383792515 and is now explicitly unresolved instead of reporting 3. Evidence manifest validation/measurement-covariance-subnormal-ratio.json at 40cc0d0 records local full-suite, WASI, contract, website/Lab, numerical and readiness results. Exact final-head CI, fresh review, ASan and UBSan are pending.",
+      "Fresh PR #234 P2 4370131337 fixed in source 931bfc62: the exact subnormal matrix [[1e-323,5e-324],[5e-324,1.5e-323]] returns an explicit unresolved result; independent oracle correlation 1/sqrt(6), variance 2.816496580927726; interpreter, native and WASI output agree.",
+      "Fresh PR #234 P2 4370174603 fixed in source 931bfc62: unequal-variance normal covariance [[1,1.7320508075688772],[1.7320508075688772,3]] no longer rounds a positive residual to zero; 90-digit Decimal oracle from the exact binary Float entry is 1.1587517153601563, and Ostrin returns an explicit unresolved error. Existing exact nonuniform rank-one regression remains 0.01.",
+      "Exact source tree later committed as 931bfc62 passed Cargo fmt, all 422 Cargo tests, the focused covariance interpreter/native/WASI/leak test, and all 32 Node WASI programs after rebuilding the release compiler.",
+      "Source 931bfc62 validation: measurement contract plus 18 tests, project-plan 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallbacks, Linguist, distribution and v0.2 readiness 12/12 pass.",
+      "Source 931bfc62 web validation: provenance page synchronized; website check 17 pages, 305 examples, 383 integration tests and WASM passes; Scientific Lab 12 demos and 29 Viz replays pass; all 11 R1/R2 experiment replays pass. Chromium 34/34 and WebKit 2/2 browser tests pass locally; Firefox was not run on Windows and remains for exact-head CI.",
+      "Independent numeric validation compared 80 report values and 136 emitted values exactly, maximum absolute difference 0, with live_allocations=0.",
+      "Evidence commit 702a55fb records both new P2 regressions and regenerates website/lab-data.js plus website/provenance-data.js for source 931bfc62."
     ],
     "activePullRequests": [
       234
-    ]
+    ],
+    "latestPullRequestValidation": {
+      "number": 234,
+      "url": "https://github.com/sircalch/Ostrin/pull/234",
+      "remoteHead": "d9dc7737ca2a9263946328ea92eec04e84cc2d3f",
+      "base": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
+      "mergeCommit": "18397d706598ee34d9b1f1ef7aa21f3e8f3611bf",
+      "state": "open-mergeable",
+      "runs": {
+        "ostrinCi": {
+          "id": 40176562175,
+          "conclusion": "failure",
+          "failures": [
+            "Website and browser checks: website/provenance-data.js was stale before regeneration"
+          ]
+        },
+        "browserAudit": {
+          "id": 40176562209,
+          "conclusion": "failure",
+          "failure": "website/provenance-data.js was stale before regeneration"
+        },
+        "nativeSanitizers": {
+          "id": 40176562214,
+          "conclusion": "success"
+        },
+        "codeql": {
+          "id": 40176562155,
+          "conclusion": "success"
+        },
+        "securityAudit": {
+          "id": 40176562192,
+          "conclusion": "success"
+        }
+      },
+      "openReviewThreads": [
+        4370131337,
+        4370174603
+      ],
+      "note": "All results above belong to the old remote head d9dc773 and are superseded. Source and evidence commits have not yet been pushed."
+    }
   },
   "pending": [
-    "Push source 6c4d1c87c3eff8452a55dc89a08c4beae3dfc2e3, evidence 40cc0d0d815f74cb39b5e240ada3c2cbf108e9ff and the updated checkpoint to the existing PR #234 branch; require CI, sanitizers and fresh review on the exact final head.",
+    "Push source 931bfc62ccdece3da5ef5e5e385946451b1d0687, evidence 702a55fb0ef352ebf0981b4179ba4c1965c2e71b and this checkpoint to the existing PR #234 branch. Update its provenance and review replies, then require CI, sanitizers and fresh review on the exact final PR head.",
     "Integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; the user authorization remains conditional on those gates.",
     "Continue R3 work beyond verified host-evidence readiness; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
     "Continue static-effects closure and broader R3 inspect/validate/replay/compare evidence.",
@@ -181,9 +229,9 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #234 has two covariance precision cases fixed in source 6c4d1c8 and documented evidence 40cc0d0; final source/evidence/checkpoint have not yet been pushed, so exact-head CI, ASan/UBSan and fresh review remain pending.",
+    "PR #234 currently has two additional P2 findings (4370131337 and 4370174603) fixed locally in source 931bfc62 with evidence 702a55fb. Source/evidence/checkpoint are not yet pushed; exact-head CI, ASan/UBSan and fresh review remain pending. The previous remote d9dc773 Website/Browser failures were caused by stale generated provenance and are corrected locally.",
     "R3 host captures remain absent; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
     "Published v0.2.0 remains frozen; do not create a new release or tag."
   ],
-  "next": "Push the complete source, evidence and checkpoint branch to PR #234; then require CI, ASan, UBSan and fresh review on its exact head before the conditionally authorized merge."
+  "next": "Update the existing PR #234 metadata, push source 931bfc62, evidence 702a55fb and the checkpoint together, then require exact-head CI, ASan/UBSan and fresh review before the conditionally authorized merge."
 }
