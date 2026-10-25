@@ -80,11 +80,12 @@ runs:
         node --test scripts/experiment-replay.test.mjs
         node scripts/experiment-replay.mjs --fixture surface --write-r3-receipt
         node scripts/r3-surface-receipt.mjs --verify
-        node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"
-        node --test scripts/r3-surface-receipt.test.mjs
         node scripts/r3-readiness.mjs --require-ready
         node scripts/quality-scorecard.mjs --write
         node scripts/status-page.mjs --write
+        node scripts/experiment-replay.mjs --replay-artifact-all . --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA" --write-profile-receipt
+        node --test scripts/r3-replay-profile.test.mjs
+        node --test scripts/r3-surface-receipt.test.mjs
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs
         node --test scripts/experiment-bundle.test.mjs
@@ -105,6 +106,7 @@ runs:
           target/r3-ci/surface-replay-receipt.json
           target/r3-ci/wasi-file-read-evidence.json
           target/r3-ci/wasi-random-evidence.json
+          target/r3-ci/r3-replay-profile-receipt.json
         if-no-files-found: error
         retention-days: 1
     - name: Download the exact candidate evidence artifact
@@ -115,7 +117,7 @@ runs:
     - name: Re-run all experiment bundles from downloaded artifact bytes
       shell: bash
       run: |
-        node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA"
+        node scripts/experiment-replay.mjs --replay-artifact-all target/r3-ci/downloaded-host-evidence --run-id "$GITHUB_RUN_ID" --tested-sha "$GITHUB_SHA" --require-profile-receipt
     - name: Upload verified host evidence artifact
       id: upload-verified-host-evidence
       uses: actions/upload-artifact@v4

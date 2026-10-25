@@ -11,6 +11,28 @@ on:
       - 'scripts/status-page.mjs'
       - 'scripts/experiment-bundle.mjs'
       - 'scripts/r3-readiness.mjs'
+      - 'scripts/r3-replay-profile.mjs'
+      - 'scripts/r3-replay-profile.test.mjs'
+      - 'scripts/r3-surface-receipt.mjs'
+      - 'scripts/experiment-replay.mjs'
+      - 'scripts/lab-data.mjs'
+      - 'docs/r3-readiness.md'
+      - 'validation/**'
+      - 'scripts/website-check.mjs'
+      - 'tests/browser/**'
+      - '.github/actions/website-verify/**'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'compiler/**'
+      - 'scripts/provenance-page.mjs'
+      - 'scripts/quality-scorecard.mjs'
+      - 'scripts/status-page.mjs'
+      - 'scripts/experiment-bundle.mjs'
+      - 'scripts/r3-readiness.mjs'
+      - 'scripts/r3-replay-profile.mjs'
+      - 'scripts/r3-replay-profile.test.mjs'
       - 'scripts/r3-surface-receipt.mjs'
       - 'scripts/experiment-replay.mjs'
       - 'scripts/lab-data.mjs'
@@ -22,21 +44,34 @@ on:
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages
+  group: pages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Build and verify the website/playground
+        id: website
+        uses: ./.github/actions/website-verify
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v5

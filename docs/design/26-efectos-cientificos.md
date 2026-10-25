@@ -221,6 +221,15 @@ El reporte local versionado sigue `OPEN` porque no incluye metadatos de host, y 
 equivalencia numérica entre plataformas. La release
 `v0.2.0` ya fue publicada; su gate de release es distinto del nivel R3 de cada ejecución.
 
+El workflow de Pages añade el perfil acotado `wasi-preview1-host-bound-replay` para sus 29 fixtures
+de visualización. Su recibo `ostrin.r3-wasi-host-replay-receipt/v1` vincula la identidad de la
+ejecución, el WASM archivado, las revisiones fuente de fixtures, los hashes de source/input/output/
+provenance, las filas de entrada y los resultados R0/R1/R2. CI vuelve a ejecutar el artefacto
+descargado antes de publicarlo y exige que el recibo coincida con la repetición. Esta evidencia describe
+un único host WASI y no altera el nivel de ningún fixture: `reproducibility.R3` sigue en cero hasta que
+exista un contrato de madurez R3 completo. No establece equivalencia entre plataformas, atestación
+criptográfica, completitud del análisis de efectos ni validez científica de los resultados.
+
 ## 8. Inferencia y reglas del checker
 
 1. Cada builtin y función de módulo tendrá una fila conocida o una declaración de frontera `unsafe`.
