@@ -5,6 +5,7 @@
 // type contract is reviewed. `from_source` makes correlation identity explicit;
 // `standard` remains compatible by using its label as the identity. Derived values
 // retain source contributions so correlated cancellation is exact.
+import std.numeric
 
 pub record Sensitivity<T> {
     source_id: String
@@ -19,6 +20,14 @@ pub record Measurement<T> {
     sources: List<Sensitivity<T>>
     known: Bool
     reason: String
+}
+
+// A bounded dense covariance model for dimensionless scalar source variables.
+// `source_ids` defines the row and column order of `matrix`.
+pub record SourceCovariance {
+    source_ids: List<String>
+    matrix: Array<Float>
+    relative_tolerance: Float
 }
 
 // A standard uncertainty represented in the coherent unit of its static dimension.
@@ -855,6 +864,224 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
             }),
             Err(message) => Err(message),
         },
+        Err(message) => Err(message),
+    }
+}
+
+fn covariance_validation_error(
+    source_ids: List<String>,
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> String {
+    if not is_finite(relative_tolerance) or relative_tolerance <= 0.0 {
+        return "covariance relative tolerance must be finite and positive"
+    }
+    n = source_ids.length()
+    if n == 0 {
+        return "covariance needs at least one source id"
+    }
+    if n > 64 {
+        return "dense covariance supports at most 64 sources"
+    }
+    shape = matrix.shape()
+    if shape.length() != 2 or shape[0] != n or shape[1] != n {
+        return "covariance matrix shape must match its source ids"
+    }
+    for i in 0 until n {
+        if source_ids[i].length() == 0 {
+            return "covariance source id must not be empty"
+        }
+        for j in 0 until i {
+            if source_ids[i] == source_ids[j] {
+                return "covariance source ids must be unique"
+            }
+        }
+    }
+
+    mut scale = 0.0
+    for i in 0 until n {
+        for j in 0 until n {
+            value = matrix.get(i, j)
+            if not is_finite(value) {
+                return "covariance entries must be finite"
+            }
+            if abs(value) > scale {
+                scale = abs(value)
+            }
+        }
+    }
+    if scale == 0.0 {
+        scale = 1.0
+    }
+    absolute_tolerance = relative_tolerance * scale
+    if not is_finite(absolute_tolerance) {
+        return "covariance tolerance scale must be finite"
+    }
+    mut symmetric = zeros([n, n])
+    for i in 0 until n {
+        symmetric.set(i, i, matrix.get(i, i))
+        for j in i + 1 until n {
+            upper = matrix.get(i, j)
+            lower = matrix.get(j, i)
+            if abs(upper - lower) > absolute_tolerance {
+                return "covariance matrix must be symmetric within tolerance"
+            }
+            average = upper * 0.5 + lower * 0.5
+            symmetric.set(i, j, average)
+            symmetric.set(j, i, average)
+        }
+    }
+
+    match numeric.eigen(symmetric, absolute_tolerance) {
+        Ok(factors) => {
+            for i in 0 until n {
+                value = factors.values[i]
+                if not is_finite(value) {
+                    return "covariance eigenvalues must be finite"
+                }
+            }
+            if factors.values[0] < 0.0 - absolute_tolerance {
+                return "covariance matrix must be positive semidefinite"
+            }
+        },
+        Err(_) => {
+            return "covariance matrix must be symmetric and numerically valid"
+        },
+    }
+    ""
+}
+
+/// Validate a small dense covariance matrix. The supplied source-id order is
+/// the canonical row and column order for this model. Entries use coherent
+/// squared units; this initial API is limited to dimensionless scalar sources.
+pub fn covariance(
+    source_ids: List<String>,
+    matrix: Array<Float>,
+    relative_tolerance: Float = 1e-12
+) -> Result<SourceCovariance, String> {
+    error = covariance_validation_error(source_ids, matrix, relative_tolerance)
+    if error != "" {
+        return Err(error)
+    }
+    Ok(SourceCovariance {
+        source_ids: source_ids,
+        matrix: matrix,
+        relative_tolerance: relative_tolerance,
+    })
+}
+
+fn covariance_source_index(source_ids: List<String>, source_id: String) -> Int {
+    for i in 0 until source_ids.length() {
+        if source_ids[i] == source_id {
+            return i
+        }
+    }
+    -1
+}
+
+/// Return J·Σ·Jᵀ for the sources currently present in a scalar measurement.
+/// Unused covariance sources have zero sensitivity; every used source must be
+/// present and its diagonal variance must match the recorded standard sigma.
+pub fn variance_with_covariance(
+    measurement: Measurement<Float>,
+    model: SourceCovariance
+) -> Result<Float, String> {
+    if not measurement.known {
+        return Err("covariance propagation needs known measurement uncertainty")
+    }
+    if not is_finite(measurement.value) {
+        return Err("measurement value must be finite")
+    }
+    error = covariance_validation_error(model.source_ids, model.matrix, model.relative_tolerance)
+    if error != "" {
+        return Err(error)
+    }
+
+    n = model.source_ids.length()
+    mut gradient = zeros([n])
+    for i in 0 until measurement.sources.length() {
+        source = measurement.sources[i]
+        if source.source_id.length() == 0 or source.source_dimension != "dimensionless" {
+            return Err("scalar covariance needs dimensionless sources with non-empty ids")
+        }
+        if not is_finite(source.source_sigma) or source.source_sigma < 0.0
+            or not is_finite(source.contribution)
+        {
+            return Err("measurement source sigma and contribution must be finite")
+        }
+        for j in 0 until i {
+            if measurement.sources[j].source_id == source.source_id {
+                return Err("measurement source ids must be unique before covariance propagation")
+            }
+        }
+        index = covariance_source_index(model.source_ids, source.source_id)
+        if index < 0 {
+            return Err("covariance model is missing a measurement source id")
+        }
+        expected_variance = source.source_sigma * source.source_sigma
+        if not is_finite(expected_variance) {
+            return Err("measurement source variance must be finite")
+        }
+        diagonal = model.matrix.get(index, index)
+        mut diagonal_scale = abs(expected_variance)
+        if abs(diagonal) > diagonal_scale {
+            diagonal_scale = abs(diagonal)
+        }
+        if diagonal_scale > 0.0
+            and abs(diagonal - expected_variance) > model.relative_tolerance * diagonal_scale
+        {
+            return Err("covariance diagonal must match the measurement source sigma")
+        }
+        if source.source_sigma == 0.0 {
+            if source.contribution != 0.0 {
+                return Err("zero-sigma source must have zero sensitivity contribution")
+            }
+            gradient.set(index, 0.0)
+        } else {
+            derivative = source.contribution / source.source_sigma
+            if not is_finite(derivative) {
+                return Err("measurement source derivative must be finite")
+            }
+            gradient.set(index, derivative)
+        }
+    }
+
+    mut variance = 0.0
+    mut absolute_sum = 0.0
+    for i in 0 until n {
+        for j in 0 until n {
+            mut covariance_entry = model.matrix.get(i, j)
+            if i != j {
+                covariance_entry = model.matrix.get(i, j) * 0.5
+                    + model.matrix.get(j, i) * 0.5
+            }
+            term = gradient[i] * covariance_entry * gradient[j]
+            if not is_finite(term) {
+                return Err("propagated covariance variance must be finite")
+            }
+            variance = variance + term
+            absolute_sum = absolute_sum + abs(term)
+            if not is_finite(variance) or not is_finite(absolute_sum) {
+                return Err("propagated covariance variance must be finite")
+            }
+        }
+    }
+    if variance < 0.0 {
+        if absolute_sum == 0.0 or abs(variance) > model.relative_tolerance * absolute_sum {
+            return Err("propagated covariance variance is negative")
+        }
+        variance = 0.0
+    }
+    Ok(variance)
+}
+
+/// Return the standard uncertainty derived from J·Σ·Jᵀ.
+pub fn uncertainty_with_covariance(
+    measurement: Measurement<Float>,
+    model: SourceCovariance
+) -> Result<Float, String> {
+    match variance_with_covariance(measurement, model) {
+        Ok(variance) => Ok(sqrt(variance)),
         Err(message) => Err(message),
     }
 }

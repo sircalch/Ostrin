@@ -19254,6 +19254,108 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
 }
 
 #[test]
+fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
+    let file = example_path("measurement_covariance.ostrin");
+    let correlated_sum_variance = 1.0_f64 * 4.0 * 1.0 + 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let correlated_difference_variance =
+        1.0_f64 * 4.0 * 1.0 - 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let independent_sum_variance = 1.0_f64 * 4.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
+    let expected = format!(
+        "correlated sum variance = {}\n\
+         correlated sum uncertainty = {}\n\
+         correlated difference variance = {}\n\
+         correlated difference uncertainty = {}\n\
+         scaled correlated variance = {}\n\
+         within-tolerance symmetric variance = {}\n\
+         independent sum uncertainty = {}\n\
+         rank-deficient cancellation uncertainty = 0\n\
+         indefinite covariance = covariance matrix must be positive semidefinite\n\
+         nonsymmetric covariance = covariance matrix must be symmetric within tolerance\n\
+         duplicate covariance id = covariance source ids must be unique\n\
+         non-finite covariance = covariance entries must be finite\n\
+         source variance mismatch = covariance diagonal must match the measurement source sigma\n\
+         missing source = covariance model is missing a measurement source id\n\
+         unknown uncertainty = covariance propagation needs known measurement uncertainty\n",
+        rounded(correlated_sum_variance),
+        rounded(correlated_sum_variance.sqrt()),
+        rounded(correlated_difference_variance),
+        rounded(correlated_difference_variance.sqrt()),
+        rounded(4.0 * correlated_sum_variance),
+        rounded(correlated_sum_variance),
+        rounded(independent_sum_variance.sqrt()),
+    );
+    assert_eq!(
+        interpreter_and_native_agree("measurement_covariance.ostrin"),
+        expected
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement covariance type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let measurement_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
+    assert!(
+        measurement_source.contains("hir=0") && measurement_source.contains("ast=0"),
+        "covariance support introduced a type-checker or AST fallback: {measurement_source}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement covariance WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "ostrin_drop_std_measurements__SourceCovariance",
+        "ostrin_drop_std_numeric__Eigen",
+        "SourceCovariance*",
+        "covariance matrix must be positive semidefinite",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "Measurement covariance WASI output is missing {marker}"
+        );
+    }
+
+    let exe = temp_artifact("measurement-covariance.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement covariance compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run Measurement covariance binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement covariance run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement covariance lifecycle leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn std_measurements_series_feeds_reproducible_error_bars() {
     let out = interpreter_and_native_agree("viz_bars.ostrin");
     assert!(
