@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7",
-    "evidenceRevision": "48ab7a2e4ad7751dc54f3b65d7ea3b2ab8c235a6",
+    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+    "evidenceRevision": "79087bffe3ef8f0706850f3e560ae6dba09c048a",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
     "lastValidatedRemotePullRequestHead": "4dcdaa7f3fcef3b2d7634ff0dce4250a958b1893",
-    "lastObservedRemotePullRequestHead": "8bab4b56b0da862cc9393bda631f300d8027e4c7",
+    "lastObservedRemotePullRequestHead": "192824a72b34b881813ffd08967cd88c83fc18eb",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -72,13 +72,17 @@
     "source-ae9aaaa-release-build-and-32-program-wasi-matrix-pass",
     "source-ae9aaaa-web-lab-29-figures-r1-r2-replays-provenance-and-website-check-pass",
     "source-ae9aaaa-numeric-validation-80-and-136-values-exact-live-allocation-zero",
-    "source-ae9aaaa-linguist-distribution-and-v0.2-readiness-12-of-12-pass"
+    "source-ae9aaaa-linguist-distribution-and-v0.2-readiness-12-of-12-pass",
+    "measurement-covariance-unequal-subnormal-midpoint-p2-4372155934-reproduced-192824a",
+    "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
+    "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
+    "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed"
   ],
   "currentPackage": {
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "p2-4372112598-fixed-in-source-ae9aaaa-evidence-48ab7a2-local-validation-passed-pending-fast-forward-push-and-new-head-ci-review",
+    "status": "p2-4372155934-fixed-in-source-354f02c-evidence-79087bf-local-validation-passed-pending-push-and-exact-head-ci-review",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -102,7 +106,8 @@
       "rejects every near-zero factor projection containing adjusted contributions; rounded-equal adjustment factors do not establish exact uniformity",
       "applies diagonal adjustments after exact power-of-two normalization and preserves root-space subnormal adjustments even when rounded sigma squares compare equal",
       "rejects every near-zero factor projection containing adjusted contributions; rounded-equal adjustment factors do not establish exact uniformity",
-      "rejects near-unit unequal-variance correlations unless bounded small-integer roots and their exact products reproduce the supplied covariance"
+      "rejects near-unit unequal-variance correlations unless bounded small-integer roots and their exact products reproduce the supplied covariance",
+      "normalizes each raw off-diagonal entry by the local geometric scale before averaging so unequal subnormal pairs retain the correct correlation"
     ],
     "evidence": [
       "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
@@ -191,18 +196,24 @@
       "Rebuilt release compiler from ae9aaaa; all 32 Node WASI Preview 1 programs passed.",
       "Website WASM check passed (17 pages, 305 examples, 383 integration tests); Lab verified 12 demos and 29 figures, and all 11 R1/R2 bundles replayed.",
       "Numeric validation on win32 x64 / Node v24.19.0 matched 80 report and 136 emitted values exactly, maximum absolute difference 0, live_allocations=0, compiler SHA-256 fcf6a1b6a73f4cca324207237f643933f9282b387b112800bdb855b418e134d0.",
-      "Linguist, distribution and v0.2 readiness (12/12) passed; v0.2.0 remains frozen. Full Cargo, browser, ASan and UBSan must pass on the next exact PR head."
+      "Linguist, distribution and v0.2 readiness (12/12) passed; v0.2.0 remains frozen. Full Cargo, browser, ASan and UBSan must pass on the next exact PR head.",
+      "Fresh review P2 4372155934 on 192824a was reproduced: the covariance matrix [[1,0,0],[0,4u,u],[0,2u,4u]] with u=5e-324 returned 2.5 because halving the one-u difference rounded to zero; independent normalized ratio is 3/8 and analytic variance is 2.75.",
+      "Source revision 354f02cb1a6a4ee57f45310d44e6d7aeacd02de0 normalizes each asymmetric off-diagonal entry by its local geometric scale before averaging; the same repro now returns 2.75. The midpoint helper sums first when finite and halves first only to avoid overflow.",
+      "Focused interpreter/native/WASI-emission/leak covariance test passed 1/1 with output 2.75; cargo fmt and Measurement contract gate plus 18/18 mutation tests passed. The full local Cargo suite was stopped while the exact-head CI suite was running and is not claimed locally.",
+      "Release build and all 32 Node WASI programs passed on source 354f02c. Website WASM check passed 17 pages, 305 examples and 383 integration tests; Lab regenerated 12 demos/29 figures, 29 bundles were refreshed and all 11 R1/R2 replays passed.",
+      "Numeric validation passed: 80 report and 136 emitted values matched exactly, maximum absolute difference 0 and live_allocations=0. Project plan remains 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallback; Linguist, distribution, v0.2 readiness 12/12 and provenance page checks passed.",
+      "ASan, UBSan, complete Cargo suite and fresh review on the next pushed exact PR head are pending; R3 remains OPEN and no performance claim is added. v0.2.0 remains frozen."
     ],
     "activePullRequests": [
       234
     ],
-    "sourceRevision": "ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7",
-    "evidenceRevision": "48ab7a2e4ad7751dc54f3b65d7ea3b2ab8c235a6",
+    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+    "evidenceRevision": "79087bffe3ef8f0706850f3e560ae6dba09c048a",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
   },
   "pending": [
-    "Fast-forward push source ae9aaaa, evidence 48ab7a2 and this checkpoint onto PR #234 after confirming remote head remains 8bab4b5.",
-    "Once source ae9aaaa is visible, reply to and resolve P2 thread 4372112598, request a fresh Codex review, and require Ostrin CI, Browser audit, Native sanitizers (ASan/UBSan), CodeQL and Security audit on the exact new PR head.",
+    "Confirm PR #234 still has remote head 192824a, then push source 354f02c, evidence 79087bf and this checkpoint as one fast-forward update.",
+    "After the push, reply to and resolve P2 thread 4372155934, request a fresh Codex review, and require Ostrin CI, Browser audit, Native sanitizers (ASan/UBSan), CodeQL and Security audit on the exact new PR head.",
     "Integrate PR #234 only when the exact current head remains mergeable, all required workflows are green and fresh review has no substantive findings; merge authorization remains conditional.",
     "Continue R3 work beyond current evidence; R3 host captures remain 0/29 and experiment records remain R0-R2, so no cross-platform reproducibility guarantee is claimed.",
     "Continue static-effects closure and broader R3 inspect/validate/replay/compare evidence.",
@@ -239,43 +250,46 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #234 remote head 8bab4b5 has a P2 now fixed in local source ae9aaaa; four of five workflows are green and Native sanitizers remains in progress. The fix commits are not yet pushed; fresh exact-head CI and review are required.",
+    "PR #234 head 192824a received P2 4372155934. It is fixed locally in source 354f02c with a regression and evidence commit 79087bf; those commits and the checkpoint are not pushed yet. Exact new-head CI, sanitizers and fresh review are required.",
     "R3 host captures remain absent; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
     "Published v0.2.0 remains frozen; do not create a new release or tag."
   ],
-  "next": "Confirm the PR branch remains at 8bab4b5, then fast-forward push source ae9aaaa, evidence 48ab7a2 and this checkpoint; resolve the fixed P2 after it is visible and require fresh review plus all five green workflows on the exact new head.",
+  "next": "Confirm PR #234 still points to 192824a, then push source 354f02c, evidence 79087bf and the checkpoint. Resolve the P2 after the fix is visible and require fresh review plus all five green workflows on the exact new head.",
   "latestPullRequestValidation": {
     "number": 234,
     "url": "https://github.com/sircalch/Ostrin/pull/234",
-    "remoteHead": "8bab4b56b0da862cc9393bda631f300d8027e4c7",
+    "remoteHead": "192824a72b34b881813ffd08967cd88c83fc18eb",
     "base": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
     "mergeCommit": null,
     "state": "open-mergeable",
     "runs": {
       "ostrinCi": {
-        "id": 40226168889,
-        "conclusion": "success"
+        "id": 40227151533,
+        "status": "in_progress"
       },
       "browserAudit": {
-        "id": 40226168873,
-        "conclusion": "success"
+        "id": 40227151524,
+        "status": "in_progress"
       },
       "nativeSanitizers": {
-        "id": 40226168853,
+        "id": 40227151598,
         "status": "in_progress"
       },
       "codeql": {
-        "id": 40226168852,
+        "id": 40227151612,
         "conclusion": "success"
       },
       "securityAudit": {
-        "id": 40226168864,
+        "id": 40227151529,
         "conclusion": "success"
       }
     },
     "openReviewThreads": [
+      4372155934
+    ],
+    "resolvedReviewThreads": [
       4372112598
     ],
-    "note": "GitHub reviewed and tested 8bab4b5. Four workflows are green; Native sanitizers is still running, and review P2 4372112598 remains open. Source ae9aaaa and evidence 48ab7a2, plus this checkpoint commit, are local and not pushed yet; they correct the P2 and require fresh exact-head checks and review."
+    "note": "GitHub reviewed 192824a and found P2 4372155934; that head's CI, Browser and sanitizer runs were still in progress when last observed, while CodeQL and Security passed. All those results are superseded by the local fix. Source 354f02c and evidence 79087bf correct the midpoint defect and pass focused/local gates, but are not pushed yet. Fresh exact-head checks and review are required."
   }
 }
