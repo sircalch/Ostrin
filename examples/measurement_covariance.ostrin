@@ -185,6 +185,22 @@ fn main() -> Void {
         Err(message) => print("near-perfect covariance residual variance = " + message),
     }
 
+    subnormal_ratio_covariance = measurements.covariance(
+        ["subnormal-ratio-large", "subnormal-ratio-small"],
+        array([
+            [1e300, 8.660254037844386e137],
+            [8.660254037844386e137, 3e-24]
+        ])
+    ).unwrap()
+    subnormal_ratio_large_sigma = sqrt(1e300)
+    subnormal_ratio_small_sigma = sqrt(3e-24)
+    subnormal_ratio_large = measurements.from_source(0.0, subnormal_ratio_large_sigma, "subnormal-ratio-large", "large variance source")
+    subnormal_ratio_small = measurements.from_source(0.0, subnormal_ratio_small_sigma, "subnormal-ratio-small", "small variance source")
+    subnormal_ratio_large_contribution = measurements.scale(subnormal_ratio_large.unwrap(), 1.0 / subnormal_ratio_large_sigma)
+    subnormal_ratio_small_contribution = measurements.scale(subnormal_ratio_small.unwrap(), 1.0 / subnormal_ratio_small_sigma)
+    subnormal_ratio_sum = measurements.add(subnormal_ratio_large_contribution, subnormal_ratio_small_contribution).unwrap()
+    print("subnormal variance ratio covariance variance = " + rounded(measurements.variance_with_covariance(subnormal_ratio_sum, subnormal_ratio_covariance).unwrap()).to_string())
+
     division_loss_covariance = measurements.covariance(
         ["division-loss-a", "division-loss-b"],
         array([

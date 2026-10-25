@@ -1027,20 +1027,11 @@ fn covariance_correlation_matrix(
             } else {
                 row_sigma = sqrt(row_variance)
                 column_sigma = sqrt(column_variance)
-                mut variance_ratio = 0.0
-                if row_variance >= column_variance {
-                    variance_ratio = column_variance / row_variance
-                } else {
-                    variance_ratio = row_variance / column_variance
-                }
-                mut covariance_scale = 0.0
-                if variance_ratio > 0.0 {
-                    if row_variance >= column_variance {
-                        covariance_scale = row_variance * sqrt(variance_ratio)
-                    } else {
-                        covariance_scale = column_variance * sqrt(variance_ratio)
-                    }
-                }
+                // The product of the standard deviations is the geometric
+                // mean of the variances. Multiplying the roots avoids first
+                // forming a variance ratio that can underflow to a subnormal
+                // and distort the correlation before the square root.
+                covariance_scale = row_sigma * column_sigma
                 if covariance_scale > 0.0 and is_finite(covariance_scale) {
                     // Divide by the scale-safe geometric mean directly. Two
                     // successive divisions can round a sub-unit correlation
@@ -1050,29 +1041,10 @@ fn covariance_correlation_matrix(
                         return Err("covariance correlation underflows Float range")
                     }
                 } else {
-                    // Keep the fallback for variance ratios outside Float
-                    // range; an unscaled perfect-looking result is unresolved.
-                    mut partial = 0.0
-                    if row_variance >= column_variance {
-                        partial = entry / row_variance
-                        if entry != 0.0 and partial == 0.0 {
-                            return Err("covariance correlation underflows Float range")
-                        }
-                        sigma_ratio = column_sigma / row_sigma
-                        if sigma_ratio == 0.0 {
-                            return Err("covariance correlation underflows Float range")
-                        }
-                        coefficient = partial / sigma_ratio
-                    } else {
-                        partial = entry / column_variance
-                        if entry != 0.0 and partial == 0.0 {
-                            return Err("covariance correlation underflows Float range")
-                        }
-                        sigma_ratio = row_sigma / column_sigma
-                        if sigma_ratio == 0.0 {
-                            return Err("covariance correlation underflows Float range")
-                        }
-                        coefficient = partial / sigma_ratio
+                    // A nonzero covariance cannot be resolved against a zero
+                    // or non-finite geometric mean in Float range.
+                    if entry != 0.0 {
+                        return Err("covariance correlation underflows Float range")
                     }
                 }
                 if not is_finite(coefficient) {
