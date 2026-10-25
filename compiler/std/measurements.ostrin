@@ -5,6 +5,7 @@
 // type contract is reviewed. `from_source` makes correlation identity explicit;
 // `standard` remains compatible by using its label as the identity. Derived values
 // retain source contributions so correlated cancellation is exact.
+import std.numeric
 
 pub record Sensitivity<T> {
     source_id: String
@@ -19,6 +20,14 @@ pub record Measurement<T> {
     sources: List<Sensitivity<T>>
     known: Bool
     reason: String
+}
+
+// A bounded dense covariance model for dimensionless scalar source variables.
+// `source_ids` defines the row and column order of `matrix`.
+pub record SourceCovariance {
+    source_ids: List<String>
+    matrix: Array<Float>
+    relative_tolerance: Float
 }
 
 // A standard uncertainty represented in the coherent unit of its static dimension.
@@ -855,6 +864,670 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
             }),
             Err(message) => Err(message),
         },
+        Err(message) => Err(message),
+    }
+}
+
+fn covariance_midpoint(lower: Float, upper: Float) -> Float {
+    sum = lower + upper
+    if is_finite(sum) {
+        // Adding first preserves adjacent subnormal entries: halving their
+        // subnormal difference can round to zero before the midpoint is formed.
+        return sum * 0.5
+    }
+    // Only same-sign, large finite entries can overflow their sum. Halving
+    // first keeps their midpoint finite without changing the subnormal path.
+    lower * 0.5 + upper * 0.5
+}
+
+fn covariance_validation_error(
+    source_ids: List<String>,
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> String {
+    if not is_finite(relative_tolerance) or relative_tolerance <= 0.0 {
+        return "covariance relative tolerance must be finite and positive"
+    }
+    if relative_tolerance > 1e-6 {
+        return "covariance relative tolerance must not exceed 1e-6"
+    }
+    n = source_ids.length()
+    if n == 0 {
+        return "covariance needs at least one source id"
+    }
+    if n > 64 {
+        return "dense covariance supports at most 64 sources"
+    }
+    shape = matrix.shape()
+    if shape.length() != 2 or shape[0] != n or shape[1] != n {
+        return "covariance matrix shape must match its source ids"
+    }
+    for i in 0 until n {
+        if source_ids[i].length() == 0 {
+            return "covariance source id must not be empty"
+        }
+        for j in 0 until i {
+            if source_ids[i] == source_ids[j] {
+                return "covariance source ids must be unique"
+            }
+        }
+    }
+
+    mut scale = 0.0
+    for i in 0 until n {
+        for j in 0 until n {
+            value = matrix.get(i, j)
+            if not is_finite(value) {
+                return "covariance entries must be finite"
+            }
+            if abs(value) > scale {
+                scale = abs(value)
+            }
+        }
+    }
+    if scale == 0.0 {
+        scale = 1.0
+    }
+    mut symmetric = zeros([n, n])
+    for i in 0 until n {
+        symmetric.set(i, i, matrix.get(i, i) / scale)
+        for j in i + 1 until n {
+            upper = matrix.get(i, j) / scale
+            lower = matrix.get(j, i) / scale
+            if abs(upper - lower) > relative_tolerance {
+                return "covariance matrix must be symmetric within tolerance"
+            }
+            average = covariance_midpoint(lower, upper)
+            symmetric.set(i, j, average)
+            symmetric.set(j, i, average)
+        }
+    }
+
+    match numeric.eigen(symmetric, relative_tolerance) {
+        Ok(factors) => {
+            for i in 0 until n {
+                value = factors.values[i]
+                if not is_finite(value) {
+                    return "covariance eigenvalues must be finite"
+                }
+            }
+            if factors.values[0] < 0.0 - relative_tolerance {
+                return "covariance matrix must be positive semidefinite"
+            }
+        },
+        Err(_) => {
+            return "covariance matrix must be symmetric and numerically valid"
+        },
+    }
+    ""
+}
+
+/// Validate a small dense covariance matrix. The supplied source-id order is
+/// the canonical row and column order for this model. Entries use coherent
+/// squared units; this initial API is limited to dimensionless scalar sources.
+pub fn covariance(
+    source_ids: List<String>,
+    matrix: Array<Float>,
+    relative_tolerance: Float = 1e-12
+) -> Result<SourceCovariance, String> {
+    error = covariance_validation_error(source_ids, matrix, relative_tolerance)
+    if error != "" {
+        return Err(error)
+    }
+    Ok(SourceCovariance {
+        source_ids: source_ids,
+        matrix: matrix,
+        relative_tolerance: relative_tolerance,
+    })
+}
+
+fn covariance_source_index(source_ids: List<String>, source_id: String) -> Int {
+    for i in 0 until source_ids.length() {
+        if source_ids[i] == source_id {
+            return i
+        }
+    }
+    -1
+}
+
+fn covariance_symmetric_entry(matrix: Array<Float>, row: Int, column: Int) -> Float {
+    if row == column {
+        return matrix.get(row, column)
+    }
+    covariance_midpoint(matrix.get(row, column), matrix.get(column, row))
+}
+
+/// Convert covariance entries to correlations using a scale-safe product of
+/// standard deviations, rejecting subnormal scales and unequal-variance
+/// near-perfect correlations that Float cannot establish exactly.
+fn covariance_correlation_matrix(
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> Result<Array<Float>, String> {
+    n = matrix.shape()[0]
+    mut correlation = zeros([n, n])
+    for i in 0 until n {
+        row_variance = covariance_symmetric_entry(matrix, i, i)
+        if not is_finite(row_variance) or row_variance < 0.0 {
+            return Err("covariance matrix could not be stably factorized")
+        }
+        if row_variance == 0.0 {
+            correlation.set(i, i, 0.0)
+        } else {
+            correlation.set(i, i, 1.0)
+        }
+        for j in 0 until i {
+            column_variance = covariance_symmetric_entry(matrix, j, j)
+            upper_entry = matrix.get(i, j)
+            lower_entry = matrix.get(j, i)
+            entry_is_nonzero = upper_entry != 0.0 or lower_entry != 0.0
+            mut coefficient = 0.0
+            mut covariance_scale = 0.0
+            if not is_finite(column_variance) or column_variance < 0.0 {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            if row_variance == 0.0 or column_variance == 0.0 {
+                if entry_is_nonzero {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+            } else {
+                row_sigma = sqrt(row_variance)
+                column_sigma = sqrt(column_variance)
+                // The product of the standard deviations is the geometric
+                // mean of the variances. Multiplying the roots avoids first
+                // forming a variance ratio that can underflow to a subnormal
+                // and distort the correlation before the square root.
+                if row_variance == column_variance {
+                    covariance_scale = row_variance
+                } else {
+                    covariance_scale = row_sigma * column_sigma
+                }
+                if covariance_scale > 0.0 and is_finite(covariance_scale) {
+                    if entry_is_nonzero and row_variance != column_variance
+                        and covariance_scale < 2.2250738585072014e-308
+                    {
+                        // A subnormal geometric scale has too few significant
+                        // bits to resolve an unequal-variance correlation.
+                        return Err("covariance correlation is numerically unresolved")
+                    }
+                    // Normalize each raw entry before averaging. Averaging
+                    // adjacent subnormals first can discard half of their
+                    // difference; here their local geometric scale makes the
+                    // midpoint representable before correlation conversion.
+                    lower_coefficient = lower_entry / covariance_scale
+                    upper_coefficient = upper_entry / covariance_scale
+                    if not is_finite(lower_coefficient) or not is_finite(upper_coefficient) {
+                        return Err("covariance matrix could not be stably factorized")
+                    }
+                    if (lower_entry != 0.0 and lower_coefficient == 0.0)
+                        or (upper_entry != 0.0 and upper_coefficient == 0.0)
+                    {
+                        return Err("covariance correlation underflows Float range")
+                    }
+                    coefficient = covariance_midpoint(lower_coefficient, upper_coefficient)
+                } else {
+                    // A nonzero covariance cannot be resolved against a zero
+                    // or non-finite geometric mean in Float range.
+                    if entry_is_nonzero {
+                        return Err("covariance correlation underflows Float range")
+                    }
+                }
+                if not is_finite(coefficient) {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                mut correlation_resolution = relative_tolerance
+                if correlation_resolution < 1.4210854715202004e-14 {
+                    correlation_resolution = 1.4210854715202004e-14
+                }
+                coefficient_magnitude = abs(coefficient)
+                if row_variance != column_variance
+                    and coefficient_magnitude >= 1.0 - correlation_resolution
+                {
+                    // Rounded square roots and products cannot prove exact
+                    // dependence (for example, sqrt(11) * sqrt(11) rounds to
+                    // 11). Certify only small integer roots whose squares and
+                    // product are exactly representable; otherwise preserve
+                    // the positive-definite residual by rejecting the case.
+                    max_exact_integer_root = 94906265.0
+                    roots_are_integers = floor(row_sigma) == row_sigma
+                        and floor(column_sigma) == column_sigma
+                    if not roots_are_integers
+                        or row_sigma > max_exact_integer_root
+                        or column_sigma > max_exact_integer_root
+                    {
+                        return Err("covariance correlation is numerically unresolved")
+                    }
+                    row_root_square = row_sigma * row_sigma
+                    column_root_square = column_sigma * column_sigma
+                    exact_root_product = row_sigma * column_sigma
+                    if row_root_square != row_variance
+                        or column_root_square != column_variance
+                        or exact_root_product != abs(upper_entry)
+                        or exact_root_product != abs(lower_entry)
+                    {
+                        return Err("covariance correlation is numerically unresolved")
+                    }
+                }
+                if coefficient_magnitude <= 1.0
+                    and 1.0 - coefficient_magnitude <= correlation_resolution
+                    and (covariance_scale == 0.0
+                        or abs(upper_entry) < covariance_scale
+                        or abs(lower_entry) < covariance_scale)
+                {
+                    return Err("covariance correlation is numerically unresolved")
+                }
+                coefficient_scale = abs(coefficient)
+                if coefficient_scale > 1.0 {
+                    if coefficient_scale - 1.0 > relative_tolerance {
+                        return Err("covariance matrix could not be stably factorized")
+                    }
+                    if coefficient < 0.0 {
+                        coefficient = -1.0
+                    } else {
+                        coefficient = 1.0
+                    }
+                }
+            }
+            correlation.set(i, j, coefficient)
+            correlation.set(j, i, coefficient)
+        }
+    }
+    Ok(correlation)
+}
+
+/// Factor a validated dimensionless correlation matrix as L·Lᵀ.
+///
+/// This factor is applied to stored source contributions so large signed terms
+/// cancel before they are squared.
+fn covariance_semidefinite_factor(
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> Result<Array<Float>, String> {
+    n = matrix.shape()[0]
+    mut lower = zeros([n, n])
+    for i in 0 until n {
+        mut diagonal_sum = 0.0
+        mut diagonal_correction = 0.0
+        mut diagonal_products = 0.0
+        for k in 0 until i {
+            diagonal_factor = lower.get(i, k)
+            term = diagonal_factor * diagonal_factor
+            if not is_finite(term) {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            if diagonal_factor != 0.0 and term == 0.0 {
+                return Err("covariance matrix factorization underflows Float range")
+            }
+            next_sum = diagonal_sum + term
+            mut residual = 0.0
+            if abs(diagonal_sum) >= abs(term) {
+                residual = (diagonal_sum - next_sum) + term
+            } else {
+                residual = (term - next_sum) + diagonal_sum
+            }
+            diagonal_correction = diagonal_correction + residual
+            diagonal_sum = next_sum
+            diagonal_products = diagonal_products + abs(term)
+            if not is_finite(diagonal_sum) or not is_finite(diagonal_correction)
+                or not is_finite(diagonal_products)
+            {
+                return Err("covariance matrix could not be stably factorized")
+            }
+        }
+        diagonal = covariance_symmetric_entry(matrix, i, i)
+        mut pivot = diagonal - (diagonal_sum + diagonal_correction)
+        pivot_scale = abs(diagonal) + diagonal_products
+        if not is_finite(pivot) or not is_finite(pivot_scale) {
+            return Err("covariance matrix could not be stably factorized")
+        }
+        if pivot < 0.0 {
+            return Err("covariance matrix could not be stably factorized")
+        }
+        if pivot > 0.0 and pivot_scale > 0.0
+            and pivot <= relative_tolerance * pivot_scale
+        {
+            return Err("covariance matrix could not be stably factorized")
+        }
+
+        if pivot == 0.0 {
+            lower.set(i, i, 0.0)
+            for row in i + 1 until n {
+                mut dot_sum = 0.0
+                mut dot_correction = 0.0
+                mut dot_products = 0.0
+                for k in 0 until i {
+                    left_factor = lower.get(row, k)
+                    right_factor = lower.get(i, k)
+                    term = left_factor * right_factor
+                    if left_factor != 0.0 and right_factor != 0.0 and term == 0.0 {
+                        return Err("covariance matrix factorization underflows Float range")
+                    }
+                    next_sum = dot_sum + term
+                    mut residual = 0.0
+                    if abs(dot_sum) >= abs(term) {
+                        residual = (dot_sum - next_sum) + term
+                    } else {
+                        residual = (term - next_sum) + dot_sum
+                    }
+                    dot_correction = dot_correction + residual
+                    dot_sum = next_sum
+                    dot_products = dot_products + abs(term)
+                }
+                entry = covariance_symmetric_entry(matrix, row, i)
+                residual = entry - (dot_sum + dot_correction)
+                residual_scale = abs(entry) + dot_products
+                if not is_finite(residual) or not is_finite(residual_scale)
+                    or (residual_scale > 0.0 and abs(residual) > relative_tolerance * residual_scale)
+                {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                lower.set(row, i, 0.0)
+            }
+        } else {
+            diagonal_factor = sqrt(pivot)
+            if not is_finite(diagonal_factor) or diagonal_factor == 0.0 {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            lower.set(i, i, diagonal_factor)
+            for row in i + 1 until n {
+                mut dot_sum = 0.0
+                mut dot_correction = 0.0
+                for k in 0 until i {
+                    left_factor = lower.get(row, k)
+                    right_factor = lower.get(i, k)
+                    term = left_factor * right_factor
+                    if left_factor != 0.0 and right_factor != 0.0 and term == 0.0 {
+                        return Err("covariance matrix factorization underflows Float range")
+                    }
+                    next_sum = dot_sum + term
+                    mut residual = 0.0
+                    if abs(dot_sum) >= abs(term) {
+                        residual = (dot_sum - next_sum) + term
+                    } else {
+                        residual = (term - next_sum) + dot_sum
+                    }
+                    dot_correction = dot_correction + residual
+                    dot_sum = next_sum
+                }
+                entry = covariance_symmetric_entry(matrix, row, i)
+                residual_value = entry - (dot_sum + dot_correction)
+                factor = residual_value / diagonal_factor
+                if not is_finite(factor) {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                if residual_value != 0.0 and factor == 0.0 {
+                    return Err("covariance matrix factorization underflows Float range")
+                }
+                lower.set(row, i, factor)
+            }
+        }
+    }
+    Ok(lower)
+}
+
+/// Return J·Σ·Jᵀ for the sources currently present in a scalar measurement.
+/// The equivalent contribution/correlation form avoids dividing and rebuilding
+/// large sensitivities. Unused sources have zero sensitivity; each used source
+/// must be present and its diagonal must match the recorded standard sigma.
+pub fn variance_with_covariance(
+    measurement: Measurement<Float>,
+    model: SourceCovariance
+) -> Result<Float, String> {
+    if not measurement.known {
+        return Err("covariance propagation needs known measurement uncertainty")
+    }
+    if not is_finite(measurement.value) {
+        return Err("measurement value must be finite")
+    }
+    error = covariance_validation_error(model.source_ids, model.matrix, model.relative_tolerance)
+    if error != "" {
+        return Err(error)
+    }
+
+    n = model.source_ids.length()
+    mut standardized_contributions = zeros([n])
+    mut source_sigmas = zeros([n])
+    mut contribution_adjustments = zeros([n])
+    mut contribution_adjustment_flags = zeros([n])
+    for i in 0 until measurement.sources.length() {
+        source = measurement.sources[i]
+        if source.source_id.length() == 0 or source.source_dimension != "dimensionless" {
+            return Err("scalar covariance needs dimensionless sources with non-empty ids")
+        }
+        if not is_finite(source.source_sigma) or source.source_sigma < 0.0
+            or not is_finite(source.contribution)
+        {
+            return Err("measurement source sigma and contribution must be finite")
+        }
+        for j in 0 until i {
+            if measurement.sources[j].source_id == source.source_id {
+                return Err("measurement source ids must be unique before covariance propagation")
+            }
+        }
+        index = covariance_source_index(model.source_ids, source.source_id)
+        if index < 0 {
+            return Err("covariance model is missing a measurement source id")
+        }
+        expected_variance = source.source_sigma * source.source_sigma
+        if not is_finite(expected_variance) {
+            return Err("measurement source variance must be finite")
+        }
+        if source.source_sigma != 0.0 and expected_variance == 0.0 {
+            return Err("measurement source variance underflows Float range")
+        }
+        diagonal = model.matrix.get(index, index)
+        if expected_variance > 0.0 and expected_variance < 2.2250738585072014e-308 {
+            // Compare in root space; rounded subnormal squares cannot establish this match.
+            if diagonal <= 0.0 {
+                return Err("covariance diagonal must match the measurement source sigma")
+            }
+            subnormal_sigma_ratio = sqrt(diagonal) / source.source_sigma
+            if not is_finite(subnormal_sigma_ratio)
+                or abs(subnormal_sigma_ratio - 1.0) > model.relative_tolerance * 0.5
+            {
+                return Err("covariance diagonal must match the measurement source sigma")
+            }
+        }
+        mut diagonal_scale = abs(expected_variance)
+        if abs(diagonal) > diagonal_scale {
+            diagonal_scale = abs(diagonal)
+        }
+        if diagonal_scale > 0.0
+            and abs(diagonal - expected_variance) > model.relative_tolerance * diagonal_scale
+        {
+            return Err("covariance diagonal must match the measurement source sigma")
+        }
+        if source.source_sigma == 0.0 {
+            if source.contribution != 0.0 {
+                return Err("zero-sigma source must have zero sensitivity contribution")
+            }
+        } else {
+            if not is_finite(source.contribution) {
+                return Err("standardized measurement source contribution must be finite")
+            }
+            standardized_contributions.set(index, source.contribution)
+        }
+        source_sigmas.set(index, source.source_sigma)
+    }
+
+    // The diagonal match is tolerance-based. Preserve the stored contribution
+    // exactly for a bitwise match; otherwise retain the accepted sigma ratio
+    // and apply it after power-of-two normalization. This avoids rounding a
+    // large contribution before cancellation is assessed.
+    for i in 0 until n {
+        source_sigma = source_sigmas[i]
+        if source_sigma != 0.0 {
+            diagonal = covariance_symmetric_entry(model.matrix, i, i)
+            expected_variance = source_sigma * source_sigma
+            mut contribution_needs_adjustment = diagonal != expected_variance
+            if expected_variance > 0.0 and expected_variance < 2.2250738585072014e-308
+                and sqrt(diagonal) != source_sigma
+            {
+                // Distinct source roots can square to the same subnormal Float.
+                // Preserve that root-space adjustment so cancellation is not
+                // incorrectly certified as exact after rounding.
+                contribution_needs_adjustment = true
+            }
+            if contribution_needs_adjustment {
+                if diagonal < 0.0 {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                adjustment = sqrt(diagonal) / source_sigma
+                adjusted_contribution = standardized_contributions[i] * adjustment
+                if not is_finite(adjustment) or adjustment == 0.0
+                    or not is_finite(adjusted_contribution)
+                {
+                    return Err("standardized measurement source contribution must be finite")
+                }
+                if standardized_contributions[i] != 0.0 and adjusted_contribution == 0.0 {
+                    return Err("standardized measurement source contribution underflows Float range")
+                }
+                contribution_adjustments.set(i, adjustment)
+                contribution_adjustment_flags.set(i, 1.0)
+            }
+        }
+    }
+
+    mut contribution_scale = 0.0
+    for i in 0 until n {
+        if abs(standardized_contributions[i]) > contribution_scale {
+            contribution_scale = abs(standardized_contributions[i])
+        }
+    }
+    if contribution_scale == 0.0 {
+        return Ok(0.0)
+    }
+    // Normalize by a power of two so binary scaling does not round away
+    // small, representable differences between large source contributions.
+    mut contribution_power_scale = 1.0
+    if contribution_scale >= 1.0 {
+        while contribution_power_scale <= contribution_scale * 0.5 {
+            contribution_power_scale = contribution_power_scale * 2.0
+        }
+    } else {
+        while contribution_power_scale > contribution_scale {
+            contribution_power_scale = contribution_power_scale * 0.5
+        }
+    }
+    correlation = match covariance_correlation_matrix(model.matrix, model.relative_tolerance) {
+        Ok(value) => value,
+        Err(message) => {
+            return Err(message)
+        },
+    }
+    factor = match covariance_semidefinite_factor(correlation, model.relative_tolerance) {
+        Ok(value) => value,
+        Err(message) => {
+            return Err(message)
+        },
+    }
+    mut variance = 0.0
+    for column in 0 until n {
+        mut projection = 0.0
+        mut projection_correction = 0.0
+        mut projection_term_magnitude = 0.0
+        mut projection_has_inexact_factor = false
+        mut projection_has_adjusted_contribution = false
+        for row in column until n {
+            normalized_contribution = standardized_contributions[row] / contribution_power_scale
+            mut projection_adjustment = contribution_adjustments[row]
+            if projection_adjustment == 0.0 {
+                projection_adjustment = 1.0
+            }
+            adjusted_normalized_contribution = normalized_contribution * projection_adjustment
+            factor_entry = factor.get(row, column)
+            // Scaling by a power of two is exact for normal binary floats, but
+            // can discard significant bits when a nonzero value becomes
+            // subnormal. Refuse that lossy normalization explicitly.
+            if contribution_power_scale > 1.0 and adjusted_normalized_contribution != 0.0
+                and abs(adjusted_normalized_contribution) < 2.2250738585072014e-308
+            {
+                return Err("propagated covariance contribution normalization loses subnormal precision")
+            }
+            term = factor_entry * adjusted_normalized_contribution
+            if not is_finite(term) {
+                return Err("propagated covariance variance must be finite")
+            }
+            if (standardized_contributions[row] != 0.0 and adjusted_normalized_contribution == 0.0)
+                or (factor_entry != 0.0 and adjusted_normalized_contribution != 0.0 and term == 0.0)
+            {
+                return Err("propagated covariance projection underflows Float range")
+            }
+            projection_term_magnitude = projection_term_magnitude + abs(term)
+            if not is_finite(projection_term_magnitude) {
+                return Err("propagated covariance variance must be finite")
+            }
+            if factor_entry != 0.0 and adjusted_normalized_contribution != 0.0
+                and factor_entry != 1.0 and factor_entry != -1.0
+            {
+                projection_has_inexact_factor = true
+            }
+            if factor_entry != 0.0 and normalized_contribution != 0.0
+                and contribution_adjustment_flags[row] != 0.0
+            {
+                projection_has_adjusted_contribution = true
+            }
+            next_projection = projection + term
+            mut residual = 0.0
+            if abs(projection) >= abs(term) {
+                residual = (projection - next_projection) + term
+            } else {
+                residual = (term - next_projection) + projection
+            }
+            projection_correction = projection_correction + residual
+            projection = next_projection
+            if not is_finite(projection) or not is_finite(projection_correction) {
+                return Err("propagated covariance variance must be finite")
+            }
+        }
+        scaled_projection = projection + projection_correction
+        if (projection_has_inexact_factor or projection_has_adjusted_contribution)
+            and projection_term_magnitude > 0.0
+        {
+            // The input tolerance bounds accepted covariance perturbations.
+            // Use at least 64 Float epsilons for factors, diagonal-adjustment
+            // products, and compensated accumulation; smaller cancellation
+            // residuals cannot be distinguished reliably from rounding error.
+            mut projection_resolution = model.relative_tolerance
+            if projection_resolution < 1.4210854715202004e-14 {
+                projection_resolution = 1.4210854715202004e-14
+            }
+            projection_limit = projection_term_magnitude * projection_resolution
+            if not is_finite(projection_limit) {
+                return Err("propagated covariance variance must be finite")
+            }
+            if abs(scaled_projection) <= projection_limit {
+                return Err("propagated covariance projection is numerically unresolved")
+            }
+        }
+        propagated_sigma = scaled_projection * contribution_power_scale
+        contribution_variance = propagated_sigma * propagated_sigma
+        if not is_finite(scaled_projection) or not is_finite(propagated_sigma)
+            or not is_finite(contribution_variance)
+        {
+            return Err("propagated covariance variance must be finite")
+        }
+        if scaled_projection != 0.0 and contribution_scale != 0.0 and propagated_sigma == 0.0 {
+            return Err("propagated covariance uncertainty underflows Float range")
+        }
+        if propagated_sigma != 0.0 and contribution_variance == 0.0 {
+            return Err("propagated covariance variance underflows Float range")
+        }
+        variance = variance + contribution_variance
+        if not is_finite(variance) {
+            return Err("propagated covariance variance must be finite")
+        }
+    }
+    Ok(variance)
+}
+
+/// Return the standard uncertainty derived from J·Σ·Jᵀ.
+pub fn uncertainty_with_covariance(
+    measurement: Measurement<Float>,
+    model: SourceCovariance
+) -> Result<Float, String> {
+    match variance_with_covariance(measurement, model) {
+        Ok(variance) => Ok(sqrt(variance)),
         Err(message) => Err(message),
     }
 }

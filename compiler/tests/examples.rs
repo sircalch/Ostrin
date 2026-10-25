@@ -12521,7 +12521,7 @@ fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
 #[test]
 fn dimensional_measurement_lab_matches_interpreter_and_native() {
     let file = example_path("measurement_lab.ostrin");
-    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\n";
+    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\ndimensionless scalar covariance\nsum variance = 7\nsum uncertainty = 2.6458\n";
     let interpreted = run(&["--run", &file]);
     assert!(
         interpreted.status.success(),
@@ -19194,7 +19194,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=22")
+        measurement_source.contains("ir=31")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -19249,6 +19249,178 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "Measurement scalar lifecycle leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
+    let file = example_path("measurement_covariance.ostrin");
+    let correlated_sum_variance = 1.0_f64 * 4.0 * 1.0 + 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let correlated_difference_variance = 1.0_f64 * 4.0 * 1.0 - 2.0 * 1.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let independent_sum_variance = 1.0_f64 * 4.0 * 1.0 + 1.0 * 1.0 * 1.0;
+    let rounded_factor_projection_oracle =
+        (350_000_000_000_000_000.0_f64 - 35.0 * 10_000_000_000_000_000.0).powi(2)
+            + (119_999_999_999_999_984.0_f64 - 12.0 * 10_000_000_000_000_000.0).powi(2);
+    assert_eq!(rounded_factor_projection_oracle, 256.0);
+    let near_perfect_correlation_oracle = 12.0e15_f64 * (15.0_f64 - 14.999_999_999_999_998_f64);
+    assert!((near_perfect_correlation_oracle - 21.316_282_072_803_006).abs() < 1e-12);
+    let subnormal_variance_ratio_geometric_mean = 1.0e150_f64 * (3.0e-24_f64).sqrt();
+    let subnormal_variance_ratio_correlation =
+        8.660_254_037_844_386e137_f64 / subnormal_variance_ratio_geometric_mean;
+    assert!((subnormal_variance_ratio_correlation - 0.5).abs() < 1e-15);
+    let subnormal_variance_ratio_oracle = 2.0 + 2.0 * subnormal_variance_ratio_correlation;
+    assert!((subnormal_variance_ratio_oracle - 3.0).abs() < 1e-14);
+    let subnormal_geometric_scale_correlation = 1.0_f64 / 3.0_f64.sqrt();
+    let subnormal_geometric_scale_oracle = 2.0 + 2.0 * subnormal_geometric_scale_correlation;
+    assert!((subnormal_geometric_scale_oracle - 3.154_700_538_379_251_5).abs() < 1e-15);
+    let review_subnormal_geometric_scale_correlation = 1.0_f64 / 6.0_f64.sqrt();
+    let review_subnormal_geometric_scale_oracle =
+        2.0 + 2.0 * review_subnormal_geometric_scale_correlation;
+    assert!((review_subnormal_geometric_scale_oracle - 2.816_496_580_927_726).abs() < 1e-15);
+    // 90-digit Decimal oracle computed from the exact binary Float inputs.
+    let rounded_geometric_mean_oracle = 1.158_751_715_360_156_3_f64;
+    assert!(rounded_geometric_mean_oracle > 1.15 && rounded_geometric_mean_oracle < 1.17);
+    // Exact integer ratio for the binary source sigma 1 + 2^-52 and stored
+    // contributions 1e16 and -9999999999999998 under an all-ones covariance.
+    let adjusted_contribution_residual_oracle =
+        (-992_800_745_259_006_i64 as f64 / 4_503_599_627_370_497_i64 as f64).powi(2);
+    assert!((adjusted_contribution_residual_oracle - 0.048_596_460_630_071_24).abs() < 1e-15);
+    // Python Fraction oracle over the exact binary source sigmas and stored contributions.
+    let equal_adjustment_residual_oracle = 1.232_595_164_407_831_7_f64;
+    assert!(equal_adjustment_residual_oracle > 1.23 && equal_adjustment_residual_oracle < 1.24);
+    // 100-digit Decimal oracle for 2e16 * (1 - c / sqrt(11)), with c the exact
+    // binary64 value represented by 3.3166247903554.
+    let rounded_root_product_oracle = 0.235_978_214_230_015_98_f64;
+    assert!(rounded_root_product_oracle > 0.2359 && rounded_root_product_oracle < 0.2361);
+    // 100-digit Decimal oracle using exact binary Float inputs and sqrt(5e-324).
+    let subnormal_rounded_square_adjustment_oracle = 4.930_380_657_631_321_6_f64;
+    assert!(subnormal_rounded_square_adjustment_oracle > 4.9);
+    assert!(subnormal_rounded_square_adjustment_oracle < 5.0);
+    // Exact ratio oracle for averaging adjacent subnormal entries before
+    // correlation conversion: ((1u + 2u) / 2) / (4u) = 3/8.
+    let unequal_subnormal_midpoint_oracle = 2.0 + 2.0 * (3.0 / 8.0);
+    assert_eq!(unequal_subnormal_midpoint_oracle, 2.75);
+    let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
+    let expected = format!(
+        "correlated sum variance = {}\n\
+         correlated sum uncertainty = {}\n\
+         correlated difference variance = {}\n\
+         correlated difference uncertainty = {}\n\
+         scaled correlated variance = {}\n\
+         within-tolerance symmetric variance = {}\n\
+         independent sum uncertainty = {}\n\
+         rank-deficient cancellation uncertainty = 0\n\
+         subnormal covariance cancellation variance = 0\n\
+         unequal subnormal covariance midpoint variance = {}\n\
+         wide-scale covariance cancellation variance = 0\n\
+         rank-three compensated variance = 1\n\
+         rank-three reordered compensated variance = 1\n\
+         rank-three 1e16 compensated variance = 1\n\
+         rank-three 1e16 reordered compensated variance = 1\n\
+         power-of-two gradient normalization variance = 4\n\
+         sqrt-three rank-one cancellation variance = 0\n\
+         unresolved positive pivot = covariance correlation is numerically unresolved\n\
+         near-perfect covariance residual variance = covariance correlation is numerically unresolved\n\
+         subnormal variance ratio covariance variance = 3\n\
+         subnormal geometric covariance scale = covariance correlation is numerically unresolved\n\
+         review subnormal geometric covariance = covariance correlation is numerically unresolved\n\
+         rounded geometric covariance = covariance correlation is numerically unresolved\n\
+         rounded root product covariance = covariance correlation is numerically unresolved\n\
+         direct contribution cancellation variance = 16\n\
+         adjusted contribution cancellation = propagated covariance projection is numerically unresolved\n\
+         equal rounded adjustment cancellation = propagated covariance projection is numerically unresolved\n\
+         subnormal rounded source squares = propagated covariance projection is numerically unresolved\n\
+         rounded factor projection = propagated covariance projection is numerically unresolved\n\
+         subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\
+         nonuniform rank-one covariance variance = 0.01\n\
+         large finite PSD covariance = accepted\n\
+         indefinite covariance = covariance matrix must be positive semidefinite\n\
+         large indefinite covariance = covariance matrix must be positive semidefinite\n\
+         nonsymmetric covariance = covariance matrix must be symmetric within tolerance\n\
+         duplicate covariance id = covariance source ids must be unique\n\
+         non-finite covariance = covariance entries must be finite\n\
+         excessive covariance tolerance = covariance relative tolerance must not exceed 1e-6\n\
+         underflowed source variance = measurement source variance underflows Float range\n\
+         subnormal source variance = covariance diagonal must match the measurement source sigma\n\
+         source variance mismatch = covariance diagonal must match the measurement source sigma\n\
+         missing source = covariance model is missing a measurement source id\n\
+         unknown uncertainty = covariance propagation needs known measurement uncertainty\n",
+        rounded(correlated_sum_variance),
+        rounded(correlated_sum_variance.sqrt()),
+        rounded(correlated_difference_variance),
+        rounded(correlated_difference_variance.sqrt()),
+        rounded(4.0 * correlated_sum_variance),
+        rounded(correlated_sum_variance),
+        rounded(independent_sum_variance.sqrt()),
+         unequal_subnormal_midpoint_oracle,
+    );
+    assert_eq!(
+        interpreter_and_native_agree("measurement_covariance.ostrin"),
+        expected
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement covariance type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let measurement_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
+    assert!(
+        measurement_source.contains("hir=0") && measurement_source.contains("ast=0"),
+        "covariance support introduced a type-checker or AST fallback: {measurement_source}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement covariance WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "ostrin_drop_std_measurements__SourceCovariance",
+        "ostrin_drop_std_numeric__Eigen",
+        "SourceCovariance*",
+        "covariance matrix must be positive semidefinite",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "Measurement covariance WASI output is missing {marker}"
+        );
+    }
+
+    let exe = temp_artifact("measurement-covariance.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement covariance compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run Measurement covariance binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement covariance run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement covariance lifecycle leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
 }

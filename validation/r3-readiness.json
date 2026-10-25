@@ -30,8 +30,8 @@
   "captureOpenCount": 29,
   "incompleteEffectBundleCount": 0,
   "closedEntryEffectBundleCount": 29,
-  "knownEffectCallCount": 20702,
-  "symbolicEffectCallCount": 74,
+  "knownEffectCallCount": 21026,
+  "symbolicEffectCallCount": 83,
   "unresolvedEffectCallCount": 0,
   "gapDiagnostics": {
     "captureGaps": {
@@ -88,9 +88,9 @@
       "symbolicInventoryStatus": "available",
       "symbolicInventoryBundleCount": 29,
       "symbolicInventoryUnavailableBundleCount": 0,
-      "symbolicCallbackReferences": 74,
+      "symbolicCallbackReferences": 83,
       "uniqueSymbolicCallbacks": 10,
-      "observedSymbolicCallbackReferences": 74,
+      "observedSymbolicCallbackReferences": 83,
       "topSymbolicCallbacks": [
         {
           "operation": "std.viz::grid_of.f",
@@ -99,48 +99,48 @@
         },
         {
           "operation": "std.numeric::bisect.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::derivative.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::golden_min.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::newton.df",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::newton.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::rk4.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::rk45.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::secant.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         },
         {
           "operation": "std.numeric::simpson.f",
-          "references": 5,
-          "bundleCount": 5
+          "references": 6,
+          "bundleCount": 6
         }
       ],
       "directReachability": {
@@ -185,25 +185,25 @@
       "availableBundleCount": 29,
       "unavailableBundleCount": 0,
       "invalidBundleCount": 0,
-      "edgeCount": 20776,
-      "categorizedEdgeCount": 20776,
+      "edgeCount": 21109,
+      "categorizedEdgeCount": 21109,
       "uncategorizedEdgeCount": 0,
-      "localFunctionEdgeCount": 9289,
-      "staticLocalFunctionEdgeCount": 9289,
+      "localFunctionEdgeCount": 9335,
+      "staticLocalFunctionEdgeCount": 9335,
       "genericTraitCandidateEdgeCount": 0,
-      "localTargetCandidateCount": 9289,
+      "localTargetCandidateCount": 9335,
       "multiTargetEdgeCount": 0,
       "resolvedCallSiteCount": 245,
       "locatedCallSiteCount": 245,
       "unlocatedCallSiteCount": 0,
       "categoryCounts": {
-        "resolvedLocalOperations": 9289,
-        "effectClassifiedOperations": 11458,
-        "effectFreeIntrinsics": 8670,
+        "resolvedLocalOperations": 9335,
+        "effectClassifiedOperations": 11747,
+        "effectFreeIntrinsics": 8884,
         "compilerBuiltinCallbacks": 0,
-        "indirectOperations": 74,
+        "indirectOperations": 83,
         "unresolvedOperations": 0,
-        "symbolicCallbacks": 74
+        "symbolicCallbacks": 83
       },
       "sourceSiteAssociationsValid": true,
       "interpretation": "Call sites are statically analyzed source occurrences associated with compiler-emitted local targets. They are not runtime traces or proof of runtime dispatch, purity, or semantic soundness."
@@ -768,8 +768,8 @@
       "effectCoverage": {
         "complete": true,
         "count_unit": "distinct_function_operation_edges",
-        "known_calls": 923,
-        "symbolic_calls": 1,
+        "known_calls": 1247,
+        "symbolic_calls": 10,
         "unresolved_calls": 0
       },
       "entryEffectClosure": {

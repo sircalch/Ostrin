@@ -36,7 +36,7 @@ for (const marker of ["safe_ref=", 'package_ref="v${version}-rc.${GITHUB_SHA:0:7
 }
 for (const marker of [
   "scripts/wasi-program-check.mjs",
-  "all 31 entries from scripts/wasi-program-check.mjs",
+  "all 32 entries from scripts/wasi-program-check.mjs",
   "sha256sum ./*.wasm > SHA256SUMS",
   "tar -czf ../ostrinc-wasm32-wasip1.tar.gz ./*.wasm SHA256SUMS README.txt",
 ]) {

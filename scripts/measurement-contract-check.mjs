@@ -16,8 +16,9 @@ function check(errors, condition, message) {
 }
 
 /**
- * Check that scalar, bounded dimensional, and structural Measurement array
- * contracts have evidence. Numeric arrays, covariance, and Monte Carlo remain open.
+ * Check that scalar, bounded dimensional, scalar covariance, and structural
+ * Measurement array contracts have evidence. Dimensional/array covariance and
+ * Monte Carlo remain open.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
@@ -26,6 +27,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
   const nativeQuantityExample = read("examples/measurement_quantity_native_smoke.ostrin", root);
   const measurementArrayExample = read("examples/measurement_array_shape.ostrin", root);
+  const covarianceExample = read("examples/measurement_covariance.ostrin", root);
   const labExample = read("examples/measurement_lab.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
@@ -43,6 +45,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     ["examples/measurement_quantity_direct_shape.ostrin", directQuantityExample],
     ["examples/measurement_quantity_native_smoke.ostrin", nativeQuantityExample],
     ["examples/measurement_array_shape.ostrin", measurementArrayExample],
+    ["examples/measurement_covariance.ostrin", covarianceExample],
     ["compiler/tests/examples.rs", tests],
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
@@ -78,7 +81,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: scalar Measurement parity test is missing");
   check(errors, tests.includes("std_measurements_series_feeds_reproducible_error_bars"),
     "compiler/tests/examples.rs: Measurement-to-error-bars parity test is missing");
-  check(errors, /measurement_source\.contains\([\s\S]*ir=22[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
+  check(errors, /measurement_source\.contains\([\s\S]*ir=31[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
     "compiler/tests/examples.rs: scalar Measurement IR ratchet is missing");
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),
@@ -96,8 +99,166 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /direct full-surface fixture now has native IR\/interpreter parity[\s\S]{0,220}div_quantity_same/i.test(lab)
       && !/direct full-surface fixture still fails native lowering/i.test(lab),
     "scripts/lab-data.mjs: direct Measurement<Quantity<D>> native evidence is stale or missing");
-  check(errors, /One-dimensional Array<Measurement<Float>> has an experimental structural profile[\s\S]{0,240}Numeric array operations, reductions, covariance, Monte Carlo and coverage intervals remain planned/i.test(lab),
+  check(errors, /One-dimensional Array<Measurement<Float>> has an experimental structural profile[\s\S]{0,300}Numeric array operations, Monte Carlo and coverage intervals remain planned/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
+  check(errors, /bounded SourceCovariance API for dimensionless scalar measurements using J·Σ·Jᵀ/i.test(lab)
+      && /SourceCovariance is experimental and limited to dense covariance matrices for at most 64 dimensionless scalar sources/i.test(lab)
+      && /its relative tolerance is at most 1e-6 \(default 1e-12\)/i.test(lab)
+      && /nonzero source sigma whose square underflows Float is rejected/i.test(lab)
+      && /propagation derives a scale-safe correlation matrix and applies it directly to the stored source contributions/i.test(lab)
+      && /product of the two source standard deviations, avoiding a variance ratio that could underflow to subnormal/i.test(lab)
+      && /rejects unequal-variance correlations when the geometric scale itself is subnormal; equal variances use the exact diagonal/i.test(lab)
+      && /avoiding lossy division by sigma and reconstruction/i.test(lab)
+      && /correlation conversion divides each symmetric off-diagonal entry by the local geometric scale before averaging/i.test(lab)
+      && /quadratic form uses a semidefinite factor and compensated projections before summing squares/i.test(lab)
+      && /Source contributions use exact power-of-two normalization/i.test(lab)
+      && /roots are small integer values whose squares and product are exactly representable/i.test(lab)
+      && /Equal rounded adjustment ratios do not prove exact uniformity/i.test(lab)
+      && /Subnormal sigma roots that differ despite equal rounded squares retain their adjustment/i.test(lab)
+      && /negative and numerically unresolved positive pivots are rejected/i.test(lab)
+      && /covariance matrix that cannot be stably factored is rejected explicitly/i.test(lab)
+      && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
+    "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
+  const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covarianceCorrelation = std.match(/fn covariance_correlation_matrix\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covariancePropagation = std.match(/pub fn variance_with_covariance\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covarianceFactorization = std.match(/fn covariance_semidefinite_factor\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covarianceMidpoint = std.match(/fn covariance_midpoint\([\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /record SourceCovariance/.test(std)
+      && /pub fn covariance\(/.test(std)
+      && /n > 64/.test(covarianceValidation)
+      && /relative_tolerance > 1e-6/.test(covarianceValidation)
+      && /matrix\.shape\(\)/.test(covarianceValidation)
+      && /is_finite\(value\)/.test(covarianceValidation)
+      && /matrix\.get\(i, i\) \/ scale/.test(covarianceValidation)
+      && /matrix\.get\(i, j\) \/ scale/.test(covarianceValidation)
+      && /abs\(upper - lower\) > relative_tolerance/.test(covarianceValidation)
+      && /numeric\.eigen\(symmetric, relative_tolerance\)/.test(covarianceValidation)
+      && /factors\.values\[0\] < 0\.0 - relative_tolerance/.test(covarianceValidation)
+      && /covariance_validation_error\(model\.source_ids, model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
+      && !/covariance_scale/.test(covariancePropagation)
+      && /expected_variance = source\.source_sigma \* source\.source_sigma/.test(covariancePropagation)
+      && /source\.source_sigma != 0\.0 and expected_variance == 0\.0/.test(covariancePropagation)
+      && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
+      && /source_sigmas\.set\(index, source\.source_sigma\)/.test(covariancePropagation)
+      && /contribution_needs_adjustment = diagonal != expected_variance[\s\S]*?adjustment = sqrt\(diagonal\) \/ source_sigma/.test(covariancePropagation)
+      && /covariance_correlation_matrix\(model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
+      && /covariance_semidefinite_factor\(correlation, model\.relative_tolerance\)/.test(covariancePropagation)
+      && /standardized_contributions/.test(covariancePropagation)
+      && /contribution_power_scale/.test(covariancePropagation)
+      && /contribution_power_scale <= contribution_scale \* 0\.5/.test(covariancePropagation)
+      && /standardized_contributions\[row\] \/ contribution_power_scale/.test(covariancePropagation)
+      && /lower_coefficient = lower_entry \/ covariance_scale/.test(covarianceCorrelation)
+      && /upper_coefficient = upper_entry \/ covariance_scale/.test(covarianceCorrelation)
+      && /coefficient = covariance_midpoint\(lower_coefficient, upper_coefficient\)/.test(covarianceCorrelation)
+      && /covariance_scale = row_sigma \* column_sigma/.test(covarianceCorrelation)
+      && /covariance_scale = row_variance/.test(covarianceCorrelation)
+      && /covariance_scale < 2\.2250738585072014e-308/.test(covarianceCorrelation)
+      && /covariance correlation is numerically unresolved/.test(covarianceCorrelation)
+      && /max_exact_integer_root = 94906265\.0/.test(covarianceCorrelation)
+      && /roots_are_integers/.test(covarianceCorrelation)
+      && /exact_root_product != abs\(upper_entry\)/.test(covarianceCorrelation)
+      && /exact_root_product != abs\(lower_entry\)/.test(covarianceCorrelation)
+      && /sqrt\(diagonal\) != source_sigma/.test(covariancePropagation)
+      && /distinct source roots can square to the same subnormal Float/i.test(covariancePropagation)
+      && /factor\.get\(row, column\)/.test(covariancePropagation)
+      && /contribution_adjustment_flags\.set\(i, 1\.0\)/.test(covariancePropagation)
+      && /if abs\(scaled_projection\) <= projection_limit \{\s*return Err\("propagated covariance projection is numerically unresolved"\)/.test(covariancePropagation)
+      && !/projection_adjustments_uniform|scaled_unadjusted_projection/.test(covariancePropagation)
+      && /projection_correction = projection_correction \+ residual/.test(covariancePropagation)
+      && /contribution_variance = propagated_sigma \* propagated_sigma/.test(covariancePropagation)
+      && /propagated covariance projection underflows Float range/.test(covariancePropagation)
+      && /pivot > 0\.0[\s\S]*?pivot <= relative_tolerance \* pivot_scale/.test(covarianceFactorization)
+      && /if pivot < 0\.0\s*\{\s*return Err/.test(covarianceFactorization)
+      && /covariance matrix could not be stably factorized/.test(covarianceFactorization),
+    "compiler/std/measurements.ostrin: bounded covariance validation and factorized J·Σ·Jᵀ propagation contract is incomplete");
+  check(errors, /sum = lower \+ upper/.test(covarianceMidpoint)
+      && /if is_finite\(sum\)/.test(covarianceMidpoint)
+      && /return sum \* 0\.5/.test(covarianceMidpoint)
+      && /lower \* 0\.5 \+ upper \* 0\.5/.test(covarianceMidpoint)
+      && /vista\s+normalizada por la entrada máxima finita/i.test(design)
+      && /La propagación divide cada entrada simétrica por la escala\s+geométrica local antes de\s+promediarla y factorizar/i.test(design)
+      && /La matriz[\s\S]{0,200}R = L · Lᵀ[\s\S]{0,200}suma\s+compensada/i.test(design)
+      && /normalizan usando una potencia de dos exacta/i.test(design)
+      && /pivotes positivos numéricamente irresueltos/i.test(design)
+      && /factorización numéricamente estable/i.test(design)
+      && /media geométrica `sqrt\(Σᵢᵢ\) · sqrt\(Σⱼⱼ\)`/i.test(design)
+      && /cociente entre varianzas, que puede redondearse a subnormal/i.test(design)
+      && /producto mismo queda\s+subnormal con varianzas distintas/i.test(design)
+      && /raíces son\s+enteras pequeñas, sus cuadrados y su producto son exactamente representables/i.test(design)
+      && /factores de ajuste redondeados\s+iguales no prueban uniformidad\s+exacta/i.test(design)
+      && /borrar la varianza residual/i.test(design)
+      && /Este orden conserva pares subnormales desiguales cuyo\s+punto\s+medio no puede representarse en la escala original/i.test(design),
+    "Measurement covariance: normalized PSD analysis and scale-safe midpoint are missing");
+  check(errors, /SourceCovariance` valida entre 1 y 64 IDs/i.test(design)
+      && /tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\]/i.test(design)
+      && /J · Σ · Jᵀ/i.test(design)
+      && /los pares simétricos que difieren dentro de esa\s+tolerancia se promedian explícitamente/i.test(design)
+      && /La matriz se vuelve a\s+validar al propagar/i.test(design)
+      && /subdesborda[\s\S]{0,120}la propagación se rechaza explícitamente/i.test(design)
+      && /no acepta[\s\S]{0,140}covarianza entre elementos/i.test(design),
+    "docs/design/25-mediciones-e-incertidumbre.md: scalar covariance contract, mutation guard or scope boundary is incomplete");
+  check(errors, tests.includes("std_measurements_covariance_matches_analytic_oracle_and_wasi")
+      && /correlated sum variance = \{\}/.test(tests)
+      && /rank-deficient cancellation uncertainty = 0/.test(tests)
+      && /subnormal covariance cancellation variance = 0/.test(tests)
+      && /unequal subnormal covariance midpoint variance = \{\}/.test(tests)
+      && /unequal_subnormal_midpoint_oracle = 2\.0 \+ 2\.0 \* \(3\.0 \/ 8\.0\)/.test(tests)
+      && /wide-scale covariance cancellation variance = 0/.test(tests)
+      && /rank-three compensated variance = 1/.test(tests)
+      && /rank-three reordered compensated variance = 1/.test(tests)
+      && /power-of-two gradient normalization variance = 4/.test(tests)
+      && /sqrt-three rank-one cancellation variance = 0/.test(tests)
+      && /direct contribution cancellation variance = 16/.test(tests)
+      && /adjusted contribution cancellation = propagated covariance projection is numerically unresolved/.test(tests)
+      && tests.includes("adjusted_contribution_residual_oracle")
+      && tests.includes("0.048_596_460_630_071_24")
+      && /unresolved positive pivot = covariance correlation is numerically unresolved/.test(tests)
+      && /near-perfect covariance residual variance = covariance correlation is numerically unresolved/.test(tests)
+      && /subnormal variance ratio covariance variance = 3/.test(tests)
+      && /subnormal geometric covariance scale = covariance correlation is numerically unresolved/.test(tests)
+      && /review subnormal geometric covariance = covariance correlation is numerically unresolved/.test(tests)
+      && /rounded geometric covariance = covariance correlation is numerically unresolved/.test(tests)
+      && /rounded root product covariance = covariance correlation is numerically unresolved/.test(tests)
+      && /equal rounded adjustment cancellation = propagated covariance projection is numerically unresolved/.test(tests)
+      && /subnormal rounded source squares = propagated covariance projection is numerically unresolved/.test(tests)
+      && tests.includes("subnormal_rounded_square_adjustment_oracle")
+      && tests.includes("4.930_380_657_631_321_6")
+      && tests.includes("rounded_root_product_oracle")
+      && tests.includes("0.235_978_214_230_015_98")
+      && tests.includes("equal_adjustment_residual_oracle")
+      && tests.includes("1.232_595_164_407_831_7")
+      && tests.includes("near_perfect_correlation_oracle")
+      && tests.includes("21.316_282_072_803_006")
+      && tests.includes("subnormal_variance_ratio_geometric_mean")
+      && tests.includes("subnormal_variance_ratio_correlation")
+      && tests.includes("subnormal_geometric_scale_oracle")
+      && tests.includes("review_subnormal_geometric_scale_oracle")
+      && tests.includes("rounded_geometric_mean_oracle")
+      && /nonuniform rank-one covariance variance = 0\.01/.test(tests)
+      && /large finite PSD covariance = accepted/.test(tests)
+      && /large indefinite covariance = covariance matrix must be positive semidefinite/.test(tests)
+      && covarianceExample.includes("measurements.covariance")
+      && covarianceExample.includes("measurements.variance_with_covariance")
+      && covarianceExample.includes("indefinite covariance")
+      && covarianceExample.includes("subnormal covariance cancellation variance")
+      && covarianceExample.includes("wide-scale covariance cancellation variance")
+      && covarianceExample.includes("rank-three compensated variance")
+      && covarianceExample.includes("rank-three reordered compensated variance")
+      && covarianceExample.includes("power-of-two gradient normalization variance")
+      && covarianceExample.includes("sqrt-three rank-one cancellation variance")
+      && covarianceExample.includes("direct contribution cancellation variance")
+      && covarianceExample.includes("adjusted contribution cancellation")
+      && covarianceExample.includes("unresolved positive pivot")
+      && covarianceExample.includes("near-perfect covariance residual variance")
+      && covarianceExample.includes("nonuniform rank-one covariance variance")
+      && covarianceExample.includes("large finite PSD covariance")
+      && covarianceExample.includes("large indefinite covariance")
+      && covarianceExample.includes("excessive covariance tolerance")
+      && covarianceExample.includes("underflowed source variance")
+      && covarianceExample.includes("subnormal source variance")
+      && covarianceExample.includes("source variance mismatch"),
+    "Measurement covariance: analytical oracle, runtime parity and validation regressions are missing");
   check(errors, tests.includes("measurement_array_structural_ownership_matches_interpreter_native_and_wasi")
       && tests.includes("measurement_array_numeric_operators_are_rejected_explicitly")
       && measurementArrayExample.includes("values[array([false, true])]")

@@ -214,20 +214,18 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    nombres accesibles de controles, imágenes e iframes ya están automatizados; queda la auditoría
    manual completa con lectores de pantalla y baselines visuales.
 7. **Extender el núcleo científico de mediciones**: el API escalar experimental de
-   `std.measurements` ya tiene paridad intérprete/native, `live_allocations=0` y una comprobación
-   de destructores recursivos en C para WASI; `sanitizers.yml` incluye esta prueba, pendiente de
-   resultado para esta rama. La proyección de series `List<Measurement<Float>>` alimenta
-   `std.viz.errorbars`. `from_source` ya separa la identidad explícita de la etiqueta; `standard`
-   mantiene compatibilidad usando la etiqueta como ID. `Measurement<Quantity<D>>` ya tiene un
-   prototipo experimental para fuentes explícitas, suma correlacionada, incertidumbre estándar,
-   productos entre dimensiones y cocientes entre dimensiones iguales y distintas; el Scientific Lab lo
-   muestra por WASM. Hay smoke tests nativos para operaciones seleccionadas con salida coincidente,
-   pero la ruta conserva un fallback AST y divergencias en el reporte de tipos. No se afirma lowering
-   tipado completo ni ownership general: la instanciación directa de `div_quantity` para dimensiones
-   iguales sigue siendo una frontera nativa. Este ciclo añade el rechazo de nominales no finitos al
-   convertir a unidades coherentes y un perfil estructural nativo para `Array<Measurement<Float>>`
-   (construcción, indexación, slicing y `to_list`) con paridad y cero fugas. Ownership/ABI nativos
-   generales, operaciones numéricas de arrays, covarianzas parciales y Monte Carlo siguen abiertos.
+   `std.measurements` ya tiene paridad intérprete/native, `live_allocations=0` y comprobación de
+   destructores recursivos en C para WASI. La proyección de series `List<Measurement<Float>>`
+   alimenta `std.viz.errorbars`. `from_source` separa la identidad explícita de la etiqueta;
+   `standard` mantiene compatibilidad usando la etiqueta como ID. `Measurement<Quantity<D>>` conserva
+   su frontera experimental: los fixtures dimensionales tienen smoke nativo seleccionado, sin
+   fallback AST ni divergencias de tipos en esos casos, pero no reclaman lowering ni ownership
+   generales. PR #233 ya integra en `main` el perfil estructural de `Array<Measurement<Float>>`.
+   Este paquete añade `SourceCovariance` experimental para matrices densas de hasta 64 fuentes
+   escalares adimensionales; sus casos comparan `J·Σ·Jᵀ` con una oracle analítica, verifican
+   intérprete/nativo, leak-check, lowering tipado y WASI. El Scientific Lab muestra la operación.
+   Covarianza para `Quantity` o arrays, operaciones numéricas de arrays, ownership/ABI generales y
+   Monte Carlo siguen abiertos.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
    reproducible antes de fijar sintaxis pública. `ostrinc --effect-report` ya compone filas experimentales
@@ -243,7 +241,7 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
 
 ## Horizonte posterior
 
-- Integración completa de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md), junto con efectos científicos y procedencia en [docs/design/26-efectos-cientificos.md](docs/design/26-efectos-cientificos.md); el API escalar tiene paridad y error bars; el prototipo dimensional ya tiene suma, producto, cocientes de dimensiones iguales y distintas y proyección de incertidumbre en intérprete/WASM. Paridad nativa, arrays, covarianzas parciales y Monte Carlo siguen pendientes.
+- Integración completa de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md), junto con efectos científicos y procedencia en [docs/design/26-efectos-cientificos.md](docs/design/26-efectos-cientificos.md); el API escalar tiene paridad y error bars, y existe un perfil denso acotado de covarianza escalar. El prototipo dimensional y la estructura `Array<Measurement<Float>>` tienen evidencia experimental de alcance limitado; siguen pendientes covarianza dimensional/de arrays, operaciones numéricas sobre arrays y Monte Carlo.
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
 - Mayor calidad de vídeo y codecs adicionales; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF, MP4 cuando existe el codec y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.

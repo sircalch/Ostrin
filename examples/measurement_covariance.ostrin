@@ -1,0 +1,518 @@
+// std.measurements · bounded covariance propagation for scalar source graphs.
+import std.measurements
+
+fn rounded(value: Float) -> Float {
+    round(value * 10000.0) / 10000.0
+}
+
+fn main() -> Void {
+    correlated = measurements.covariance(
+        ["caliper", "reference"],
+        array([
+            [4.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    caliper = measurements.from_source(10.0, 2.0, "caliper", "caliper")
+    reference = measurements.from_source(4.0, 1.0, "reference", "reference")
+    total = measurements.add(caliper.unwrap(), reference.unwrap()).unwrap()
+    difference = measurements.sub(caliper.unwrap(), reference.unwrap()).unwrap()
+    print("correlated sum variance = " + rounded(measurements.variance_with_covariance(total, correlated).unwrap()).to_string())
+    print("correlated sum uncertainty = " + rounded(measurements.uncertainty_with_covariance(total, correlated).unwrap()).to_string())
+    print("correlated difference variance = " + rounded(measurements.variance_with_covariance(difference, correlated).unwrap()).to_string())
+    print("correlated difference uncertainty = " + rounded(measurements.uncertainty_with_covariance(difference, correlated).unwrap()).to_string())
+    doubled = measurements.scale(total, 2.0)
+    print("scaled correlated variance = " + rounded(measurements.variance_with_covariance(doubled, correlated).unwrap()).to_string())
+
+    near_symmetric = measurements.covariance(
+        ["caliper", "reference"],
+        array([
+            [4.0, 1.0000000000001],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    print("within-tolerance symmetric variance = " + rounded(measurements.variance_with_covariance(total, near_symmetric).unwrap()).to_string())
+
+    independent = measurements.covariance(
+        ["caliper", "reference"],
+        array([
+            [4.0, 0.0],
+            [0.0, 1.0]
+        ])
+    ).unwrap()
+    print("independent sum uncertainty = " + rounded(measurements.uncertainty_with_covariance(total, independent).unwrap()).to_string())
+
+    rank_deficient = measurements.covariance(
+        ["shared-a", "shared-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    shared_a = measurements.from_source(3.0, 1.0, "shared-a", "same source")
+    shared_b = measurements.from_source(5.0, 1.0, "shared-b", "same source")
+    cancelled = measurements.sub(shared_a.unwrap(), shared_b.unwrap()).unwrap()
+    print("rank-deficient cancellation uncertainty = " + rounded(measurements.uncertainty_with_covariance(cancelled, rank_deficient).unwrap()).to_string())
+
+    subnormal_sigma = sqrt(5e-324)
+    subnormal_scale = 1.0 / subnormal_sigma
+    subnormal_covariance = measurements.covariance(
+        ["subnormal-a", "subnormal-b"],
+        array([
+            [5e-324, 5e-324],
+            [5e-324, 5e-324]
+        ])
+    ).unwrap()
+    subnormal_a = measurements.from_source(0.0, subnormal_sigma, "subnormal-a", "tiny source A")
+    subnormal_b = measurements.from_source(0.0, subnormal_sigma, "subnormal-b", "tiny source B")
+    subnormal_a_scaled = measurements.scale(subnormal_a.unwrap(), subnormal_scale)
+    subnormal_b_scaled = measurements.scale(subnormal_b.unwrap(), subnormal_scale)
+    subnormal_difference = measurements.sub(subnormal_a_scaled, subnormal_b_scaled).unwrap()
+    print("subnormal covariance cancellation variance = " + measurements.variance_with_covariance(subnormal_difference, subnormal_covariance).unwrap().to_string())
+
+    subnormal_midpoint_unit = 5e-324
+    subnormal_midpoint_sigma = sqrt(4.0 * subnormal_midpoint_unit)
+    subnormal_midpoint_scale = 1.0 / subnormal_midpoint_sigma
+    subnormal_midpoint_covariance = measurements.covariance(
+        ["unused-midpoint", "midpoint-a", "midpoint-b"],
+        array([
+            [1.0, 0.0, 0.0],
+            [0.0, 4.0 * subnormal_midpoint_unit, subnormal_midpoint_unit],
+            [0.0, 2.0 * subnormal_midpoint_unit, 4.0 * subnormal_midpoint_unit]
+        ])
+    ).unwrap()
+    subnormal_midpoint_a = measurements.from_source(0.0, subnormal_midpoint_sigma, "midpoint-a", "subnormal source A").unwrap()
+    subnormal_midpoint_b = measurements.from_source(0.0, subnormal_midpoint_sigma, "midpoint-b", "subnormal source B").unwrap()
+    subnormal_midpoint_a_scaled = measurements.scale(subnormal_midpoint_a, subnormal_midpoint_scale)
+    subnormal_midpoint_b_scaled = measurements.scale(subnormal_midpoint_b, subnormal_midpoint_scale)
+    subnormal_midpoint_sum = measurements.add(subnormal_midpoint_a_scaled, subnormal_midpoint_b_scaled).unwrap()
+    print("unequal subnormal covariance midpoint variance = " + measurements.variance_with_covariance(subnormal_midpoint_sum, subnormal_midpoint_covariance).unwrap().to_string())
+
+    wide_scale_covariance = measurements.covariance(
+        ["unused-large", "wide-a", "wide-b"],
+        array([
+            [1e300, 0.0, 0.0],
+            [0.0, 1e-100, 1e-100],
+            [0.0, 1e-100, 1e-100]
+        ])
+    ).unwrap()
+    wide_a = measurements.from_source(0.0, 1e-50, "wide-a", "tiny source A")
+    wide_b = measurements.from_source(0.0, 1e-50, "wide-b", "tiny source B")
+    wide_a_scaled = measurements.scale(wide_a.unwrap(), 1e50)
+    wide_b_scaled = measurements.scale(wide_b.unwrap(), 1e50)
+    wide_difference = measurements.sub(wide_a_scaled, wide_b_scaled).unwrap()
+    print("wide-scale covariance cancellation variance = " + measurements.variance_with_covariance(wide_difference, wide_scale_covariance).unwrap().to_string())
+
+    rank_three = measurements.covariance(
+        ["large", "unit", "negative"],
+        array([
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ])
+    ).unwrap()
+    rank_three_reordered = measurements.covariance(
+        ["large", "negative", "unit"],
+        array([
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ])
+    ).unwrap()
+    large_source = measurements.from_source(0.0, 1.0, "large", "large contribution")
+    unit_source = measurements.from_source(0.0, 1.0, "unit", "unit residual")
+    negative_source = measurements.from_source(0.0, 1.0, "negative", "negative contribution")
+    large_contribution = measurements.scale(large_source.unwrap(), 1e8)
+    unit_contribution = unit_source.unwrap()
+    negative_contribution = measurements.scale(negative_source.unwrap(), -1e8)
+    first_pair = measurements.add(large_contribution, unit_contribution).unwrap()
+    first_order = measurements.add(first_pair, negative_contribution).unwrap()
+    second_pair = measurements.add(large_contribution, negative_contribution).unwrap()
+    second_order = measurements.add(second_pair, unit_contribution).unwrap()
+    print("rank-three compensated variance = " + measurements.variance_with_covariance(first_order, rank_three).unwrap().to_string())
+    print("rank-three reordered compensated variance = " + measurements.variance_with_covariance(second_order, rank_three_reordered).unwrap().to_string())
+
+    extreme_large_contribution = measurements.scale(large_source.unwrap(), 1e16)
+    extreme_negative_contribution = measurements.scale(negative_source.unwrap(), -1e16)
+    extreme_first_pair = measurements.add(extreme_large_contribution, unit_contribution).unwrap()
+    extreme_first_order = measurements.add(extreme_first_pair, extreme_negative_contribution).unwrap()
+    extreme_second_pair = measurements.add(extreme_large_contribution, extreme_negative_contribution).unwrap()
+    extreme_second_order = measurements.add(extreme_second_pair, unit_contribution).unwrap()
+    print("rank-three 1e16 compensated variance = " + measurements.variance_with_covariance(extreme_first_order, rank_three).unwrap().to_string())
+    print("rank-three 1e16 reordered compensated variance = " + measurements.variance_with_covariance(extreme_second_order, rank_three_reordered).unwrap().to_string())
+
+    gradient_residual_covariance = measurements.covariance(
+        ["gradient-a", "gradient-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    gradient_a = measurements.from_source(0.0, 1.0, "gradient-a", "gradient source A")
+    gradient_b = measurements.from_source(0.0, 1.0, "gradient-b", "gradient source B")
+    gradient_a_scaled = measurements.scale(gradient_a.unwrap(), 1e16)
+    gradient_b_scaled = measurements.scale(gradient_b.unwrap(), -9999999999999998.0)
+    gradient_residual = measurements.add(gradient_a_scaled, gradient_b_scaled).unwrap()
+    print("power-of-two gradient normalization variance = " + rounded(measurements.variance_with_covariance(gradient_residual, gradient_residual_covariance).unwrap()).to_string())
+
+    unresolved_pivot_covariance = measurements.covariance(
+        ["pivot-a", "pivot-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0000000000005]
+        ])
+    ).unwrap()
+    pivot_a = measurements.from_source(0.0, 1.0, "pivot-a", "pivot source A")
+    pivot_b = measurements.from_source(0.0, sqrt(1.0000000000005), "pivot-b", "pivot source B")
+    pivot_a_scaled = measurements.scale(pivot_a.unwrap(), 1e8)
+    pivot_b_scaled = measurements.scale(pivot_b.unwrap(), 1e8)
+    pivot_difference = measurements.sub(pivot_a_scaled, pivot_b_scaled).unwrap()
+    sqrt_three_sigma = sqrt(3.0)
+    sqrt_three_variance = sqrt_three_sigma * sqrt_three_sigma
+    sqrt_three_covariance = measurements.covariance(
+        ["sqrt-three-a", "sqrt-three-b"],
+        array([
+            [sqrt_three_variance, sqrt_three_variance],
+            [sqrt_three_variance, sqrt_three_variance]
+        ])
+    ).unwrap()
+    sqrt_three_a = measurements.from_source(0.0, sqrt_three_sigma, "sqrt-three-a", "rank-one source A")
+    sqrt_three_b = measurements.from_source(0.0, sqrt_three_sigma, "sqrt-three-b", "rank-one source B")
+    sqrt_three_a_scaled = measurements.scale(sqrt_three_a.unwrap(), 1e16)
+    sqrt_three_b_scaled = measurements.scale(sqrt_three_b.unwrap(), 1e16)
+    sqrt_three_difference = measurements.sub(sqrt_three_a_scaled, sqrt_three_b_scaled).unwrap()
+    print("sqrt-three rank-one cancellation variance = " + rounded(measurements.variance_with_covariance(sqrt_three_difference, sqrt_three_covariance).unwrap()).to_string())
+    match measurements.variance_with_covariance(pivot_difference, unresolved_pivot_covariance) {
+        Ok(value) => print("unresolved positive pivot = " + rounded(value).to_string()),
+        Err(message) => print("unresolved positive pivot = " + message),
+    }
+
+    near_perfect_covariance = measurements.covariance(
+        ["near-perfect-a", "near-perfect-b"],
+        array([
+            [9.0, 14.999999999999998],
+            [14.999999999999998, 25.0]
+        ])
+    ).unwrap()
+    near_perfect_a = measurements.from_source(0.0, 3.0, "near-perfect-a", "near-perfect source A")
+    near_perfect_b = measurements.from_source(0.0, 5.0, "near-perfect-b", "near-perfect source B")
+    near_perfect_a_scaled = measurements.scale(near_perfect_a.unwrap(), 1e8)
+    near_perfect_b_scaled = measurements.scale(near_perfect_b.unwrap(), -6e7)
+    near_perfect_measurement = measurements.add(near_perfect_a_scaled, near_perfect_b_scaled).unwrap()
+    match measurements.variance_with_covariance(near_perfect_measurement, near_perfect_covariance) {
+        Ok(value) => print("near-perfect covariance residual variance = " + rounded(value).to_string()),
+        Err(message) => print("near-perfect covariance residual variance = " + message),
+    }
+
+    subnormal_ratio_covariance = measurements.covariance(
+        ["subnormal-ratio-large", "subnormal-ratio-small"],
+        array([
+            [1e300, 8.660254037844386e137],
+            [8.660254037844386e137, 3e-24]
+        ])
+    ).unwrap()
+    subnormal_ratio_large_sigma = sqrt(1e300)
+    subnormal_ratio_small_sigma = sqrt(3e-24)
+    subnormal_ratio_large = measurements.from_source(0.0, subnormal_ratio_large_sigma, "subnormal-ratio-large", "large variance source")
+    subnormal_ratio_small = measurements.from_source(0.0, subnormal_ratio_small_sigma, "subnormal-ratio-small", "small variance source")
+    subnormal_ratio_large_contribution = measurements.scale(subnormal_ratio_large.unwrap(), 1.0 / subnormal_ratio_large_sigma)
+    subnormal_ratio_small_contribution = measurements.scale(subnormal_ratio_small.unwrap(), 1.0 / subnormal_ratio_small_sigma)
+    subnormal_ratio_sum = measurements.add(subnormal_ratio_large_contribution, subnormal_ratio_small_contribution).unwrap()
+    print("subnormal variance ratio covariance variance = " + rounded(measurements.variance_with_covariance(subnormal_ratio_sum, subnormal_ratio_covariance).unwrap()).to_string())
+
+    subnormal_scale_covariance = measurements.covariance(
+        ["subnormal-scale-small", "subnormal-scale-large"],
+        array([
+            [5e-324, 5e-324],
+            [5e-324, 1.5e-323]
+        ])
+    ).unwrap()
+    subnormal_scale_small_sigma = sqrt(5e-324)
+    subnormal_scale_large_sigma = sqrt(1.5e-323)
+    subnormal_scale_small = measurements.from_source(0.0, subnormal_scale_small_sigma, "subnormal-scale-small", "small subnormal variance")
+    subnormal_scale_large = measurements.from_source(0.0, subnormal_scale_large_sigma, "subnormal-scale-large", "large subnormal variance")
+    subnormal_scale_small_contribution = measurements.scale(subnormal_scale_small.unwrap(), 1.0 / subnormal_scale_small_sigma)
+    subnormal_scale_large_contribution = measurements.scale(subnormal_scale_large.unwrap(), 1.0 / subnormal_scale_large_sigma)
+    subnormal_scale_sum = measurements.add(subnormal_scale_small_contribution, subnormal_scale_large_contribution).unwrap()
+    match measurements.variance_with_covariance(subnormal_scale_sum, subnormal_scale_covariance) {
+        Ok(value) => print("subnormal geometric covariance scale = " + rounded(value).to_string()),
+        Err(message) => print("subnormal geometric covariance scale = " + message),
+    }
+
+    subnormal_review_covariance = measurements.covariance(
+        ["subnormal-review-small", "subnormal-review-large"],
+        array([
+            [1e-323, 5e-324],
+            [5e-324, 1.5e-323]
+        ])
+    ).unwrap()
+    subnormal_review_small_sigma = sqrt(1e-323)
+    subnormal_review_large_sigma = sqrt(1.5e-323)
+    subnormal_review_small = measurements.from_source(0.0, subnormal_review_small_sigma, "subnormal-review-small", "review small subnormal variance")
+    subnormal_review_large = measurements.from_source(0.0, subnormal_review_large_sigma, "subnormal-review-large", "review large subnormal variance")
+    subnormal_review_small_contribution = measurements.scale(subnormal_review_small.unwrap(), 1.0 / subnormal_review_small_sigma)
+    subnormal_review_large_contribution = measurements.scale(subnormal_review_large.unwrap(), 1.0 / subnormal_review_large_sigma)
+    subnormal_review_sum = measurements.add(subnormal_review_small_contribution, subnormal_review_large_contribution).unwrap()
+    match measurements.variance_with_covariance(subnormal_review_sum, subnormal_review_covariance) {
+        Ok(value) => print("review subnormal geometric covariance = " + rounded(value).to_string()),
+        Err(message) => print("review subnormal geometric covariance = " + message),
+    }
+
+    rounded_geometric_covariance = measurements.covariance(
+        ["rounded-geometric-small", "rounded-geometric-large"],
+        array([
+            [1.0, 1.7320508075688772],
+            [1.7320508075688772, 3.0]
+        ])
+    ).unwrap()
+    rounded_geometric_small_source = measurements.from_source(0.0, 1.0, "rounded-geometric-small", "unit variance")
+    rounded_geometric_large_sigma = sqrt(3.0)
+    rounded_geometric_large_source = measurements.from_source(0.0, rounded_geometric_large_sigma, "rounded-geometric-large", "variance three")
+    rounded_geometric_small_scaled = measurements.scale(rounded_geometric_small_source.unwrap(), 1e8)
+    rounded_geometric_large_scaled = measurements.scale(rounded_geometric_large_source.unwrap(), -1e8 / rounded_geometric_large_sigma)
+    rounded_geometric_sum = measurements.add(rounded_geometric_small_scaled, rounded_geometric_large_scaled).unwrap()
+    match measurements.variance_with_covariance(rounded_geometric_sum, rounded_geometric_covariance) {
+        Ok(value) => print("rounded geometric covariance = " + rounded(value).to_string()),
+        Err(message) => print("rounded geometric covariance = " + message),
+    }
+
+    rounded_root_product_covariance = measurements.covariance(
+        ["rounded-root-product-unit", "rounded-root-product-eleven"],
+        array([
+            [1.0, 3.3166247903554],
+            [3.3166247903554, 11.0]
+        ])
+    ).unwrap()
+    rounded_root_product_unit = measurements.from_source(0.0, 1.0, "rounded-root-product-unit", "unit variance")
+    rounded_root_product_eleven_sigma = sqrt(11.0)
+    rounded_root_product_eleven = measurements.from_source(0.0, rounded_root_product_eleven_sigma, "rounded-root-product-eleven", "variance eleven")
+    rounded_root_product_unit_scaled = measurements.scale(rounded_root_product_unit.unwrap(), 1e8)
+    rounded_root_product_eleven_scaled = measurements.scale(rounded_root_product_eleven.unwrap(), -1e8 / rounded_root_product_eleven_sigma)
+    rounded_root_product_pair = measurements.add(rounded_root_product_unit_scaled, rounded_root_product_eleven_scaled).unwrap()
+    match measurements.variance_with_covariance(rounded_root_product_pair, rounded_root_product_covariance) {
+        Ok(value) => print("rounded root product covariance = " + rounded(value).to_string()),
+        Err(message) => print("rounded root product covariance = " + message),
+    }
+
+    division_loss_covariance = measurements.covariance(
+        ["division-loss-a", "division-loss-b"],
+        array([
+            [9.0, 3.0],
+            [3.0, 1.0]
+        ])
+    ).unwrap()
+    division_loss_measurement = Measurement<Float> {
+        value: 0.0,
+        sources: [
+            Sensitivity<Float> {
+                source_id: "division-loss-a",
+                label: "large positive contribution",
+                source_dimension: "dimensionless",
+                source_sigma: 3.0,
+                contribution: 30000000000000004.0,
+            },
+            Sensitivity<Float> {
+                source_id: "division-loss-b",
+                label: "large negative contribution",
+                source_dimension: "dimensionless",
+                source_sigma: 1.0,
+                contribution: -30000000000000000.0,
+            }
+        ],
+        known: true,
+        reason: "",
+    }
+    print("direct contribution cancellation variance = " + rounded(measurements.variance_with_covariance(division_loss_measurement, division_loss_covariance).unwrap()).to_string())
+
+    adjusted_contribution_covariance = measurements.covariance(
+        ["adjusted-a", "adjusted-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    adjusted_contribution_a = measurements.from_source(0.0, 1.0000000000000002, "adjusted-a", "rounded diagonal adjustment")
+    adjusted_contribution_b = measurements.from_source(0.0, 1.0, "adjusted-b", "matching diagonal")
+    adjusted_contribution_a_scaled = measurements.scale(adjusted_contribution_a.unwrap(), 9999999999999998.0)
+    adjusted_contribution_b_scaled = measurements.scale(adjusted_contribution_b.unwrap(), -9999999999999998.0)
+    adjusted_contribution_pair = measurements.add(adjusted_contribution_a_scaled, adjusted_contribution_b_scaled).unwrap()
+    match measurements.variance_with_covariance(adjusted_contribution_pair, adjusted_contribution_covariance) {
+        Ok(value) => print("adjusted contribution cancellation = " + rounded(value).to_string()),
+        Err(message) => print("adjusted contribution cancellation = " + message),
+    }
+
+    equal_adjustment_a = measurements.from_source(0.0, 0.9999999999999999, "equal-adjustment-a", "rounded ratio source A")
+    equal_adjustment_b = measurements.from_source(0.0, 0.9999999999999998, "equal-adjustment-b", "rounded ratio source B")
+    equal_adjustment_covariance = measurements.covariance(
+        ["equal-adjustment-a", "equal-adjustment-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    equal_adjustment_a_scaled = measurements.scale(equal_adjustment_a.unwrap(), 10000000000000002.0)
+    equal_adjustment_b_scaled = measurements.scale(equal_adjustment_b.unwrap(), -10000000000000002.0)
+    equal_adjustment_pair = measurements.add(equal_adjustment_a_scaled, equal_adjustment_b_scaled).unwrap()
+    match measurements.variance_with_covariance(equal_adjustment_pair, equal_adjustment_covariance) {
+        Ok(value) => print("equal rounded adjustment cancellation = " + rounded(value).to_string()),
+        Err(message) => print("equal rounded adjustment cancellation = " + message),
+    }
+
+    subnormal_rounded_square_covariance = measurements.covariance(
+        ["subnormal-rounded-square-a", "subnormal-rounded-square-b"],
+        array([
+            [5e-324, 5e-324],
+            [5e-324, 5e-324]
+        ])
+    ).unwrap()
+    subnormal_rounded_square_a = measurements.from_source(0.0, 2.2227587494850775e-162, "subnormal-rounded-square-a", "subnormal source A")
+    subnormal_rounded_square_b = measurements.from_source(0.0, 2.222758749485078e-162, "subnormal-rounded-square-b", "subnormal source B")
+    subnormal_rounded_square_a_scaled = measurements.scale(subnormal_rounded_square_a.unwrap(), 4.498913794543196e177)
+    subnormal_rounded_square_b_scaled = measurements.scale(subnormal_rounded_square_b.unwrap(), -4.4989137945431955e177)
+    subnormal_rounded_square_pair = measurements.add(subnormal_rounded_square_a_scaled, subnormal_rounded_square_b_scaled).unwrap()
+    match measurements.variance_with_covariance(subnormal_rounded_square_pair, subnormal_rounded_square_covariance) {
+        Ok(value) => print("subnormal rounded source squares = " + rounded(value).to_string()),
+        Err(message) => print("subnormal rounded source squares = " + message),
+    }
+
+    // Exact correlation-factor projections are 0 and -16 (variance 256), but
+    // the rounded coefficients cannot resolve that residual safely.
+    rounded_factor_covariance = measurements.covariance(
+        ["projection-a", "projection-b", "projection-c"],
+        array([
+            [1.0, 0.0, 35.0],
+            [0.0, 1.0, 12.0],
+            [35.0, 12.0, 1369.0]
+        ])
+    ).unwrap()
+    projection_a = measurements.from_source(0.0, 1.0, "projection-a", "projection source A")
+    projection_b = measurements.from_source(0.0, 1.0, "projection-b", "projection source B")
+    projection_c = measurements.from_source(0.0, 37.0, "projection-c", "projection source C")
+    projection_a_scaled = measurements.scale(projection_a.unwrap(), 350000000000000000.0)
+    projection_b_scaled = measurements.scale(projection_b.unwrap(), 119999999999999984.0)
+    projection_c_scaled = measurements.scale(projection_c.unwrap(), -10000000000000000.0)
+    projection_ab = measurements.add(projection_a_scaled, projection_b_scaled).unwrap()
+    rounded_factor_projection = measurements.add(projection_ab, projection_c_scaled).unwrap()
+    match measurements.variance_with_covariance(rounded_factor_projection, rounded_factor_covariance) {
+        Ok(value) => print("rounded factor projection = " + rounded(value).to_string()),
+        Err(message) => print("rounded factor projection = " + message),
+    }
+
+    subnormal_normalization_covariance = measurements.covariance(
+        ["normalization-large", "normalization-middle", "normalization-negative"],
+        array([
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ])
+    ).unwrap()
+    normalization_large_source = measurements.from_source(0.0, 1.0, "normalization-large", "large contribution")
+    normalization_middle_source = measurements.from_source(0.0, 1.0, "normalization-middle", "small residual")
+    normalization_negative_source = measurements.from_source(0.0, 1.0, "normalization-negative", "negative contribution")
+    normalization_large = measurements.scale(normalization_large_source.unwrap(), 1e308)
+    normalization_middle = measurements.scale(normalization_middle_source.unwrap(), 1e-15)
+    normalization_negative = measurements.scale(normalization_negative_source.unwrap(), -1e308)
+    normalization_pair = measurements.add(normalization_large, normalization_middle).unwrap()
+    subnormal_normalization = measurements.add(normalization_pair, normalization_negative).unwrap()
+    match measurements.variance_with_covariance(subnormal_normalization, subnormal_normalization_covariance) {
+        Ok(value) => print("subnormal contribution normalization = " + value.to_string()),
+        Err(message) => print("subnormal contribution normalization = " + message),
+    }
+
+    nonuniform_rank_one = measurements.covariance(
+        ["rank-a", "rank-b", "rank-c", "rank-d"],
+        array([
+            [1.0, 3.0, 2.0, 1.0],
+            [3.0, 9.0, 6.0, 3.0],
+            [2.0, 6.0, 4.0, 2.0],
+            [1.0, 3.0, 2.0, 1.0]
+        ])
+    ).unwrap()
+    rank_a = measurements.from_source(0.0, 1.0, "rank-a", "rank-one source A")
+    rank_b = measurements.from_source(0.0, 3.0, "rank-b", "rank-one source B")
+    rank_c = measurements.from_source(0.0, 2.0, "rank-c", "rank-one source C")
+    rank_d = measurements.from_source(0.0, 1.0, "rank-d", "rank-one source D")
+    rank_a_scaled = measurements.scale(rank_a.unwrap(), 1e16)
+    rank_b_scaled = measurements.scale(rank_b.unwrap(), -1e16)
+    rank_c_scaled = measurements.scale(rank_c.unwrap(), 1e16)
+    rank_d_scaled = measurements.scale(rank_d.unwrap(), 0.1)
+    rank_ab = measurements.add(rank_a_scaled, rank_b_scaled).unwrap()
+    rank_abc = measurements.add(rank_ab, rank_c_scaled).unwrap()
+    nonuniform_cancellation = measurements.add(rank_abc, rank_d_scaled).unwrap()
+    print("nonuniform rank-one covariance variance = " + rounded(measurements.variance_with_covariance(nonuniform_cancellation, nonuniform_rank_one).unwrap()).to_string())
+
+    large_psd = measurements.covariance(
+        ["large-psd-a", "large-psd-b"],
+        array([
+            [1e308, 1e308],
+            [1e308, 1e308]
+        ])
+    )
+    match large_psd {
+        Ok(_) => print("large finite PSD covariance = accepted"),
+        Err(message) => print("large finite PSD covariance = " + message),
+    }
+
+    match measurements.covariance(["caliper", "reference"], array([[1.0, 2.0], [2.0, 1.0]])) {
+        Ok(_) => print("indefinite covariance accepted"),
+        Err(message) => print("indefinite covariance = " + message),
+    }
+    match measurements.covariance(
+        ["large-a", "large-b"],
+        array([
+            [1e308, 1.5e308],
+            [1.5e308, 1e308]
+        ])
+    ) {
+        Ok(_) => print("large indefinite covariance accepted"),
+        Err(message) => print("large indefinite covariance = " + message),
+    }
+    match measurements.covariance(["caliper", "reference"], array([[1.0, 0.5], [0.25, 1.0]])) {
+        Ok(_) => print("nonsymmetric covariance accepted"),
+        Err(message) => print("nonsymmetric covariance = " + message),
+    }
+    match measurements.covariance(["caliper", "caliper"], array([[1.0, 0.0], [0.0, 1.0]])) {
+        Ok(_) => print("duplicate covariance id accepted"),
+        Err(message) => print("duplicate covariance id = " + message),
+    }
+    match measurements.covariance(["caliper", "reference"], array([[sqrt(-1.0), 0.0], [0.0, 1.0]])) {
+        Ok(_) => print("non-finite covariance accepted"),
+        Err(message) => print("non-finite covariance = " + message),
+    }
+    match measurements.covariance(["bad"], array([[-1.0]]), 1.0) {
+        Ok(_) => print("excessive covariance tolerance accepted an indefinite matrix"),
+        Err(message) => print("excessive covariance tolerance = " + message),
+    }
+    tiny = measurements.from_source(0.0, 1e-200, "tiny", "tiny")
+    scaled_tiny = measurements.scale(tiny.unwrap(), 1e200)
+    underflowed = measurements.covariance(["tiny"], array([[0.0]])).unwrap()
+    match measurements.variance_with_covariance(scaled_tiny, underflowed) {
+        Ok(_) => print("underflowed source variance accepted"),
+        Err(message) => print("underflowed source variance = " + message),
+    }
+    subnormal_source = measurements.from_source(0.0, 2e-162, "subnormal-source", "subnormal source")
+    scaled_subnormal_source = measurements.scale(subnormal_source.unwrap(), 1e162)
+    subnormal_source_covariance = measurements.covariance(
+        ["subnormal-source"],
+        array([[5e-324]])
+    ).unwrap()
+    match measurements.variance_with_covariance(scaled_subnormal_source, subnormal_source_covariance) {
+        Ok(_) => print("subnormal source variance accepted"),
+        Err(message) => print("subnormal source variance = " + message),
+    }
+    mismatch = measurements.covariance(["caliper", "reference"], array([[9.0, 1.0], [1.0, 1.0]])).unwrap()
+    match measurements.uncertainty_with_covariance(total, mismatch) {
+        Ok(_) => print("source variance mismatch accepted"),
+        Err(message) => print("source variance mismatch = " + message),
+    }
+    missing = measurements.covariance(["caliper"], array([[4.0]])).unwrap()
+    match measurements.variance_with_covariance(total, missing) {
+        Ok(_) => print("missing source accepted"),
+        Err(message) => print("missing source = " + message),
+    }
+    unknown = measurements.unknown(1.0, "sensor offline")
+    match measurements.variance_with_covariance(unknown, correlated) {
+        Ok(_) => print("unknown uncertainty accepted"),
+        Err(message) => print("unknown uncertainty = " + message),
+    }
+}

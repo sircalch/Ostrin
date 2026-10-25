@@ -54,6 +54,16 @@ pasó con regresiones máximas de 2.889% nativas y 2.126% interpretadas. El snap
 con el anterior porque cambió la versión del compilador de 0.1.0 a 0.2.0 y cambió
 la fuente del workload Float; no se interpreta como regresión ni mejora.
 
+La corrida local más reciente está registrada en
+[`validation/benchmark-m1-covariance-windows-5998717.json`](../validation/benchmark-m1-covariance-windows-5998717.json), SHA-256
+`189fd80377da23adbce55173324045237625891df4aee618dc0137f0173f98cc`: source
+`59987174444b03df5c1fd310bacc5386436b232b`, Windows 11 x64, 15 workloads,
+7 muestras y 1 calentamiento, con intérprete y binario nativo verificando salida
+idéntica. Para `measurement_covariance.ostrin`, la mediana fue 84.802 ms en el
+intérprete y 8.272 ms en nativo (10.252× en esta carga concreta). El informe
+registra hashes de fuente y salida; no mide RSS/memoria pico y no permite afirmar
+rendimiento entre plataformas o frente a otros lenguajes.
+
 Para reproducirlo localmente:
 
 ```text

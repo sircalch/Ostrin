@@ -18,7 +18,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 387
+    "rustMarkedTests": 389
   },
   "nativeBackend": {
     "ir": 7220,
@@ -46,8 +46,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "ciRunUrl": null
   },
   "effectCoverage": {
-    "knownCalls": 20702,
-    "symbolicCalls": 74,
+    "knownCalls": 21029,
+    "symbolicCalls": 83,
     "unresolvedCalls": 0,
     "countUnit": "distinct_function_operation_edges",
     "aggregation": "sum_of_per_bundle_distinct_function_operation_edges",
@@ -72,19 +72,19 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "captureOpenCount": 29,
     "incompleteEffectBundleCount": 0,
     "closedEntryEffectBundleCount": 29,
-    "symbolicEffectCallCount": 74,
+    "symbolicEffectCallCount": 83,
     "unresolvedEffectCallCount": 0,
     "callResolutionEvidence": {
       "status": "available",
       "bundleCount": 29,
       "availableBundleCount": 29,
       "invalidBundleCount": 0,
-      "edgeCount": 20776,
-      "categorizedEdgeCount": 20776,
+      "edgeCount": 21112,
+      "categorizedEdgeCount": 21112,
       "uncategorizedEdgeCount": 0,
-      "staticLocalFunctionEdgeCount": 9289,
+      "staticLocalFunctionEdgeCount": 9335,
       "genericTraitCandidateEdgeCount": 0,
-      "localTargetCandidateCount": 9289,
+      "localTargetCandidateCount": 9335,
       "multiTargetEdgeCount": 0,
       "resolvedCallSiteCount": 245,
       "locatedCallSiteCount": 245,

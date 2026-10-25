@@ -1,0 +1,585 @@
+{
+  "schema": "ostrin.measurement-covariance-review-evidence/v1",
+  "reviewFinding": {
+    "pullRequest": 234,
+    "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4370078465",
+    "severity": "P2",
+    "summary": "Avoid subnormal precision loss in the variance ratio"
+  },
+  "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+  "releaseTag": "v0.2.0",
+  "releaseArtifactsChanged": false,
+  "additionalReviewFindings": [
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4370131337",
+      "severity": "P2",
+      "summary": "Reject precision loss in subnormal geometric means",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1e-323,
+          5e-324
+        ],
+        [
+          5e-324,
+          1.5e-323
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "sqrt(1e-323)",
+        "sqrt(1.5e-323)"
+      ],
+      "storedContributions": [
+        1,
+        1
+      ],
+      "independentOracleCorrelation": "1 / sqrt(6)",
+      "independentOracleVariance": "2 + 2 / sqrt(6) = 2.816496580927726",
+      "actualResult": "covariance correlation is numerically unresolved",
+      "reason": "An unequal-variance subnormal geometric scale cannot resolve the supplied correlation reliably."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4370174603",
+      "severity": "P2",
+      "summary": "Detect perfect correlations caused by rounded geometric means",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          1.7320508075688772
+        ],
+        [
+          1.7320508075688772,
+          3
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "1.0",
+        "sqrt(3.0)"
+      ],
+      "storedContributions": [
+        100000000,
+        -100000000
+      ],
+      "independentOracleVariance": 1.1587517153601563,
+      "independentOracleMethod": "90-digit Python Decimal using Decimal.from_float for the exact binary covariance entry; 2e16 * (1 - covariance / sqrt(3)).",
+      "actualResult": "covariance correlation is numerically unresolved",
+      "reason": "For unequal variances near unit correlation, the implementation accepts perfect dependence only when Float roots reproduce both diagonals and their product exactly reproduces the covariance."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4371782448",
+      "severity": "P2",
+      "summary": "Preserve rounding residuals when adjusting source contributions",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "1.0000000000000002",
+        "1"
+      ],
+      "storedContributions": [
+        10000000000000000,
+        -9999999999999998
+      ],
+      "independentOracleVariance": 0.048596460630071246,
+      "independentOracleMethod": "Exact rational residual from the binary64 inputs: (992800745259006 / 4503599627370497)^2, evaluated independently with Python Fraction.",
+      "actualResult": "propagated covariance projection is numerically unresolved",
+      "reason": "After power-of-two normalization, a near-zero Cholesky projection that contains any tolerated diagonal adjustment now returns an explicit unresolved error. This deliberately avoids inferring exact uniformity from rounded adjustment ratios."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4371912834",
+      "severity": "P2",
+      "summary": "Verify exact uniformity before exempting adjusted cancellation",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "sourceStandardDeviations": [
+        0.9999999999999999,
+        0.9999999999999998
+      ],
+      "storedContributions": [
+        10000000000000000,
+        -10000000000000000
+      ],
+      "appliedScales": [
+        10000000000000002,
+        -10000000000000002
+      ],
+      "independentOracleVariance": 1.2325951644078317,
+      "independentOracleMethod": "Exact rational arithmetic over the exact binary Float inputs, evaluated independently with Python Fraction.",
+      "actualResult": "propagated covariance projection is numerically unresolved",
+      "reason": "The two rounded diagonal-adjustment ratios compare equal even though their exact ratios differ. Every near-zero projection with adjusted contributions now returns an explicit unresolved error; equal rounded factors no longer exempt cancellation."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4371912837",
+      "severity": "P2",
+      "summary": "Do not treat rounded root squares as proof of exact dependence",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          3.3166247903554
+        ],
+        [
+          3.3166247903554,
+          11
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "1.0",
+        "sqrt(11.0)"
+      ],
+      "storedContributions": [
+        100000000,
+        -100000000
+      ],
+      "independentOracleVariance": 0.23597821423001597,
+      "independentOracleMethod": "100-digit Python Decimal using Decimal.from_float for the exact binary64 covariance entry and high precision sqrt(11).",
+      "actualResult": "covariance correlation is numerically unresolved",
+      "reason": "The rounded Float product sqrt(11) * sqrt(11) equals 11 without proving that the exact root square equals the supplied diagonal. Unequal-variance near-unit correlations are now certified only for small integer roots whose squares and cross product are exactly representable and equal the inputs; all other cases fail explicitly."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4372112598",
+      "severity": "P2",
+      "summary": "Detect source adjustments hidden by rounded subnormal squares",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          5e-324,
+          5e-324
+        ],
+        [
+          5e-324,
+          5e-324
+        ]
+      ],
+      "sourceStandardDeviations": [
+        2.2227587494850775e-162,
+        2.222758749485078e-162
+      ],
+      "storedContributions": [
+        10000000000000000,
+        -10000000000000000
+      ],
+      "appliedScales": [
+        4.498913794543196e+177,
+        -4.4989137945431955e+177
+      ],
+      "independentOracleVariance": 4.930380657631321,
+      "independentOracleMethod": "100-digit Python Decimal from exact binary64 inputs: (sqrt(5e-324) * (1e16/sigmaA - 1e16/sigmaB))^2.",
+      "actualResult": "propagated covariance projection is numerically unresolved",
+      "reason": "Both distinct binary Float source sigmas square to the same subnormal Float, so comparing only rounded squares skipped adjustment and returned zero. Validation already accepts the roots within tolerance; propagation now preserves a root-space adjustment whenever sqrt(diagonal) differs exactly from the source sigma, even if the rounded squares compare equal."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4372155934",
+      "severity": "P2",
+      "summary": "Reject lossy midpoints between unequal subnormal entries",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          2e-323,
+          5e-324
+        ],
+        [
+          0,
+          1e-323,
+          2e-323
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "unused source",
+        "sqrt(2e-323)",
+        "sqrt(2e-323)"
+      ],
+      "storedContributions": [
+        1,
+        1
+      ],
+      "independentOracleCorrelation": "((1u + 2u) / 2) / (4u) = 3/8",
+      "independentOracleVariance": "2 + 2 * (3/8) = 2.75",
+      "actualResultBeforeFix": 2.5,
+      "actualResultAfterFix": 2.75,
+      "reason": "Halving the one-subnormal-unit difference rounds it to zero and selects one endpoint before correlation conversion. The implementation now divides each raw symmetric entry by the local geometric scale before averaging, so the correlation midpoint 0.375 is represented directly; the exact example changes from 2.5 to 2.75."
+    }
+  ],
+  "regression": {
+    "covariance": [
+      [
+        1e+300,
+        8.660254037844386e+137
+      ],
+      [
+        8.660254037844386e+137,
+        3e-24
+      ]
+    ],
+    "standardDeviations": [
+      "sqrt(1e300)",
+      "sqrt(3e-24)"
+    ],
+    "expectedCorrelation": 0.5,
+    "expectedPropagatedVariance": 3,
+    "oracle": "independent Float64 calculation of covariance divided by the product of the two diagonal square roots"
+  },
+  "followupNumericalBoundary": {
+    "covariance": [
+      [
+        5e-324,
+        5e-324
+      ],
+      [
+        5e-324,
+        1.5e-323
+      ]
+    ],
+    "sourceStandardDeviations": [
+      "sqrt(5e-324)",
+      "sqrt(1.5e-323)"
+    ],
+    "independentOracleCorrelation": "1 / sqrt(3)",
+    "independentOracleVariance": "2 + 2 / sqrt(3) = 3.1547005383792515",
+    "actualResult": "covariance correlation is numerically unresolved",
+    "reason": "The geometric scale itself is subnormal and the source variances differ; its Float representation cannot resolve the correlation reliably.",
+    "equalVarianceSubnormalBehavior": "Equal subnormal diagonal variances use the diagonal as the exact geometric scale; the existing correlated cancellation regression remains accepted."
+  },
+  "implementation": {
+    "path": "compiler/std/measurements.ostrin",
+    "function": "covariance_correlation_matrix",
+    "method": "Use each diagonal directly when variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing validated standard deviations. Divide each raw off-diagonal entry by the local geometric scale before averaging in correlation space, preserving the variance implied by unequal subnormal entries without materializing an unrepresentable midpoint. The midpoint helper sums before halving whenever the sum is finite, so adjacent subnormal differences are not halved to zero; it halves first only on same-sign overflow. Apply accepted diagonal-adjustment ratios after exact power-of-two normalization. For subnormal variances, preserve a root-space adjustment whenever sqrt(covariance diagonal) differs from the source sigma even when the rounded squares compare equal. For unequal-variance near-unit correlations, accept exact dependence only for small integer roots whose squares and cross product are exactly representable and reproduce the supplied matrix. Accumulate Cholesky projections with compensation; reject every near-zero projection that contains adjusted contributions. Reject subnormal unequal-variance geometric scales and other unresolved correlations instead of erasing representable residual variance."
+  },
+  "localValidation": {
+    "environment": {
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v24.19.0"
+    },
+    "commands": [
+      {
+        "command": "cargo fmt -- --check",
+        "result": "passed"
+      },
+      {
+        "command": "cargo test std_measurements_covariance_matches_analytic_oracle_and_wasi -- --nocapture",
+        "result": "passed",
+        "interpreterNativeParity": true,
+        "wasiCEmissionOracle": true,
+        "leakCheck": "live_allocations=0"
+      },
+      {
+        "command": "cargo test",
+        "result": "passed",
+        "unitTests": 33,
+        "differentialTests": 6,
+        "integrationTests": 383,
+        "totalTests": 422
+      },
+      {
+        "command": "node scripts/wasi-program-check.mjs",
+        "result": "passed",
+        "programs": 32,
+        "compilerBuiltFromSourceRevision": "931bfc62ccdece3da5ef5e5e385946451b1d0687"
+      },
+      {
+        "command": "node scripts/measurement-contract-check.mjs && node --test scripts/measurement-contract-check.test.mjs",
+        "result": "passed",
+        "mutationTests": 18
+      },
+      {
+        "command": "node scripts/project-plan-check.mjs",
+        "result": "passed",
+        "irBodies": 7220,
+        "hirBodies": 41,
+        "astFallbacks": 0
+      },
+      {
+        "command": "node scripts/website-check.mjs",
+        "result": "passed",
+        "publicPages": 17,
+        "examples": 305,
+        "integrationTests": 383,
+        "wasmArtifact": true
+      },
+      {
+        "command": "node scripts/website-check.mjs --wasm",
+        "result": "passed",
+        "publicPages": 17,
+        "examples": 305,
+        "integrationTests": 383,
+        "wasmArtifact": true
+      },
+      {
+        "command": "node scripts/provenance-page.mjs --check",
+        "result": "passed",
+        "generatedAfterCompilerSourceChange": true
+      },
+      {
+        "command": "node tests/browser/prepare-runtime.mjs && npx playwright test --project=chromium --project=webkit-smoke",
+        "result": "passed",
+        "chromiumTests": 34,
+        "webkitSmokeTests": 2,
+        "firefox": "Not run locally on Windows; exact-head GitHub browser workflow remains required."
+      },
+      {
+        "command": "node scripts/lab-data.mjs --verify-replays",
+        "result": "passed",
+        "demos": 12,
+        "figureReplays": 29
+      },
+      {
+        "command": "node scripts/experiment-replay.mjs --all",
+        "result": "passed",
+        "bundles": 11,
+        "levels": [
+          "R1",
+          "R2"
+        ]
+      },
+      {
+        "command": "node scripts/linguist-check.mjs",
+        "result": "passed",
+        "sampleCandidates": 7,
+        "examples": 305
+      },
+      {
+        "command": "node scripts/distribution-check.mjs",
+        "result": "passed"
+      },
+      {
+        "command": "node scripts/numeric-validation.mjs",
+        "result": "passed",
+        "reportValues": 80,
+        "emittedValues": 136,
+        "maximumAbsoluteDifference": 0,
+        "leakCheck": "live_allocations=0"
+      },
+      {
+        "command": "node scripts/v0.2-readiness-check.mjs",
+        "result": "passed",
+        "readyCriteria": 12,
+        "totalCriteria": 12
+      }
+    ],
+    "r3": {
+      "status": "OPEN",
+      "baseBundles": 29,
+      "hostCaptures": 0,
+      "experimentLevels": [
+        "R0",
+        "R1",
+        "R2"
+      ],
+      "crossPlatformReproducibilityClaim": false
+    },
+    "performanceAssessment": "No benchmark was run for this correctness fix; it reuses the standard deviations already computed during validation. No performance claim is made."
+  },
+  "pendingExternalValidation": {
+    "exactHeadCi": "Pending on the final PR head after the source, evidence and checkpoint commits are pushed.",
+    "exactHeadFreshReview": "Pending on the final PR head.",
+    "asan": "Pending on the final PR head.",
+    "ubsan": "Pending on the final PR head.",
+    "merge": "Conditionally authorized only after required checks pass and fresh review has no substantive findings."
+  },
+  "limitations": [
+    "SourceCovariance remains experimental and limited to dense matrices for at most 64 dimensionless scalar sources.",
+    "Covariance propagation for Measurement<Quantity<D>>, Measurement arrays, array reductions and unsupported measurement states remains unsupported.",
+    "This local validation does not close R3 or establish cross-platform reproducibility."
+  ],
+  "priorLocalValidationSourceRevision": "931bfc62ccdece3da5ef5e5e385946451b1d0687",
+  "latestLocalValidation": {
+    "sourceRevision": "06849b5453fd3bfa3bc573f280abee1440ea387c",
+    "platform": "Windows 11 x64",
+    "completedAt": "2026-10-25",
+    "commands": [
+      {
+        "command": "cargo fmt -- --check",
+        "result": "passed"
+      },
+      {
+        "command": "cargo test --test examples std_measurements_covariance_matches_analytic_oracle_and_wasi -- --nocapture",
+        "result": "passed",
+        "tests": 1,
+        "interpreterNativeParity": true,
+        "leakCheck": "live_allocations=0"
+      },
+      {
+        "command": "cargo test",
+        "result": "passed",
+        "unitTests": 33,
+        "differentialTests": 6,
+        "integrationTests": 383,
+        "totalTests": 422,
+        "testedWorkingTreeCommittedAs": "06849b5453fd3bfa3bc573f280abee1440ea387c"
+      },
+      {
+        "command": "node scripts/wasi-program-check.mjs",
+        "result": "passed",
+        "programs": 32,
+        "compilerBuiltFromSourceRevision": "06849b5453fd3bfa3bc573f280abee1440ea387c"
+      },
+      {
+        "command": "node scripts/measurement-contract-check.mjs && node --test scripts/measurement-contract-check.test.mjs",
+        "result": "passed",
+        "mutationTests": 18
+      },
+      {
+        "command": "node scripts/project-plan-check.mjs",
+        "result": "passed",
+        "irBodies": 7220,
+        "hirBodies": 41,
+        "astFallbacks": 0
+      },
+      {
+        "command": "node scripts/lab-data.mjs --write --verify-replays",
+        "result": "passed",
+        "demos": 12,
+        "figureReplays": 29
+      },
+      {
+        "command": "node scripts/experiment-bundle.mjs --write-all",
+        "result": "passed",
+        "bundles": 29
+      },
+      {
+        "command": "node scripts/experiment-replay.mjs --all",
+        "result": "passed",
+        "bundles": 11,
+        "levels": [
+          "R1",
+          "R2"
+        ]
+      },
+      {
+        "command": "node scripts/website-check.mjs --wasm",
+        "result": "passed",
+        "publicPages": 17,
+        "examples": 305,
+        "integrationTests": 383,
+        "wasmArtifact": true
+      },
+      {
+        "command": "node scripts/provenance-page.mjs --check",
+        "result": "passed"
+      },
+      {
+        "command": "node scripts/numeric-validation.mjs",
+        "result": "passed",
+        "reportValues": 80,
+        "emittedValues": 136,
+        "maximumAbsoluteDifference": 0,
+        "leakCheck": "live_allocations=0"
+      },
+      {
+        "command": "node scripts/linguist-check.mjs",
+        "result": "passed",
+        "sampleCandidates": 7,
+        "examples": 305
+      },
+      {
+        "command": "node scripts/distribution-check.mjs",
+        "result": "passed"
+      },
+      {
+        "command": "node scripts/v0.2-readiness-check.mjs",
+        "result": "passed",
+        "readyCriteria": 12,
+        "totalCriteria": 12
+      }
+    ],
+    "browser": "Not rerun locally for this source revision; exact-head GitHub Browser audit remains required.",
+    "sanitizers": "ASan and UBSan require exact-head GitHub CI.",
+    "r3": {
+      "status": "OPEN",
+      "baseBundles": 29,
+      "hostCaptures": 0,
+      "experimentLevels": [
+        "R0",
+        "R1",
+        "R2"
+      ],
+      "crossPlatformReproducibilityClaim": false
+    },
+    "performanceAssessment": "No benchmark was run for this correctness fix; no performance claim is made."
+  },
+  "historicalSourceRevision": "06849b5453fd3bfa3bc573f280abee1440ea387c",
+  "latestReviewAmendment": {
+    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+    "finding": "4372155934: unequal subnormal covariance entries are divided by their local geometric scale before averaging; the reproduced variance changes from 2.5 to the analytic 2.75.",
+    "independentOracleVariance": 2.75,
+    "reproductionBeforeFix": "2.5",
+    "reproductionAfterFix": "2.75",
+    "localValidation": {
+      "focusedInterpreterNativeWasiLeakTest": "passed: 1 test; interpreter/native parity, exact output 2.75, WASI C emission and live_allocations=0",
+      "cargoFormat": "passed",
+      "measurementContractGateAndMutationTests": "passed: 18/18",
+      "releaseBuild": "passed from source revision 354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+      "wasiProgramMatrix": "passed: 32/32 from source revision 354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+      "websiteWasmBuild": "passed from the corrected compiler; lab data regenerated and 29 figure replays match",
+      "experimentBundles": "29 fixtures regenerated; all 11 R1/R2 bundles replayed",
+      "websiteCheck": "passed: 17 pages, 305 examples, 383 integration tests and WASM",
+      "numericValidation": "passed: 80 report values, 136 emitted values, maximum absolute difference 0, live_allocations=0",
+      "projectPlan": "passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
+      "linguistDistributionReadiness": "passed; v0.2 readiness 12/12",
+      "provenancePage": "passed after regeneration",
+      "fullCargoSuite": "not completed locally; exact-head Ostrin CI is required",
+      "browserAndSanitizers": "must pass on the final exact PR HEAD in GitHub CI",
+      "r3": "OPEN; no host captures are claimed",
+      "performance": "No benchmark was run; no performance claim is made."
+    },
+    "exactHeadCiAndFreshReview": "pending after the next PR branch push"
+  },
+  "supersededSourceRevisions": [
+    "469b11a76cccbff9714d5a65c4abc27169d67a77",
+    "06849b5453fd3bfa3bc573f280abee1440ea387c",
+    "ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7"
+  ],
+  "previousReviewAmendment": {
+    "sourceRevision": "469b11a76cccbff9714d5a65c4abc27169d67a77",
+    "findings": [
+      "4371912834: rounded adjustment ratios no longer certify uniformity; unresolved adjusted cancellation is rejected.",
+      "4371912837: rounded root multiplication no longer certifies exact dependence; only bounded exactly representable integer roots qualify."
+    ],
+    "localValidation": {
+      "cargoFormat": "passed on source revision 469b11a",
+      "focusedInterpreterNativeWasiLeakTest": "passed: 1 test; 382 filtered; interpreter/native parity, WASI C emission and live_allocations=0",
+      "measurementContractGate": "passed",
+      "measurementContractMutationTests": "passed: 18/18",
+      "fullCargoSuite": "422 tests passed after both review findings were fixed and before tightening the exact-integer-root bound; the final bound change was validated by the focused test",
+      "releaseBuildAfterFinalBound": "passed",
+      "wasiProgramMatrixAfterFinalBound": "passed: 32/32",
+      "projectPlan": "passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
+      "websiteCheck": "passed: 17 pages, 305 examples, 383 integration tests, WASM artifact",
+      "scientificLab": "passed: 12 demos and 29 figure replays match",
+      "experimentBundles": "29 fixtures regenerated from source revision 469b11a; all 11 R1/R2 bundles replayed",
+      "numericValidation": "passed on win32 x64 with Node v24.19.0: 80 report values and 136 emitted values matched exactly; maximum absolute difference 0; live_allocations=0",
+      "linguist": "passed: proposal, grammar, 7 sample candidates and 305 Ostrin examples",
+      "distribution": "passed: release matrix, checksums and installers",
+      "v0_2_readiness": "READY: 12/12 criteria",
+      "provenancePage": "passed",
+      "browserAndSanitizers": "must pass on the final exact PR HEAD in GitHub CI",
+      "r3": "OPEN; 0/29 host captures and no cross-platform reproducibility claim"
+    },
+    "exactHeadCiAndFreshReview": "pending"
+  }
+}

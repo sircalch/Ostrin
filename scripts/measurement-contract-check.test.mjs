@@ -11,6 +11,7 @@ const trackedFiles = [
   "examples/measurement_quantity_direct_shape.ostrin",
   "examples/measurement_quantity_native_smoke.ostrin",
   "examples/measurement_array_shape.ostrin",
+  "examples/measurement_covariance.ostrin",
   "examples/measurement_lab.ostrin",
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
@@ -300,6 +301,134 @@ test("the gate rejects claims that exceed the structural Measurement array profi
     writeFileSync(file, source);
     const result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded structural array Measurement boundary")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate requires bounded scalar covariance evidence and explicit scope", () => {
+  const root = fixtureRoot();
+  try {
+    const stdFile = path.join(root, "compiler/std/measurements.ostrin");
+    const std = readFileSync(stdFile, "utf8");
+    writeFileSync(stdFile, std.replace("if n > 64 {", "if n > 128 {"));
+    let result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "and sqrt(diagonal) != source_sigma",
+      "and sqrt(diagonal) == source_sigma",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std);
+    writeFileSync(stdFile, std.replace("relative_tolerance > 1e-6", "relative_tolerance > 1e-3"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace("factor.get(row, column)", "factor.get(row, row)"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "if source.source_sigma != 0.0 and expected_variance == 0.0 {",
+      "if source.source_sigma != 0.0 {",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std);
+    writeFileSync(stdFile, std.replace(
+      "matrix.get(i, i) / scale",
+      "matrix.get(i, i)",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "covariance_correlation_matrix(model.matrix, model.relative_tolerance)",
+      "covariance_correlation_matrix(covariance_scale * model.matrix, model.relative_tolerance)",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "adjustment = sqrt(diagonal) / source_sigma",
+      "adjustment = 1.0",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "max_exact_integer_root = 94906265.0",
+      "max_exact_integer_root = 0.0",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "if abs(scaled_projection) <= projection_limit {",
+      "if false {",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "sum = lower + upper",
+      "sum = lower - upper",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("normalized PSD analysis and scale-safe midpoint")));
+
+    writeFileSync(stdFile, std);
+    const labFile = path.join(root, "scripts/lab-data.mjs");
+    const lab = readFileSync(labFile, "utf8");
+    writeFileSync(labFile, lab.replace("using J·Σ·Jᵀ", "using independent variances"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
+
+    writeFileSync(labFile, lab.replace("Source contributions use exact power-of-two normalization", "Source contributions use rounded normalization"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
+
+    writeFileSync(labFile, lab.replace(
+      "Negative and numerically unresolved positive pivots are rejected rather than changing the covariance result",
+      "negative pivots are accepted",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
+
+    writeFileSync(labFile, lab);
+    const testFile = path.join(root, "compiler/tests/examples.rs");
+    const tests = readFileSync(testFile, "utf8");
+    writeFileSync(testFile, tests.replace("rank-deficient cancellation uncertainty = 0", "rank case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("subnormal covariance cancellation variance = 0", "subnormal case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("wide-scale covariance cancellation variance = 0", "wide-scale case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("rank-three compensated variance = 1", "rank-three case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("rank-three reordered compensated variance = 1", "rank-three reorder case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("sqrt-three rank-one cancellation variance = 0", "sqrt-three case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("direct contribution cancellation variance = 16", "direct contribution case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

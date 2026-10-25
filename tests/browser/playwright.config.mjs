@@ -2,7 +2,11 @@ import { defineConfig } from "@playwright/test";
 import os from "node:os";
 import path from "node:path";
 
-const baseURL = "http://127.0.0.1:4173/Ostrin/";
+const testPort = Number(process.env.OSTRIN_TEST_PORT ?? process.env.PORT ?? 4173);
+if (!Number.isInteger(testPort) || testPort < 1 || testPort > 65535) {
+  throw new Error("OSTRIN_TEST_PORT must be an integer from 1 to 65535");
+}
+const baseURL = `http://127.0.0.1:${testPort}/Ostrin/`;
 
 export default defineConfig({
   testDir: ".",
@@ -39,7 +43,8 @@ export default defineConfig({
   webServer: {
     command: "node server.mjs",
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && process.env.OSTRIN_REUSE_SERVER === "1",
+    env: { PORT: String(testPort) },
     timeout: 30_000,
   },
 });

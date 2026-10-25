@@ -984,6 +984,10 @@ fn run_codegen(
     }
     let mut command = std::process::Command::new(&compiler);
     command.arg(&c_path).arg("-o").arg(&output_path).arg("-O2");
+    // Compensated numerical algorithms rely on each source-level operation
+    // rounding separately. Some C toolchains contract multiply/add pairs at
+    // optimization levels used by Ostrin's compiled backends, which can erase
+    // the low-order residual those algorithms preserve.
     if target == "wasm32-wasi" {
         // wasi-sdk 34 no longer defaults the legacy `wasm32-wasi` triple to
         // the right sysroot layout. Keep the CLI spelling for compatibility,

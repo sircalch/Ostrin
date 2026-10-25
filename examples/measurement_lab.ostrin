@@ -2,6 +2,10 @@
 // Source identity carries correlation through dimensional products and ratios.
 import std.measurements
 
+fn rounded(value: Float) -> Float {
+    round(value * 10000.0) / 10000.0
+}
+
 fn main() -> Void {
     exact_zero = measurements.exact_quantity(0 m).unwrap()
     print("exact zero uncertainty (m) = " + measurements.quantity_uncertainty(exact_zero).unwrap().value.to_string())
@@ -35,4 +39,18 @@ fn main() -> Void {
     print("cross-dimension ratio = " + speed.value.to_string())
     print("speed dimension = " + speed.value.dimension_key())
     print("speed standard uncertainty (m/s) = " + speed_u.value.to_string())
+
+    caliper = measurements.from_source(10.0, 2.0, "caliper", "caliper").unwrap()
+    reference = measurements.from_source(4.0, 1.0, "reference", "reference").unwrap()
+    source_covariance = measurements.covariance(
+        ["caliper", "reference"],
+        array([
+            [4.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    scalar_sum = measurements.add(caliper, reference).unwrap()
+    print("dimensionless scalar covariance")
+    print("sum variance = " + measurements.variance_with_covariance(scalar_sum, source_covariance).unwrap().to_string())
+    print("sum uncertainty = " + rounded(measurements.uncertainty_with_covariance(scalar_sum, source_covariance).unwrap()).to_string())
 }
