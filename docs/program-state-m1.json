@@ -10,8 +10,8 @@
   },
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "96596637dc1edd60efdd25554fd76ee2329b29db",
-    "evidenceRevision": "96596637dc1edd60efdd25554fd76ee2329b29db",
+    "sourceRevision": "5a8e434de1d9a8b4e8714df250c2daf0f28b6a47",
+    "evidenceRevision": "5a8e434de1d9a8b4e8714df250c2daf0f28b6a47",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -30,13 +30,14 @@
     "measurement-covariance-large-matrix-psd-normalization-and-subnormal-midpoint-regressions-fixed",
     "measurement-covariance-local-full-suite-wasi-chromium-webkit-and-numeric-validation-green",
     "local-numeric-validation",
-    "local-benchmark-contract-check"
+    "local-benchmark-contract-check",
+    "measurement-covariance-propagation-preserves-correlations-across-matrix-scales"
   ],
   "currentPackage": {
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "local-validation-passed-source-commit-9659663-awaiting-checkpoint-commit-push-exact-head-ci-review",
+    "status": "source-commit-5a8e434-local-full-suite-and-scientific-gates-passed-awaiting-checkpoint-push-exact-head-ci-review",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -45,7 +46,8 @@
       "normalizes covariance entries by the largest finite entry before relative-tolerance PSD analysis",
       "uses an underflow-safe midpoint for canonicalization and covariance propagation, including subnormal entries",
       "explicit refusal of covariance for Measurement<Quantity<D>>, Measurement arrays, array reductions and unsupported measurement states",
-      "Scientific Lab example, documentation, generated website data and an actual Node WASI Preview 1 smoke entry"
+      "Scientific Lab example, documentation, generated website data and an actual Node WASI Preview 1 smoke entry",
+      "preserves original-scale off-diagonal entries for propagation across widely separated covariance magnitudes"
     ],
     "evidence": [
       "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
@@ -59,7 +61,7 @@
       "scripts/linguist-check.mjs: proposal, grammar, 7 sample candidates and 305 Ostrin examples pass",
       "scripts/distribution-check.mjs: release matrix, checksums and installers pass",
       "Codex P2 review: underflow case from tiny source sigma plus 1e200 scale now returns an explicit error; native and WASI example cover it",
-      "Two fresh Codex P2 findings reproduced and fixed locally: subnormal symmetric off-diagonal covariance now preserves cancellation, and a large finite indefinite matrix is rejected after normalized PSD analysis; the example also confirms a large rank-deficient PSD matrix is accepted",
+      "Three fresh Codex P2 findings were reproduced and fixed locally: an underflow-safe symmetric midpoint, normalized large-matrix PSD analysis, and preservation of tiny correlations beside a huge unused covariance entry; the regression confirms cancellation variance 0.",
       "Focused covariance interpreter/native/leak test, 32-program WASI matrix, measurement contract checker and all 18 contract tests passed after these fixes",
       "Full cargo suite passed: 33 unit, 6 differential and 383 integration tests; the scalar Measurement IR ratchet is now 28 IR, 0 HIR, 0 AST",
       "The bars R2 experiment bundle regenerated its compiler-derived effect graph and passed verification after the new standard-library helper changed that graph",
@@ -69,14 +71,15 @@
       "node scripts/experiment-replay.mjs --all verified all 11 R1/R2 replay bundles after refreshing the bars effect provenance",
       "R3 host artifact 12581253033 from run 40146766218: all 29 bundles declare head/tested SHA 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714; all 116 manifest byte counts/SHA-256 values recomputed without mismatch",
       "R3 readiness and scorecard: 29/29 bundle entries ready, 0 open, unresolved effect calls 0; each experiment's declared level remains R0-R2 and no cross-platform guarantee is claimed",
-      "Source and regression changes committed at 96596637dc1edd60efdd25554fd76ee2329b29db; local validations recorded above ran against this exact source tree before the separate checkpoint commit."
+      "Source and regression changes committed at 96596637dc1edd60efdd25554fd76ee2329b29db; local validations recorded above ran against this exact source tree before the separate checkpoint commit.",
+      "Source commit 5a8e434de1d9a8b4e8714df250c2daf0f28b6a47 passes the full Cargo suite (33 unit, 6 differential, 383 integration; 422 total), all 32 WASI programs, focused interpreter/native covariance with live_allocations=0, 18 contract tests, generated Lab/website, numeric validation, 11 R1/R2 replays, Linguist and distribution checks. The mixed-scale regression uses an unused 1e300 diagonal and a used rank-one 1e-100 covariance block."
     ],
     "activePullRequests": [
       234
     ]
   },
   "pending": [
-    "commit and push the locally validated fixes, then verify CI, ASan, UBSan, security and a fresh review on the exact updated head of PR #234 before integration",
+    "push source commit 5a8e434 and its updated checkpoint to PR #234, then verify exact-head CI, sanitizers and fresh review before integration",
     "integrate the package only after its exact-head checks pass and review has no substantive findings",
     "continue R3 work beyond the verified host-evidence readiness gate; the experiment records remain at R0-R2 and do not establish cross-platform reproducibility",
     "continue static-effects closure and broader R3 inspect/validate/replay/compare evidence",
@@ -116,5 +119,5 @@
     "R3 host-evidence readiness for main is verified; broader reproducibility remains open because declared bundle levels are R0-R2 and no cross-platform equivalence is claimed",
     "the published v0.2.0 tag/assets remain frozen; no new release or tag is authorized"
   ],
-  "next": "commit the checkpoint with source/evidence revision 96596637dc1edd60efdd25554fd76ee2329b29db; push the source and checkpoint commits to PR #234, then verify exact-head CI and fresh review before integration"
+  "next": "commit the checkpoint with source/evidence revision 5a8e434de1d9a8b4e8714df250c2daf0f28b6a47 and push it to PR #234; rerun exact-head CI and fresh review before integration"
 }
