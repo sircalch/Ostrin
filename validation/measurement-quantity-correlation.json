@@ -1,0 +1,49 @@
+{
+  "schema": "ostrin.measurement-quantity-correlation/v1",
+  "status": "experimental-bounded-profile",
+  "baseRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+  "sourceRevision": "c1a4281e4d4fdac81eab6249cbc04707433eef0d",
+  "profile": {
+    "api": "std.measurements.quantity_uncertainty_with_correlation",
+    "measurement": "Measurement<Quantity<D>>",
+    "result": "CoherentUncertainty<D>",
+    "correlation": "dimensionless dense Pearson matrix with 1 to 64 unique source IDs",
+    "validation": ["finite", "symmetric within tolerance", "unit diagonal", "coefficients in [-1, 1]", "positive semidefinite within tolerance"],
+    "limits": ["unit-carrying covariance matrices are unsupported", "Measurement arrays are unsupported", "array reductions are unsupported", "this evidence does not establish general Measurement<Quantity<D>> native support"]
+  },
+  "analyticCase": {
+    "operation": "y = length * elapsed_time",
+    "inputs": [
+      { "sourceId": "length-source", "value": 2, "unit": "m", "standardUncertainty": 0.1, "uncertaintyUnit": "m", "sensitivity": 3, "contribution": 0.3 },
+      { "sourceId": "time-source", "value": 3, "unit": "s", "standardUncertainty": 0.2, "uncertaintyUnit": "s", "sensitivity": 2, "contribution": 0.4 }
+    ],
+    "correlationMatrix": [[1, 0.5], [0.5, 1]],
+    "outputDimension": "Length*Time",
+    "varianceTerms": [0.09, 0.16, 0.12],
+    "expectedVariance": 0.37,
+    "expectedStandardUncertainty": 0.6082762530298219,
+    "uncertaintyUnit": "coherent unit for Length*Time"
+  },
+  "observed": {
+    "interpreterOutput": "product dimension = Length*Time\nproduct standard uncertainty = 0.6082762530298219\n",
+    "nativeOutput": "product dimension = Length*Time\nproduct standard uncertainty = 0.6082762530298219\n",
+    "nativeLeakCheck": "live_allocations=0",
+    "nativeLowering": { "mainFunction": "IR", "astFallback": 0, "genericTypeDivergences": 0 },
+    "wasi": { "target": "wasm32-wasip1", "matrixPassedPrograms": 33, "includedCase": "measurement_quantity_correlation" }
+  },
+  "validation": {
+    "focusedRustTest": { "name": "dimensional_measurement_lab_matches_interpreter_and_native", "passed": 1, "failed": 0 },
+    "measurementContract": { "gate": "passed", "testsPassed": 18, "testsFailed": 0 },
+    "lab": { "demos": 12, "figureReplays": 29, "status": "passed" },
+    "website": { "publicPages": 17, "examples": 305, "integrationTests": 383, "status": "passed" },
+    "projectPlan": { "hirIrBodies": 7261, "irBodies": 7220, "hirBodies": 41, "astFallbacks": 0, "status": "passed" },
+    "linguist": "passed",
+    "distribution": "passed",
+    "v0.2Readiness": { "ready": true, "criteria": "12/12" },
+    "fullCargoSuite": "not completed locally: the existing differential suite made no useful progress for several hours while compiling a large visualization example with GCC; that run was interrupted, and the focused Measurement test passed. Exact-head CI remains required."
+  },
+  "traceability": {
+    "sourceRevision": "c1a4281e4d4fdac81eab6249cbc04707433eef0d",
+    "evidenceCommit": "recorded by docs/program-state-m1.json after the evidence commit; omitted here to avoid self-reference"
+  }
+}

@@ -95,8 +95,9 @@ covarianza dimensional ni sobre arrays.
 productos entre dimensiones y proyección de incertidumbre estándar con paridad intérprete/native,
 emisión WASI, `live_allocations=0`, cuerpo `main` generado por IR y cero divergencias de tipos.
 `examples/measurement_lab.ostrin` valida además productos, el cociente de igual dimensión por
-`div_quantity_same` y el cociente dimensional distinto; también genera `main` por IR y declara cero
-divergencias. `examples/measurement_quantity_direct_shape.ostrin` cubre la superficie directa, sus
+`div_quantity_same`, el cociente dimensional distinto y la correlación de fuentes `Length` y `Time`
+en un producto `Length*Time`; la oracle analítica produce incertidumbre `sqrt(0.37)`. También genera
+`main` por IR y declara cero divergencias. `examples/measurement_quantity_direct_shape.ostrin` cubre la superficie directa, sus
 validaciones de entrada y el error explícito de `div_quantity` para dimensiones iguales; su `main`
 también pasa por IR, coincide con la salida del intérprete, emite C para WASI y termina con
 `live_allocations=0`. La frontera restante aquí es de API: el cociente adimensional requiere
@@ -343,14 +344,26 @@ Los intermedios no finitos también se rechazan.
 `ostrinc --compile` desactiva la contracción de multiplicación-suma del
 compilador C (`-ffp-contract=off`): el backend WASI optimizado había fusionado operaciones y borrado
 residuos que la suma compensada necesita preservar. La matriz Node WASI incluye estos casos de
-cancelación. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
-`Measurement<Quantity<D>>`, `Array<Measurement<T>>`, covarianza entre elementos ni reducciones.
-`examples/measurement_covariance.ostrin` comprueba sumas, diferencias, escalado, fuentes
-independientes, una matriz singular, entradas de escalas muy distintas, cancelación de rango uno,
-tolerancia de simetría y entradas inválidas con una oracle
-analítica; también verifica paridad intérprete/nativo, C para WASI, lowering sin fallback y
-`live_allocations=0`. El programa se añade a la matriz de 32 smoke tests WASI para ejecutarlo además
-bajo Node WASI Preview 1.
+cancelación. `SourceCovariance` y `variance_with_covariance` siguen limitados a
+`Measurement<Float>` y matrices cuyas entradas son varianzas y covarianzas coherentes de fuentes
+adimensionales.
+
+El perfil separado `SourceCorrelation` acepta una matriz adimensional de correlación de hasta 64
+identidades de fuente. Requiere diagonal igual a uno dentro de tolerancia, entradas finitas,
+simetría y semidefinitud positiva; `quantity_uncertainty_with_correlation` convierte cada
+contribución a la unidad coherente del resultado y devuelve `CoherentUncertainty<D>`. La matriz
+puede relacionar fuentes originales de dimensiones diferentes porque sus coeficientes no llevan
+unidades; las contribuciones ya tienen la dimensión `D` del resultado. `examples/measurement_lab.ostrin`
+verifica un producto `Length*Time` generado por fuentes `Length` y `Time`: las contribuciones
+analíticas son `0.3` y `0.4`, la correlación es `0.5`, y la varianza/incertidumbre oracle es
+`0.37` / `sqrt(0.37) = 0.6082762530298219`. La prueba exige paridad intérprete/nativo, lowering
+sin AST fallback, emisión C para WASI y `live_allocations=0`; el mismo Lab forma parte de la matriz
+de 33 smoke tests ejecutados bajo Node WASI Preview 1. Este perfil sigue siendo experimental y su
+evidencia no demuestra soporte nativo general para toda combinación `Measurement<Quantity<D>>`.
+La entrada, las derivadas, los términos de varianza, el resultado analítico y las salidas observadas
+se registran en [`validation/measurement-quantity-correlation.json`](../../validation/measurement-quantity-correlation.json).
+Matrices de covarianza con unidades, arrays de mediciones, covarianza entre elementos y
+reducciones continúan sin soporte.
 
 La composición con `Quantity<D>` queda definida por tipos antes de elegir una representación de
 runtime:
@@ -420,9 +433,9 @@ ejecución nativa con leak-check. Esta evidencia corresponde a ese fixture y sus
 establece soporte general para toda combinación de dimensiones o contenedores. La propagación debe
 mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.
 Para ampliar el alcance se requieren pruebas adicionales de alias explícito, independencia de
-etiquetas repetidas, reducciones con fuentes compartidas, covarianza dimensional y de arrays,
-conversiones de unidades y ejecución WASI. También se necesitan leak-check, ASan y UBSan para los
-buffers o grafos gestionados.
+etiquetas repetidas, reducciones con fuentes compartidas, matrices de covarianza con unidades,
+covarianza de arrays, conversiones de unidades y más combinaciones de ejecución WASI. También se
+necesitan leak-check, ASan y UBSan para los buffers o grafos gestionados.
 
 ## 6. Operaciones y reglas
 
@@ -581,12 +594,13 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
    nativa de paridad y ownership con leak-check. La generalización a todas las estructuras genéricas
    y contenedores sigue abierta.
 6. **Parcial:** proyectar series escalares a valores e incertidumbres para error bars y ofrecer
-   `SourceCovariance` experimental hasta 64 fuentes escalares adimensionales; siguen pendientes
-   las matrices para arrays/dimensiones y la salida de contribuciones.
+   `SourceCovariance` experimental para escalares adimensionales más `SourceCorrelation` experimental
+   para la incertidumbre de una salida dimensional escalar; siguen pendientes matrices de covarianza
+   con unidades, arrays y la salida de contribuciones.
 7. Añadir propagación Monte Carlo explícita y semilla reproducible.
 8. **Parcial:** las series escalares proyectan incertidumbres estándar a `std.viz.errorbars`;
-   falta conectar `Quantity`, covarianza dimensional/de arrays, bandas con nivel declarado y
-   procedencia completa.
+   falta conectar `Quantity` y `CoherentUncertainty<D>` a las figuras, cubrir covarianza de arrays,
+   bandas con nivel declarado y procedencia completa.
 9. Habilitar WASM y la galería únicamente cuando las tres rutas tengan paridad.
 
 ## 12. Evidencia y pruebas necesarias

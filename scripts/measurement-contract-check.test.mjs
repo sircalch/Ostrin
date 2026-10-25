@@ -50,7 +50,7 @@ test("the gate requires accurate dimensional native-smoke scope and experimental
       "Array<Measurement<Float>> has complete numeric support",
     ));
     result = validateMeasurementContract(root);
-    assert.ok(result.errors.some((error) => error.includes("arrays, covariance, and Monte Carlo boundary")));
+    assert.ok(result.errors.some((error) => error.includes("arrays and Monte Carlo boundary")));
 
     writeFileSync(file, original.replace("Equal dimensions in div_quantity reach the explicit experimental boundary error; use div_quantity_same", "native parity"));
     result = validateMeasurementContract(root);
@@ -384,7 +384,7 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     writeFileSync(stdFile, std);
     const labFile = path.join(root, "scripts/lab-data.mjs");
     const lab = readFileSync(labFile, "utf8");
-    writeFileSync(labFile, lab.replace("using J·Σ·Jᵀ", "using independent variances"));
+    writeFileSync(labFile, lab.replace("with J·Σ·Jᵀ", "with independent variances"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
 
