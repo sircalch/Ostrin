@@ -105,4 +105,19 @@ fn main() -> Void {
         Ok(_) => print("rounded perfect correlation = accepted"),
         Err(message) => print("rounded perfect correlation = " + message),
     }
+
+    converted_a = measurements.from_quantity_source(1 cm, 1000000000000000128 cm, "converted-a", "large centimeter uncertainty").unwrap()
+    converted_b = measurements.from_quantity_source(1 cm, 1000000000000000256 cm, "converted-b", "second large centimeter uncertainty").unwrap()
+    converted_difference = measurements.sub_quantity(converted_a, converted_b).unwrap()
+    converted_correlation = measurements.source_correlation(
+        ["converted-a", "converted-b"],
+        array([
+            [1.0, 1.0],
+            [1.0, 1.0]
+        ])
+    ).unwrap()
+    match measurements.quantity_uncertainty_with_correlation(converted_difference, converted_correlation) {
+        Ok(value) => print("unit-conversion cancellation = " + value.value.to_string()),
+        Err(message) => print("unit-conversion cancellation = " + message),
+    }
 }

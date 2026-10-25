@@ -1639,6 +1639,8 @@ pub fn quantity_uncertainty_with_correlation<D: Dimension>(
     // sensitivity to its canonical output-unit contribution, while preserving
     // its identity and using the model as the standardized sources' covariance.
     mut normalized_sources: List<Sensitivity<Float>> = []
+    mut has_nonzero_original_contribution = false
+    mut has_lossy_coherent_conversion = false
     for i in 0 until measurement.sources.length() {
         source = measurement.sources[i]
         validation_error = validate_quantity_source(source)
@@ -1653,9 +1655,20 @@ pub fn quantity_uncertainty_with_correlation<D: Dimension>(
         if covariance_source_index(model.source_ids, source.source_id) < 0 {
             return Err("correlation model is missing a measurement source id")
         }
-        contribution = source.contribution.value() * source.contribution.unit_scale()
+        original_contribution = source.contribution.value()
+        unit_scale = source.contribution.unit_scale()
+        if not is_finite(unit_scale) or unit_scale <= 0.0 {
+            return Err("measurement sensitivity unit scale must be finite and positive")
+        }
+        contribution = original_contribution * unit_scale
         if not is_finite(contribution) {
             return Err("measurement sensitivity contribution must be finite")
+        }
+        if original_contribution != 0.0 {
+            has_nonzero_original_contribution = true
+        }
+        if contribution / unit_scale != original_contribution {
+            has_lossy_coherent_conversion = true
         }
         if source.source_sigma == 0.0 and contribution != 0.0 {
             return Err("zero-sigma source must have zero sensitivity contribution")
@@ -1685,6 +1698,12 @@ pub fn quantity_uncertainty_with_correlation<D: Dimension>(
         Err(message) => {
             return Err(message)
         },
+    }
+    // If rounded unit conversions collapse distinct sensitivities, an exact
+    // zero from the covariance kernel does not prove zero uncertainty. Reject
+    // that case instead of publishing a false exact cancellation.
+    if variance == 0.0 and has_nonzero_original_contribution and has_lossy_coherent_conversion {
+        return Err("correlated measurement uncertainty is numerically unresolved after unit conversion")
     }
     uncertainty_value = sqrt(variance)
     if not is_finite(uncertainty_value) {
