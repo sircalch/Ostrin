@@ -360,6 +360,17 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
 
+    writeFileSync(labFile, lab.replace("Gradients use exact power-of-two normalization", "Gradients use rounded normalization"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
+
+    writeFileSync(labFile, lab.replace(
+      "positive pivots unresolved within the relative tolerance are rejected rather than adding spurious variance",
+      "positive pivots are accepted",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
+
     writeFileSync(labFile, lab);
     const testFile = path.join(root, "compiler/tests/examples.rs");
     const tests = readFileSync(testFile, "utf8");

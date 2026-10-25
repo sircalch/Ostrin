@@ -109,6 +109,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /propagation averages original entries before factoring/i.test(lab)
       && /midpoint calculation preserves subnormal symmetric covariance entries/i.test(lab)
       && /quadratic form uses a semidefinite factor and compensated linear projections before summing squares/i.test(lab)
+      && /Gradients use exact power-of-two normalization/i.test(lab)
+      && /positive pivots unresolved within the relative tolerance are rejected rather than adding spurious variance/i.test(lab)
       && /covariance matrix that cannot be stably factored is rejected explicitly/i.test(lab)
       && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
@@ -133,11 +135,14 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /source\.source_sigma != 0\.0 and expected_variance == 0\.0/.test(covariancePropagation)
       && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
       && /covariance_semidefinite_factor\(model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
-      && /gradient_scale/.test(covariancePropagation)
+      && /gradient_power_scale/.test(covariancePropagation)
+      && /gradient_power_scale <= gradient_scale \* 0\.5/.test(covariancePropagation)
+      && /gradient\[row\] \/ gradient_power_scale/.test(covariancePropagation)
       && /factor\.get\(row, column\)/.test(covariancePropagation)
       && /projection_correction = projection_correction \+ residual/.test(covariancePropagation)
       && /contribution_variance = propagated_sigma \* propagated_sigma/.test(covariancePropagation)
       && /propagated covariance projection underflows Float range/.test(covariancePropagation)
+      && /pivot > 0\.0[\s\S]*?pivot <= relative_tolerance \* pivot_scale/.test(covarianceFactorization)
       && /covariance matrix could not be stably factorized/.test(covarianceFactorization),
     "compiler/std/measurements.ostrin: bounded covariance validation and factorized J·Σ·Jᵀ propagation contract is incomplete");
   check(errors, /lower \+ \(upper - lower\) \* 0\.5/.test(covarianceMidpoint)
@@ -147,6 +152,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /vista\s+normalizada por la entrada máxima finita/i.test(design)
       && /La propagación promedia las entradas originales antes de\s+factorizar/i.test(design)
       && /forma cuadrática se calcula una\s+factorización semidefinida[\s\S]{0,200}proyecciones[\s\S]{0,100}suma compensada/i.test(design)
+      && /normalizan usando una potencia de dos exacta/i.test(design)
+      && /pivotes positivos numéricamente irresueltos/i.test(design)
       && /factorización numéricamente estable/i.test(design)
       && /El punto\s+medio evita perder covarianzas subnormales/i.test(design),
     "Measurement covariance: normalized PSD analysis and underflow-safe midpoint are missing");
@@ -165,6 +172,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /wide-scale covariance cancellation variance = 0/.test(tests)
       && /rank-three compensated variance = 1/.test(tests)
       && /rank-three reordered compensated variance = 1/.test(tests)
+      && /power-of-two gradient normalization variance = 4/.test(tests)
+      && /unresolved positive pivot = covariance matrix could not be stably factorized/.test(tests)
       && /nonuniform rank-one covariance variance = 0\.01/.test(tests)
       && /large finite PSD covariance = accepted/.test(tests)
       && /large indefinite covariance = covariance matrix must be positive semidefinite/.test(tests)
@@ -175,6 +184,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && covarianceExample.includes("wide-scale covariance cancellation variance")
       && covarianceExample.includes("rank-three compensated variance")
       && covarianceExample.includes("rank-three reordered compensated variance")
+      && covarianceExample.includes("power-of-two gradient normalization variance")
+      && covarianceExample.includes("unresolved positive pivot")
       && covarianceExample.includes("nonuniform rank-one covariance variance")
       && covarianceExample.includes("large finite PSD covariance")
       && covarianceExample.includes("large indefinite covariance")

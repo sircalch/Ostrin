@@ -2017,7 +2017,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::covariance_semidefinite_factor",
-        "line": 1051,
+        "line": 1056,
         "operation": "lower.set"
       },
       {
@@ -2025,7 +2025,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::covariance_semidefinite_factor",
-        "line": 1074,
+        "line": 1079,
         "operation": "std.measurements::covariance_symmetric_entry"
       },
       {
@@ -2033,7 +2033,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::covariance_semidefinite_factor",
-        "line": 1082,
+        "line": 1087,
         "operation": "lower.set"
       },
       {
@@ -2041,7 +2041,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::covariance_semidefinite_factor",
-        "line": 1089,
+        "line": 1094,
         "operation": "lower.set"
       },
       {
@@ -2049,7 +2049,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::covariance_semidefinite_factor",
-        "line": 1110,
+        "line": 1115,
         "operation": "std.measurements::covariance_symmetric_entry"
       },
       {
@@ -2057,7 +2057,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::covariance_semidefinite_factor",
-        "line": 1119,
+        "line": 1124,
         "operation": "lower.set"
       },
       {
@@ -2065,7 +2065,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1139,
+        "line": 1144,
         "operation": "std.measurements::covariance_validation_error"
       },
       {
@@ -2073,7 +2073,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1161,
+        "line": 1166,
         "operation": "std.measurements::covariance_source_index"
       },
       {
@@ -2081,7 +2081,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1186,
+        "line": 1191,
         "operation": "gradient.set"
       },
       {
@@ -2089,7 +2089,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1192,
+        "line": 1197,
         "operation": "gradient.set"
       },
       {
@@ -2097,7 +2097,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::variance_with_covariance",
-        "line": 1205,
+        "line": 1222,
         "operation": "std.measurements::covariance_semidefinite_factor"
       },
       {
@@ -2105,7 +2105,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "measurement",
         "file": "<ostrin-std>/measurements.ostrin",
         "function": "std.measurements::uncertainty_with_covariance",
-        "line": 1267,
+        "line": 1284,
         "operation": "std.measurements::variance_with_covariance"
       },
       {

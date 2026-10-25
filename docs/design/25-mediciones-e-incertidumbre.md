@@ -304,8 +304,11 @@ factorización semidefinida `Σ = L · Lᵀ` y se suman los cuadrados de las pro
 cada proyección usa suma compensada. Así, las contribuciones grandes se cancelan antes de elevar el
 residuo al cuadrado, incluso para la regresión no uniforme de rango uno con resultado `0.01`. Si la
 factorización encuentra cancelación numéricamente irresuelta o una proyección subdesbordada, se
-devuelve un error explícito en vez de informar una incertidumbre exacta. Los intermedios no finitos
-también se rechazan. `ostrinc --compile` desactiva la contracción de multiplicación-suma del
+devuelve un error explícito en vez de informar una incertidumbre exacta. Los gradientes se
+normalizan usando una potencia de dos exacta para conservar diferencias representables entre
+contribuciones grandes. Los pivotes positivos numéricamente irresueltos se rechazan en vez de
+introducir una componente espuria en matrices singulares. Los intermedios no finitos también se
+rechazan. `ostrinc --compile` desactiva la contracción de multiplicación-suma del
 compilador C (`-ffp-contract=off`): el backend WASI optimizado había fusionado operaciones y borrado
 residuos que la suma compensada necesita preservar. La matriz Node WASI incluye estos casos de
 cancelación. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
