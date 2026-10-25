@@ -10,8 +10,8 @@
   },
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "7fc21cdf7c574edf3fdf417573bea2c3b5d03619",
-    "evidenceRevision": "d5eae7625606637a480dc8ce7baaf0513a0cdf15",
+    "sourceRevision": "9d416938f7829ed1c800243e68790d326a97aac6",
+    "evidenceRevision": "a06ef3b370011d240cf06939ad4f5e543b8c90ba",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -32,13 +32,20 @@
     "local-numeric-validation",
     "local-benchmark-contract-check",
     "measurement-covariance-propagation-preserves-correlations-across-matrix-scales",
-    "measurement-covariance-quadratic-form-compensated-sums-preserve-small-residuals"
+    "measurement-covariance-quadratic-form-compensated-sums-preserve-small-residuals",
+    "measurement-covariance-rounded-factor-projection-p2-rejected-as-unresolved-9d41693",
+    "measurement-covariance-lossy-subnormal-normalization-p2-rejected-9d41693",
+    "measurement-covariance-full-cargo-422-tests-green-on-source-9d41693",
+    "measurement-covariance-wasi-32-programs-green-on-source-9d41693",
+    "measurement-covariance-15-workload-benchmark-recorded-on-source-9d41693",
+    "covariance-generated-website-and-bars-effect-bundle-synchronized",
+    "pr-234-source-evidence-checkpoint-prepared-locally"
   ],
   "currentPackage": {
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "source-7fc21cd-evidence-d5eae76-checkpointed-exact-head-ci-and-review-pending",
+    "status": "source-9d41693-evidence-a06ef3b-checkpointed-exact-head-validation-pending",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -95,14 +102,23 @@
       "Benchmark run on clean commit 5bf8a47afb869f26b29eec0816ec66a2b8d52c01 includes 15 workloads, 7 samples and 1 warmup on Windows 11 x64; covariance medians are 89.504 ms interpreter and 8.912 ms native (10.042 ratio). Raw report SHA-256 d366ffc6b0187bc5da6077b9af4ca8bf295e70190fc7fbccc85509cd6f4230f2 is retained at validation/benchmark-m1-covariance-windows.json and the generated benchmark website data includes the new workload. Peak memory/RSS was not measured; no cross-platform or cross-language performance claim is made.",
       "Evidence commit 93cf67a records the raw benchmark, generated 15-workload website snapshot and validation results; a later checkpoint records subsequent evidence revisions separately.",
       "Exact-head Website and browser checks on 687400f failed because generated website/provenance-data.js still described 500 known operation edges and omitted covariance_correlation_matrix after the scalar covariance implementation changed the compiler provenance graph.",
-      "Regenerated website/provenance-data.js in evidence commit d5eae7625606637a480dc8ce7baaf0513a0cdf15. The generator now records 513 known operation edges, the correlation helper and current standard-library line mappings; node scripts/provenance-page.mjs and node scripts/website-check.mjs --wasm pass locally (17 public pages, 305 examples, 383 integration tests)."
+      "Regenerated website/provenance-data.js in evidence commit d5eae7625606637a480dc8ce7baaf0513a0cdf15. The generator now records 513 known operation edges, the correlation helper and current standard-library line mappings; node scripts/provenance-page.mjs and node scripts/website-check.mjs --wasm pass locally (17 public pages, 305 examples, 383 integration tests).",
+      "Fresh PR #234 review P2: a rank-two covariance with analytic variance 256 now returns an explicit numerically-unresolved projection error instead of zero; interpreter/native regression and WASI oracle agree.",
+      "Fresh PR #234 review P2: power-of-two contribution normalization now explicitly rejects nonzero values rounded into the subnormal range; interpreter/native regression and WASI oracle agree.",
+      "Full Cargo suite on exact source tree 9d416938f7829ed1c800243e68790d326a97aac6 passed: 33 unit, 6 differential and 383 integration tests (422 total). Cargo fmt check passed.",
+      "Optimized host compiler and browser WASI compiler were rebuilt from source 9d416938f7829ed1c800243e68790d326a97aac6; Node WASI Preview 1 matrix passed all 32 programs.",
+      "Measurement contract checker and 18 mutation tests passed; project-plan passed with 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback; independent numeric validation matched 80 report values and 136 emitted values exactly with live_allocations=0.",
+      "Generated provenance and benchmark web data were synchronized; Scientific Lab replay verified all 29 R1/R2 figures; website-check passed (17 pages, 305 examples, 383 integration tests, WASM); Linguist and distribution checks passed. Refreshed bars effect bundle passes verification.",
+      "Windows 11 x64 benchmark report validation/benchmark-m1-covariance-windows-9d41693.json has SHA-256 67a537590941e9c9510078112b28d051487a44b4f8db2ec70432da67706fb250; 15 workloads, 7 samples and 1 warmup on clean source 9d41693. Covariance median: 74.607 ms interpreter, 7.787 ms native, ratio 9.581. RSS is not measured; no cross-platform claim.",
+      "R3 readiness after bundle regeneration remains OPEN: 29/29 base bundles inventoried, 0/29 host captures, 21,026 known effect references, 83 symbolic callbacks, 0 unresolved references. Declared experiment levels remain R0-R2; no cross-platform reproducibility claim.",
+      "PR #234 current remote head remains 6b1352be1bc9b6911c5bd12bd10e9c5a2cc0415a, base main 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714, open and mergeable. Its earlier checks/review are superseded by the pending source/evidence/checkpoint commits."
     ],
     "activePullRequests": [
       234
     ]
   },
   "pending": [
-      "push the checkpoint for source 7fc21cd and evidence d5eae76, then verify required CI, native sanitizers and fresh review on the final exact PR #234 head",
+    "Push the source 9d41693, evidence a06ef3b, and checkpoint commits to PR #234; require checks and fresh review on the final exact head before the conditionally authorized merge.",
     "integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; existing user authorization is conditional on those gates",
     "continue R3 work beyond the verified host-evidence readiness gate; the experiment records remain at R0-R2 and do not establish cross-platform reproducibility",
     "continue static-effects closure and broader R3 inspect/validate/replay/compare evidence",
@@ -139,8 +155,9 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "R3 host-evidence readiness for main is verified; broader reproducibility remains open because declared bundle levels are R0-R2 and no cross-platform equivalence is claimed",
-    "the published v0.2.0 tag/assets remain frozen; no new release or tag is authorized"
+    "PR #234 exact final HEAD has not yet completed required CI, native sanitizers, or fresh review; do not merge until all are green and no substantive findings remain.",
+    "R3 host captures remain absent; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
+    "The published v0.2.0 tag and assets remain frozen; no new release or tag is authorized."
   ],
-    "next": "push the checkpoint for source 7fc21cd and evidence d5eae76, then require green checks plus a fresh review without substantive findings on the final PR #234 head before the conditionally authorized merge"
+  "next": "Push the source 9d41693, evidence a06ef3b, and checkpoint commits to the existing PR #234 branch. Require a fresh exact-head review and green required CI, including sanitizers, before considering the conditionally authorized merge."
 }
