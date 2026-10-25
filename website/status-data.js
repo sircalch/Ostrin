@@ -46,7 +46,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "ciRunUrl": null
   },
   "effectCoverage": {
-    "knownCalls": 21028,
+    "knownCalls": 21029,
     "symbolicCalls": 83,
     "unresolvedCalls": 0,
     "countUnit": "distinct_function_operation_edges",
@@ -79,8 +79,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
       "bundleCount": 29,
       "availableBundleCount": 29,
       "invalidBundleCount": 0,
-      "edgeCount": 21111,
-      "categorizedEdgeCount": 21111,
+      "edgeCount": 21112,
+      "categorizedEdgeCount": 21112,
       "uncategorizedEdgeCount": 0,
       "staticLocalFunctionEdgeCount": 9335,
       "genericTraitCandidateEdgeCount": 0,
