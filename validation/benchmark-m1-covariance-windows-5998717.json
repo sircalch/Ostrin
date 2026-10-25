@@ -1,0 +1,808 @@
+{
+  "schema": 3,
+  "workloads": [
+    {
+      "index": 0,
+      "workload": "examples/benchmark_numeric.ostrin",
+      "sourceBytes": 347,
+      "sourceSha256": "600c6d18abcd319eefbd5c869c301cfa1df5c5950e8b345458d9655012f6792d",
+      "outputBytes": 11,
+      "outputSha256": "5eb06c147e97a87d816495ec13d06e74730a77040766c7118a11ce79debb426f",
+      "nativeCompileMs": 276.596,
+      "interpreterMs": [
+        132.165,
+        129.19,
+        127.984,
+        127.045,
+        128.368,
+        126.185,
+        127.23
+      ],
+      "nativeMs": [
+        7.551,
+        7.943,
+        7.59,
+        7.628,
+        7.526,
+        7.787,
+        7.632
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 126.185,
+          "maxMs": 132.165,
+          "meanMs": 128.31,
+          "medianMs": 127.984,
+          "p95Ms": 131.273,
+          "stdevMs": 1.814
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.526,
+          "maxMs": 7.943,
+          "meanMs": 7.665,
+          "medianMs": 7.628,
+          "p95Ms": 7.896,
+          "stdevMs": 0.138
+        }
+      },
+      "interpreterMedianMs": 127.984,
+      "nativeMedianMs": 7.628,
+      "interpreterToNativeMedianRatio": 16.779
+    },
+    {
+      "index": 1,
+      "workload": "examples/arrays.ostrin",
+      "sourceBytes": 1085,
+      "sourceSha256": "af2083471ba956c21067645fb984ce006519efac560afb571ec8c867b848ae86",
+      "outputBytes": 328,
+      "outputSha256": "30ded28c2b9d5e35ee00631c0656f85233cbfa6f5eb98ff9622cc27aea272fcd",
+      "nativeCompileMs": 594.999,
+      "interpreterMs": [
+        9.93,
+        9.849,
+        9.404,
+        9.356,
+        9.227,
+        9.603,
+        10.244
+      ],
+      "nativeMs": [
+        7.195,
+        6.537,
+        6.232,
+        6.379,
+        6.74,
+        7.173,
+        7.594
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 9.227,
+          "maxMs": 10.244,
+          "meanMs": 9.659,
+          "medianMs": 9.603,
+          "p95Ms": 10.15,
+          "stdevMs": 0.338
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 6.232,
+          "maxMs": 7.594,
+          "meanMs": 6.836,
+          "medianMs": 6.74,
+          "p95Ms": 7.475,
+          "stdevMs": 0.461
+        }
+      },
+      "interpreterMedianMs": 9.603,
+      "nativeMedianMs": 6.74,
+      "interpreterToNativeMedianRatio": 1.425
+    },
+    {
+      "index": 2,
+      "workload": "examples/quantity_arrays.ostrin",
+      "sourceBytes": 827,
+      "sourceSha256": "6165ecd6cbff6095a47a9b8e8cbc61f2aef27061dfb320e83ae7a8b72b557dd5",
+      "outputBytes": 411,
+      "outputSha256": "096611c76f3ce67238f18fad043e6c63875b931118ec64ddb3be7c316faf3a75",
+      "nativeCompileMs": 626.47,
+      "interpreterMs": [
+        9.788,
+        9.621,
+        9.703,
+        9.24,
+        10.883,
+        11.02,
+        10.821
+      ],
+      "nativeMs": [
+        6.704,
+        7.358,
+        7.176,
+        7.774,
+        8.136,
+        8.11,
+        8.234
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 9.24,
+          "maxMs": 11.02,
+          "meanMs": 10.154,
+          "medianMs": 9.788,
+          "p95Ms": 10.979,
+          "stdevMs": 0.675
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 6.704,
+          "maxMs": 8.234,
+          "meanMs": 7.642,
+          "medianMs": 7.774,
+          "p95Ms": 8.205,
+          "stdevMs": 0.536
+        }
+      },
+      "interpreterMedianMs": 9.788,
+      "nativeMedianMs": 7.774,
+      "interpreterToNativeMedianRatio": 1.259
+    },
+    {
+      "index": 3,
+      "workload": "examples/benchmark_float_array.ostrin",
+      "sourceBytes": 342,
+      "sourceSha256": "d5d1162487732d99f8ae1d63310b1f82991d5e827c73f57c5845e0ffd3727af1",
+      "outputBytes": 37,
+      "outputSha256": "e2343caf81fa353e5f8e8794d9473aef2f1f3d766059aa03084412071e6e3591",
+      "nativeCompileMs": 370.372,
+      "interpreterMs": [
+        10.013,
+        10.494,
+        10.377,
+        11.044,
+        11.752,
+        10.895,
+        10.413
+      ],
+      "nativeMs": [
+        7.397,
+        8.021,
+        8.294,
+        8.662,
+        7.738,
+        8.164,
+        8.203
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 10.013,
+          "maxMs": 11.752,
+          "meanMs": 10.712,
+          "medianMs": 10.494,
+          "p95Ms": 11.54,
+          "stdevMs": 0.53
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.397,
+          "maxMs": 8.662,
+          "meanMs": 8.068,
+          "medianMs": 8.164,
+          "p95Ms": 8.551,
+          "stdevMs": 0.376
+        }
+      },
+      "interpreterMedianMs": 10.494,
+      "nativeMedianMs": 8.164,
+      "interpreterToNativeMedianRatio": 1.285
+    },
+    {
+      "index": 4,
+      "workload": "examples/benchmark_quantity_array.ostrin",
+      "sourceBytes": 363,
+      "sourceSha256": "cf041d130fa559da73e399fbd8d20740d7c0376fa35ec8ab1ddd08ed23bd9c97",
+      "outputBytes": 45,
+      "outputSha256": "79631376a7e1cb201f105e6a55ab677258f258065b13040b8238ba66ea8ffb1c",
+      "nativeCompileMs": 461.958,
+      "interpreterMs": [
+        9.519,
+        10.848,
+        10.822,
+        11.588,
+        11.253,
+        11.094,
+        10.574
+      ],
+      "nativeMs": [
+        7.537,
+        13.959,
+        8.323,
+        8.627,
+        8.349,
+        7.894,
+        7.758
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 9.519,
+          "maxMs": 11.588,
+          "meanMs": 10.814,
+          "medianMs": 10.848,
+          "p95Ms": 11.488,
+          "stdevMs": 0.61
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.537,
+          "maxMs": 13.959,
+          "meanMs": 8.921,
+          "medianMs": 8.323,
+          "p95Ms": 12.359,
+          "stdevMs": 2.086
+        }
+      },
+      "interpreterMedianMs": 10.848,
+      "nativeMedianMs": 8.323,
+      "interpreterToNativeMedianRatio": 1.304
+    },
+    {
+      "index": 5,
+      "workload": "examples/numeric_methods.ostrin",
+      "sourceBytes": 1640,
+      "sourceSha256": "e021c50c1868560cff701e0de8cda97b07c472d85527f8c853ecdc1f0d237692",
+      "outputBytes": 332,
+      "outputSha256": "cc579fca9af4d7a9731c7bc2b1a215b36fc9a1ee20fe66728a00d695e58ebd58",
+      "nativeCompileMs": 1572.424,
+      "interpreterMs": [
+        55.976,
+        56.346,
+        58.18,
+        59.225,
+        56.259,
+        57.103,
+        58.281
+      ],
+      "nativeMs": [
+        9.792,
+        9.916,
+        9.653,
+        10.034,
+        10.33,
+        10.843,
+        10.416
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 55.976,
+          "maxMs": 59.225,
+          "meanMs": 57.339,
+          "medianMs": 57.103,
+          "p95Ms": 58.942,
+          "stdevMs": 1.147
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 9.653,
+          "maxMs": 10.843,
+          "meanMs": 10.14,
+          "medianMs": 10.034,
+          "p95Ms": 10.715,
+          "stdevMs": 0.383
+        }
+      },
+      "interpreterMedianMs": 57.103,
+      "nativeMedianMs": 10.034,
+      "interpreterToNativeMedianRatio": 5.691
+    },
+    {
+      "index": 6,
+      "workload": "examples/numeric_lu.ostrin",
+      "sourceBytes": 1444,
+      "sourceSha256": "f2bb4bb02bd9ab7bc681af1c29defe4d5cbdec0d76e50a3fea8f3989ae38bd90",
+      "outputBytes": 282,
+      "outputSha256": "5f5d980416766344175681432d58647a3364358c894e61dca5389173d6f17a88",
+      "nativeCompileMs": 1533.95,
+      "interpreterMs": [
+        31.347,
+        31.903,
+        30.914,
+        29.906,
+        31.868,
+        30.676,
+        30.158
+      ],
+      "nativeMs": [
+        7.801,
+        7.983,
+        7.913,
+        7.371,
+        8.121,
+        7.415,
+        12.641
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 29.906,
+          "maxMs": 31.903,
+          "meanMs": 30.967,
+          "medianMs": 30.914,
+          "p95Ms": 31.892,
+          "stdevMs": 0.727
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.371,
+          "maxMs": 12.641,
+          "meanMs": 8.464,
+          "medianMs": 7.913,
+          "p95Ms": 11.285,
+          "stdevMs": 1.725
+        }
+      },
+      "interpreterMedianMs": 30.914,
+      "nativeMedianMs": 7.913,
+      "interpreterToNativeMedianRatio": 3.907
+    },
+    {
+      "index": 7,
+      "workload": "examples/numeric_svd.ostrin",
+      "sourceBytes": 1867,
+      "sourceSha256": "867b8651ac16cd033434b40c5c7098d9eef51106db3e754e3f6284fc91230232",
+      "outputBytes": 304,
+      "outputSha256": "8dc7f6a8375ccc906efd212bdcf5dd02cc692105b1304970a7c9c5550516a72c",
+      "nativeCompileMs": 1520.322,
+      "interpreterMs": [
+        30.085,
+        32.435,
+        30.704,
+        29.959,
+        33.668,
+        29.457,
+        35.425
+      ],
+      "nativeMs": [
+        7.68,
+        8.391,
+        7.637,
+        7.866,
+        7.633,
+        7.869,
+        8.108
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 29.457,
+          "maxMs": 35.425,
+          "meanMs": 31.676,
+          "medianMs": 30.704,
+          "p95Ms": 34.898,
+          "stdevMs": 2.068
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.633,
+          "maxMs": 8.391,
+          "meanMs": 7.883,
+          "medianMs": 7.866,
+          "p95Ms": 8.306,
+          "stdevMs": 0.26
+        }
+      },
+      "interpreterMedianMs": 30.704,
+      "nativeMedianMs": 7.866,
+      "interpreterToNativeMedianRatio": 3.903
+    },
+    {
+      "index": 8,
+      "workload": "examples/numeric_complex_linear_algebra.ostrin",
+      "sourceBytes": 2949,
+      "sourceSha256": "5eaec3506ae800b3737747adee77461b22789e498f3a8155c625560d519d1cf2",
+      "outputBytes": 241,
+      "outputSha256": "433ddb585475dbca9b9d1da223a522bf12bb4a1eebb331c9cd7b47931c17fd4f",
+      "nativeCompileMs": 1536.617,
+      "interpreterMs": [
+        33.207,
+        30.501,
+        29.602,
+        32.769,
+        35.441,
+        31.63,
+        34.89
+      ],
+      "nativeMs": [
+        7.794,
+        7.668,
+        7.782,
+        8.835,
+        8.148,
+        7.881,
+        8.676
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 29.602,
+          "maxMs": 35.441,
+          "meanMs": 32.577,
+          "medianMs": 32.769,
+          "p95Ms": 35.276,
+          "stdevMs": 2.001
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.668,
+          "maxMs": 8.835,
+          "meanMs": 8.112,
+          "medianMs": 7.881,
+          "p95Ms": 8.787,
+          "stdevMs": 0.431
+        }
+      },
+      "interpreterMedianMs": 32.769,
+      "nativeMedianMs": 7.881,
+      "interpreterToNativeMedianRatio": 4.158
+    },
+    {
+      "index": 9,
+      "workload": "examples/viz_scatter_fit.ostrin",
+      "sourceBytes": 2226,
+      "sourceSha256": "356793bcde17891fe60df5753a283ee98ab857f0f6750d8c9a7b8b6a90fea699",
+      "outputBytes": 12819,
+      "outputSha256": "ecb2e338432f52a9f1bb91fcb792e6307cda4bd06b186a7959562241243c5608",
+      "nativeCompileMs": 3766.78,
+      "interpreterMs": [
+        101.346,
+        103.442,
+        103.98,
+        112.753,
+        103.628,
+        102.446,
+        109.144
+      ],
+      "nativeMs": [
+        9.593,
+        9.219,
+        8.981,
+        9.459,
+        8.896,
+        8.921,
+        9.79
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 101.346,
+          "maxMs": 112.753,
+          "meanMs": 105.248,
+          "medianMs": 103.628,
+          "p95Ms": 111.67,
+          "stdevMs": 3.819
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 8.896,
+          "maxMs": 9.79,
+          "meanMs": 9.266,
+          "medianMs": 9.219,
+          "p95Ms": 9.731,
+          "stdevMs": 0.329
+        }
+      },
+      "interpreterMedianMs": 103.628,
+      "nativeMedianMs": 9.219,
+      "interpreterToNativeMedianRatio": 11.24
+    },
+    {
+      "index": 10,
+      "workload": "benchmarks/temperature-float.ostrin",
+      "sourceBytes": 199,
+      "sourceSha256": "a6f6d03ce2a91c0ffeb8c82cd41c5aa1b412c6afe1e7ecd33d7a7e1f82f7bc45",
+      "outputBytes": 5,
+      "outputSha256": "60734f174b2035e5b2ba85fef8c648cc0cb18c5995b419d3cd1c025c5b09d0c7",
+      "nativeCompileMs": 286.844,
+      "interpreterMs": [
+        34.635,
+        34.029,
+        34.003,
+        33.953,
+        33.699,
+        35.594,
+        34.541
+      ],
+      "nativeMs": [
+        7.577,
+        8.019,
+        7.706,
+        7.615,
+        7.546,
+        8.251,
+        8.497
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 33.699,
+          "maxMs": 35.594,
+          "meanMs": 34.351,
+          "medianMs": 34.029,
+          "p95Ms": 35.307,
+          "stdevMs": 0.594
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.546,
+          "maxMs": 8.497,
+          "meanMs": 7.887,
+          "medianMs": 7.706,
+          "p95Ms": 8.424,
+          "stdevMs": 0.347
+        }
+      },
+      "interpreterMedianMs": 34.029,
+      "nativeMedianMs": 7.706,
+      "interpreterToNativeMedianRatio": 4.416
+    },
+    {
+      "index": 11,
+      "workload": "benchmarks/temperature-interval.ostrin",
+      "sourceBytes": 219,
+      "sourceSha256": "685f77322a5903149f2a8eed1dddfa2b52782a613ee6adf22141b88a2f521134",
+      "outputBytes": 7,
+      "outputSha256": "1c38139853adc4fc87d67509a49dcc328066676433b22fbd0629ff1063e0afe3",
+      "nativeCompileMs": 327.394,
+      "interpreterMs": [
+        78.568,
+        78.705,
+        77.641,
+        79.041,
+        80.235,
+        81.022,
+        77.684
+      ],
+      "nativeMs": [
+        8.782,
+        8.372,
+        7.552,
+        8.23,
+        12.617,
+        8.352,
+        9.029
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 77.641,
+          "maxMs": 81.022,
+          "meanMs": 78.985,
+          "medianMs": 78.705,
+          "p95Ms": 80.786,
+          "stdevMs": 1.163
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.552,
+          "maxMs": 12.617,
+          "meanMs": 8.991,
+          "medianMs": 8.372,
+          "p95Ms": 11.541,
+          "stdevMs": 1.542
+        }
+      },
+      "interpreterMedianMs": 78.705,
+      "nativeMedianMs": 8.372,
+      "interpreterToNativeMedianRatio": 9.401
+    },
+    {
+      "index": 12,
+      "workload": "benchmarks/temperature-point.ostrin",
+      "sourceBytes": 235,
+      "sourceSha256": "35d5b9b2bdf7b0f8a2194264bf21b343d4f0f153a8c7933c18032e4c9961c894",
+      "outputBytes": 21,
+      "outputSha256": "abcde6ea2948c089211e4eb5f804d3db90cccba38078a807de92027f0ca5fc0c",
+      "nativeCompileMs": 326.046,
+      "interpreterMs": [
+        204.963,
+        219.785,
+        204.715,
+        206.033,
+        206.232,
+        215.323,
+        208.509
+      ],
+      "nativeMs": [
+        7.718,
+        7.82,
+        7.416,
+        7.707,
+        7.632,
+        7.714,
+        7.354
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 204.715,
+          "maxMs": 219.785,
+          "meanMs": 209.366,
+          "medianMs": 206.232,
+          "p95Ms": 218.446,
+          "stdevMs": 5.434
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.354,
+          "maxMs": 7.82,
+          "meanMs": 7.623,
+          "medianMs": 7.707,
+          "p95Ms": 7.79,
+          "stdevMs": 0.16
+        }
+      },
+      "interpreterMedianMs": 206.232,
+      "nativeMedianMs": 7.707,
+      "interpreterToNativeMedianRatio": 26.761
+    },
+    {
+      "index": 13,
+      "workload": "benchmarks/measurement-source-identity.ostrin",
+      "sourceBytes": 578,
+      "sourceSha256": "2b0ef3e3d8cc36b467e4e255cbc087b1bc31f13cfb78842be5cad44d789beac3",
+      "outputBytes": 26,
+      "outputSha256": "3c0c192fc2cb084e26f1d5e58528dea2ef31d286f5f389141f1ebf3216112686",
+      "nativeCompileMs": 2134.252,
+      "interpreterMs": [
+        886.117,
+        887.328,
+        907.116,
+        899.609,
+        895.82,
+        912.871,
+        897.518
+      ],
+      "nativeMs": [
+        43.819,
+        42.73,
+        49.543,
+        45.393,
+        41.793,
+        43.492,
+        44.501
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 886.117,
+          "maxMs": 912.871,
+          "meanMs": 898.054,
+          "medianMs": 897.518,
+          "p95Ms": 911.145,
+          "stdevMs": 8.999
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 41.793,
+          "maxMs": 49.543,
+          "meanMs": 44.467,
+          "medianMs": 43.819,
+          "p95Ms": 48.298,
+          "stdevMs": 2.335
+        }
+      },
+      "interpreterMedianMs": 897.518,
+      "nativeMedianMs": 43.819,
+      "interpreterToNativeMedianRatio": 20.483
+    },
+    {
+      "index": 14,
+      "workload": "examples/measurement_covariance.ostrin",
+      "sourceBytes": 19176,
+      "sourceSha256": "953a834c2b2168409a841d6e402863bb37df1724f2f0fc2c0c42826e3de9ee77",
+      "outputBytes": 2002,
+      "outputSha256": "23c101eb1554c1bcc23d68005ce8833bba11defd58e0c8f540cff23b51535e63",
+      "nativeCompileMs": 2492.345,
+      "interpreterMs": [
+        94.604,
+        79.957,
+        85.879,
+        84.802,
+        88.438,
+        81.294,
+        79.941
+      ],
+      "nativeMs": [
+        8.302,
+        8.01,
+        7.638,
+        8.845,
+        8.518,
+        8.272,
+        7.856
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 79.941,
+          "maxMs": 94.604,
+          "meanMs": 84.988,
+          "medianMs": 84.802,
+          "p95Ms": 92.754,
+          "stdevMs": 4.923
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 7.638,
+          "maxMs": 8.845,
+          "meanMs": 8.206,
+          "medianMs": 8.272,
+          "p95Ms": 8.747,
+          "stdevMs": 0.378
+        }
+      },
+      "interpreterMedianMs": 84.802,
+      "nativeMedianMs": 8.272,
+      "interpreterToNativeMedianRatio": 10.252
+    }
+  ],
+  "commit": "59987174444b03df5c1fd310bacc5386436b232b",
+  "git": {
+    "commit": "59987174444b03df5c1fd310bacc5386436b232b",
+    "clean": true
+  },
+  "compiler": "compiler/target/release/ostrinc.exe",
+  "compilerVersion": "ostrinc 0.2.0",
+  "node": "v24.19.0",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "os": {
+      "type": "Windows_NT",
+      "release": "10.0.26200",
+      "version": "Windows 11 Pro"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 5700X 8-Core Processor             ",
+      "logicalCores": 16
+    },
+    "memoryBytes": 34278834176
+  },
+  "platform": "win32",
+  "arch": "x64",
+  "nativeCompile": {
+    "target": "native",
+    "cCompiler": {
+      "command": "gcc",
+      "version": "gcc (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r8) 13.2.0"
+    },
+    "compilerManagedDefaults": [
+      "-O2",
+      "-ffp-contract=off"
+    ],
+    "argvCapture": "not intercepted; see compiler/src/main.rs",
+    "environment": {
+      "OSTRIN_CC": null,
+      "OSTRIN_CFLAGS": null
+    }
+  },
+  "methodology": {
+    "clock": "node:perf_hooks performance.now wall-clock process duration",
+    "outputCheck": "normalized UTF-8 stdout must match interpreter and native output exactly",
+    "quantityFloatPair": {
+      "comparedValues": 2,
+      "maximumAbsoluteDifference": 0,
+      "absoluteTolerance": 1e-13,
+      "relativeTolerance": 1e-12
+    },
+    "memory": "not captured; peak child RSS and allocation counters are a planned metric"
+  },
+  "iterations": 7,
+  "warmups": 1
+}
