@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "c1a4281e4d4fdac81eab6249cbc04707433eef0d",
-    "evidenceRevision": "9ac34469d37c34ff745f16124c4c80fc4bc2858f",
-    "dashboardRevision": "84b6c0470821e42a288e76b62637d14ea4f32a35",
+    "sourceRevision": "6c6c3aa55f0c38d5a5c633330f22f8705f5f8a34",
+    "evidenceRevision": "e05cbb79a4955d7d42bba48af51916ac51c41cc5",
+    "dashboardRevision": "d6120a86940bef74374bd4aac858e6160f0d26f3",
     "lastValidatedRemotePullRequestHead": "e30c1358953cb34d1408a6b62847bef9f2e7baa6",
-    "lastObservedRemotePullRequestHead": "e30c1358953cb34d1408a6b62847bef9f2e7baa6",
+    "lastObservedRemotePullRequestHead": "7d2b7be7bed015e103a0f63f854dee809fb95ac6",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -88,43 +88,53 @@
     "measurement-correlation-numeric-validation-80-reports-136-emitted-values-exact",
     "measurement-correlation-linguist-distribution-and-v0.2-readiness-12-of-12-green",
     "measurement-correlation-evidence-9ac3446-and-dashboard-84b6c04-recorded",
+    "measurement-correlation-rounded-endpoint-p2-fixed-source-6c6c3aa-with-exact-rational-regression",
+    "measurement-correlation-p2-focused-interpreter-native-test-wasi33-and-contract18-green",
+    "measurement-scalar-native-lowering-ratchet-updated-31-to-34-after-three-sourcecorrelation-ir-bodies",
+    "stale-remote-pr235-failures-diagnosed-and-fixed-provenance-page-regenerated-website383-green",
+    "numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero-after-p2",
+    "project-plan-linguist-distribution-ownership-v0.2-readiness-and-scorecard-tests-green-after-p2",
     "r3-bars-bundle-regenerated-effect-coverage-21063-r3-open-zero-host-captures"
   ],
   "currentPackage": {
     "name": "dimensional-source-correlation",
     "branch": "codex/dimensional-measurement-correlation",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "pr-235-open-awaiting-checkpoint-update-and-exact-head-checks-review",
+    "status": "pr-235-local-p2-fix-and-evidence-ready-awaiting-push-and-exact-head-checks-review",
     "scope": [
       "experimental dense dimensionless SourceCorrelation matrices for one to 64 source identities",
       "scalar quantity_uncertainty_with_correlation for Measurement<Quantity<D>> with sources of different input dimensions",
       "coherent-unit source contributions and statically dimensioned CoherentUncertainty<D> result",
       "finite, shape, unique-ID, symmetry, unit-diagonal, coefficient-bound and PSD validation",
       "analytical Length*Time product oracle: contribution terms 0.09 + 0.16 + 0.12 = variance 0.37",
+      "reject symmetry-tolerant asymmetric coefficients when Float midpoint rounding would erase residual uncertainty at +/-1",
+      "P2 regression: coefficients 1 and 0.9999999999999999 with contributions +1e16 and -1e16 have exact rational standard uncertainty 105367121.277235079..., so the ambiguous matrix returns an explicit unresolved error",
       "unit-carrying covariance matrices, measurement arrays and array reductions remain unsupported"
     ],
     "evidence": [
-      "Source commit c1a4281e4d4fdac81eab6249cbc04707433eef0d; evidence documentation commit 9ac34469d37c34ff745f16124c4c80fc4bc2858f and generated evidence/dashboard commit 84b6c0470821e42a288e76b62637d14ea4f32a35.",
+      "Implementation source commit 6c6c3aa55f0c38d5a5c633330f22f8705f5f8a34; P2 documentation, exact rational oracle, contract gate and regression evidence commit e05cbb7; regenerated Lab/status/provenance dashboard commit d6120a8. Evidence and dashboard metadata do not change the source revision.",
       "Focused Rust integration test dimensional_measurement_lab_matches_interpreter_and_native passed 1/1; interpreter and native output match the analytical uncertainty; native --leak-check reports live_allocations=0.",
+      "The new near-perfect asymmetric correlation regression produces +1e16 and -1e16 contributions and rejects the matrix as numerically unresolved; exact binary-rational averaging yields variance 23283064365386962890625/2097152 and standard uncertainty 105367121.277235079467422420100100195301299681915115421502045.",
       "Native type report confirms IR lowering with ast=0, ast-fallback=0 and divergences=0; WASI C emission contains the concrete SourceCorrelation path.",
       "Node WASI Preview 1 matrix passed all 33 programs, including measurement_quantity_correlation.",
       "Measurement contract gate and 18/18 mutation tests passed; project-plan reports 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallbacks.",
       "Website check passed 17 public pages, 305 examples and 383 integration tests; Lab verified 12 demos and 29 figure replays.",
       "Numeric validation matched 80 report values and 136 emitted values exactly with live_allocations=0; this general matrix report is separate from the correlation analytical oracle.",
       "Linguist, distribution, ownership checks and the 12/12 v0.2 readiness gate passed; v0.2.0 remains frozen.",
-      "Local full Cargo suite was interrupted after several hours with no useful progress in the differential test compiling viz_isosurface via GCC; the focused Measurement test passed. New exact-head CI remains required.",
+      "Focused scalar Measurement parity test passed after updating its native-source IR ratchet from 31 to 34; the additional three bodies are the SourceCorrelation API, with hir=0 and ast=0. The full local Cargo suite was interrupted after several hours while the existing differential visualization test compiled with GCC; exact-head CI is required.",
+      "The old PR #235 head 7d2b7be failed because this lowering ratchet was stale (also under ASan/UBSan) and website/provenance-data.js needed regeneration. Both issues are fixed locally; those old checks do not validate the new head.",
       "Main 69c962 post-merge validation completed 8/8 checks successfully, including compiler tests on Windows/Linux/macOS, browser audit, CodeQL, dependency/security checks and website deployment."
     ],
     "activePullRequests": [
       235
     ],
-    "sourceRevision": "c1a4281e4d4fdac81eab6249cbc04707433eef0d",
-    "evidenceRevision": "9ac34469d37c34ff745f16124c4c80fc4bc2858f",
-    "dashboardRevision": "84b6c0470821e42a288e76b62637d14ea4f32a35"
+    "sourceRevision": "6c6c3aa55f0c38d5a5c633330f22f8705f5f8a34",
+    "evidenceRevision": "e05cbb79a4955d7d42bba48af51916ac51c41cc5",
+    "dashboardRevision": "d6120a86940bef74374bd4aac858e6160f0d26f3"
   },
   "pending": [
-    "Push the checkpoint-only PR 235 metadata update; then validate the resulting current PR head, not the initial fc59407 head.",
-    "Require all current-head checks, native sanitizers and fresh review with no substantive findings before integration.",
+    "Commit this checkpoint and push the source, evidence and generated website updates to PR #235; then validate the pushed exact head, not the failed 7d2b7be head or the earlier fc59407 review.",
+    "Require all checks, native sanitizers and a fresh review with no substantive findings on the new exact head before integration.",
     "Continue R3 host capture and broader inspect/validate/replay/compare work; current readiness is OPEN with 0/29 host captures and experiment levels R0-R2.",
     "Keep unit-carrying covariance matrices, Measurement arrays and array reductions outside the supported profile until separately typed and validated.",
     "Keep v0.2.0 tag and published release unchanged."
@@ -159,22 +169,23 @@
     "note": "All eight post-merge check runs for main SHA 69c962dee40a4b12606d131df0e8655b90924516 completed successfully. GitHub confirms PR #234 is merged and its head is contained in main. These runs validate the merged #234 tree, not the current dimensional SourceCorrelation commits."
   },
   "blockers": [
-    "The full Cargo suite has not completed locally on the current SourceCorrelation tree; the prior Windows run stalled for several hours in the existing differential visualization compilation. Exact-head CI and sanitizers are required before integration.",
+    "The old remote PR head 7d2b7be had failed compiler/ASan/UBSan checks because a fixed IR-count assertion remained at 31 after SourceCorrelation raised the count to 34; the website check also found stale provenance-data.js. Both causes are fixed locally, but the updated exact head has not run CI or sanitizers yet.",
+    "The full Cargo suite has not completed locally on the current SourceCorrelation tree; a prior Windows run stalled for several hours compiling the existing differential visualization example. Exact-head CI and sanitizers are required before integration.",
     "R3 remains OPEN: all 29 bundles have base evidence, but host capture is missing from 29/29; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized by this program step."
   ],
-  "next": "Push the checkpoint-only update to PR #235, then validate every required check and fresh review on the resulting exact head before considering integration.",
+  "next": "Push the completed P2 fix, scalar IR ratchet update, refreshed website provenance, evidence, dashboard and this checkpoint to PR #235; then validate all required checks and obtain a fresh review on that exact head.",
   "latestPullRequestValidation": {
     "number": 235,
     "url": "https://github.com/sircalch/Ostrin/pull/235",
-    "remoteHead": "fc59407cd70074e6d20f5b5f860776c615df7842",
+    "remoteHead": "7d2b7be7bed015e103a0f63f854dee809fb95ac6",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "mergeCommit": null,
-    "state": "open-before-checkpoint-update",
+    "state": "open-failing-head-superseded-by-local-fixes-awaiting-push",
     "reviewThreads": {
-      "total": 0,
-      "unresolved": 0
+      "total": 1,
+      "unresolved": 1
     },
-    "note": "PR #235 was created from the validated local source, evidence and dashboard commits. This checkpoint-only commit will advance the PR head; any checks on fc59407 are superseded and must not be treated as approval. The full local Cargo suite did not complete, so current-head CI and a fresh review remain required."
+    "note": "The remote head 7d2b7be is stale and has failures: compiler/ASan/UBSan reported a scalar Measurement IR baseline of 31 where the new std.measurements source correctly reports 34, and Website and browser checks found generated provenance-data.js stale. Updated local commits 6c6c3aa/e05cbb7/d6120a8 fix the count, add the P2 near-perfect correlation regression and regenerate provenance. The existing Codex P2 review refers to fc59407; its fix is present locally, but a fresh review and all checks on the pushed exact head remain required."
   }
 }
