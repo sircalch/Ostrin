@@ -22,6 +22,7 @@
     "measurement-covariance-added-to-32-program-wasi-execution-matrix",
     "main-r3-host-evidence-29-bundles-and-116-manifest-file-records-verified-against-main-0a3a824",
     "scalar-covariance-underflow-guard-and-regression-example",
+    "full-cargo-suite-rerun-after-p2-fix-6-differential-383-integration-33-unit-green",
     "full-cargo-test-6-differential-383-integration-33-unit-green",
     "measurement-contract-gate-and-18-tests-green",
     "project-plan-linguist-distribution-and-website-checks-green",
@@ -33,7 +34,7 @@
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "underflow-fix-and-focused-gates-passed-awaiting-exact-head-ci-and-review",
+    "status": "full-local-validation-passed-awaiting-exact-head-ci-and-fresh-review",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -46,7 +47,7 @@
       "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
       "examples/measurement_covariance.ostrin: correlated sum/difference, scaling, independence, singular PSD matrix, tolerance and invalid-input cases",
       "scripts/wasi-program-check.mjs: 32 programs passed locally, including measurement_covariance under Node WASI Preview 1",
-      "cargo test on the pre-P2 covariance code: 6 differential, 383 integration and 33 unit tests passed; rerun on the underflow fix is in progress",
+      "cargo test after the underflow fix: 6 differential, 383 integration and 33 unit tests passed",
       "scripts/measurement-contract-check.mjs and 18 contract tests passed",
       "scripts/project-plan-check.mjs: 7,261 HIR/IR bodies, 7,220 IR + 41 HIR, 0 AST fallback",
       "scripts/website-check.mjs: 17 public pages, 305 examples, 383 integration tests",
@@ -60,7 +61,6 @@
     "activePullRequests": [234]
   },
   "pending": [
-    "finish the full local Cargo suite started after the P2 regression fix",
     "verify CI, ASan, UBSan, security and a fresh review on the exact new head of PR #234 before integration",
     "integrate the package only after its exact-head checks pass and review has no substantive findings",
     "continue R3 work beyond the verified host-evidence readiness gate; the experiment records remain at R0-R2 and do not establish cross-platform reproducibility",
@@ -85,5 +85,5 @@
     "R3 host-evidence readiness for main is verified; broader reproducibility remains open because declared bundle levels are R0-R2 and no cross-platform equivalence is claimed",
     "the published v0.2.0 tag/assets remain frozen; no new release or tag is authorized"
   ],
-  "next": "finish the local full suite and exact-head CI/review for PR #234; integrate only after the underflow fix is confirmed, then continue typed Measurement and broader reproducibility work"
+  "next": "verify exact-head CI, sanitizers and fresh review for PR #234; integrate only after the underflow fix is confirmed, then continue typed Measurement and broader reproducibility work"
 }
