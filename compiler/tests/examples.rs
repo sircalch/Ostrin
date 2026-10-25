@@ -19274,6 +19274,13 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     let subnormal_geometric_scale_correlation = 1.0_f64 / 3.0_f64.sqrt();
     let subnormal_geometric_scale_oracle = 2.0 + 2.0 * subnormal_geometric_scale_correlation;
     assert!((subnormal_geometric_scale_oracle - 3.154_700_538_379_251_5).abs() < 1e-15);
+    let review_subnormal_geometric_scale_correlation = 1.0_f64 / 6.0_f64.sqrt();
+    let review_subnormal_geometric_scale_oracle =
+        2.0 + 2.0 * review_subnormal_geometric_scale_correlation;
+    assert!((review_subnormal_geometric_scale_oracle - 2.816_496_580_927_726).abs() < 1e-15);
+    // 90-digit Decimal oracle computed from the exact binary Float inputs.
+    let rounded_geometric_mean_oracle = 1.158_751_715_360_156_3_f64;
+    assert!(rounded_geometric_mean_oracle > 1.15 && rounded_geometric_mean_oracle < 1.17);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19296,6 +19303,8 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          near-perfect covariance residual variance = covariance correlation is numerically unresolved\n\
          subnormal variance ratio covariance variance = 3\n\
          subnormal geometric covariance scale = covariance correlation is numerically unresolved\n\
+         review subnormal geometric covariance = covariance correlation is numerically unresolved\n\
+         rounded geometric covariance = covariance correlation is numerically unresolved\n\
          direct contribution cancellation variance = 16\n\
          rounded factor projection = propagated covariance projection is numerically unresolved\n\
          subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\

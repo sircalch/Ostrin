@@ -220,6 +220,43 @@ fn main() -> Void {
         Err(message) => print("subnormal geometric covariance scale = " + message),
     }
 
+    subnormal_review_covariance = measurements.covariance(
+        ["subnormal-review-small", "subnormal-review-large"],
+        array([
+            [1e-323, 5e-324],
+            [5e-324, 1.5e-323]
+        ])
+    ).unwrap()
+    subnormal_review_small_sigma = sqrt(1e-323)
+    subnormal_review_large_sigma = sqrt(1.5e-323)
+    subnormal_review_small = measurements.from_source(0.0, subnormal_review_small_sigma, "subnormal-review-small", "review small subnormal variance")
+    subnormal_review_large = measurements.from_source(0.0, subnormal_review_large_sigma, "subnormal-review-large", "review large subnormal variance")
+    subnormal_review_small_contribution = measurements.scale(subnormal_review_small.unwrap(), 1.0 / subnormal_review_small_sigma)
+    subnormal_review_large_contribution = measurements.scale(subnormal_review_large.unwrap(), 1.0 / subnormal_review_large_sigma)
+    subnormal_review_sum = measurements.add(subnormal_review_small_contribution, subnormal_review_large_contribution).unwrap()
+    match measurements.variance_with_covariance(subnormal_review_sum, subnormal_review_covariance) {
+        Ok(value) => print("review subnormal geometric covariance = " + rounded(value).to_string()),
+        Err(message) => print("review subnormal geometric covariance = " + message),
+    }
+
+    rounded_geometric_covariance = measurements.covariance(
+        ["rounded-geometric-small", "rounded-geometric-large"],
+        array([
+            [1.0, 1.7320508075688772],
+            [1.7320508075688772, 3.0]
+        ])
+    ).unwrap()
+    rounded_geometric_small_source = measurements.from_source(0.0, 1.0, "rounded-geometric-small", "unit variance")
+    rounded_geometric_large_sigma = sqrt(3.0)
+    rounded_geometric_large_source = measurements.from_source(0.0, rounded_geometric_large_sigma, "rounded-geometric-large", "variance three")
+    rounded_geometric_small_scaled = measurements.scale(rounded_geometric_small_source.unwrap(), 1e8)
+    rounded_geometric_large_scaled = measurements.scale(rounded_geometric_large_source.unwrap(), -1e8 / rounded_geometric_large_sigma)
+    rounded_geometric_sum = measurements.add(rounded_geometric_small_scaled, rounded_geometric_large_scaled).unwrap()
+    match measurements.variance_with_covariance(rounded_geometric_sum, rounded_geometric_covariance) {
+        Ok(value) => print("rounded geometric covariance = " + rounded(value).to_string()),
+        Err(message) => print("rounded geometric covariance = " + message),
+    }
+
     division_loss_covariance = measurements.covariance(
         ["division-loss-a", "division-loss-b"],
         array([

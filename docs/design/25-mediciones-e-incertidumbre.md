@@ -314,7 +314,11 @@ puede representarse como un valor positivo y finito. También se rechaza si el p
 subnormal con varianzas distintas, porque sus pocos bits no resuelven la correlación; para diagonales
 iguales se usa la varianza directamente. Si un coeficiente menor
 que `1` queda dentro de la tolerancia numérica de una dependencia perfecta, se rechaza como
-irresuelto en vez de redondearlo a `1` y borrar la varianza residual. La matriz `R = L · Lᵀ` se
+irresuelto en vez de redondearlo a `1` y borrar la varianza residual. Con varianzas distintas,
+un coeficiente que redondea a `1` solo se acepta como dependencia exacta si las raíces `Float`
+reproducen ambas diagonales al elevarse al cuadrado y su producto reproduce exactamente la
+covarianza; si no, se devuelve un error explícito. Esto cubre también los casos donde el producto
+geométrico redondea una correlación no perfecta a `1`. La matriz `R = L · Lᵀ` se
 factoriza y cada proyección `Lᵀ · c` usa suma
 compensada antes de elevar el resultado al cuadrado. Así se conservan residuos representables en
 cancelaciones grandes, incluida la regresión no uniforme de rango uno con resultado `0.01`, la

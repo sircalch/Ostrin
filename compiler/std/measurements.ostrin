@@ -996,8 +996,8 @@ fn covariance_symmetric_entry(matrix: Array<Float>, row: Int, column: Int) -> Fl
 }
 
 /// Convert covariance entries to correlations using a scale-safe product of
-/// standard deviations, rejecting subnormal unequal-variance scales that
-/// cannot resolve the input correlation reliably.
+/// standard deviations, rejecting subnormal scales and unequal-variance
+/// near-perfect correlations that Float cannot establish exactly.
 fn covariance_correlation_matrix(
     matrix: Array<Float>,
     relative_tolerance: Float
@@ -1068,6 +1068,24 @@ fn covariance_correlation_matrix(
                     correlation_resolution = 1.4210854715202004e-14
                 }
                 coefficient_magnitude = abs(coefficient)
+                if row_variance != column_variance
+                    and coefficient_magnitude >= 1.0 - correlation_resolution
+                {
+                    // A rounded geometric mean can make an unequal-variance,
+                    // positive-definite covariance look perfectly correlated.
+                    // Establish exact roots and their product before treating
+                    // a rounded unit coefficient as a true singular edge.
+                    // If Float arithmetic cannot reproduce all three inputs,
+                    // do not erase a positive residual variance.
+                    row_root_square = row_sigma * row_sigma
+                    column_root_square = column_sigma * column_sigma
+                    if row_root_square != row_variance
+                        or column_root_square != column_variance
+                        or covariance_scale != abs(entry)
+                    {
+                        return Err("covariance correlation is numerically unresolved")
+                    }
+                }
                 if coefficient_magnitude <= 1.0
                     and 1.0 - coefficient_magnitude <= correlation_resolution
                     and (covariance_scale == 0.0 or abs(entry) < covariance_scale)
