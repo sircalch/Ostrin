@@ -340,8 +340,15 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
     writeFileSync(stdFile, std.replace(
-      "covariance_semidefinite_factor(model.matrix, model.relative_tolerance)",
-      "covariance_semidefinite_factor(covariance_scale * model.matrix, model.relative_tolerance)",
+      "covariance_correlation_matrix(model.matrix, model.relative_tolerance)",
+      "covariance_correlation_matrix(covariance_scale * model.matrix, model.relative_tolerance)",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std.replace(
+      "adjustment = sqrt(diagonal) / source_sigma",
+      "adjustment = 1.0",
     ));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
@@ -360,13 +367,13 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
 
-    writeFileSync(labFile, lab.replace("Gradients use exact power-of-two normalization", "Gradients use rounded normalization"));
+    writeFileSync(labFile, lab.replace("Source contributions use exact power-of-two normalization", "Source contributions use rounded normalization"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
 
     writeFileSync(labFile, lab.replace(
-      "positive pivots unresolved within the relative tolerance are rejected rather than adding spurious variance",
-      "positive pivots are accepted",
+      "negative and numerically unresolved positive pivots are rejected rather than changing the covariance result",
+      "negative pivots are accepted",
     ));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
@@ -391,6 +398,14 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
 
     writeFileSync(testFile, tests.replace("rank-three reordered compensated variance = 1", "rank-three reorder case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("sqrt-three rank-one cancellation variance = 0", "sqrt-three case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("direct contribution cancellation variance = 16", "direct contribution case removed"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
   } finally {

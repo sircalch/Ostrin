@@ -140,20 +140,63 @@ fn main() -> Void {
     unresolved_pivot_covariance = measurements.covariance(
         ["pivot-a", "pivot-b"],
         array([
-            [2.0, 2.0],
-            [2.0, 2.0]
+            [1.0, 1.0],
+            [1.0, 1.0000000000005]
         ])
     ).unwrap()
-    pivot_sigma = sqrt(2.0)
-    pivot_a = measurements.from_source(0.0, pivot_sigma, "pivot-a", "pivot source A")
-    pivot_b = measurements.from_source(0.0, pivot_sigma, "pivot-b", "pivot source B")
+    pivot_a = measurements.from_source(0.0, 1.0, "pivot-a", "pivot source A")
+    pivot_b = measurements.from_source(0.0, sqrt(1.0000000000005), "pivot-b", "pivot source B")
     pivot_a_scaled = measurements.scale(pivot_a.unwrap(), 1e8)
     pivot_b_scaled = measurements.scale(pivot_b.unwrap(), 1e8)
     pivot_difference = measurements.sub(pivot_a_scaled, pivot_b_scaled).unwrap()
+    sqrt_three_covariance = measurements.covariance(
+        ["sqrt-three-a", "sqrt-three-b"],
+        array([
+            [3.0, 3.0],
+            [3.0, 3.0]
+        ])
+    ).unwrap()
+    sqrt_three_sigma = sqrt(3.0)
+    sqrt_three_a = measurements.from_source(0.0, sqrt_three_sigma, "sqrt-three-a", "rank-one source A")
+    sqrt_three_b = measurements.from_source(0.0, sqrt_three_sigma, "sqrt-three-b", "rank-one source B")
+    sqrt_three_a_scaled = measurements.scale(sqrt_three_a.unwrap(), 1e16)
+    sqrt_three_b_scaled = measurements.scale(sqrt_three_b.unwrap(), 1e16)
+    sqrt_three_difference = measurements.sub(sqrt_three_a_scaled, sqrt_three_b_scaled).unwrap()
+    print("sqrt-three rank-one cancellation variance = " + rounded(measurements.variance_with_covariance(sqrt_three_difference, sqrt_three_covariance).unwrap()).to_string())
     match measurements.variance_with_covariance(pivot_difference, unresolved_pivot_covariance) {
         Ok(value) => print("unresolved positive pivot = " + rounded(value).to_string()),
         Err(message) => print("unresolved positive pivot = " + message),
     }
+
+    division_loss_covariance = measurements.covariance(
+        ["division-loss-a", "division-loss-b"],
+        array([
+            [9.0, 3.0],
+            [3.0, 1.0]
+        ])
+    ).unwrap()
+    division_loss_measurement = Measurement<Float> {
+        value: 0.0,
+        sources: [
+            Sensitivity<Float> {
+                source_id: "division-loss-a",
+                label: "large positive contribution",
+                source_dimension: "dimensionless",
+                source_sigma: 3.0,
+                contribution: 30000000000000004.0,
+            },
+            Sensitivity<Float> {
+                source_id: "division-loss-b",
+                label: "large negative contribution",
+                source_dimension: "dimensionless",
+                source_sigma: 1.0,
+                contribution: -30000000000000000.0,
+            }
+        ],
+        known: true,
+        reason: "",
+    }
+    print("direct contribution cancellation variance = " + rounded(measurements.variance_with_covariance(division_loss_measurement, division_loss_covariance).unwrap()).to_string())
 
     nonuniform_rank_one = measurements.covariance(
         ["rank-a", "rank-b", "rank-c", "rank-d"],

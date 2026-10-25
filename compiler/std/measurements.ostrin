@@ -995,10 +995,88 @@ fn covariance_symmetric_entry(matrix: Array<Float>, row: Int, column: Int) -> Fl
     covariance_midpoint(matrix.get(row, column), matrix.get(column, row))
 }
 
-/// Factor a validated positive-semidefinite covariance matrix as L·Lᵀ.
+/// Convert covariance entries to a dimensionless correlation matrix without
+/// multiplying standard deviations, which could overflow or underflow.
+fn covariance_correlation_matrix(
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> Result<Array<Float>, String> {
+    n = matrix.shape()[0]
+    mut correlation = zeros([n, n])
+    for i in 0 until n {
+        row_variance = covariance_symmetric_entry(matrix, i, i)
+        if not is_finite(row_variance) or row_variance < 0.0 {
+            return Err("covariance matrix could not be stably factorized")
+        }
+        if row_variance == 0.0 {
+            correlation.set(i, i, 0.0)
+        } else {
+            correlation.set(i, i, 1.0)
+        }
+        for j in 0 until i {
+            column_variance = covariance_symmetric_entry(matrix, j, j)
+            entry = covariance_symmetric_entry(matrix, i, j)
+            mut coefficient = 0.0
+            if not is_finite(column_variance) or column_variance < 0.0 {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            if row_variance == 0.0 or column_variance == 0.0 {
+                if entry != 0.0 {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+            } else {
+                mut partial = 0.0
+                if row_variance >= column_variance {
+                    row_sigma = sqrt(row_variance)
+                    column_sigma = sqrt(column_variance)
+                    partial = entry / row_variance
+                    if entry != 0.0 and partial == 0.0 {
+                        return Err("covariance correlation underflows Float range")
+                    }
+                    sigma_ratio = column_sigma / row_sigma
+                    if sigma_ratio == 0.0 {
+                        return Err("covariance correlation underflows Float range")
+                    }
+                    coefficient = partial / sigma_ratio
+                } else {
+                    row_sigma = sqrt(row_variance)
+                    column_sigma = sqrt(column_variance)
+                    partial = entry / column_variance
+                    if entry != 0.0 and partial == 0.0 {
+                        return Err("covariance correlation underflows Float range")
+                    }
+                    sigma_ratio = row_sigma / column_sigma
+                    if sigma_ratio == 0.0 {
+                        return Err("covariance correlation underflows Float range")
+                    }
+                    coefficient = partial / sigma_ratio
+                }
+                if not is_finite(coefficient) {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                coefficient_scale = abs(coefficient)
+                if coefficient_scale > 1.0 {
+                    if coefficient_scale - 1.0 > relative_tolerance {
+                        return Err("covariance matrix could not be stably factorized")
+                    }
+                    if coefficient < 0.0 {
+                        coefficient = -1.0
+                    } else {
+                        coefficient = 1.0
+                    }
+                }
+            }
+            correlation.set(i, j, coefficient)
+            correlation.set(j, i, coefficient)
+        }
+    }
+    Ok(correlation)
+}
+
+/// Factor a validated dimensionless correlation matrix as L·Lᵀ.
 ///
-/// This keeps uncertainty propagation in a sum of squared projections, so
-/// large signed source contributions cancel before they are squared.
+/// This factor is applied to stored source contributions so large signed terms
+/// cancel before they are squared.
 fn covariance_semidefinite_factor(
     matrix: Array<Float>,
     relative_tolerance: Float
@@ -1041,10 +1119,7 @@ fn covariance_semidefinite_factor(
             return Err("covariance matrix could not be stably factorized")
         }
         if pivot < 0.0 {
-            if pivot_scale == 0.0 or abs(pivot) > relative_tolerance * pivot_scale {
-                return Err("covariance matrix could not be stably factorized")
-            }
-            pivot = 0.0
+            return Err("covariance matrix could not be stably factorized")
         }
         if pivot > 0.0 and pivot_scale > 0.0
             and pivot <= relative_tolerance * pivot_scale
@@ -1129,8 +1204,9 @@ fn covariance_semidefinite_factor(
 }
 
 /// Return J·Σ·Jᵀ for the sources currently present in a scalar measurement.
-/// Unused covariance sources have zero sensitivity; every used source must be
-/// present and its diagonal variance must match the recorded standard sigma.
+/// The equivalent contribution/correlation form avoids dividing and rebuilding
+/// large sensitivities. Unused sources have zero sensitivity; each used source
+/// must be present and its diagonal must match the recorded standard sigma.
 pub fn variance_with_covariance(
     measurement: Measurement<Float>,
     model: SourceCovariance
@@ -1147,7 +1223,8 @@ pub fn variance_with_covariance(
     }
 
     n = model.source_ids.length()
-    mut gradient = zeros([n])
+    mut standardized_contributions = zeros([n])
+    mut source_sigmas = zeros([n])
     for i in 0 until measurement.sources.length() {
         source = measurement.sources[i]
         if source.source_id.length() == 0 or source.source_dimension != "dimensionless" {
@@ -1188,38 +1265,70 @@ pub fn variance_with_covariance(
             if source.contribution != 0.0 {
                 return Err("zero-sigma source must have zero sensitivity contribution")
             }
-            gradient.set(index, 0.0)
         } else {
-            derivative = source.contribution / source.source_sigma
-            if not is_finite(derivative) {
-                return Err("measurement source derivative must be finite")
+            if not is_finite(source.contribution) {
+                return Err("standardized measurement source contribution must be finite")
             }
-            gradient.set(index, derivative)
+            standardized_contributions.set(index, source.contribution)
+        }
+        source_sigmas.set(index, source.source_sigma)
+    }
+
+    // The diagonal match is tolerance-based. Preserve the stored contribution
+    // exactly for a bitwise match; otherwise adjust only by the accepted sigma
+    // ratio so the result still reflects the covariance model's exact diagonal.
+    for i in 0 until n {
+        source_sigma = source_sigmas[i]
+        if source_sigma != 0.0 {
+            diagonal = covariance_symmetric_entry(model.matrix, i, i)
+            expected_variance = source_sigma * source_sigma
+            if diagonal != expected_variance {
+                if diagonal < 0.0 {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                adjustment = sqrt(diagonal) / source_sigma
+                adjusted_contribution = standardized_contributions[i] * adjustment
+                if not is_finite(adjustment) or adjustment == 0.0
+                    or not is_finite(adjusted_contribution)
+                {
+                    return Err("standardized measurement source contribution must be finite")
+                }
+                if standardized_contributions[i] != 0.0 and adjusted_contribution == 0.0 {
+                    return Err("standardized measurement source contribution underflows Float range")
+                }
+                standardized_contributions.set(i, adjusted_contribution)
+            }
         }
     }
 
-    mut gradient_scale = 0.0
+    mut contribution_scale = 0.0
     for i in 0 until n {
-        if abs(gradient[i]) > gradient_scale {
-            gradient_scale = abs(gradient[i])
+        if abs(standardized_contributions[i]) > contribution_scale {
+            contribution_scale = abs(standardized_contributions[i])
         }
     }
-    if gradient_scale == 0.0 {
+    if contribution_scale == 0.0 {
         return Ok(0.0)
     }
     // Normalize by a power of two so binary scaling does not round away
-    // small, representable differences between large source gradients.
-    mut gradient_power_scale = 1.0
-    if gradient_scale >= 1.0 {
-        while gradient_power_scale <= gradient_scale * 0.5 {
-            gradient_power_scale = gradient_power_scale * 2.0
+    // small, representable differences between large source contributions.
+    mut contribution_power_scale = 1.0
+    if contribution_scale >= 1.0 {
+        while contribution_power_scale <= contribution_scale * 0.5 {
+            contribution_power_scale = contribution_power_scale * 2.0
         }
     } else {
-        while gradient_power_scale > gradient_scale {
-            gradient_power_scale = gradient_power_scale * 0.5
+        while contribution_power_scale > contribution_scale {
+            contribution_power_scale = contribution_power_scale * 0.5
         }
     }
-    factor = match covariance_semidefinite_factor(model.matrix, model.relative_tolerance) {
+    correlation = match covariance_correlation_matrix(model.matrix, model.relative_tolerance) {
+        Ok(value) => value,
+        Err(message) => {
+            return Err(message)
+        },
+    }
+    factor = match covariance_semidefinite_factor(correlation, model.relative_tolerance) {
         Ok(value) => value,
         Err(message) => {
             return Err(message)
@@ -1230,14 +1339,14 @@ pub fn variance_with_covariance(
         mut projection = 0.0
         mut projection_correction = 0.0
         for row in column until n {
-            normalized_gradient = gradient[row] / gradient_power_scale
+            normalized_contribution = standardized_contributions[row] / contribution_power_scale
             factor_entry = factor.get(row, column)
-            term = factor_entry * normalized_gradient
+            term = factor_entry * normalized_contribution
             if not is_finite(term) {
                 return Err("propagated covariance variance must be finite")
             }
-            if (gradient[row] != 0.0 and normalized_gradient == 0.0)
-                or (factor_entry != 0.0 and normalized_gradient != 0.0 and term == 0.0)
+            if (standardized_contributions[row] != 0.0 and normalized_contribution == 0.0)
+                or (factor_entry != 0.0 and normalized_contribution != 0.0 and term == 0.0)
             {
                 return Err("propagated covariance projection underflows Float range")
             }
@@ -1255,14 +1364,14 @@ pub fn variance_with_covariance(
             }
         }
         scaled_projection = projection + projection_correction
-        propagated_sigma = scaled_projection * gradient_power_scale
+        propagated_sigma = scaled_projection * contribution_power_scale
         contribution_variance = propagated_sigma * propagated_sigma
         if not is_finite(scaled_projection) or not is_finite(propagated_sigma)
             or not is_finite(contribution_variance)
         {
             return Err("propagated covariance variance must be finite")
         }
-        if scaled_projection != 0.0 and gradient_scale != 0.0 and propagated_sigma == 0.0 {
+        if scaled_projection != 0.0 and contribution_scale != 0.0 and propagated_sigma == 0.0 {
             return Err("propagated covariance uncertainty underflows Float range")
         }
         if propagated_sigma != 0.0 and contribution_variance == 0.0 {

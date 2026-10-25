@@ -297,18 +297,25 @@ usadas. El punto medio evita perder covarianzas subnormales cuando ambas entrada
 signo y evita desbordarse cuando tienen signos opuestos. Las diagonales de cada fuente usada deben
 coincidir con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y
 subdesborda a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente
-como exacta. Las fuentes declaradas pero no usadas tienen gradiente cero. La matriz se vuelve a
+como exacta. Si la diagonal coincide exactamente con `sigma²`, se conserva el aporte almacenado sin
+reconstruirlo; si solo coincide dentro de tolerancia, se escala el aporte por
+`sqrt(Σₛₛ) / sigmaₛ` para mantener la diagonal del modelo. Las fuentes declaradas pero no usadas
+tienen gradiente cero. La matriz se vuelve a
 validar al propagar, porque sus arrays pueden cambiar después de la construcción. La fórmula es
-`J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`. Para evaluar la forma cuadrática se calcula una
-factorización semidefinida `Σ = L · Lᵀ` y se suman los cuadrados de las proyecciones `Lᵀ · J`;
-cada proyección usa suma compensada. Así, las contribuciones grandes se cancelan antes de elevar el
-residuo al cuadrado, incluso para la regresión no uniforme de rango uno con resultado `0.01`. Si la
-factorización encuentra cancelación numéricamente irresuelta o una proyección subdesbordada, se
-devuelve un error explícito en vez de informar una incertidumbre exacta. Los gradientes se
-normalizan usando una potencia de dos exacta para conservar diferencias representables entre
-contribuciones grandes. Los pivotes positivos numéricamente irresueltos se rechazan en vez de
-introducir una componente espuria en matrices singulares. Los intermedios no finitos también se
-rechazan. `ostrinc --compile` desactiva la contracción de multiplicación-suma del
+`J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`. Para evitar perder bits al dividir una contribución
+grande entre su sigma y reconstruirla, la propagación forma una matriz de correlación `R` y opera
+directamente con las contribuciones guardadas `cₛ = Jₛ · sigmaₛ`: `c · R · cᵀ`. Las correlaciones
+se calculan dividiendo primero por la varianza mayor y luego por la razón de sigmas, sin formar el
+producto de sigmas. La matriz `R = L · Lᵀ` se factoriza y cada proyección `Lᵀ · c` usa suma
+compensada antes de elevar el resultado al cuadrado. Así se conservan residuos representables en
+cancelaciones grandes, incluida la regresión no uniforme de rango uno con resultado `0.01`, la
+cancelación exacta con sigma `sqrt(3)` y un residuo de varianza `16`. Si la factorización encuentra
+un pivote negativo, cancelación numéricamente irresuelta o una proyección subdesbordada, devuelve
+un error explícito en vez de informar una incertidumbre incorrecta. Las contribuciones se
+normalizan usando una potencia de dos exacta para conservar diferencias representables. Los
+pivotes positivos numéricamente irresueltos también se rechazan en vez de introducir una componente
+espuria en matrices casi singulares. Los intermedios no finitos también se rechazan.
+`ostrinc --compile` desactiva la contracción de multiplicación-suma del
 compilador C (`-ffp-contract=off`): el backend WASI optimizado había fusionado operaciones y borrado
 residuos que la suma compensada necesita preservar. La matriz Node WASI incluye estos casos de
 cancelación. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta

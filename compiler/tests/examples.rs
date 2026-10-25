@@ -19194,7 +19194,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=30")
+        measurement_source.contains("ir=31")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -19276,7 +19276,9 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          rank-three 1e16 compensated variance = 1\n\
          rank-three 1e16 reordered compensated variance = 1\n\
          power-of-two gradient normalization variance = 4\n\
+         sqrt-three rank-one cancellation variance = 0\n\
          unresolved positive pivot = covariance matrix could not be stably factorized\n\
+         direct contribution cancellation variance = 16\n\
          nonuniform rank-one covariance variance = 0.01\n\
          large finite PSD covariance = accepted\n\
          indefinite covariance = covariance matrix must be positive semidefinite\n\
