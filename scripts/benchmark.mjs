@@ -33,6 +33,7 @@ const defaultWorkloads = [
   "benchmarks/temperature-interval.ostrin",
   "benchmarks/temperature-point.ostrin",
   "benchmarks/measurement-source-identity.ostrin",
+  "examples/measurement_covariance.ostrin",
 ];
 
 function option(name, fallback) {
