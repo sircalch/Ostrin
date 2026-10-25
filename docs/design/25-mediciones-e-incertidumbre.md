@@ -315,23 +315,23 @@ subnormal con varianzas distintas, porque sus pocos bits no resuelven la correla
 iguales se usa la varianza directamente. Si un coeficiente menor
 que `1` queda dentro de la tolerancia numérica de una dependencia perfecta, se rechaza como
 irresuelto en vez de redondearlo a `1` y borrar la varianza residual. Con varianzas distintas,
-un coeficiente que redondea a `1` solo se acepta como dependencia exacta si las raíces `Float`
-reproducen ambas diagonales al elevarse al cuadrado y su producto reproduce exactamente la
-covarianza; si no, se devuelve un error explícito. Esto cubre también los casos donde el producto
-geométrico redondea una correlación no perfecta a `1`. La matriz `R = L · Lᵀ` se
+un coeficiente cercano a `1` solo se acepta como dependencia exacta cuando ambas raíces son
+enteras pequeñas, sus cuadrados y su producto son exactamente representables dentro del rango
+entero y coinciden con la matriz. Un producto `Float` que redondea de vuelta a una diagonal no
+prueba dependencia exacta; los demás casos devuelven un error explícito. La matriz `R = L · Lᵀ` se
 factoriza y cada proyección `Lᵀ · c` usa suma
 compensada antes de elevar el resultado al cuadrado. Así se conservan residuos representables en
 cancelaciones grandes, incluida la regresión no uniforme de rango uno con resultado `0.01`, la
 cancelación exacta con sigma `sqrt(3)` y un residuo de varianza `16`. Si la factorización encuentra
 un pivote negativo, cancelación numéricamente irresuelta o una proyección subdesbordada, devuelve
 un error explícito en vez de informar una incertidumbre incorrecta. Las contribuciones se
-normalizan usando una potencia de dos exacta para conservar diferencias representables. Los ajustes
-tolerados de diagonal se aplican después de normalizar las contribuciones; si sus factores difieren
-y su redondeo hace irresoluble una cancelación, la propagación devuelve un error explícito. Una
-cancelación exacta que permanece en cero antes y después de un factor común sigue siendo válida.
+normalizan usando una potencia de dos exacta para conservar diferencias representables.
 Los pivotes positivos numéricamente irresueltos también se rechazan en vez de introducir una componente
 espuria en matrices casi singulares. La normalización que convierte una contribución no nula en
-subnormal se rechaza porque puede perder una fracción significativa de su valor. En cada proyección
+subnormal se rechaza porque puede perder una fracción significativa de su valor. Si una proyección
+cercana a cero contiene contribuciones con ajuste de diagonal, se devuelve un error aunque sus
+factores redondeados coincidan. Los factores de ajuste redondeados iguales no prueban uniformidad
+exacta. En cada proyección
 con coeficientes no exactos, también se rechaza una cancelación cuyo residuo sea menor que la
 tolerancia del modelo (con un piso de 64 epsilons de `Float`) por la suma de magnitudes de sus
 términos. Esto mantiene explícito el límite de resolución en vez de reportar incertidumbre falsa.

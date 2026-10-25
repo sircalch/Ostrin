@@ -6,7 +6,7 @@
     "severity": "P2",
     "summary": "Avoid subnormal precision loss in the variance ratio"
   },
-  "sourceRevision": "06849b5453fd3bfa3bc573f280abee1440ea387c",
+  "sourceRevision": "469b11a76cccbff9714d5a65c4abc27169d67a77",
   "releaseTag": "v0.2.0",
   "releaseArtifactsChanged": false,
   "additionalReviewFindings": [
@@ -92,7 +92,67 @@
       "independentOracleVariance": 0.048596460630071246,
       "independentOracleMethod": "Exact rational residual from the binary64 inputs: (992800745259006 / 4503599627370497)^2, evaluated independently with Python Fraction.",
       "actualResult": "propagated covariance projection is numerically unresolved",
-      "reason": "Different tolerated diagonal adjustments can round a large cancelling contribution pair to exact zero. The implementation now applies ratios after power-of-two normalization, accumulates adjusted and original projections with compensation, and rejects unresolved cancellation when adjustments differ."
+      "reason": "After power-of-two normalization, a near-zero Cholesky projection that contains any tolerated diagonal adjustment now returns an explicit unresolved error. This deliberately avoids inferring exact uniformity from rounded adjustment ratios."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4371912834",
+      "severity": "P2",
+      "summary": "Verify exact uniformity before exempting adjusted cancellation",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "sourceStandardDeviations": [
+        0.9999999999999999,
+        0.9999999999999998
+      ],
+      "storedContributions": [
+        10000000000000000,
+        -10000000000000000
+      ],
+      "appliedScales": [
+        10000000000000002,
+        -10000000000000002
+      ],
+      "independentOracleVariance": 1.2325951644078317,
+      "independentOracleMethod": "Exact rational arithmetic over the exact binary Float inputs, evaluated independently with Python Fraction.",
+      "actualResult": "propagated covariance projection is numerically unresolved",
+      "reason": "The two rounded diagonal-adjustment ratios compare equal even though their exact ratios differ. Every near-zero projection with adjusted contributions now returns an explicit unresolved error; equal rounded factors no longer exempt cancellation."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4371912837",
+      "severity": "P2",
+      "summary": "Do not treat rounded root squares as proof of exact dependence",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          3.3166247903554
+        ],
+        [
+          3.3166247903554,
+          11
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "1.0",
+        "sqrt(11.0)"
+      ],
+      "storedContributions": [
+        100000000,
+        -100000000
+      ],
+      "independentOracleVariance": 0.23597821423001597,
+      "independentOracleMethod": "100-digit Python Decimal using Decimal.from_float for the exact binary64 covariance entry and high precision sqrt(11).",
+      "actualResult": "covariance correlation is numerically unresolved",
+      "reason": "The rounded Float product sqrt(11) * sqrt(11) equals 11 without proving that the exact root square equals the supplied diagonal. Unequal-variance near-unit correlations are now certified only for small integer roots whose squares and cross product are exactly representable and equal the inputs; all other cases fail explicitly."
     }
   ],
   "regression": {
@@ -138,7 +198,7 @@
   "implementation": {
     "path": "compiler/std/measurements.ostrin",
     "function": "covariance_correlation_matrix",
-    "method": "Use each diagonal directly when variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing validated standard deviations. Apply accepted diagonal-adjustment ratios after exact power-of-two normalization. Accumulate adjusted and original Cholesky projections with compensation; reject an unresolved near-zero projection when source adjustment factors differ. Preserve exact zero cancellation when the adjustments are uniform and both adjusted and original projections cancel exactly. Reject subnormal unequal-variance geometric scales and unresolved near-unit correlations rather than erasing representable residual variance."
+    "method": "Use each diagonal directly when variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing validated standard deviations. Apply accepted diagonal-adjustment ratios after exact power-of-two normalization. For unequal-variance near-unit correlations, accept exact dependence only for small integer roots whose squares and cross product are exactly representable and reproduce the supplied matrix. Accumulate Cholesky projections with compensation; reject every near-zero projection that contains adjusted contributions, even when rounded adjustment ratios compare equal. Reject subnormal unequal-variance geometric scales and other unresolved correlations instead of erasing representable residual variance."
   },
   "localValidation": {
     "environment": {
@@ -392,5 +452,34 @@
       "crossPlatformReproducibilityClaim": false
     },
     "performanceAssessment": "No benchmark was run for this correctness fix; no performance claim is made."
+  },
+  "historicalSourceRevision": "06849b5453fd3bfa3bc573f280abee1440ea387c",
+  "latestReviewAmendment": {
+    "sourceRevision": "469b11a76cccbff9714d5a65c4abc27169d67a77",
+    "findings": [
+      "4371912834: rounded adjustment ratios no longer certify uniformity; unresolved adjusted cancellation is rejected.",
+      "4371912837: rounded root multiplication no longer certifies exact dependence; only bounded exactly representable integer roots qualify."
+    ],
+    "localValidation": {
+      "cargoFormat": "passed on source revision 469b11a",
+      "focusedInterpreterNativeWasiLeakTest": "passed: 1 test; 382 filtered; interpreter/native parity, WASI C emission and live_allocations=0",
+      "measurementContractGate": "passed",
+      "measurementContractMutationTests": "passed: 18/18",
+      "fullCargoSuite": "422 tests passed after both review findings were fixed and before tightening the exact-integer-root bound; the final bound change was validated by the focused test",
+      "releaseBuildAfterFinalBound": "passed",
+      "wasiProgramMatrixAfterFinalBound": "passed: 32/32",
+      "projectPlan": "passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
+      "websiteCheck": "passed: 17 pages, 305 examples, 383 integration tests, WASM artifact",
+      "scientificLab": "passed: 12 demos and 29 figure replays match",
+      "experimentBundles": "29 fixtures regenerated from source revision 469b11a; all 11 R1/R2 bundles replayed",
+      "numericValidation": "passed on win32 x64 with Node v24.19.0: 80 report values and 136 emitted values matched exactly; maximum absolute difference 0; live_allocations=0",
+      "linguist": "passed: proposal, grammar, 7 sample candidates and 305 Ostrin examples",
+      "distribution": "passed: release matrix, checksums and installers",
+      "v0_2_readiness": "READY: 12/12 criteria",
+      "provenancePage": "passed",
+      "browserAndSanitizers": "must pass on the final exact PR HEAD in GitHub CI",
+      "r3": "OPEN; 0/29 host captures and no cross-platform reproducibility claim"
+    },
+    "exactHeadCiAndFreshReview": "pending"
   }
 }
