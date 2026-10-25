@@ -10,8 +10,8 @@
   },
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
-    "sourceRevision": "d4cbd6f2eb37d94f80cf70814435c26605e0fd24",
-    "evidenceRevision": "f87d36ade451f10b6b5592edc1132c2a02ba7d28",
+    "sourceRevision": "59987174444b03df5c1fd310bacc5386436b232b",
+    "evidenceRevision": "a8a87aa4fb4cfdf2b5e558729959fe60dd733e13",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -39,13 +39,20 @@
     "measurement-covariance-wasi-32-programs-green-on-source-9d41693",
     "measurement-covariance-15-workload-benchmark-recorded-on-source-9d41693",
     "covariance-generated-website-and-bars-effect-bundle-synchronized",
-    "pr-234-source-evidence-checkpoint-prepared-locally"
+    "pr-234-source-evidence-checkpoint-prepared-locally",
+    "measurement-covariance-near-perfect-correlation-p2-rejected-as-unresolved-5998717",
+    "full-cargo-422-tests-wasi-32-and-contract-18-green-source-5998717",
+    "measurement-covariance-benchmark-15-workloads-7-samples-source-5998717",
+    "website-lab-provenance-benchmark-status-data-regenerated-and-verified-source-5998717",
+    "chromium-and-webkit-36-browser-tests-green-firefox-launch-unavailable-source-5998717",
+    "numeric-validation-80-report-and-136-emitted-values-exact-live-allocations-zero-source-5998717",
+    "v0.2-readiness-12-of-12-ready-r3-open-0-of-29-host-captures-source-5998717"
   ],
   "currentPackage": {
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "local-source-and-evidence-validation-passed-final-pr-head-checks-and-review-pending",
+    "status": "local-source-and-evidence-validation-passed-exact-pr-head-checks-and-fresh-review-pending",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -61,7 +68,8 @@
       "builds a scale-safe correlation matrix and applies stored source contributions directly without lossy division and reconstruction",
       "adjusts contributions only when an accepted covariance diagonal differs from the recorded sigma squared",
       "rejects negative and relative-tolerance-unresolved positive factorization pivots instead of changing the covariance result",
-      "subnormal source variances compare sqrt(covariance diagonal) against source sigma in root space so rounded subnormal squares cannot accept a materially mismatched diagonal"
+      "subnormal source variances compare sqrt(covariance diagonal) against source sigma in root space so rounded subnormal squares cannot accept a materially mismatched diagonal",
+      "rejects correlations numerically indistinguishable from perfect dependence instead of rounding away a representable residual variance"
     ],
     "evidence": [
       "compiler/tests/examples.rs::std_measurements_covariance_matches_analytic_oracle_and_wasi: analytical oracle, interpreter/native parity, IR without HIR/AST fallback, WASI C emission and live_allocations=0",
@@ -115,15 +123,23 @@
       "PR #234 current remote head remains 6b1352be1bc9b6911c5bd12bd10e9c5a2cc0415a, base main 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714, open and mergeable. Its earlier checks/review are superseded by the pending source/evidence/checkpoint commits.",
       "Source d4cbd6f2eb37d94f80cf70814435c26605e0fd24 fixes PR #234 review P2 for [[5e-324]] with sigma 2e-162 by comparing sqrt(diagonal)/sigma against half the relative tolerance; the existing valid sqrt(5e-324) cancellation remains accepted. The example is asserted in interpreter/native parity and in the WASI exact-output oracle.",
       "After source d4cbd6f2eb37d94f80cf70814435c26605e0fd24: full Cargo suite passed (33 unit, 6 differential, 383 integration; 422 total); focused covariance regression passed; Node WASI Preview 1 matrix passed 32/32; Measurement contract checker and 18 tests passed; cargo fmt check passed; project-plan check reported 7,261 HIR/IR bodies and 0 AST fallback; website check passed (17 pages, 305 examples, 383 integration tests, WASM); provenance page regenerated and validated; numeric validation compared 80 values plus 136 emitted values exactly with live_allocations=0.",
-      "R3 source-lineage reconciliation was preserved in local commit 88ccfc8 on codex/r3-source-lineage after its prior 13/13 bundle tests, 29 replay checks and website/R3 gates passed; it remains unpushed and unmerged pending covariance integration."
+      "R3 source-lineage reconciliation was preserved in local commit 88ccfc8 on codex/r3-source-lineage after its prior 13/13 bundle tests, 29 replay checks and website/R3 gates passed; it remains unpushed and unmerged pending covariance integration.",
+      "Source commit 59987174444b03df5c1fd310bacc5386436b232b fixes PR #234 review thread 4370000879. It computes correlation from a scale-safe geometric mean and explicitly rejects sub-unit coefficients within max(relative tolerance, 64 Float epsilons) of perfect dependence when the covariance entry is below that scale; the 9/25 diagonal regression with covariance 14.999999999999998 has an independent analytic residual variance of 21.316282072803006 and returns an explicit unresolved result in interpreter, native and WASI.",
+      "Full Cargo test on exact source 59987174444b03df5c1fd310bacc5386436b232b passed: 33 unit, 6 differential and 383 integration tests (422 total). Focused Measurement covariance interpreter/native/leak/WASI test passed; all 32 WASI programs passed.",
+      "Measurement contract checker and 18 mutation tests passed; project-plan remains 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallback; Linguist and distribution checks passed; v0.2-readiness-check remains READY with 12/12 criteria.",
+      "Scientific Lab generated data passed 12 demo checks and 29/29 replay comparisons. Provenance page regenerated. Website check passed with 17 public pages, 305 examples, 383 integration tests and the WASM artifact. Browser projects Chromium and WebKit passed 36/36 tests; Firefox could not launch on this Windows host (spawn UNKNOWN), so its two smoke tests remain unverified locally. The updated status dashboard test passed.",
+      "Independent numeric validation compared 80 report values and 136 emitted values exactly (maximum absolute difference 0) with live_allocations=0.",
+      "Benchmark report validation passed for 15 workloads, 7 samples and 1 warmup on Windows 11 x64; report SHA-256 189fd80377da23adbce55173324045237625891df4aee618dc0137f0173f98cc records clean source commit 59987174444b03df5c1fd310bacc5386436b232b. Measurement covariance medians were 84.802 ms interpreted and 8.272 ms native (10.252 ratio); peak RSS/memory is not measured and no cross-platform or cross-language claim is made.",
+      "Regenerated the benchmark page, Scientific Lab copy, provenance data and public quality scorecard. The scorecard now records 389 Rust-marked tests, 21,026 known effect edges, 83 symbolic callbacks and 0 unresolved calls. R3 readiness remains OPEN with 29/29 base bundles, 0/29 host captures; levels remain R0-R2 and no cross-platform reproducibility claim is made.",
+      "Remote main is still 0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714. PR #234 remote head is still 46c72a321be5f626aa1542316041df98685e55d6; its checks and review predate source 5998717 and are superseded. The local source and evidence commits have not yet been pushed."
     ],
     "activePullRequests": [
       234
     ]
   },
   "pending": [
-    "Push source d4cbd6f2eb37d94f80cf70814435c26605e0fd24, evidence f87d36ade451f10b6b5592edc1132c2a02ba7d28 and the updated checkpoint to the existing PR #234 branch; require required checks and a fresh review on that final exact head before considering the conditionally authorized merge.",
-    "integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; existing user authorization is conditional on those gates",
+    "Push source 59987174444b03df5c1fd310bacc5386436b232b, evidence a8a87aa4fb4cfdf2b5e558729959fe60dd733e13 and the updated checkpoint to the existing PR #234 branch; require CI and a fresh review on the exact new head.",
+    "Integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; the user's authorization is conditional on those gates.",
     "continue R3 work beyond the verified host-evidence readiness gate; the experiment records remain at R0-R2 and do not establish cross-platform reproducibility",
     "continue static-effects closure and broader R3 inspect/validate/replay/compare evidence",
     "extend Measurement covariance to dimensions or arrays only with a separate typed ABI, ownership and analytical evidence package",
@@ -159,9 +175,9 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #234 final exact HEAD has not yet completed required CI, native sanitizers, or fresh review; the f72f215 subnormal-source P2 is fixed locally in source d4cbd6f2eb37d94f80cf70814435c26605e0fd24, but the final head must be reviewed and all checks green before merging.",
+    "PR #234 remote HEAD 46c72a321be5f626aa1542316041df98685e55d6 has not been updated with the local P2 correction at source 59987174444b03df5c1fd310bacc5386436b232b. Existing checks/review are superseded; push the completed checkpoint and require green exact-head CI, sanitizers and fresh review before the conditionally authorized merge.",
     "R3 host captures remain absent; experiment records remain at R0-R2 and do not establish cross-platform reproducibility.",
     "The published v0.2.0 tag and assets remain frozen; no new release or tag is authorized."
   ],
-  "next": "Push source d4cbd6f2eb37d94f80cf70814435c26605e0fd24, evidence f87d36ade451f10b6b5592edc1132c2a02ba7d28 and the checkpoint to PR #234; wait for green required checks and a fresh review with no substantive findings on the exact final head before the authorized merge."
+  "next": "Commit the updated docs/program-state-m1.json checkpoint with sourceRevision 59987174444b03df5c1fd310bacc5386436b232b and evidenceRevision a8a87aa4fb4cfdf2b5e558729959fe60dd733e13, then push the complete branch to PR #234 and wait for exact-head checks and fresh review."
 }
