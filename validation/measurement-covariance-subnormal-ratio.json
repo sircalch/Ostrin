@@ -6,9 +6,43 @@
     "severity": "P2",
     "summary": "Avoid subnormal precision loss in the variance ratio"
   },
-  "sourceRevision": "6c4d1c87c3eff8452a55dc89a08c4beae3dfc2e3",
+  "sourceRevision": "931bfc62ccdece3da5ef5e5e385946451b1d0687",
   "releaseTag": "v0.2.0",
   "releaseArtifactsChanged": false,
+  "additionalReviewFindings": [
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4370131337",
+      "severity": "P2",
+      "summary": "Reject precision loss in subnormal geometric means",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [1e-323, 5e-324],
+        [5e-324, 1.5e-323]
+      ],
+      "sourceStandardDeviations": ["sqrt(1e-323)", "sqrt(1.5e-323)"],
+      "storedContributions": [1, 1],
+      "independentOracleCorrelation": "1 / sqrt(6)",
+      "independentOracleVariance": "2 + 2 / sqrt(6) = 2.816496580927726",
+      "actualResult": "covariance correlation is numerically unresolved",
+      "reason": "An unequal-variance subnormal geometric scale cannot resolve the supplied correlation reliably."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4370174603",
+      "severity": "P2",
+      "summary": "Detect perfect correlations caused by rounded geometric means",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [1.0, 1.7320508075688772],
+        [1.7320508075688772, 3.0]
+      ],
+      "sourceStandardDeviations": ["1.0", "sqrt(3.0)"],
+      "storedContributions": [100000000, -100000000],
+      "independentOracleVariance": 1.1587517153601563,
+      "independentOracleMethod": "90-digit Python Decimal using Decimal.from_float for the exact binary covariance entry; 2e16 * (1 - covariance / sqrt(3)).",
+      "actualResult": "covariance correlation is numerically unresolved",
+      "reason": "For unequal variances near unit correlation, the implementation accepts perfect dependence only when Float roots reproduce both diagonals and their product exactly reproduces the covariance."
+    }
+  ],
   "regression": {
     "covariance": [
       [1e300, 8.660254037844386e137],
@@ -34,7 +68,7 @@
   "implementation": {
     "path": "compiler/std/measurements.ostrin",
     "function": "covariance_correlation_matrix",
-    "method": "Use the diagonal directly when the variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing the validated standard deviations. Reject a nonzero off-diagonal correlation when unequal variances produce a subnormal geometric scale, and reject any nonzero covariance whose scale is not finite and positive."
+    "method": "Use the diagonal directly when the variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing the validated standard deviations. Reject a nonzero off-diagonal correlation when unequal variances produce a subnormal geometric scale. Near unit correlations with unequal variances are accepted as exact only if the Float roots square back to both diagonals and their product exactly matches the covariance; reject unresolved cases rather than erasing positive residual variance. Reject any nonzero covariance whose scale is not finite and positive."
   },
   "localValidation": {
     "environment": {
@@ -48,6 +82,13 @@
         "result": "passed"
       },
       {
+        "command": "cargo test std_measurements_covariance_matches_analytic_oracle_and_wasi -- --nocapture",
+        "result": "passed",
+        "interpreterNativeParity": true,
+        "wasiCEmissionOracle": true,
+        "leakCheck": "live_allocations=0"
+      },
+      {
         "command": "cargo test",
         "result": "passed",
         "unitTests": 33,
@@ -58,7 +99,8 @@
       {
         "command": "node scripts/wasi-program-check.mjs",
         "result": "passed",
-        "programs": 32
+        "programs": 32,
+        "compilerBuiltFromSourceRevision": "931bfc62ccdece3da5ef5e5e385946451b1d0687"
       },
       {
         "command": "node scripts/measurement-contract-check.mjs && node --test scripts/measurement-contract-check.test.mjs",
@@ -81,10 +123,36 @@
         "wasmArtifact": true
       },
       {
+        "command": "node scripts/website-check.mjs --wasm",
+        "result": "passed",
+        "publicPages": 17,
+        "examples": 305,
+        "integrationTests": 383,
+        "wasmArtifact": true
+      },
+      {
+        "command": "node scripts/provenance-page.mjs --check",
+        "result": "passed",
+        "generatedAfterCompilerSourceChange": true
+      },
+      {
+        "command": "node tests/browser/prepare-runtime.mjs && npx playwright test --project=chromium --project=webkit-smoke",
+        "result": "passed",
+        "chromiumTests": 34,
+        "webkitSmokeTests": 2,
+        "firefox": "Not run locally on Windows; exact-head GitHub browser workflow remains required."
+      },
+      {
         "command": "node scripts/lab-data.mjs --verify-replays",
         "result": "passed",
         "demos": 12,
         "figureReplays": 29
+      },
+      {
+        "command": "node scripts/experiment-replay.mjs --all",
+        "result": "passed",
+        "bundles": 11,
+        "levels": ["R1", "R2"]
       },
       {
         "command": "node scripts/linguist-check.mjs",
