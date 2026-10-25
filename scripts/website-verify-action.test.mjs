@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const actionPath = path.join(repositoryRoot, ".github/actions/website-verify/action.yml");
+const pagesWorkflowPath = path.join(repositoryRoot, ".github/workflows/pages.yml");
 
 test("R3 readiness is replayed from the exact uploaded candidate before official evidence publication", () => {
   const action = readFileSync(actionPath, "utf8");
@@ -32,4 +33,12 @@ test("R3 readiness is replayed from the exact uploaded candidate before official
   assert.match(action, /path: target\/r3-ci\/downloaded-host-evidence/);
   assert.match(action, /target\/r3-ci\/r3-replay-profile-receipt\.json/);
   assert.match(action, /value: \$\{\{ steps\.upload-verified-host-evidence\.outputs\.artifact-url \}\}/);
+});
+
+test("pull requests verify the website artifact without deploying Pages", () => {
+  const workflow = readFileSync(pagesWorkflowPath, "utf8");
+  assert.match(workflow, /pull_request:\s*\n\s+paths:\s*\n\s+- 'website\/\*\*'/);
+  assert.match(workflow, /group: pages-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}/);
+  assert.match(workflow, /verify:\s*\n\s+if: github\.event_name == 'pull_request'[\s\S]*?permissions:\s*\n\s+contents: read[\s\S]*?uses: \.\/\.github\/actions\/website-verify/);
+  assert.match(workflow, /deploy:\s*\n\s+if: github\.event_name != 'pull_request'[\s\S]*?pages: write[\s\S]*?id-token: write/);
 });
