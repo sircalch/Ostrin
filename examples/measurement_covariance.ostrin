@@ -114,6 +114,15 @@ fn main() -> Void {
     print("rank-three compensated variance = " + measurements.variance_with_covariance(first_order, rank_three).unwrap().to_string())
     print("rank-three reordered compensated variance = " + measurements.variance_with_covariance(second_order, rank_three_reordered).unwrap().to_string())
 
+    extreme_large_contribution = measurements.scale(large_source.unwrap(), 1e16)
+    extreme_negative_contribution = measurements.scale(negative_source.unwrap(), -1e16)
+    extreme_first_pair = measurements.add(extreme_large_contribution, unit_contribution).unwrap()
+    extreme_first_order = measurements.add(extreme_first_pair, extreme_negative_contribution).unwrap()
+    extreme_second_pair = measurements.add(extreme_large_contribution, extreme_negative_contribution).unwrap()
+    extreme_second_order = measurements.add(extreme_second_pair, unit_contribution).unwrap()
+    print("rank-three 1e16 compensated variance = " + measurements.variance_with_covariance(extreme_first_order, rank_three).unwrap().to_string())
+    print("rank-three 1e16 reordered compensated variance = " + measurements.variance_with_covariance(extreme_second_order, rank_three_reordered).unwrap().to_string())
+
     large_psd = measurements.covariance(
         ["large-psd-a", "large-psd-b"],
         array([

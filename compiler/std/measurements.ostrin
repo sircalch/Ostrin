@@ -1077,11 +1077,13 @@ pub fn variance_with_covariance(
                 return Err("propagated covariance variance must be finite")
             }
             next_row_sum = row_sum + row_term
+            mut row_residual = 0.0
             if abs(row_sum) >= abs(row_term) {
-                row_correction = row_correction + (row_sum - next_row_sum) + row_term
+                row_residual = (row_sum - next_row_sum) + row_term
             } else {
-                row_correction = row_correction + (row_term - next_row_sum) + row_sum
+                row_residual = (row_term - next_row_sum) + row_sum
             }
+            row_correction = row_correction + row_residual
             row_sum = next_row_sum
             if not is_finite(row_sum) or not is_finite(row_correction) {
                 return Err("propagated covariance variance must be finite")
@@ -1102,11 +1104,13 @@ pub fn variance_with_covariance(
             return Err("propagated covariance variance must be finite")
         }
         next_variance = variance + outer_term
+        mut variance_residual = 0.0
         if abs(variance) >= abs(outer_term) {
-            variance_correction = variance_correction + (variance - next_variance) + outer_term
+            variance_residual = (variance - next_variance) + outer_term
         } else {
-            variance_correction = variance_correction + (outer_term - next_variance) + variance
+            variance_residual = (outer_term - next_variance) + variance
         }
+        variance_correction = variance_correction + variance_residual
         variance = next_variance
         if not is_finite(variance) or not is_finite(variance_correction) {
             return Err("propagated covariance variance must be finite")
