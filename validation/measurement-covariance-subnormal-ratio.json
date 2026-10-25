@@ -6,7 +6,7 @@
     "severity": "P2",
     "summary": "Avoid subnormal precision loss in the variance ratio"
   },
-  "sourceRevision": "140a53dea5ef46f92dc687c657c5b37988ddf3c4",
+  "sourceRevision": "6c4d1c87c3eff8452a55dc89a08c4beae3dfc2e3",
   "releaseTag": "v0.2.0",
   "releaseArtifactsChanged": false,
   "regression": {
@@ -19,10 +19,22 @@
     "expectedPropagatedVariance": 3,
     "oracle": "independent Float64 calculation of covariance divided by the product of the two diagonal square roots"
   },
+  "followupNumericalBoundary": {
+    "covariance": [
+      [5e-324, 5e-324],
+      [5e-324, 1.5e-323]
+    ],
+    "sourceStandardDeviations": ["sqrt(5e-324)", "sqrt(1.5e-323)"],
+    "independentOracleCorrelation": "1 / sqrt(3)",
+    "independentOracleVariance": "2 + 2 / sqrt(3) = 3.1547005383792515",
+    "actualResult": "covariance correlation is numerically unresolved",
+    "reason": "The geometric scale itself is subnormal and the source variances differ; its Float representation cannot resolve the correlation reliably.",
+    "equalVarianceSubnormalBehavior": "Equal subnormal diagonal variances use the diagonal as the exact geometric scale; the existing correlated cancellation regression remains accepted."
+  },
   "implementation": {
     "path": "compiler/std/measurements.ostrin",
     "function": "covariance_correlation_matrix",
-    "method": "Compute the geometric-mean scale as sqrt(row variance) * sqrt(column variance), reusing the already validated standard deviations; reject nonzero covariance when its scale is not representable as a finite positive Float."
+    "method": "Use the diagonal directly when the variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing the validated standard deviations. Reject a nonzero off-diagonal correlation when unequal variances produce a subnormal geometric scale, and reject any nonzero covariance whose scale is not finite and positive."
   },
   "localValidation": {
     "environment": {
@@ -109,10 +121,10 @@
     "performanceAssessment": "No benchmark was run for this correctness fix; it reuses the standard deviations already computed during validation. No performance claim is made."
   },
   "pendingExternalValidation": {
-    "exactHeadCi": true,
-    "exactHeadFreshReview": true,
-    "asan": true,
-    "ubsan": true,
+    "exactHeadCi": "Pending on the final PR head after the source, evidence and checkpoint commits are pushed.",
+    "exactHeadFreshReview": "Pending on the final PR head.",
+    "asan": "Pending on the final PR head.",
+    "ubsan": "Pending on the final PR head.",
     "merge": "Conditionally authorized only after required checks pass and fresh review has no substantive findings."
   },
   "limitations": [
