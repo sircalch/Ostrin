@@ -81,7 +81,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: scalar Measurement parity test is missing");
   check(errors, tests.includes("std_measurements_series_feeds_reproducible_error_bars"),
     "compiler/tests/examples.rs: Measurement-to-error-bars parity test is missing");
-  check(errors, /measurement_source\.contains\([\s\S]*ir=31[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
+  check(errors, /measurement_source\.contains\([\s\S]*ir=34[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
     "compiler/tests/examples.rs: scalar Measurement IR ratchet is missing");
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),
