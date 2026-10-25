@@ -30,6 +30,15 @@ pub record SourceCovariance {
     relative_tolerance: Float
 }
 
+// A dimensionless correlation matrix. Unlike SourceCovariance, this model can
+// relate sources whose input quantities have different dimensions: each
+// measurement sensitivity is already expressed in the output quantity's unit.
+pub record SourceCorrelation {
+    source_ids: List<String>
+    matrix: Array<Float>
+    relative_tolerance: Float
+}
+
 // A standard uncertainty represented in the coherent unit of its static dimension.
 pub record CoherentUncertainty<D> {
     dimension_key: String
@@ -981,6 +990,73 @@ pub fn covariance(
     })
 }
 
+fn source_correlation_canonical_matrix(source_ids: List<String>, matrix: Array<Float>) -> Array<Float> {
+    n = source_ids.length()
+    mut canonical = zeros([n, n])
+    for i in 0 until n {
+        canonical.set(i, i, 1.0)
+        for j in 0 until i {
+            average = covariance_midpoint(matrix.get(i, j), matrix.get(j, i))
+            canonical.set(i, j, average)
+            canonical.set(j, i, average)
+        }
+    }
+    canonical
+}
+
+fn source_correlation_validation_error(
+    source_ids: List<String>,
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> String {
+    error = covariance_validation_error(source_ids, matrix, relative_tolerance)
+    if error != "" {
+        return "correlation model is invalid: " + error
+    }
+    n = source_ids.length()
+    for i in 0 until n {
+        diagonal = matrix.get(i, i)
+        if abs(diagonal - 1.0) > relative_tolerance {
+            return "correlation matrix diagonal must equal one"
+        }
+        for j in 0 until i {
+            upper = matrix.get(i, j)
+            lower = matrix.get(j, i)
+            coefficient = covariance_midpoint(lower, upper)
+            if abs(upper) > 1.0 or abs(lower) > 1.0 or abs(coefficient) > 1.0 {
+                return "correlation coefficients must be within [-1, 1]"
+            }
+        }
+    }
+    canonical = source_correlation_canonical_matrix(source_ids, matrix)
+    canonical_error = covariance_validation_error(source_ids, canonical, relative_tolerance)
+    if canonical_error != "" {
+        return "canonical correlation matrix is invalid: " + canonical_error
+    }
+    ""
+}
+
+/// Build a bounded dense, dimensionless correlation model for one to 64
+/// source identities. Matrix entries are Pearson correlation coefficients;
+/// the diagonal is one, and the matrix must be symmetric and positive
+/// semidefinite within the declared tolerance.
+pub fn source_correlation(
+    source_ids: List<String>,
+    matrix: Array<Float>,
+    relative_tolerance: Float = 1e-12
+) -> Result<SourceCorrelation, String> {
+    error = source_correlation_validation_error(source_ids, matrix, relative_tolerance)
+    if error != "" {
+        return Err(error)
+    }
+    canonical = source_correlation_canonical_matrix(source_ids, matrix)
+    Ok(SourceCorrelation {
+        source_ids: source_ids,
+        matrix: canonical,
+        relative_tolerance: relative_tolerance,
+    })
+}
+
 fn covariance_source_index(source_ids: List<String>, source_id: String) -> Int {
     for i in 0 until source_ids.length() {
         if source_ids[i] == source_id {
@@ -1530,4 +1606,86 @@ pub fn uncertainty_with_covariance(
         Ok(variance) => Ok(sqrt(variance)),
         Err(message) => Err(message),
     }
+}
+
+/// Propagate correlated uncertainty through a dimensioned scalar measurement.
+/// Sensitivities are converted to coherent units before the dimensionless
+/// correlation kernel runs; the returned value retains the measurement's
+/// static dimension in `CoherentUncertainty<D>`.
+pub fn quantity_uncertainty_with_correlation<D: Dimension>(
+    measurement: Measurement<Quantity<D>>,
+    model: SourceCorrelation
+) -> Result<CoherentUncertainty<D>, String> {
+    if not measurement.known {
+        return Err(measurement.reason)
+    }
+    nominal = measurement.value.value() * measurement.value.unit_scale()
+    if not is_finite(measurement.value.value()) or not is_finite(nominal) {
+        return Err("measurement value must be finite")
+    }
+    mut validation_error = source_correlation_validation_error(model.source_ids, model.matrix, model.relative_tolerance)
+    if validation_error != "" {
+        return Err(validation_error)
+    }
+
+    // The scalar covariance kernel accepts standardized unit-variance source
+    // variables. Keep that representation private: map each original source
+    // sensitivity to its canonical output-unit contribution, while preserving
+    // its identity and using the model as the standardized sources' covariance.
+    mut normalized_sources: List<Sensitivity<Float>> = []
+    for i in 0 until measurement.sources.length() {
+        source = measurement.sources[i]
+        validation_error = validate_quantity_source(source)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        for j in 0 until i {
+            if measurement.sources[j].source_id == source.source_id {
+                return Err("measurement source ids must be unique before correlation propagation")
+            }
+        }
+        if covariance_source_index(model.source_ids, source.source_id) < 0 {
+            return Err("correlation model is missing a measurement source id")
+        }
+        contribution = source.contribution.value() * source.contribution.unit_scale()
+        if not is_finite(contribution) {
+            return Err("measurement sensitivity contribution must be finite")
+        }
+        if source.source_sigma == 0.0 and contribution != 0.0 {
+            return Err("zero-sigma source must have zero sensitivity contribution")
+        }
+        normalized_sources.push(Sensitivity<Float> {
+            source_id: source.source_id,
+            label: source.label,
+            source_dimension: "dimensionless",
+            source_sigma: 1.0,
+            contribution: contribution,
+        })
+    }
+    normalized_measurement = Measurement<Float> {
+        value: nominal,
+        sources: normalized_sources,
+        known: true,
+        reason: "",
+    }
+    canonical_matrix = source_correlation_canonical_matrix(model.source_ids, model.matrix)
+    normalized_model = SourceCovariance {
+        source_ids: model.source_ids,
+        matrix: canonical_matrix,
+        relative_tolerance: model.relative_tolerance,
+    }
+    variance = match variance_with_covariance(normalized_measurement, normalized_model) {
+        Ok(value) => value,
+        Err(message) => {
+            return Err(message)
+        },
+    }
+    uncertainty_value = sqrt(variance)
+    if not is_finite(uncertainty_value) {
+        return Err("measurement uncertainty overflowed")
+    }
+    Ok(CoherentUncertainty<D> {
+        dimension_key: measurement.value.dimension_key(),
+        value: uncertainty_value,
+    })
 }

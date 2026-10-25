@@ -12521,7 +12521,9 @@ fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
 #[test]
 fn dimensional_measurement_lab_matches_interpreter_and_native() {
     let file = example_path("measurement_lab.ostrin");
-    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\ndimensionless scalar covariance\nsum variance = 7\nsum uncertainty = 2.6458\n";
+    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\ndimensionless scalar covariance\nsum variance = 7\nsum uncertainty = 2.6458\ndimensioned source correlation\nproduct dimension = Length*Time\nproduct standard uncertainty = 0.6082762530298219\ninvalid correlation diagonal = correlation matrix diagonal must equal one\nmissing correlation source = correlation model is missing a measurement source id\n";
+    let analytic_uncertainty = (0.3_f64.powi(2) + 0.4_f64.powi(2) + 2.0 * 0.5 * 0.3 * 0.4).sqrt();
+    assert!((analytic_uncertainty - 0.608_276_253_029_821_9).abs() < 1e-15);
     let interpreted = run(&["--run", &file]);
     assert!(
         interpreted.status.success(),
@@ -12529,6 +12531,34 @@ fn dimensional_measurement_lab_matches_interpreter_and_native() {
         stderr(&interpreted)
     );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "dimensional correlation type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("examples/measurement_lab.ostrin ir=")
+            && report_text.contains("ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "dimensioned correlation must lower without AST fallback or type divergence: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "dimensioned correlation WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("std_measurements__SourceCorrelation")
+            && wasi_source.contains("correlation matrix diagonal must equal one"),
+        "dimensioned correlation WASI output omitted its concrete model or validation path"
+    );
 
     let exe = temp_artifact("measurement-lab.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);

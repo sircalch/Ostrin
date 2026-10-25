@@ -53,4 +53,37 @@ fn main() -> Void {
     print("dimensionless scalar covariance")
     print("sum variance = " + measurements.variance_with_covariance(scalar_sum, source_covariance).unwrap().to_string())
     print("sum uncertainty = " + rounded(measurements.uncertainty_with_covariance(scalar_sum, source_covariance).unwrap()).to_string())
+
+    measured_length = measurements.from_quantity_source(2 m, 0.1 m, "length-source", "length reading").unwrap()
+    measured_time = measurements.from_quantity_source(3 s, 0.2 s, "time-source", "time reading").unwrap()
+    measured_product = measurements.mul_quantity(measured_length, measured_time).unwrap()
+    product_correlation = measurements.source_correlation(
+        ["length-source", "time-source"],
+        array([
+            [1.0, 0.5],
+            [0.5, 1.0]
+        ])
+    ).unwrap()
+    correlated_product_u = measurements.quantity_uncertainty_with_correlation(measured_product, product_correlation).unwrap()
+    print("dimensioned source correlation")
+    print("product dimension = " + measured_product.value.dimension_key())
+    print("product standard uncertainty = " + correlated_product_u.value.to_string())
+
+    invalid_correlation = measurements.source_correlation(
+        ["length-source", "time-source"],
+        array([
+            [1.0, 0.2],
+            [0.2, 0.9]
+        ])
+    )
+    match invalid_correlation {
+        Ok(_) => print("invalid correlation diagonal = accepted"),
+        Err(message) => print("invalid correlation diagonal = " + message),
+    }
+
+    incomplete_correlation = measurements.source_correlation(["length-source"], array([[1.0]])).unwrap()
+    match measurements.quantity_uncertainty_with_correlation(measured_product, incomplete_correlation) {
+        Ok(_) => print("missing correlation source = accepted"),
+        Err(message) => print("missing correlation source = " + message),
+    }
 }
