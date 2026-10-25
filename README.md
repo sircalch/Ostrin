@@ -51,7 +51,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **382 integration tests, 33 unit tests and 6 differential
+The compiler suite currently passes **383 integration tests, 33 unit tests and 6 differential
 interpreter↔native tests**. Reproduction commands and evidence boundaries are documented in
 [`README-reproduce.md`](README-reproduce.md). Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
@@ -255,7 +255,8 @@ The design is documented in [`docs/design/`](docs/design/), including:
 - memory model;
 - derive and dynamic traits;
 - packages and the consolidated language reference;
-- the proposed Measurement<T> and uncertainty model.
+- experimental `Measurement<T>` uncertainty propagation, including bounded dense covariance for
+  dimensionless scalar sources; dimensional or array covariance remains unsupported.
 
 The project website is published at [sircalch.github.io/Ostrin](https://sircalch.github.io/Ostrin/)
 when GitHub Pages is enabled.

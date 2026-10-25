@@ -12521,7 +12521,7 @@ fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
 #[test]
 fn dimensional_measurement_lab_matches_interpreter_and_native() {
     let file = example_path("measurement_lab.ostrin");
-    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\n";
+    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\ndimensionless scalar covariance\nsum variance = 7\nsum uncertainty = 2.6458\n";
     let interpreted = run(&["--run", &file]);
     assert!(
         interpreted.status.success(),
@@ -19194,7 +19194,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=22")
+        measurement_source.contains("ir=27")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -19274,6 +19274,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          nonsymmetric covariance = covariance matrix must be symmetric within tolerance\n\
          duplicate covariance id = covariance source ids must be unique\n\
          non-finite covariance = covariance entries must be finite\n\
+         excessive covariance tolerance = covariance relative tolerance must not exceed 1e-6\n\
          source variance mismatch = covariance diagonal must match the measurement source sigma\n\
          missing source = covariance model is missing a measurement source id\n\
          unknown uncertainty = covariance propagation needs known measurement uncertainty\n",

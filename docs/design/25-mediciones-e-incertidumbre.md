@@ -1,7 +1,8 @@
 # 25 — Mediciones e incertidumbre
 
 **Estado:** propuesta en implementación experimental; `std.measurements` ofrece un API escalar
-funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres.
+funcional, una covarianza densa acotada para fuentes escalares adimensionales y una proyección de
+series `List<Measurement<Float>>` para valores e incertidumbres.
 `Measurement<Quantity<D>>` tiene pruebas experimentales de paridad de salida en intérprete y nativo
 para construcción, suma/resta correlacionada, productos y propagación de incertidumbre estándar.
 El smoke, el laboratorio y el fixture de superficie directa generan `main` mediante IR y reportan
@@ -11,7 +12,8 @@ acredita esos programas, no el soporte general de `Measurement<Quantity<D>>` ni 
 universal de ownership. `Array<Measurement<Float>>` tiene ahora un perfil estructural experimental
 de una dimensión para construcción, indexación, `get`, slicing, selección por máscara booleana,
 conversión a lista y visualización; cada límite probado conserva y libera los elementos. Las
-operaciones numéricas sobre arrays, covarianza y Monte Carlo siguen pendientes.
+operaciones numéricas sobre arrays, covarianza de valores dimensionales o arrays, y Monte Carlo
+siguen pendientes.
 
 **Fecha:** 2026-10-24
 
@@ -80,6 +82,11 @@ selección por máscara booleana, conversión a `List<Measurement<Float>>`, reto
 desde una función y visualización de elementos distintos. Las pruebas comparan intérprete y
 nativo, verifican lowering por IR sin fallback, emiten C para WASI y terminan con
 `live_allocations=0`. El perfil no habilita aritmética, broadcasting, reducciones ni covarianza.
+`examples/measurement_covariance.ostrin` cubre la matriz densa acotada para mediciones escalares
+adimensionales, incluyendo `J·Σ·Jᵀ`, diagonal consistente con sigma, matriz singular y rechazos
+de entradas inválidas. Su prueba compara los valores con una oracle analítica, corre en intérprete y
+nativo, confirma lowering tipado, emite C para WASI y termina con `live_allocations=0`; no valida
+covarianza dimensional ni sobre arrays.
 `examples/measurement_quantity_native_smoke.ostrin` cubre construcción, suma/resta correlacionada,
 productos entre dimensiones y proyección de incertidumbre estándar con paridad intérprete/native,
 emisión WASI, `live_allocations=0`, cuerpo `main` generado por IR y cero divergencias de tipos.
@@ -255,8 +262,9 @@ La representación futura debe separar tres conceptos:
 `from_source` crea o reutiliza la fuente según el `source_id` que entregue el usuario; repetirlo es
 una declaración explícita de correlación y requiere conservar la misma `sigma`. Una etiqueta
 repetida no crea alias con este constructor. `standard(value, sigma, label)` conserva la regla
-escalar vigente como conveniencia experimental; los arrays se limitan al perfil estructural y las
-covarianzas siguen pendientes. La clave
+escalar vigente como conveniencia experimental; `covariance` ofrece un perfil denso acotado para
+mediciones escalares adimensionales, mientras los arrays se limitan al perfil estructural y no
+aceptan matrices de covarianza. La clave
 estable suministrada por el usuario no se interpreta como identidad global entre ejecuciones.
 
 Para `Array<Measurement<T>>` se adopta el siguiente contrato de composición:
@@ -272,12 +280,23 @@ Para `Array<Measurement<T>>` se adopta el siguiente contrato de composición:
   orden de los elementos del array. Esto permite usar una matriz densa para un bloque pequeño y una
   representación dispersa para un conjunto grande sin cambiar el significado.
 
-La primera representación de covarianza debe validar valores finitos, simetría y semidefinitud
-positiva dentro de una tolerancia documentada. Las entradas diagonales de fuentes independientes
-pueden derivarse de `sigma²`; las covarianzas fuera de la diagonal requieren una declaración
-explícita. Una matriz inválida produce un diagnóstico; no se corrige silenciosamente. La
-propagación linealizada sigue siendo `J · Σ · Jᵀ`, y el resultado conserva el orden de fuentes para
-exponer contribuciones y permitir una serialización determinista.
+El perfil implementado `SourceCovariance` valida entre 1 y 64 IDs no vacíos y únicos, forma
+`n × n`, entradas finitas, simetría y semidefinitud positiva. La tolerancia relativa está acotada a
+`(0, 1e-6]` y su valor predeterminado es `1e-12`; los pares simétricos que difieren dentro de esa
+tolerancia se promedian explícitamente antes de validar la semidefinitud y propagar. Se documenta
+este ajuste acotado para que el resultado no dependa de cuál mitad de la matriz se lea. Las
+diagonales de cada fuente usada deben coincidir
+con `sigma²` dentro de la misma tolerancia; las fuentes declaradas pero no usadas tienen gradiente
+cero. La matriz se vuelve a validar al propagar, porque sus arrays pueden cambiar después de la
+construcción. La fórmula es `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`; una varianza negativa
+mayor que el error de redondeo relativo se rechaza y solo se trunca a cero una negativa pequeña
+dentro de tolerancia. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
+`Measurement<Quantity<D>>`, `Array<Measurement<T>>`, covarianza entre elementos ni reducciones.
+`examples/measurement_covariance.ostrin` comprueba sumas, diferencias, escalado, fuentes
+independientes, una matriz singular, tolerancia de simetría y entradas inválidas con una oracle
+analítica; también verifica paridad intérprete/nativo, C para WASI, lowering sin fallback y
+`live_allocations=0`. El programa se añade a la matriz de 32 smoke tests WASI para ejecutarlo además
+bajo Node WASI Preview 1.
 
 La composición con `Quantity<D>` queda definida por tipos antes de elegir una representación de
 runtime:
@@ -337,7 +356,7 @@ hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
 Este prototipo habilita un perfil estructural unidimensional acotado para `Array<Measurement<Float>>`,
 incluidos acceso por `get`, selección booleana, escape de elementos y visualización, pero no
-operaciones numéricas sobre esos arrays ni covarianza. La evidencia de esta fase no generaliza el
+operaciones numéricas sobre esos arrays ni covarianza de arrays. La evidencia de esta fase no generaliza el
 perfil a otros payloads `Measurement<T>`, que requieren sus propias pruebas de paridad y ownership. El soporte de
 `Measurement<Quantity<D>>` sigue siendo experimental y está limitado por la superficie realmente
 verificada. El fixture `examples/measurement_quantity_direct_shape.ostrin` ya cubre su forma directa:
@@ -347,9 +366,9 @@ ejecución nativa con leak-check. Esta evidencia corresponde a ese fixture y sus
 establece soporte general para toda combinación de dimensiones o contenedores. La propagación debe
 mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.
 Para ampliar el alcance se requieren pruebas adicionales de alias explícito, independencia de
-etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
-unidades y ejecución WASI. También se necesitan leak-check, ASan y UBSan para los buffers o grafos
-gestionados.
+etiquetas repetidas, reducciones con fuentes compartidas, covarianza dimensional y de arrays,
+conversiones de unidades y ejecución WASI. También se necesitan leak-check, ASan y UBSan para los
+buffers o grafos gestionados.
 
 ## 6. Operaciones y reglas
 
@@ -359,10 +378,11 @@ La primera implementación debe cubrir suma, resta, producto, cociente, potencia
 conversiones de unidades ya soportadas. Para funciones diferenciables, el camino linealizado
 usa las derivadas disponibles y conserva las dependencias de fuente.
 
-El contrato escalar actual usa la ley de propagación de incertidumbre de primer orden: si una
+El contrato escalar sin matriz usa la ley de propagación de incertidumbre de primer orden: si una
 salida `y = f(x)` depende de fuentes con sensibilidades `cᵢ` y desviaciones estándar `σᵢ`, su
-varianza es `Σᵢ (cᵢ σᵢ)²`. La fórmula general añade términos de covarianza; esta fase aún no acepta
-una matriz de covarianza. `from_source` usa el `source_id` explícito para identificar una variable:
+varianza es `Σᵢ (cᵢ σᵢ)²`. Para el perfil explícito `SourceCovariance`, la varianza general es
+`J · Σ · Jᵀ`, donde `Jᵢ = contributionᵢ / σᵢ`; el ejemplo de covarianza fija y prueba ese contrato.
+Sin matriz, `from_source` usa el `source_id` explícito para identificar una variable:
 las contribuciones con el mismo ID se combinan antes de elevar al cuadrado, mientras que IDs
 distintos se tratan como fuentes independientes. `standard` sigue usando la etiqueta como identidad
 por compatibilidad experimental.
@@ -506,11 +526,13 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
 5. **Implementado para ese fixture:** lowering a IR tipado, emisión C para WASI y comprobación
    nativa de paridad y ownership con leak-check. La generalización a todas las estructuras genéricas
    y contenedores sigue abierta.
-6. **En curso:** proyectar series escalares a valores e incertidumbres para error bars; añadir
-   después arrays, covarianza y salida de contribuciones.
+6. **Parcial:** proyectar series escalares a valores e incertidumbres para error bars y ofrecer
+   `SourceCovariance` experimental hasta 64 fuentes escalares adimensionales; siguen pendientes
+   las matrices para arrays/dimensiones y la salida de contribuciones.
 7. Añadir propagación Monte Carlo explícita y semilla reproducible.
 8. **Parcial:** las series escalares proyectan incertidumbres estándar a `std.viz.errorbars`;
-   falta conectar `Quantity`, covarianza, bandas con nivel declarado y procedencia completa.
+   falta conectar `Quantity`, covarianza dimensional/de arrays, bandas con nivel declarado y
+   procedencia completa.
 9. Habilitar WASM y la galería únicamente cuando las tres rutas tengan paridad.
 
 ## 12. Evidencia y pruebas necesarias

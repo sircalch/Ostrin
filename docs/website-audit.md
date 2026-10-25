@@ -35,7 +35,7 @@ visual regression claim.
 
 `scripts/website-check.mjs` now verifies both logo copies are valid 256×256 PNGs, match byte for
 byte, and stay at or below 100,000 bytes. After regenerating the source-backed experiment bundles,
-`node scripts/website-check.mjs` passed with 17 public pages, 304 Ostrin examples and 382
+`node scripts/website-check.mjs` passed with 17 public pages, 305 Ostrin examples and 383
 integration tests. Chromium also loaded both desktop and mobile homepage layouts with the 256 px
 logo and no horizontal overflow. The reference now indexes 28 design documents, including the
 contextual reassignment package.
@@ -67,10 +67,10 @@ contextual reassignment package.
 
 ## Verified inventory
 
-- **304** `.ostrin` source files under `examples/`, including package-project sources and
+- **305** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **28** Markdown design documents under `docs/design/`.
-- Compiler suite: **382 integration**, **6 differential** and **33 unit** tests.
+- Compiler suite: **383 integration**, **6 differential** and **33 unit** tests.
 - WASI release smoke matrix: **23 program modules** passed in run [38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359) with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum

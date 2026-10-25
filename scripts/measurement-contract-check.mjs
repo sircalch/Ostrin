@@ -16,8 +16,9 @@ function check(errors, condition, message) {
 }
 
 /**
- * Check that scalar, bounded dimensional, and structural Measurement array
- * contracts have evidence. Numeric arrays, covariance, and Monte Carlo remain open.
+ * Check that scalar, bounded dimensional, scalar covariance, and structural
+ * Measurement array contracts have evidence. Dimensional/array covariance and
+ * Monte Carlo remain open.
  */
 export function validateMeasurementContract(root = repositoryRoot) {
   const errors = [];
@@ -26,6 +27,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const directQuantityExample = read("examples/measurement_quantity_direct_shape.ostrin", root);
   const nativeQuantityExample = read("examples/measurement_quantity_native_smoke.ostrin", root);
   const measurementArrayExample = read("examples/measurement_array_shape.ostrin", root);
+  const covarianceExample = read("examples/measurement_covariance.ostrin", root);
   const labExample = read("examples/measurement_lab.ostrin", root);
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
@@ -43,6 +45,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     ["examples/measurement_quantity_direct_shape.ostrin", directQuantityExample],
     ["examples/measurement_quantity_native_smoke.ostrin", nativeQuantityExample],
     ["examples/measurement_array_shape.ostrin", measurementArrayExample],
+    ["examples/measurement_covariance.ostrin", covarianceExample],
     ["compiler/tests/examples.rs", tests],
     ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
@@ -78,7 +81,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "compiler/tests/examples.rs: scalar Measurement parity test is missing");
   check(errors, tests.includes("std_measurements_series_feeds_reproducible_error_bars"),
     "compiler/tests/examples.rs: Measurement-to-error-bars parity test is missing");
-  check(errors, /measurement_source\.contains\([\s\S]*ir=22[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
+  check(errors, /measurement_source\.contains\([\s\S]*ir=27[\s\S]*hir=0[\s\S]*ast=0/.test(tests),
     "compiler/tests/examples.rs: scalar Measurement IR ratchet is missing");
 
   check(errors, /primera fase\s+ejecutable/i.test(design) && /Measurement<Float>/i.test(design),
@@ -96,8 +99,43 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /direct full-surface fixture now has native IR\/interpreter parity[\s\S]{0,220}div_quantity_same/i.test(lab)
       && !/direct full-surface fixture still fails native lowering/i.test(lab),
     "scripts/lab-data.mjs: direct Measurement<Quantity<D>> native evidence is stale or missing");
-  check(errors, /One-dimensional Array<Measurement<Float>> has an experimental structural profile[\s\S]{0,240}Numeric array operations, reductions, covariance, Monte Carlo and coverage intervals remain planned/i.test(lab),
+  check(errors, /One-dimensional Array<Measurement<Float>> has an experimental structural profile[\s\S]{0,300}Numeric array operations, Monte Carlo and coverage intervals remain planned/i.test(lab),
     "scripts/lab-data.mjs: dimensional Measurement arrays, covariance, and Monte Carlo boundary is missing");
+  check(errors, /bounded SourceCovariance API for dimensionless scalar measurements using J·Σ·Jᵀ/i.test(lab)
+      && /SourceCovariance is experimental and limited to dense covariance matrices for at most 64 dimensionless scalar sources/i.test(lab)
+      && /its relative tolerance is at most 1e-6 \(default 1e-12\)/i.test(lab)
+      && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
+    "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
+  const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
+  const covariancePropagation = std.match(/pub fn variance_with_covariance\([\s\S]*?\n}\n/)?.[0] ?? "";
+  check(errors, /record SourceCovariance/.test(std)
+      && /pub fn covariance\(/.test(std)
+      && /n > 64/.test(covarianceValidation)
+      && /relative_tolerance > 1e-6/.test(covarianceValidation)
+      && /matrix\.shape\(\)/.test(covarianceValidation)
+      && /is_finite\(value\)/.test(covarianceValidation)
+      && /abs\(upper - lower\) > absolute_tolerance/.test(covarianceValidation)
+      && /numeric\.eigen\(symmetric, absolute_tolerance\)/.test(covarianceValidation)
+      && /covariance_validation_error\(model\.source_ids, model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
+      && /expected_variance = source\.source_sigma \* source\.source_sigma/.test(covariancePropagation)
+      && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
+      && /term = gradient\[i\] \* covariance_entry \* gradient\[j\]/.test(covariancePropagation)
+      && /variance is negative/.test(covariancePropagation),
+    "compiler/std/measurements.ostrin: bounded covariance validation and J·Σ·Jᵀ propagation contract is incomplete");
+  check(errors, /SourceCovariance` valida entre 1 y 64 IDs[\s\S]{0,720}tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\][\s\S]{0,1200}J · Σ · Jᵀ/i.test(design)
+      && /los pares simétricos que difieren dentro de esa\s+tolerancia se promedian explícitamente/i.test(design)
+      && /La matriz se vuelve a validar al propagar/i.test(design)
+      && /no acepta[\s\S]{0,140}covarianza entre elementos/i.test(design),
+    "docs/design/25-mediciones-e-incertidumbre.md: scalar covariance contract, mutation guard or scope boundary is incomplete");
+  check(errors, tests.includes("std_measurements_covariance_matches_analytic_oracle_and_wasi")
+      && /correlated sum variance = \{\}/.test(tests)
+      && /rank-deficient cancellation uncertainty = 0/.test(tests)
+      && covarianceExample.includes("measurements.covariance")
+      && covarianceExample.includes("measurements.variance_with_covariance")
+      && covarianceExample.includes("indefinite covariance")
+      && covarianceExample.includes("excessive covariance tolerance")
+      && covarianceExample.includes("source variance mismatch"),
+    "Measurement covariance: analytical oracle, runtime parity and validation regressions are missing");
   check(errors, tests.includes("measurement_array_structural_ownership_matches_interpreter_native_and_wasi")
       && tests.includes("measurement_array_numeric_operators_are_rejected_explicitly")
       && measurementArrayExample.includes("values[array([false, true])]")

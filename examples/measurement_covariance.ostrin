@@ -70,6 +70,10 @@ fn main() -> Void {
         Ok(_) => print("non-finite covariance accepted"),
         Err(message) => print("non-finite covariance = " + message),
     }
+    match measurements.covariance(["bad"], array([[-1.0]]), 1.0) {
+        Ok(_) => print("excessive covariance tolerance accepted an indefinite matrix"),
+        Err(message) => print("excessive covariance tolerance = " + message),
+    }
     mismatch = measurements.covariance(["caliper", "reference"], array([[9.0, 1.0], [1.0, 1.0]])).unwrap()
     match measurements.uncertainty_with_covariance(total, mismatch) {
         Ok(_) => print("source variance mismatch accepted"),

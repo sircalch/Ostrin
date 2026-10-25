@@ -11,6 +11,7 @@ const trackedFiles = [
   "examples/measurement_quantity_direct_shape.ostrin",
   "examples/measurement_quantity_native_smoke.ostrin",
   "examples/measurement_array_shape.ostrin",
+  "examples/measurement_covariance.ostrin",
   "examples/measurement_lab.ostrin",
   "compiler/tests/examples.rs",
   "docs/design/25-mediciones-e-incertidumbre.md",
@@ -300,6 +301,38 @@ test("the gate rejects claims that exceed the structural Measurement array profi
     writeFileSync(file, source);
     const result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded structural array Measurement boundary")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate requires bounded scalar covariance evidence and explicit scope", () => {
+  const root = fixtureRoot();
+  try {
+    const stdFile = path.join(root, "compiler/std/measurements.ostrin");
+    const std = readFileSync(stdFile, "utf8");
+    writeFileSync(stdFile, std.replace("if n > 64 {", "if n > 128 {"));
+    let result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std);
+    writeFileSync(stdFile, std.replace("relative_tolerance > 1e-6", "relative_tolerance > 1e-3"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
+    writeFileSync(stdFile, std);
+    const labFile = path.join(root, "scripts/lab-data.mjs");
+    const lab = readFileSync(labFile, "utf8");
+    writeFileSync(labFile, lab.replace("using J·Σ·Jᵀ", "using independent variances"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("website Measurement covariance example")));
+
+    writeFileSync(labFile, lab);
+    const testFile = path.join(root, "compiler/tests/examples.rs");
+    const tests = readFileSync(testFile, "utf8");
+    writeFileSync(testFile, tests.replace("rank-deficient cancellation uncertainty = 0", "rank case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

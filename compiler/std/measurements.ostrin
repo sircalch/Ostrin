@@ -876,6 +876,9 @@ fn covariance_validation_error(
     if not is_finite(relative_tolerance) or relative_tolerance <= 0.0 {
         return "covariance relative tolerance must be finite and positive"
     }
+    if relative_tolerance > 1e-6 {
+        return "covariance relative tolerance must not exceed 1e-6"
+    }
     n = source_ids.length()
     if n == 0 {
         return "covariance needs at least one source id"

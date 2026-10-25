@@ -176,6 +176,12 @@ const programs = [
     expected: "[0, 1, 2, 3, 4] s\n[0, 3, 12, 27, 48] m\n48 m\n[0, 10.799999999999999, 43.199999999999996, 97.19999999999999, 172.79999999999998] km/h\n[0, 0.009, 0.144, 0.729, 2.304] kJ\n0.048 km\n18 m\n17.69745744450315 m\n313.2 m^2\n[1000, 1003, 1012, 1027, 1048] m\n[false, false, true, true, true]\n[0, 0.003, 0.012, 0.027, 0.048]\n[-3, -12] m\nm\n[0 m, 3 m, 12 m, 27 m, 48 m]\n[1, 0.5, 0.3333333333333333, 0.25] 1/s\n[0, 100, 200, 300] m\n",
   },
   {
+    name: "measurement_covariance",
+    source: "examples/measurement_covariance.ostrin",
+    args: ["measurement_covariance.wasm"],
+    expected: "correlated sum variance = 7\ncorrelated sum uncertainty = 2.6458\ncorrelated difference variance = 3\ncorrelated difference uncertainty = 1.7321\nscaled correlated variance = 28\nwithin-tolerance symmetric variance = 7\nindependent sum uncertainty = 2.2361\nrank-deficient cancellation uncertainty = 0\nindefinite covariance = covariance matrix must be positive semidefinite\nnonsymmetric covariance = covariance matrix must be symmetric within tolerance\nduplicate covariance id = covariance source ids must be unique\nnon-finite covariance = covariance entries must be finite\nexcessive covariance tolerance = covariance relative tolerance must not exceed 1e-6\nsource variance mismatch = covariance diagonal must match the measurement source sigma\nmissing source = covariance model is missing a measurement source id\nunknown uncertainty = covariance propagation needs known measurement uncertainty\n",
+  },
+  {
     name: "native_ir_function_values",
     source: "examples/native_ir_function_values.ostrin",
     args: ["native_ir_function_values.wasm"],
