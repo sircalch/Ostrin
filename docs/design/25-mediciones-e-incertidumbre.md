@@ -291,10 +291,11 @@ tolerancia se promedian explícitamente antes de validar la semidefinitud y prop
 este ajuste acotado para que el resultado no dependa de cuál mitad de la matriz se lea. Una vista
 normalizada por la entrada máxima finita se usa solo para comparar simetría y comprobar la
 semidefinitud con el eigensolver; así, las comparaciones usan la tolerancia relativa sin sumar
-magnitudes que puedan desbordarse. La propagación promedia las entradas originales antes de
-factorizar, de modo que una entrada grande sin usar no borra correlaciones pequeñas de las fuentes
-usadas. El punto medio evita perder covarianzas subnormales cuando ambas entradas tienen el mismo
-signo y evita desbordarse cuando tienen signos opuestos. Las diagonales de cada fuente usada deben
+magnitudes que puedan desbordarse. La propagación divide cada entrada simétrica por la escala
+geométrica local antes de promediarla y factorizarla; así, una entrada grande sin usar no borra
+correlaciones pequeñas de las fuentes usadas. Este orden conserva pares subnormales desiguales cuyo
+punto medio no puede representarse en la escala original, y evita desbordar al tratar valores grandes.
+Las diagonales de cada fuente usada deben
 coincidir con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y
 subdesborda a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente
 como exacta. Cuando `sigma²` es subnormal, la coincidencia se comprueba mediante la razón estable

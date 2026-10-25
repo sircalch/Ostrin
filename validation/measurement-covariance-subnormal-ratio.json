@@ -6,7 +6,7 @@
     "severity": "P2",
     "summary": "Avoid subnormal precision loss in the variance ratio"
   },
-  "sourceRevision": "ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7",
+  "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
   "releaseTag": "v0.2.0",
   "releaseArtifactsChanged": false,
   "additionalReviewFindings": [
@@ -185,6 +185,43 @@
       "independentOracleMethod": "100-digit Python Decimal from exact binary64 inputs: (sqrt(5e-324) * (1e16/sigmaA - 1e16/sigmaB))^2.",
       "actualResult": "propagated covariance projection is numerically unresolved",
       "reason": "Both distinct binary Float source sigmas square to the same subnormal Float, so comparing only rounded squares skipped adjustment and returned zero. Validation already accepts the roots within tolerance; propagation now preserves a root-space adjustment whenever sqrt(diagonal) differs exactly from the source sigma, even if the rounded squares compare equal."
+    },
+    {
+      "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4372155934",
+      "severity": "P2",
+      "summary": "Reject lossy midpoints between unequal subnormal entries",
+      "status": "fixed-in-source-awaiting-exact-head-ci-and-review",
+      "covariance": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          2e-323,
+          5e-324
+        ],
+        [
+          0,
+          1e-323,
+          2e-323
+        ]
+      ],
+      "sourceStandardDeviations": [
+        "unused source",
+        "sqrt(2e-323)",
+        "sqrt(2e-323)"
+      ],
+      "storedContributions": [
+        1,
+        1
+      ],
+      "independentOracleCorrelation": "((1u + 2u) / 2) / (4u) = 3/8",
+      "independentOracleVariance": "2 + 2 * (3/8) = 2.75",
+      "actualResultBeforeFix": 2.5,
+      "actualResultAfterFix": 2.75,
+      "reason": "Halving the one-subnormal-unit difference rounds it to zero and selects one endpoint before correlation conversion. The implementation now divides each raw symmetric entry by the local geometric scale before averaging, so the correlation midpoint 0.375 is represented directly; the exact example changes from 2.5 to 2.75."
     }
   ],
   "regression": {
@@ -230,7 +267,7 @@
   "implementation": {
     "path": "compiler/std/measurements.ostrin",
     "function": "covariance_correlation_matrix",
-    "method": "Use each diagonal directly when variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing validated standard deviations. Apply accepted diagonal-adjustment ratios after exact power-of-two normalization. For subnormal variances, preserve a root-space adjustment whenever sqrt(covariance diagonal) differs from the source sigma even when the rounded squares compare equal. For unequal-variance near-unit correlations, accept exact dependence only for small integer roots whose squares and cross product are exactly representable and reproduce the supplied matrix. Accumulate Cholesky projections with compensation; reject every near-zero projection that contains adjusted contributions. Reject subnormal unequal-variance geometric scales and other unresolved correlations instead of erasing representable residual variance."
+    "method": "Use each diagonal directly when variances are equal; otherwise compute the geometric scale as sqrt(row variance) * sqrt(column variance), reusing validated standard deviations. Divide each raw off-diagonal entry by the local geometric scale before averaging in correlation space, preserving the variance implied by unequal subnormal entries without materializing an unrepresentable midpoint. The midpoint helper sums before halving whenever the sum is finite, so adjacent subnormal differences are not halved to zero; it halves first only on same-sign overflow. Apply accepted diagonal-adjustment ratios after exact power-of-two normalization. For subnormal variances, preserve a root-space adjustment whenever sqrt(covariance diagonal) differs from the source sigma even when the rounded squares compare equal. For unequal-variance near-unit correlations, accept exact dependence only for small integer roots whose squares and cross product are exactly representable and reproduce the supplied matrix. Accumulate Cholesky projections with compensation; reject every near-zero projection that contains adjusted contributions. Reject subnormal unequal-variance geometric scales and other unresolved correlations instead of erasing representable residual variance."
   },
   "localValidation": {
     "environment": {
@@ -487,43 +524,35 @@
   },
   "historicalSourceRevision": "06849b5453fd3bfa3bc573f280abee1440ea387c",
   "latestReviewAmendment": {
-    "sourceRevision": "ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7",
-    "finding": "4372112598: equal rounded subnormal squares no longer hide a root-space adjustment; unresolved cancellation returns an explicit error.",
-    "independentOracleVariance": 4.930380657631321,
+    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+    "finding": "4372155934: unequal subnormal covariance entries are divided by their local geometric scale before averaging; the reproduced variance changes from 2.5 to the analytic 2.75.",
+    "independentOracleVariance": 2.75,
+    "reproductionBeforeFix": "2.5",
+    "reproductionAfterFix": "2.75",
     "localValidation": {
-      "focusedInterpreterNativeWasiLeakTest": "passed: 1 test; interpreter/native parity, WASI emission and live_allocations=0",
+      "focusedInterpreterNativeWasiLeakTest": "passed: 1 test; interpreter/native parity, exact output 2.75, WASI C emission and live_allocations=0",
       "cargoFormat": "passed",
-      "measurementContractGate": "passed",
-      "measurementContractMutationTests": "passed: 18/18",
-      "releaseBuild": "passed from source revision ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7",
-      "wasiProgramMatrix": "passed: 32/32 from source revision ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7",
-      "websiteLabReplayRegeneration": "passed: 12 demos and 29 figure replays match",
-      "generatedExperimentBundles": "29 fixtures regenerated from the new source revision",
-      "fullCargoSuite": "not rerun after this latest P2; exact-head Ostrin CI is required",
+      "measurementContractGateAndMutationTests": "passed: 18/18",
+      "releaseBuild": "passed from source revision 354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+      "wasiProgramMatrix": "passed: 32/32 from source revision 354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
+      "websiteWasmBuild": "passed from the corrected compiler; lab data regenerated and 29 figure replays match",
+      "experimentBundles": "29 fixtures regenerated; all 11 R1/R2 bundles replayed",
+      "websiteCheck": "passed: 17 pages, 305 examples, 383 integration tests and WASM",
+      "numericValidation": "passed: 80 report values, 136 emitted values, maximum absolute difference 0, live_allocations=0",
+      "projectPlan": "passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
+      "linguistDistributionReadiness": "passed; v0.2 readiness 12/12",
+      "provenancePage": "passed after regeneration",
+      "fullCargoSuite": "not completed locally; exact-head Ostrin CI is required",
       "browserAndSanitizers": "must pass on the final exact PR HEAD in GitHub CI",
       "r3": "OPEN; no host captures are claimed",
-      "projectPlan": "passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
-      "websiteCheck": "passed: 17 pages, 305 examples, 383 integration tests and WASM",
-      "labReplay": "12 demos and 29 figures match; all 11 R1/R2 bundles replayed",
-      "numericValidation": {
-        "result": "passed on win32 x64, Node v24.19.0",
-        "reportValues": 80,
-        "emittedValues": 136,
-        "maximumAbsoluteDifference": 0,
-        "leakCheck": "live_allocations=0",
-        "compilerSha256": "fcf6a1b6a73f4cca324207237f643933f9282b387b112800bdb855b418e134d0"
-      },
-      "linguist": "passed: proposal, grammar, 7 sample candidates and 305 examples",
-      "distribution": "passed: release matrix, checksums and installers",
-      "v0_2_readiness": "READY: 12/12 criteria",
-      "provenancePage": "passed",
-      "benchmark": "no benchmark claim; prior and current covariance source hashes differ"
+      "performance": "No benchmark was run; no performance claim is made."
     },
-    "exactHeadCiAndFreshReview": "pending"
+    "exactHeadCiAndFreshReview": "pending after the next PR branch push"
   },
   "supersededSourceRevisions": [
     "469b11a76cccbff9714d5a65c4abc27169d67a77",
-    "06849b5453fd3bfa3bc573f280abee1440ea387c"
+    "06849b5453fd3bfa3bc573f280abee1440ea387c",
+    "ae9aaaad51f2ead272c19df4c830cdb6bc6c99c7"
   ],
   "previousReviewAmendment": {
     "sourceRevision": "469b11a76cccbff9714d5a65c4abc27169d67a77",
