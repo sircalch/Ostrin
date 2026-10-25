@@ -296,10 +296,13 @@ a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar l
 Las fuentes declaradas pero no usadas tienen gradiente cero. La matriz se vuelve a validar al propagar,
 porque sus arrays pueden cambiar después de la construcción. La fórmula es `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`; una varianza negativa
 mayor que el error de redondeo relativo se rechaza y solo se trunca a cero una negativa pequeña
-dentro de tolerancia. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
+dentro de tolerancia. La forma cuadrática usa sumas compensadas por fila y en la acumulación exterior,
+para conservar residuos pequeños después de cancelar contribuciones grandes; los intermedios no
+finitos se rechazan. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
 `Measurement<Quantity<D>>`, `Array<Measurement<T>>`, covarianza entre elementos ni reducciones.
 `examples/measurement_covariance.ostrin` comprueba sumas, diferencias, escalado, fuentes
-independientes, una matriz singular, entradas de escalas muy distintas, tolerancia de simetría y entradas inválidas con una oracle
+independientes, una matriz singular, entradas de escalas muy distintas, cancelación de rango uno,
+tolerancia de simetría y entradas inválidas con una oracle
 analítica; también verifica paridad intérprete/nativo, C para WASI, lowering sin fallback y
 `live_allocations=0`. El programa se añade a la matriz de 32 smoke tests WASI para ejecutarlo además
 bajo Node WASI Preview 1.

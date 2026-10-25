@@ -85,6 +85,35 @@ fn main() -> Void {
     wide_difference = measurements.sub(wide_a_scaled, wide_b_scaled).unwrap()
     print("wide-scale covariance cancellation variance = " + measurements.variance_with_covariance(wide_difference, wide_scale_covariance).unwrap().to_string())
 
+    rank_three = measurements.covariance(
+        ["large", "unit", "negative"],
+        array([
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ])
+    ).unwrap()
+    rank_three_reordered = measurements.covariance(
+        ["large", "negative", "unit"],
+        array([
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ])
+    ).unwrap()
+    large_source = measurements.from_source(0.0, 1.0, "large", "large contribution")
+    unit_source = measurements.from_source(0.0, 1.0, "unit", "unit residual")
+    negative_source = measurements.from_source(0.0, 1.0, "negative", "negative contribution")
+    large_contribution = measurements.scale(large_source.unwrap(), 1e8)
+    unit_contribution = unit_source.unwrap()
+    negative_contribution = measurements.scale(negative_source.unwrap(), -1e8)
+    first_pair = measurements.add(large_contribution, unit_contribution).unwrap()
+    first_order = measurements.add(first_pair, negative_contribution).unwrap()
+    second_pair = measurements.add(large_contribution, negative_contribution).unwrap()
+    second_order = measurements.add(second_pair, unit_contribution).unwrap()
+    print("rank-three compensated variance = " + measurements.variance_with_covariance(first_order, rank_three).unwrap().to_string())
+    print("rank-three reordered compensated variance = " + measurements.variance_with_covariance(second_order, rank_three_reordered).unwrap().to_string())
+
     large_psd = measurements.covariance(
         ["large-psd-a", "large-psd-b"],
         array([

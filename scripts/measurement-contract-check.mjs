@@ -108,6 +108,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /matrix is normalized by its largest finite entry only for the symmetry and positive-semidefinite checks/i.test(lab)
       && /propagation\s+averages original entries before multiplying by gradients/i.test(lab)
       && /midpoint calculation preserves subnormal symmetric covariance entries/i.test(lab)
+      && /quadratic form uses compensated row and outer sums to retain small residuals after large correlated cancellation/i.test(lab)
       && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
@@ -130,7 +131,12 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /expected_variance = source\.source_sigma \* source\.source_sigma/.test(covariancePropagation)
       && /source\.source_sigma != 0\.0 and expected_variance == 0\.0/.test(covariancePropagation)
       && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
-      && /term = gradient\[i\] \* covariance_entry \* gradient\[j\]/.test(covariancePropagation)
+      && /row_correction = row_correction \+/.test(covariancePropagation)
+      && /variance_correction = variance_correction \+/.test(covariancePropagation)
+      && /variance = variance \+ variance_correction/.test(covariancePropagation)
+      && /next_row_sum = row_sum \+ row_term/.test(covariancePropagation)
+      && /next_variance = variance \+ outer_term/.test(covariancePropagation)
+      && /term = gradient\[i\] \* row_term/.test(covariancePropagation)
       && /variance is negative/.test(covariancePropagation),
     "compiler/std/measurements.ostrin: bounded covariance validation and J·Σ·Jᵀ propagation contract is incomplete");
   check(errors, /lower \+ \(upper - lower\) \* 0\.5/.test(covarianceMidpoint)
@@ -139,6 +145,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /if lower > upper/.test(covarianceMidpoint)
       && /vista\s+normalizada por la entrada máxima finita/i.test(design)
       && /La propagación promedia las entradas originales antes de\s+multiplicarlas por el gradiente/i.test(design)
+      && /sumas compensadas por fila y en la acumulación exterior/i.test(design)
+      && /residuos pequeños después de cancelar contribuciones grandes/i.test(design)
       && /El punto\s+medio evita perder covarianzas subnormales/i.test(design),
     "Measurement covariance: normalized PSD analysis and underflow-safe midpoint are missing");
   check(errors, /SourceCovariance` valida entre 1 y 64 IDs[\s\S]{0,1200}tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\][\s\S]{0,1600}J · Σ · Jᵀ/i.test(design)
@@ -152,6 +160,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /rank-deficient cancellation uncertainty = 0/.test(tests)
       && /subnormal covariance cancellation variance = 0/.test(tests)
       && /wide-scale covariance cancellation variance = 0/.test(tests)
+      && /rank-three compensated variance = 1/.test(tests)
+      && /rank-three reordered compensated variance = 1/.test(tests)
       && /large finite PSD covariance = accepted/.test(tests)
       && /large indefinite covariance = covariance matrix must be positive semidefinite/.test(tests)
       && covarianceExample.includes("measurements.covariance")
@@ -159,6 +169,8 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && covarianceExample.includes("indefinite covariance")
       && covarianceExample.includes("subnormal covariance cancellation variance")
       && covarianceExample.includes("wide-scale covariance cancellation variance")
+      && covarianceExample.includes("rank-three compensated variance")
+      && covarianceExample.includes("rank-three reordered compensated variance")
       && covarianceExample.includes("large finite PSD covariance")
       && covarianceExample.includes("large indefinite covariance")
       && covarianceExample.includes("excessive covariance tolerance")

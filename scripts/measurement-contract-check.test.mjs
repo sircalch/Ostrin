@@ -320,6 +320,12 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
+    writeFileSync(stdFile, std
+      .replaceAll("row_correction = row_correction +", "row_correction = 0.0 +")
+      .replaceAll("variance_correction = variance_correction +", "variance_correction = 0.0 +"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
     writeFileSync(stdFile, std.replace(
       "if source.source_sigma != 0.0 and expected_variance == 0.0 {",
       "if source.source_sigma != 0.0 {",
@@ -368,6 +374,14 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
 
     writeFileSync(testFile, tests.replace("wide-scale covariance cancellation variance = 0", "wide-scale case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("rank-three compensated variance = 1", "rank-three case removed"));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
+
+    writeFileSync(testFile, tests.replace("rank-three reordered compensated variance = 1", "rank-three reorder case removed"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("analytical oracle, runtime parity")));
   } finally {

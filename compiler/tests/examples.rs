@@ -19271,6 +19271,8 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          rank-deficient cancellation uncertainty = 0\n\
          subnormal covariance cancellation variance = 0\n\
          wide-scale covariance cancellation variance = 0\n\
+         rank-three compensated variance = 1\n\
+         rank-three reordered compensated variance = 1\n\
          large finite PSD covariance = accepted\n\
          indefinite covariance = covariance matrix must be positive semidefinite\n\
          large indefinite covariance = covariance matrix must be positive semidefinite\n\
