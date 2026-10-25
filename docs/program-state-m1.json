@@ -11,7 +11,7 @@
   "checkpoint": {
     "mainRevision": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
     "sourceRevision": "7fc21cdf7c574edf3fdf417573bea2c3b5d03619",
-    "evidenceRevision": "82352d7b1cf28416fc3396476cb7cbc6c5e1c715",
+    "evidenceRevision": "93cf67ad14650afd1637572d3929e900a4f0a357",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -38,7 +38,7 @@
     "name": "bounded-scalar-measurement-covariance",
     "branch": "codex/measurement-scalar-covariance",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "source-7fc21cd-benchmark-snapshot-5bf8a47-locally-validated-awaiting-final-evidence-checkpoint-push-and-exact-head-ci-review",
+    "status": "source-7fc21cd-evidence-93cf67a-committed-final-checkpoint-pending-push-and-exact-head-ci-review",
     "scope": [
       "experimental dense SourceCovariance matrices for 1 to 64 unique dimensionless scalar source IDs",
       "finite/symmetric/positive-semidefinite validation with relative tolerance in (0, 1e-6], default 1e-12",
@@ -92,14 +92,15 @@
       "Fresh review 5641749562 on exact PR head 391be4a found two further P2 precision failures. Both were reproduced in interpreter and native execution: singular covariance [[3,3],[3,3]] with sigma sqrt(3) produced variance 4 instead of 0, and exact stored contributions 30000000000000004 and -30000000000000000 under perfect correlation produced 64 instead of 16.",
       "Source commit 7fc21cdf7c574edf3fdf417573bea2c3b5d03619 fixes both review cases by factoring a scale-safe correlation matrix and projecting stored source contributions directly. The diagonal-tolerance path preserves bitwise matches and adjusts only accepted non-identical diagonals; every negative pivot now returns a stability error. Regression output is variance 0 for the sqrt(3) singular cancellation and variance 16 for the direct-contribution residual.",
       "Exact source 7fc21cd full Cargo suite passed: 33 unit, 6 differential and 383 integration tests (422 total). Focused covariance interpreter/native/leak and WASI emission passed; Node WASI Preview 1 matrix passed all 32 programs. Measurement contract checker and all 18 mutation tests, project-plan (7,261 HIR/IR bodies: 7,220 IR + 41 HIR, 0 AST), Linguist (305 examples), distribution, and website check (17 pages, 305 examples, 383 integration tests) passed. Lab data verified 29 experiment replays; the bars bundle was refreshed.",
-      "Benchmark run on clean commit 5bf8a47afb869f26b29eec0816ec66a2b8d52c01 includes 15 workloads, 7 samples and 1 warmup on Windows 11 x64; covariance medians are 89.504 ms interpreter and 8.912 ms native (10.042 ratio). Raw report SHA-256 d366ffc6b0187bc5da6077b9af4ca8bf295e70190fc7fbccc85509cd6f4230f2 is retained at validation/benchmark-m1-covariance-windows.json and the generated benchmark website data includes the new workload. Peak memory/RSS was not measured; no cross-platform or cross-language performance claim is made."
+      "Benchmark run on clean commit 5bf8a47afb869f26b29eec0816ec66a2b8d52c01 includes 15 workloads, 7 samples and 1 warmup on Windows 11 x64; covariance medians are 89.504 ms interpreter and 8.912 ms native (10.042 ratio). Raw report SHA-256 d366ffc6b0187bc5da6077b9af4ca8bf295e70190fc7fbccc85509cd6f4230f2 is retained at validation/benchmark-m1-covariance-windows.json and the generated benchmark website data includes the new workload. Peak memory/RSS was not measured; no cross-platform or cross-language performance claim is made.",
+      "Evidence commit 93cf67a records the raw benchmark, generated 15-workload website snapshot and validation results; final checkpoint commit updates this field to that exact evidence revision."
     ],
     "activePullRequests": [
       234
     ]
   },
   "pending": [
-    "commit the current source, benchmark and local validation evidence into the PR checkpoint, then verify required CI, native sanitizers and fresh review on the final exact head",
+    "push the final checkpoint pointer for evidence 93cf67a, then verify required CI, native sanitizers and fresh review on the final exact PR #234 head",
     "integrate PR #234 only after exact-head required checks are green and fresh review has no substantive findings; existing user authorization is conditional on those gates",
     "continue R3 work beyond the verified host-evidence readiness gate; the experiment records remain at R0-R2 and do not establish cross-platform reproducibility",
     "continue static-effects closure and broader R3 inspect/validate/replay/compare evidence",
@@ -139,5 +140,5 @@
     "R3 host-evidence readiness for main is verified; broader reproducibility remains open because declared bundle levels are R0-R2 and no cross-platform equivalence is claimed",
     "the published v0.2.0 tag/assets remain frozen; no new release or tag is authorized"
   ],
-  "next": "commit the evidence and checkpoint for source 7fc21cd, push the final PR #234 head, and require green checks plus a fresh review without substantive findings before the conditionally authorized merge"
+  "next": "push the final checkpoint for source 7fc21cd and evidence 93cf67a, then require green checks plus a fresh review without substantive findings on the final PR #234 head before the conditionally authorized merge"
 }
