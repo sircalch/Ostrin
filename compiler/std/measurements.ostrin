@@ -988,6 +988,141 @@ fn covariance_source_index(source_ids: List<String>, source_id: String) -> Int {
     -1
 }
 
+fn covariance_symmetric_entry(matrix: Array<Float>, row: Int, column: Int) -> Float {
+    if row == column {
+        return matrix.get(row, column)
+    }
+    covariance_midpoint(matrix.get(row, column), matrix.get(column, row))
+}
+
+/// Factor a validated positive-semidefinite covariance matrix as L·Lᵀ.
+///
+/// This keeps uncertainty propagation in a sum of squared projections, so
+/// large signed source contributions cancel before they are squared.
+fn covariance_semidefinite_factor(
+    matrix: Array<Float>,
+    relative_tolerance: Float
+) -> Result<Array<Float>, String> {
+    n = matrix.shape()[0]
+    mut lower = zeros([n, n])
+    for i in 0 until n {
+        mut diagonal_sum = 0.0
+        mut diagonal_correction = 0.0
+        mut diagonal_products = 0.0
+        for k in 0 until i {
+            diagonal_factor = lower.get(i, k)
+            term = diagonal_factor * diagonal_factor
+            if not is_finite(term) {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            if diagonal_factor != 0.0 and term == 0.0 {
+                return Err("covariance matrix factorization underflows Float range")
+            }
+            next_sum = diagonal_sum + term
+            mut residual = 0.0
+            if abs(diagonal_sum) >= abs(term) {
+                residual = (diagonal_sum - next_sum) + term
+            } else {
+                residual = (term - next_sum) + diagonal_sum
+            }
+            diagonal_correction = diagonal_correction + residual
+            diagonal_sum = next_sum
+            diagonal_products = diagonal_products + abs(term)
+            if not is_finite(diagonal_sum) or not is_finite(diagonal_correction)
+                or not is_finite(diagonal_products)
+            {
+                return Err("covariance matrix could not be stably factorized")
+            }
+        }
+        diagonal = covariance_symmetric_entry(matrix, i, i)
+        mut pivot = diagonal - (diagonal_sum + diagonal_correction)
+        pivot_scale = abs(diagonal) + diagonal_products
+        if not is_finite(pivot) or not is_finite(pivot_scale) {
+            return Err("covariance matrix could not be stably factorized")
+        }
+        if pivot < 0.0 {
+            if pivot_scale == 0.0 or abs(pivot) > relative_tolerance * pivot_scale {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            pivot = 0.0
+        }
+
+        if pivot == 0.0 {
+            lower.set(i, i, 0.0)
+            for row in i + 1 until n {
+                mut dot_sum = 0.0
+                mut dot_correction = 0.0
+                mut dot_products = 0.0
+                for k in 0 until i {
+                    left_factor = lower.get(row, k)
+                    right_factor = lower.get(i, k)
+                    term = left_factor * right_factor
+                    if left_factor != 0.0 and right_factor != 0.0 and term == 0.0 {
+                        return Err("covariance matrix factorization underflows Float range")
+                    }
+                    next_sum = dot_sum + term
+                    mut residual = 0.0
+                    if abs(dot_sum) >= abs(term) {
+                        residual = (dot_sum - next_sum) + term
+                    } else {
+                        residual = (term - next_sum) + dot_sum
+                    }
+                    dot_correction = dot_correction + residual
+                    dot_sum = next_sum
+                    dot_products = dot_products + abs(term)
+                }
+                entry = covariance_symmetric_entry(matrix, row, i)
+                residual = entry - (dot_sum + dot_correction)
+                residual_scale = abs(entry) + dot_products
+                if not is_finite(residual) or not is_finite(residual_scale)
+                    or (residual_scale > 0.0 and abs(residual) > relative_tolerance * residual_scale)
+                {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                lower.set(row, i, 0.0)
+            }
+        } else {
+            diagonal_factor = sqrt(pivot)
+            if not is_finite(diagonal_factor) or diagonal_factor == 0.0 {
+                return Err("covariance matrix could not be stably factorized")
+            }
+            lower.set(i, i, diagonal_factor)
+            for row in i + 1 until n {
+                mut dot_sum = 0.0
+                mut dot_correction = 0.0
+                for k in 0 until i {
+                    left_factor = lower.get(row, k)
+                    right_factor = lower.get(i, k)
+                    term = left_factor * right_factor
+                    if left_factor != 0.0 and right_factor != 0.0 and term == 0.0 {
+                        return Err("covariance matrix factorization underflows Float range")
+                    }
+                    next_sum = dot_sum + term
+                    mut residual = 0.0
+                    if abs(dot_sum) >= abs(term) {
+                        residual = (dot_sum - next_sum) + term
+                    } else {
+                        residual = (term - next_sum) + dot_sum
+                    }
+                    dot_correction = dot_correction + residual
+                    dot_sum = next_sum
+                }
+                entry = covariance_symmetric_entry(matrix, row, i)
+                residual_value = entry - (dot_sum + dot_correction)
+                factor = residual_value / diagonal_factor
+                if not is_finite(factor) {
+                    return Err("covariance matrix could not be stably factorized")
+                }
+                if residual_value != 0.0 and factor == 0.0 {
+                    return Err("covariance matrix factorization underflows Float range")
+                }
+                lower.set(row, i, factor)
+            }
+        }
+    }
+    Ok(lower)
+}
+
 /// Return J·Σ·Jᵀ for the sources currently present in a scalar measurement.
 /// Unused covariance sources have zero sensitivity; every used source must be
 /// present and its diagonal variance must match the recorded standard sigma.
@@ -1058,73 +1193,68 @@ pub fn variance_with_covariance(
         }
     }
 
-    mut variance = 0.0
-    mut variance_correction = 0.0
-    mut absolute_sum = 0.0
+    mut gradient_scale = 0.0
     for i in 0 until n {
-        mut row_sum = 0.0
-        mut row_correction = 0.0
-        for j in 0 until n {
-            mut covariance_entry = model.matrix.get(i, j)
-            if i != j {
-                covariance_entry = covariance_midpoint(
-                    model.matrix.get(j, i),
-                    model.matrix.get(i, j)
-                )
-            }
-            row_term = covariance_entry * gradient[j]
-            if not is_finite(row_term) {
-                return Err("propagated covariance variance must be finite")
-            }
-            next_row_sum = row_sum + row_term
-            mut row_residual = 0.0
-            if abs(row_sum) >= abs(row_term) {
-                row_residual = (row_sum - next_row_sum) + row_term
-            } else {
-                row_residual = (row_term - next_row_sum) + row_sum
-            }
-            row_correction = row_correction + row_residual
-            row_sum = next_row_sum
-            if not is_finite(row_sum) or not is_finite(row_correction) {
-                return Err("propagated covariance variance must be finite")
-            }
-
-            term = gradient[i] * row_term
+        if abs(gradient[i]) > gradient_scale {
+            gradient_scale = abs(gradient[i])
+        }
+    }
+    if gradient_scale == 0.0 {
+        return Ok(0.0)
+    }
+    factor = match covariance_semidefinite_factor(model.matrix, model.relative_tolerance) {
+        Ok(value) => value,
+        Err(message) => {
+            return Err(message)
+        },
+    }
+    mut variance = 0.0
+    for column in 0 until n {
+        mut projection = 0.0
+        mut projection_correction = 0.0
+        for row in column until n {
+            normalized_gradient = gradient[row] / gradient_scale
+            factor_entry = factor.get(row, column)
+            term = factor_entry * normalized_gradient
             if not is_finite(term) {
                 return Err("propagated covariance variance must be finite")
             }
-            absolute_sum = absolute_sum + abs(term)
-            if not is_finite(absolute_sum) {
+            if (gradient[row] != 0.0 and normalized_gradient == 0.0)
+                or (factor_entry != 0.0 and normalized_gradient != 0.0 and term == 0.0)
+            {
+                return Err("propagated covariance projection underflows Float range")
+            }
+            next_projection = projection + term
+            mut residual = 0.0
+            if abs(projection) >= abs(term) {
+                residual = (projection - next_projection) + term
+            } else {
+                residual = (term - next_projection) + projection
+            }
+            projection_correction = projection_correction + residual
+            projection = next_projection
+            if not is_finite(projection) or not is_finite(projection_correction) {
                 return Err("propagated covariance variance must be finite")
             }
         }
-        row_value = row_sum + row_correction
-        outer_term = gradient[i] * row_value
-        if not is_finite(row_value) or not is_finite(outer_term) {
+        scaled_projection = projection + projection_correction
+        propagated_sigma = scaled_projection * gradient_scale
+        contribution_variance = propagated_sigma * propagated_sigma
+        if not is_finite(scaled_projection) or not is_finite(propagated_sigma)
+            or not is_finite(contribution_variance)
+        {
             return Err("propagated covariance variance must be finite")
         }
-        next_variance = variance + outer_term
-        mut variance_residual = 0.0
-        if abs(variance) >= abs(outer_term) {
-            variance_residual = (variance - next_variance) + outer_term
-        } else {
-            variance_residual = (outer_term - next_variance) + variance
+        if scaled_projection != 0.0 and gradient_scale != 0.0 and propagated_sigma == 0.0 {
+            return Err("propagated covariance uncertainty underflows Float range")
         }
-        variance_correction = variance_correction + variance_residual
-        variance = next_variance
-        if not is_finite(variance) or not is_finite(variance_correction) {
+        if propagated_sigma != 0.0 and contribution_variance == 0.0 {
+            return Err("propagated covariance variance underflows Float range")
+        }
+        variance = variance + contribution_variance
+        if not is_finite(variance) {
             return Err("propagated covariance variance must be finite")
         }
-    }
-    variance = variance + variance_correction
-    if not is_finite(variance) {
-        return Err("propagated covariance variance must be finite")
-    }
-    if variance < 0.0 {
-        if absolute_sum == 0.0 or abs(variance) > model.relative_tolerance * absolute_sum {
-            return Err("propagated covariance variance is negative")
-        }
-        variance = 0.0
     }
     Ok(variance)
 }
