@@ -1338,9 +1338,19 @@ pub fn variance_with_covariance(
     for column in 0 until n {
         mut projection = 0.0
         mut projection_correction = 0.0
+        mut projection_term_magnitude = 0.0
+        mut projection_has_inexact_factor = false
         for row in column until n {
             normalized_contribution = standardized_contributions[row] / contribution_power_scale
             factor_entry = factor.get(row, column)
+            // Scaling by a power of two is exact for normal binary floats, but
+            // can discard significant bits when a nonzero value becomes
+            // subnormal. Refuse that lossy normalization explicitly.
+            if contribution_power_scale > 1.0 and normalized_contribution != 0.0
+                and abs(normalized_contribution) < 2.2250738585072014e-308
+            {
+                return Err("propagated covariance contribution normalization loses subnormal precision")
+            }
             term = factor_entry * normalized_contribution
             if not is_finite(term) {
                 return Err("propagated covariance variance must be finite")
@@ -1349,6 +1359,15 @@ pub fn variance_with_covariance(
                 or (factor_entry != 0.0 and normalized_contribution != 0.0 and term == 0.0)
             {
                 return Err("propagated covariance projection underflows Float range")
+            }
+            projection_term_magnitude = projection_term_magnitude + abs(term)
+            if not is_finite(projection_term_magnitude) {
+                return Err("propagated covariance variance must be finite")
+            }
+            if factor_entry != 0.0 and normalized_contribution != 0.0
+                and factor_entry != 1.0 and factor_entry != -1.0
+            {
+                projection_has_inexact_factor = true
             }
             next_projection = projection + term
             mut residual = 0.0
@@ -1364,6 +1383,23 @@ pub fn variance_with_covariance(
             }
         }
         scaled_projection = projection + projection_correction
+        if projection_has_inexact_factor and projection_term_magnitude > 0.0 {
+            // The input tolerance bounds accepted covariance perturbations.
+            // Use at least 64 Float epsilons for the factor, products, and
+            // compensated accumulation; smaller cancellation residuals cannot
+            // be distinguished reliably from their rounding error.
+            mut projection_resolution = model.relative_tolerance
+            if projection_resolution < 1.4210854715202004e-14 {
+                projection_resolution = 1.4210854715202004e-14
+            }
+            projection_limit = projection_term_magnitude * projection_resolution
+            if not is_finite(projection_limit) {
+                return Err("propagated covariance variance must be finite")
+            }
+            if abs(scaled_projection) <= projection_limit {
+                return Err("propagated covariance projection is numerically unresolved")
+            }
+        }
         propagated_sigma = scaled_projection * contribution_power_scale
         contribution_variance = propagated_sigma * propagated_sigma
         if not is_finite(scaled_projection) or not is_finite(propagated_sigma)

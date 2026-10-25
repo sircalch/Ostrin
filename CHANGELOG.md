@@ -30,7 +30,10 @@
   large cancellation. Exact power-of-two normalization and compensated
   projections retain representable residual variance. Negative and numerically
   unresolved positive pivots reject the factorization instead of silently
-  changing singular covariance. `ostrinc --compile` disables C multiply-add
+  changing singular covariance. Projections whose residual falls below the
+  covariance tolerance or a 64-epsilon resolution floor are rejected when their
+  factors require rounded products; power-of-two normalization that loses
+  subnormal contribution precision is also rejected. `ostrinc --compile` disables C multiply-add
   contraction to preserve these rounding steps. Regressions cover singular
   `sqrt(3)` covariance and a 16-unit residual after cancellation, with analytical
   oracle, interpreter/native parity, leak-check and optimized WASI execution;

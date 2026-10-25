@@ -314,7 +314,12 @@ un pivote negativo, cancelación numéricamente irresuelta o una proyección sub
 un error explícito en vez de informar una incertidumbre incorrecta. Las contribuciones se
 normalizan usando una potencia de dos exacta para conservar diferencias representables. Los
 pivotes positivos numéricamente irresueltos también se rechazan en vez de introducir una componente
-espuria en matrices casi singulares. Los intermedios no finitos también se rechazan.
+espuria en matrices casi singulares. La normalización que convierte una contribución no nula en
+subnormal se rechaza porque puede perder una fracción significativa de su valor. En cada proyección
+con coeficientes no exactos, también se rechaza una cancelación cuyo residuo sea menor que la
+tolerancia del modelo (con un piso de 64 epsilons de `Float`) por la suma de magnitudes de sus
+términos. Esto mantiene explícito el límite de resolución en vez de reportar incertidumbre falsa.
+Los intermedios no finitos también se rechazan.
 `ostrinc --compile` desactiva la contracción de multiplicación-suma del
 compilador C (`-ffp-contract=off`): el backend WASI optimizado había fusionado operaciones y borrado
 residuos que la suma compensada necesita preservar. La matriz Node WASI incluye estos casos de

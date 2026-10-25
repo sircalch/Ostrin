@@ -198,6 +198,50 @@ fn main() -> Void {
     }
     print("direct contribution cancellation variance = " + rounded(measurements.variance_with_covariance(division_loss_measurement, division_loss_covariance).unwrap()).to_string())
 
+    // Exact correlation-factor projections are 0 and -16 (variance 256), but
+    // the rounded coefficients cannot resolve that residual safely.
+    rounded_factor_covariance = measurements.covariance(
+        ["projection-a", "projection-b", "projection-c"],
+        array([
+            [1.0, 0.0, 35.0],
+            [0.0, 1.0, 12.0],
+            [35.0, 12.0, 1369.0]
+        ])
+    ).unwrap()
+    projection_a = measurements.from_source(0.0, 1.0, "projection-a", "projection source A")
+    projection_b = measurements.from_source(0.0, 1.0, "projection-b", "projection source B")
+    projection_c = measurements.from_source(0.0, 37.0, "projection-c", "projection source C")
+    projection_a_scaled = measurements.scale(projection_a.unwrap(), 350000000000000000.0)
+    projection_b_scaled = measurements.scale(projection_b.unwrap(), 119999999999999984.0)
+    projection_c_scaled = measurements.scale(projection_c.unwrap(), -10000000000000000.0)
+    projection_ab = measurements.add(projection_a_scaled, projection_b_scaled).unwrap()
+    rounded_factor_projection = measurements.add(projection_ab, projection_c_scaled).unwrap()
+    match measurements.variance_with_covariance(rounded_factor_projection, rounded_factor_covariance) {
+        Ok(value) => print("rounded factor projection = " + rounded(value).to_string()),
+        Err(message) => print("rounded factor projection = " + message),
+    }
+
+    subnormal_normalization_covariance = measurements.covariance(
+        ["normalization-large", "normalization-middle", "normalization-negative"],
+        array([
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ])
+    ).unwrap()
+    normalization_large_source = measurements.from_source(0.0, 1.0, "normalization-large", "large contribution")
+    normalization_middle_source = measurements.from_source(0.0, 1.0, "normalization-middle", "small residual")
+    normalization_negative_source = measurements.from_source(0.0, 1.0, "normalization-negative", "negative contribution")
+    normalization_large = measurements.scale(normalization_large_source.unwrap(), 1e308)
+    normalization_middle = measurements.scale(normalization_middle_source.unwrap(), 1e-15)
+    normalization_negative = measurements.scale(normalization_negative_source.unwrap(), -1e308)
+    normalization_pair = measurements.add(normalization_large, normalization_middle).unwrap()
+    subnormal_normalization = measurements.add(normalization_pair, normalization_negative).unwrap()
+    match measurements.variance_with_covariance(subnormal_normalization, subnormal_normalization_covariance) {
+        Ok(value) => print("subnormal contribution normalization = " + value.to_string()),
+        Err(message) => print("subnormal contribution normalization = " + message),
+    }
+
     nonuniform_rank_one = measurements.covariance(
         ["rank-a", "rank-b", "rank-c", "rank-d"],
         array([
