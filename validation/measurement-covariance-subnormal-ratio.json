@@ -1,0 +1,123 @@
+{
+  "schema": "ostrin.measurement-covariance-review-evidence/v1",
+  "reviewFinding": {
+    "pullRequest": 234,
+    "url": "https://github.com/sircalch/Ostrin/pull/234#discussion_r4370078465",
+    "severity": "P2",
+    "summary": "Avoid subnormal precision loss in the variance ratio"
+  },
+  "sourceRevision": "140a53dea5ef46f92dc687c657c5b37988ddf3c4",
+  "releaseTag": "v0.2.0",
+  "releaseArtifactsChanged": false,
+  "regression": {
+    "covariance": [
+      [1e300, 8.660254037844386e137],
+      [8.660254037844386e137, 3e-24]
+    ],
+    "standardDeviations": ["sqrt(1e300)", "sqrt(3e-24)"],
+    "expectedCorrelation": 0.5,
+    "expectedPropagatedVariance": 3,
+    "oracle": "independent Float64 calculation of covariance divided by the product of the two diagonal square roots"
+  },
+  "implementation": {
+    "path": "compiler/std/measurements.ostrin",
+    "function": "covariance_correlation_matrix",
+    "method": "Compute the geometric-mean scale as sqrt(row variance) * sqrt(column variance), reusing the already validated standard deviations; reject nonzero covariance when its scale is not representable as a finite positive Float."
+  },
+  "localValidation": {
+    "environment": {
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v24.19.0"
+    },
+    "commands": [
+      {
+        "command": "cargo fmt -- --check",
+        "result": "passed"
+      },
+      {
+        "command": "cargo test",
+        "result": "passed",
+        "unitTests": 33,
+        "differentialTests": 6,
+        "integrationTests": 383,
+        "totalTests": 422
+      },
+      {
+        "command": "node scripts/wasi-program-check.mjs",
+        "result": "passed",
+        "programs": 32
+      },
+      {
+        "command": "node scripts/measurement-contract-check.mjs && node --test scripts/measurement-contract-check.test.mjs",
+        "result": "passed",
+        "mutationTests": 18
+      },
+      {
+        "command": "node scripts/project-plan-check.mjs",
+        "result": "passed",
+        "irBodies": 7220,
+        "hirBodies": 41,
+        "astFallbacks": 0
+      },
+      {
+        "command": "node scripts/website-check.mjs",
+        "result": "passed",
+        "publicPages": 17,
+        "examples": 305,
+        "integrationTests": 383,
+        "wasmArtifact": true
+      },
+      {
+        "command": "node scripts/lab-data.mjs --verify-replays",
+        "result": "passed",
+        "demos": 12,
+        "figureReplays": 29
+      },
+      {
+        "command": "node scripts/linguist-check.mjs",
+        "result": "passed",
+        "sampleCandidates": 7,
+        "examples": 305
+      },
+      {
+        "command": "node scripts/distribution-check.mjs",
+        "result": "passed"
+      },
+      {
+        "command": "node scripts/numeric-validation.mjs",
+        "result": "passed",
+        "reportValues": 80,
+        "emittedValues": 136,
+        "maximumAbsoluteDifference": 0,
+        "leakCheck": "live_allocations=0"
+      },
+      {
+        "command": "node scripts/v0.2-readiness-check.mjs",
+        "result": "passed",
+        "readyCriteria": 12,
+        "totalCriteria": 12
+      }
+    ],
+    "r3": {
+      "status": "OPEN",
+      "baseBundles": 29,
+      "hostCaptures": 0,
+      "experimentLevels": ["R0", "R1", "R2"],
+      "crossPlatformReproducibilityClaim": false
+    },
+    "performanceAssessment": "No benchmark was run for this correctness fix; it reuses the standard deviations already computed during validation. No performance claim is made."
+  },
+  "pendingExternalValidation": {
+    "exactHeadCi": true,
+    "exactHeadFreshReview": true,
+    "asan": true,
+    "ubsan": true,
+    "merge": "Conditionally authorized only after required checks pass and fresh review has no substantive findings."
+  },
+  "limitations": [
+    "SourceCovariance remains experimental and limited to dense matrices for at most 64 dimensionless scalar sources.",
+    "Covariance propagation for Measurement<Quantity<D>>, Measurement arrays, array reductions and unsupported measurement states remains unsupported.",
+    "This local validation does not close R3 or establish cross-platform reproducibility."
+  ]
+}
