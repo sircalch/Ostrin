@@ -310,7 +310,9 @@ directamente con las contribuciones guardadas `cₛ = Jₛ · sigmaₛ`: `c · R
 se convierten con la media geométrica `sqrt(Σᵢᵢ) · sqrt(Σⱼⱼ)`. Esta forma evita formar primero el
 cociente entre varianzas, que puede redondearse a subnormal y distorsionar una correlación aunque
 el denominador final sea normal. Una covarianza no nula se rechaza si esa escala geométrica no
-puede representarse como un valor positivo y finito. Si un coeficiente menor
+puede representarse como un valor positivo y finito. También se rechaza si el producto mismo queda
+subnormal con varianzas distintas, porque sus pocos bits no resuelven la correlación; para diagonales
+iguales se usa la varianza directamente. Si un coeficiente menor
 que `1` queda dentro de la tolerancia numérica de una dependencia perfecta, se rechaza como
 irresuelto en vez de redondearlo a `1` y borrar la varianza residual. La matriz `R = L · Lᵀ` se
 factoriza y cada proyección `Lᵀ · c` usa suma

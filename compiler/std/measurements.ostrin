@@ -995,8 +995,9 @@ fn covariance_symmetric_entry(matrix: Array<Float>, row: Int, column: Int) -> Fl
     covariance_midpoint(matrix.get(row, column), matrix.get(column, row))
 }
 
-/// Convert covariance entries to a dimensionless correlation matrix without
-/// multiplying standard deviations, which could overflow or underflow.
+/// Convert covariance entries to correlations using a scale-safe product of
+/// standard deviations, rejecting subnormal unequal-variance scales that
+/// cannot resolve the input correlation reliably.
 fn covariance_correlation_matrix(
     matrix: Array<Float>,
     relative_tolerance: Float
@@ -1017,6 +1018,7 @@ fn covariance_correlation_matrix(
             column_variance = covariance_symmetric_entry(matrix, j, j)
             entry = covariance_symmetric_entry(matrix, i, j)
             mut coefficient = 0.0
+            mut covariance_scale = 0.0
             if not is_finite(column_variance) or column_variance < 0.0 {
                 return Err("covariance matrix could not be stably factorized")
             }
@@ -1031,8 +1033,19 @@ fn covariance_correlation_matrix(
                 // mean of the variances. Multiplying the roots avoids first
                 // forming a variance ratio that can underflow to a subnormal
                 // and distort the correlation before the square root.
-                covariance_scale = row_sigma * column_sigma
+                if row_variance == column_variance {
+                    covariance_scale = row_variance
+                } else {
+                    covariance_scale = row_sigma * column_sigma
+                }
                 if covariance_scale > 0.0 and is_finite(covariance_scale) {
+                    if entry != 0.0 and row_variance != column_variance
+                        and covariance_scale < 2.2250738585072014e-308
+                    {
+                        // A subnormal geometric scale has too few significant
+                        // bits to resolve an unequal-variance correlation.
+                        return Err("covariance correlation is numerically unresolved")
+                    }
                     // Divide by the scale-safe geometric mean directly. Two
                     // successive divisions can round a sub-unit correlation
                     // up to exactly 1 and erase its positive residual.

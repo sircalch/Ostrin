@@ -19271,6 +19271,9 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     assert!((subnormal_variance_ratio_correlation - 0.5).abs() < 1e-15);
     let subnormal_variance_ratio_oracle = 2.0 + 2.0 * subnormal_variance_ratio_correlation;
     assert!((subnormal_variance_ratio_oracle - 3.0).abs() < 1e-14);
+    let subnormal_geometric_scale_correlation = 1.0_f64 / 3.0_f64.sqrt();
+    let subnormal_geometric_scale_oracle = 2.0 + 2.0 * subnormal_geometric_scale_correlation;
+    assert!((subnormal_geometric_scale_oracle - 3.154_700_538_379_251_5).abs() < 1e-15);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19292,6 +19295,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          unresolved positive pivot = covariance correlation is numerically unresolved\n\
          near-perfect covariance residual variance = covariance correlation is numerically unresolved\n\
          subnormal variance ratio covariance variance = 3\n\
+         subnormal geometric covariance scale = covariance correlation is numerically unresolved\n\
          direct contribution cancellation variance = 16\n\
          rounded factor projection = propagated covariance projection is numerically unresolved\n\
          subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\

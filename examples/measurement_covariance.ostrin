@@ -201,6 +201,25 @@ fn main() -> Void {
     subnormal_ratio_sum = measurements.add(subnormal_ratio_large_contribution, subnormal_ratio_small_contribution).unwrap()
     print("subnormal variance ratio covariance variance = " + rounded(measurements.variance_with_covariance(subnormal_ratio_sum, subnormal_ratio_covariance).unwrap()).to_string())
 
+    subnormal_scale_covariance = measurements.covariance(
+        ["subnormal-scale-small", "subnormal-scale-large"],
+        array([
+            [5e-324, 5e-324],
+            [5e-324, 1.5e-323]
+        ])
+    ).unwrap()
+    subnormal_scale_small_sigma = sqrt(5e-324)
+    subnormal_scale_large_sigma = sqrt(1.5e-323)
+    subnormal_scale_small = measurements.from_source(0.0, subnormal_scale_small_sigma, "subnormal-scale-small", "small subnormal variance")
+    subnormal_scale_large = measurements.from_source(0.0, subnormal_scale_large_sigma, "subnormal-scale-large", "large subnormal variance")
+    subnormal_scale_small_contribution = measurements.scale(subnormal_scale_small.unwrap(), 1.0 / subnormal_scale_small_sigma)
+    subnormal_scale_large_contribution = measurements.scale(subnormal_scale_large.unwrap(), 1.0 / subnormal_scale_large_sigma)
+    subnormal_scale_sum = measurements.add(subnormal_scale_small_contribution, subnormal_scale_large_contribution).unwrap()
+    match measurements.variance_with_covariance(subnormal_scale_sum, subnormal_scale_covariance) {
+        Ok(value) => print("subnormal geometric covariance scale = " + rounded(value).to_string()),
+        Err(message) => print("subnormal geometric covariance scale = " + message),
+    }
+
     division_loss_covariance = measurements.covariance(
         ["division-loss-a", "division-loss-b"],
         array([
