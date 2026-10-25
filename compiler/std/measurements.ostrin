@@ -1344,7 +1344,16 @@ pub fn variance_with_covariance(
         if source_sigma != 0.0 {
             diagonal = covariance_symmetric_entry(model.matrix, i, i)
             expected_variance = source_sigma * source_sigma
-            if diagonal != expected_variance {
+            mut contribution_needs_adjustment = diagonal != expected_variance
+            if expected_variance > 0.0 and expected_variance < 2.2250738585072014e-308
+                and sqrt(diagonal) != source_sigma
+            {
+                // Distinct source roots can square to the same subnormal Float.
+                // Preserve that root-space adjustment so cancellation is not
+                // incorrectly certified as exact after rounding.
+                contribution_needs_adjustment = true
+            }
+            if contribution_needs_adjustment {
                 if diagonal < 0.0 {
                     return Err("covariance matrix could not be stably factorized")
                 }

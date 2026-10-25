@@ -315,6 +315,13 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     let result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
+    writeFileSync(stdFile, std.replace(
+      "and sqrt(diagonal) != source_sigma",
+      "and sqrt(diagonal) == source_sigma",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
     writeFileSync(stdFile, std);
     writeFileSync(stdFile, std.replace("relative_tolerance > 1e-6", "relative_tolerance > 1e-3"));
     result = validateMeasurementContract(root);

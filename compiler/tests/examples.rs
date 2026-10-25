@@ -19293,6 +19293,10 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
     // binary64 value represented by 3.3166247903554.
     let rounded_root_product_oracle = 0.235_978_214_230_015_98_f64;
     assert!(rounded_root_product_oracle > 0.2359 && rounded_root_product_oracle < 0.2361);
+    // 100-digit Decimal oracle using exact binary Float inputs and sqrt(5e-324).
+    let subnormal_rounded_square_adjustment_oracle = 4.930_380_657_631_321_6_f64;
+    assert!(subnormal_rounded_square_adjustment_oracle > 4.9);
+    assert!(subnormal_rounded_square_adjustment_oracle < 5.0);
     let rounded = |value: f64| ((value * 10_000.0).round() / 10_000.0).to_string();
     let expected = format!(
         "correlated sum variance = {}\n\
@@ -19321,6 +19325,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          direct contribution cancellation variance = 16\n\
          adjusted contribution cancellation = propagated covariance projection is numerically unresolved\n\
          equal rounded adjustment cancellation = propagated covariance projection is numerically unresolved\n\
+         subnormal rounded source squares = propagated covariance projection is numerically unresolved\n\
          rounded factor projection = propagated covariance projection is numerically unresolved\n\
          subnormal contribution normalization = propagated covariance contribution normalization loses subnormal precision\n\
          nonuniform rank-one covariance variance = 0.01\n\
