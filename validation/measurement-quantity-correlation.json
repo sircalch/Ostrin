@@ -2,7 +2,7 @@
   "schema": "ostrin.measurement-quantity-correlation/v1",
   "status": "experimental-bounded-profile",
   "baseRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-  "sourceRevision": "6c6c3aa55f0c38d5a5c633330f22f8705f5f8a34",
+  "sourceRevision": "c20b087dd727992c40a7871887dff9b9cb5624d1",
   "profile": {
     "api": "std.measurements.quantity_uncertainty_with_correlation",
     "measurement": "Measurement<Quantity<D>>",
@@ -32,6 +32,15 @@
       "exactVariance": "23283064365386962890625/2097152",
       "exactStandardUncertainty": "105367121.277235079467422420100100195301299681915115421502045",
       "expectedBehavior": "reject when tolerance canonicalization would round an asymmetric pair to exact dependence"
+    },
+    "lossyCoherentUnitConversion": {
+      "operation": "subtract measurements with distinct sources and perfectly correlated uncertainties",
+      "sourceSigmaCm": ["1000000000000000128", "1000000000000000256"],
+      "sourceContributionsCm": ["+1000000000000000128", "-1000000000000000256"],
+      "correlationMatrix": [[1, 1], [1, 1]],
+      "roundedCoherentContributionsM": ["+1.0000000000000002e16", "-1.0000000000000002e16"],
+      "exactResidualMeters": "128/100 = 32/25",
+      "expectedBehavior": "reject a zero covariance result when converting a nonzero contribution to coherent units fails its Float round trip"
     }
   },
   "observed": {
@@ -39,6 +48,7 @@
     "nativeOutput": "product dimension = Length*Time\nproduct standard uncertainty = 0.6082762530298219\n",
     "nativeLeakCheck": "live_allocations=0",
     "nearPerfectAsymmetricCorrelationOutput": "near-perfect contributions\nnear-length = 10000000000000000\nnear-time = -10000000000000000\nrounded perfect correlation = correlation coefficient is numerically unresolved\n",
+    "lossyCoherentUnitConversionOutput": "unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion\n",
     "nativeLowering": { "mainFunction": "IR", "astFallback": 0, "genericTypeDivergences": 0 },
     "wasi": { "target": "wasm32-wasip1", "matrixPassedPrograms": 33, "includedCase": "measurement_quantity_correlation" }
   },
@@ -54,7 +64,7 @@
     "fullCargoSuite": "not completed locally: the existing differential suite made no useful progress for several hours while compiling a large visualization example with GCC; that run was interrupted, and the focused Measurement test passed. Exact-head CI remains required."
   },
   "traceability": {
-    "sourceRevision": "6c6c3aa55f0c38d5a5c633330f22f8705f5f8a34",
+    "sourceRevision": "c20b087dd727992c40a7871887dff9b9cb5624d1",
     "evidenceCommit": "recorded by docs/program-state-m1.json after the evidence commit; omitted here to avoid self-reference"
   }
 }

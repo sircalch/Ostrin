@@ -367,6 +367,11 @@ Float redondea a `+1` o `-1` aunque alguno de los dos valores difiera del extrem
 borrar una incertidumbre residual. La regresión usa coeficientes `1.0` y `0.9999999999999999` con
 contribuciones `+1e16` y `-1e16`: el promedio racional exacto implica una incertidumbre de
 `105367121.277235079...`, por lo que el constructor devuelve un error explícito.
+La propagación dimensional también rechaza un resultado cero si convertir contribuciones a la
+unidad coherente perdió información: dos incertidumbres de `1000000000000000128 cm` y
+`1000000000000000256 cm`, opuestas por una resta y correlacionadas perfectamente, conservan un
+residuo exacto de `128/100 = 32/25 m`. Convertir cada término por separado a `Float` los redondea
+al mismo valor y ocultaría ese residuo; la operación devuelve un error de conversión no resuelta.
 Matrices de covarianza con unidades, arrays de mediciones, covarianza entre elementos y
 reducciones continúan sin soporte.
 

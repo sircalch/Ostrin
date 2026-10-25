@@ -440,6 +440,20 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     writeFileSync(stdFile, std.replace("correlation coefficient is numerically unresolved", "correlation coefficient accepted"));
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));
+
+    writeFileSync(testFile, tests.replace(
+      "unit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion",
+      "unit-conversion cancellation = 0",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));
+
+    writeFileSync(stdFile, std.replace(
+      "variance == 0.0 and has_nonzero_original_contribution and has_lossy_coherent_conversion",
+      "variance == 0.0 and has_nonzero_original_contribution and false",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("Measurement<Quantity<D>> correlation")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
