@@ -247,7 +247,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
             format!("Task_{}*", mangle_task_payload(&args[0], records))
         }
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
-            format!("{}*", array_name(ty).ok_or(())?)
+            format!("{}*", array_name(ty, records).ok_or(())?)
         }
         Ty::Applied(name, args)
             if name == "Option" && args.len() == 1 && option_supported(&args[0], records) =>
@@ -637,10 +637,28 @@ fn array_element(ty: &Ty) -> Option<&Ty> {
     }
 }
 
-/// The generated C array runtime currently has scalar numeric and boolean
-/// instantiations. Keep this predicate aligned with `Codegen::map_type` so
-/// IR can only select helpers that the final C program actually emits.
+fn measurement_type(ty: &Ty) -> bool {
+    matches!(
+        ty,
+        Ty::Applied(name, args)
+            if args.len() == 1
+                && (name == "Measurement" || name.ends_with("::Measurement"))
+    )
+}
+
+/// The generated C array runtime has scalar numeric/boolean instantiations and
+/// a structural ownership profile for `Array<Measurement<T>>`.
 fn array_supported(ty: &Ty) -> bool {
+    matches!(
+        array_element(ty),
+        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
+    ) || array_element(ty).is_some_and(measurement_type)
+}
+
+/// Numeric array kernels are deliberately narrower than the structural array
+/// runtime. Measurement arrays own managed records and currently expose only
+/// construction, indexing, slicing and shape operations.
+fn array_operator_supported(ty: &Ty) -> bool {
     matches!(
         array_element(ty),
         Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
@@ -654,19 +672,22 @@ fn list_array_supported(ty: &Ty) -> bool {
     matches!(
         array_element(ty),
         Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
-    )
+    ) || array_element(ty).is_some_and(measurement_type)
 }
 
-fn array_name(ty: &Ty) -> Option<String> {
+fn array_name(ty: &Ty, records: &RecordFields) -> Option<String> {
     array_element(ty)
         .filter(|element| {
             matches!(
                 **element,
                 Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_)
-            )
+            ) || measurement_type(element)
         })
         .map(|element| match element {
             Ty::Quantity(_) => "Array_Float".to_string(),
+            element if measurement_type(element) => {
+                format!("Array_{}", mangle_option_payload(element, records))
+            }
             _ => format!("Array_{}", mangle_scalar(element)),
         })
 }
@@ -876,6 +897,9 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
             match &args[0] {
                 Ty::Quantity(_) => "Array_Float".to_string(),
+                element if measurement_type(element) => {
+                    format!("Array_{}", mangle_option_payload(element, records))
+                }
                 element => format!("Array_{}", mangle_scalar(element)),
             }
         }
@@ -2186,7 +2210,7 @@ fn emit_instruction(
                 && value_ty(values, *operand)? == *ty
                 && array_supported(ty)
             {
-                let array_c_name = array_name(ty).ok_or(())?;
+                let array_c_name = array_name(ty, records).ok_or(())?;
                 out.push_str(&format!(
                     "    {} = {array_c_name}_not({});\n",
                     value_name(*dst),
@@ -2203,7 +2227,7 @@ fn emit_instruction(
                 && value_ty(values, *operand)? == *ty
                 && array_supported(ty)
             {
-                let array_c_name = array_name(ty).ok_or(())?;
+                let array_c_name = array_name(ty, records).ok_or(())?;
                 out.push_str(&format!(
                     "    {} = {array_c_name}_neg({});\n",
                     value_name(*dst),
@@ -2342,12 +2366,15 @@ fn emit_instruction(
                         _ => return Err(()),
                     };
                 if *ty != result_ty
-                    || !array_supported(&Ty::Applied("Array".to_string(), vec![element.clone()]))
+                    || !array_operator_supported(&Ty::Applied(
+                        "Array".to_string(),
+                        vec![element.clone()],
+                    ))
                 {
                     return Err(());
                 }
                 let array_ty = Ty::Applied("Array".to_string(), vec![element.clone()]);
-                let array_c_name = array_name(&array_ty).ok_or(())?;
+                let array_c_name = array_name(&array_ty, records).ok_or(())?;
                 let left_code = value_code(values, *left)?;
                 let right_code = value_code(values, *right)?;
                 let code = match function {
@@ -2785,7 +2812,8 @@ fn emit_instruction(
                         && *ty == Ty::Applied(name.clone(), args.clone())
                         && matches!(value_ty(values, *index)?, Ty::Applied(mask_name, mask_args) if mask_name == "Array" && mask_args.as_slice() == [Ty::Bool]) =>
                 {
-                    let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
+                    let array_c_name =
+                        array_name(&Ty::Applied(name, args.clone()), records).ok_or(())?;
                     let code = if matches!(args[0], Ty::Quantity(_)) {
                         // Quantity arrays use the Array_Float backing but keep
                         // one shared unit label on the array header.  The
@@ -2808,7 +2836,8 @@ fn emit_instruction(
                         && value_ty(values, *index)? == Ty::Int
                         && *ty == args[0] =>
                 {
-                    let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
+                    let array_c_name =
+                        array_name(&Ty::Applied(name, args.clone()), records).ok_or(())?;
                     let code = if quantity(&args[0]) {
                         format!(
                             "ostrin_qty_from_borrowed({array_c_name}_index1({object_code}, {index_code}), {object_code}->unit)"
@@ -3124,7 +3153,7 @@ fn emit_instruction(
                 {
                     let array_ty = Ty::Applied(name.clone(), array_args.clone());
                     let element = array_args[0].clone();
-                    let array_c_name = array_name(&array_ty).ok_or(())?;
+                    let array_c_name = array_name(&array_ty, records).ok_or(())?;
                     let codes = args
                         .iter()
                         .map(|arg| value_code(values, *arg))
@@ -3739,7 +3768,7 @@ fn emit_instruction(
                 {
                     return Err(());
                 }
-                let array_c_name = array_name(&left_ty).ok_or(())?;
+                let array_c_name = array_name(&left_ty, records).ok_or(())?;
                 format!("{array_c_name}_{callee}({}, {})", codes[0], codes[1])
             } else if callee == "rng"
                 && args.len() == 1
@@ -3755,7 +3784,7 @@ fn emit_instruction(
                 if name != "Array" || array_args.len() != 1 || !array_supported(ty) {
                     return Err(());
                 }
-                let array_c_name = array_name(ty).ok_or(())?;
+                let array_c_name = array_name(ty, records).ok_or(())?;
                 if quantity(&array_args[0]) && input_ty == Ty::List(Box::new(array_args[0].clone()))
                 {
                     let list_name =
@@ -3794,7 +3823,7 @@ fn emit_instruction(
                 {
                     return Err(());
                 }
-                let array_c_name = array_name(ty).ok_or(())?;
+                let array_c_name = array_name(ty, records).ok_or(())?;
                 format!("{array_c_name}_full({}, {})", codes[0], codes[1])
             } else if callee == "arange"
                 && args.len() == 2
@@ -3834,7 +3863,7 @@ fn emit_instruction(
                 };
                 let left_is_array = scalar_or_array(args[1])?;
                 let right_is_array = scalar_or_array(args[2])?;
-                let array_c_name = array_name(&result_ty).ok_or(())?;
+                let array_c_name = array_name(&result_ty, records).ok_or(())?;
                 let operand = |value: ValueId, is_array: bool, slot: &str| {
                     let code = value_code(values, value)?;
                     if is_array {
@@ -4045,7 +4074,7 @@ fn emit_instruction(
                         Ty::Int => "ostrin_abs_i64",
                         _ => return Err(()),
                     };
-                    let array_c_name = array_name(&arg_ty).ok_or(())?;
+                    let array_c_name = array_name(&arg_ty, records).ok_or(())?;
                     format!("{array_c_name}_map({}, {function})", codes[0])
                 } else {
                     match arg_ty {
@@ -4102,7 +4131,7 @@ fn emit_instruction(
                         Ty::Float32 => format!("{base}f"),
                         _ => return Err(()),
                     };
-                    let array_c_name = array_name(&arg_ty).ok_or(())?;
+                    let array_c_name = array_name(&arg_ty, records).ok_or(())?;
                     format!("{array_c_name}_map({}, {function})", codes[0])
                 } else {
                     let function = match arg_ty {
@@ -5209,7 +5238,7 @@ fn emit_instruction(
             if value_ty(values, inputs[1])? != Ty::Int || value_ty(values, inputs[2])? != Ty::Int {
                 return Err(());
             }
-            let array_c_name = array_name(&object_ty).ok_or(())?;
+            let array_c_name = array_name(&object_ty, records).ok_or(())?;
             let object = value_code(values, inputs[0])?;
             let start = value_code(values, inputs[1])?;
             let end = value_code(values, inputs[2])?;

@@ -13240,31 +13240,118 @@ fn temperature_point_conversion_rejects_overflow_in_interpreter_and_native() {
 }
 
 #[test]
-fn measurement_array_boundary_has_actionable_diagnostic() {
+fn measurement_array_structural_ownership_matches_interpreter_native_and_wasi() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(
-        !interpreted.status.success(),
-        "Array<Measurement<Float>> unexpectedly became interpreter-supported"
-    );
-    assert!(
-        stderr(&interpreted).contains("'array' expects a (nested) List of numbers or quantities"),
-        "interpreter array boundary diagnostic changed: {}",
+        interpreted.status.success(),
+        "Measurement array interpreter failed: {}",
         stderr(&interpreted)
     );
+    let expected = stdout(&interpreted);
+    assert!(
+        expected.contains("value: 2") && expected.contains("value: 3"),
+        "Measurement array display must preserve distinct elements: {expected}"
+    );
+    assert!(
+        expected.contains("2\n"),
+        "unexpected Measurement array output: {expected}"
+    );
 
-    let native = run(&["--native-type-report", &file]);
+    let report = run(&["--native-type-report", &file]);
     assert!(
-        !native.status.success(),
-        "Array<Measurement<Float>> unexpectedly became native-supported"
+        report.status.success(),
+        "Measurement array native type report failed: {}",
+        stderr(&report)
     );
+    let report_text = stdout(&report);
     assert!(
-        stderr(&native).contains(
-            "'array' of Measurement<T> is not supported by the native backend yet; use List<Measurement<T>>"
+        report_text.contains("ast-fallback: 0") && report_text.contains("divergences: 0"),
+        "Measurement array must lower through typed IR: {report_text}"
+    );
+
+    let exe = temp_artifact("measurement_array_structural.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compiled.status.success(),
+        "native Measurement array compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement array binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native Measurement array failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    let normalize_measurement_record_name = |output: String| {
+        output.replace(
+            "std.measurements::Measurement",
+            "std_measurements__Measurement",
+        )
+    };
+    assert_eq!(
+        normalize_measurement_record_name(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n")
         ),
-        "native array boundary diagnostic changed: {}",
-        stderr(&native)
+        normalize_measurement_record_name(expected),
+        "native Measurement array diverged"
     );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement array leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement array WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Array_std_measurements__Measurement__Float"),
+        "WASI output omitted Measurement array runtime"
+    );
+}
+
+#[test]
+fn measurement_array_numeric_operators_are_rejected_explicitly() {
+    for (case, expression) in [
+        ("addition", "values + values"),
+        ("comparison", "values < values"),
+    ] {
+        let source = format!(
+            r#"import std.measurements
+
+fn main() -> Void {{
+    values: Array<Measurement<Float>> = array([
+        measurements.exact(2.0),
+        measurements.exact(3.0)
+    ])
+    result = {expression}
+}}
+"#
+        );
+        let path = temp_source(&format!("measurement-array-{case}-error.ostrin"), &source);
+        let checked = run(&[&path]);
+        let _ = fs::remove_file(&path);
+        assert!(
+            !checked.status.success(),
+            "numeric Measurement array operator '{expression}' unexpectedly compiled"
+        );
+        let diagnostics = stderr(&checked);
+        assert!(
+            diagnostics.contains("E1042"),
+            "missing structural-only diagnostic for '{expression}': {diagnostics}"
+        );
+        assert!(
+            diagnostics.contains("structural access only"),
+            "diagnostic did not explain the supported profile for '{expression}': {diagnostics}"
+        );
+    }
 }
 
 #[test]

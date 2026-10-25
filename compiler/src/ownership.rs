@@ -1227,6 +1227,17 @@ fn is_fresh_array_mask_index(
     let Some((index_ty, _, _)) = definitions.get(index) else {
         return false;
     };
+    let measurement_element = match object_ty {
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 => {
+            matches!(
+                &args[0],
+                Ty::Applied(name, payload)
+                    if payload.len() == 1
+                        && (name == "Measurement" || name.ends_with("::Measurement"))
+            )
+        }
+        _ => false,
+    };
     object_ty == ty
         && matches!(
             object_ty,
@@ -1239,6 +1250,7 @@ fn is_fresh_array_mask_index(
                     args.as_slice(),
                     [Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_)]
                 )
+                    || measurement_element
         )
         && matches!(
             index_ty,

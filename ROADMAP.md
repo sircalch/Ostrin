@@ -225,8 +225,9 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    pero la ruta conserva un fallback AST y divergencias en el reporte de tipos. No se afirma lowering
    tipado completo ni ownership general: la instanciación directa de `div_quantity` para dimensiones
    iguales sigue siendo una frontera nativa. Este ciclo añade el rechazo de nominales no finitos al
-   convertir a unidades coherentes. Ownership/ABI nativos generales, `Array<Measurement<T>>`,
-   covarianzas parciales y Monte Carlo siguen abiertos.
+   convertir a unidades coherentes y un perfil estructural nativo para `Array<Measurement<Float>>`
+   (construcción, indexación, slicing y `to_list`) con paridad y cero fugas. Ownership/ABI nativos
+   generales, operaciones numéricas de arrays, covarianzas parciales y Monte Carlo siguen abiertos.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
    reproducible antes de fijar sintaxis pública. `ostrinc --effect-report` ya compone filas experimentales
