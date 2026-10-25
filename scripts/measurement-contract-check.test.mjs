@@ -320,6 +320,13 @@ test("the gate requires bounded scalar covariance evidence and explicit scope", 
     result = validateMeasurementContract(root);
     assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
 
+    writeFileSync(stdFile, std.replace(
+      "if source.source_sigma != 0.0 and expected_variance == 0.0 {",
+      "if source.source_sigma != 0.0 {",
+    ));
+    result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("bounded covariance validation")));
+
     writeFileSync(stdFile, std);
     const labFile = path.join(root, "scripts/lab-data.mjs");
     const lab = readFileSync(labFile, "utf8");

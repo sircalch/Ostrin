@@ -19274,6 +19274,7 @@ fn std_measurements_covariance_matches_analytic_oracle_and_wasi() {
          duplicate covariance id = covariance source ids must be unique\n\
          non-finite covariance = covariance entries must be finite\n\
          excessive covariance tolerance = covariance relative tolerance must not exceed 1e-6\n\
+         underflowed source variance = measurement source variance underflows Float range\n\
          source variance mismatch = covariance diagonal must match the measurement source sigma\n\
          missing source = covariance model is missing a measurement source id\n\
          unknown uncertainty = covariance propagation needs known measurement uncertainty\n",

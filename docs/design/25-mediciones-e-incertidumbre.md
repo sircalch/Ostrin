@@ -286,9 +286,10 @@ El perfil implementado `SourceCovariance` valida entre 1 y 64 IDs no vacíos y �
 tolerancia se promedian explícitamente antes de validar la semidefinitud y propagar. Se documenta
 este ajuste acotado para que el resultado no dependa de cuál mitad de la matriz se lea. Las
 diagonales de cada fuente usada deben coincidir
-con `sigma²` dentro de la misma tolerancia; las fuentes declaradas pero no usadas tienen gradiente
-cero. La matriz se vuelve a validar al propagar, porque sus arrays pueden cambiar después de la
-construcción. La fórmula es `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`; una varianza negativa
+con `sigma²` dentro de la misma tolerancia; si un `sigma` no nulo se eleva al cuadrado y subdesborda
+a cero en `Float`, la propagación se rechaza explícitamente en vez de tratar la fuente como exacta.
+Las fuentes declaradas pero no usadas tienen gradiente cero. La matriz se vuelve a validar al propagar,
+porque sus arrays pueden cambiar después de la construcción. La fórmula es `J · Σ · Jᵀ`, con `Jₛ = contributionₛ / sigmaₛ`; una varianza negativa
 mayor que el error de redondeo relativo se rechaza y solo se trunca a cero una negativa pequeña
 dentro de tolerancia. La API solo cubre `Measurement<Float>` con fuentes adimensionales; no acepta
 `Measurement<Quantity<D>>`, `Array<Measurement<T>>`, covarianza entre elementos ni reducciones.

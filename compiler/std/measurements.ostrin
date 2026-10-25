@@ -1025,6 +1025,9 @@ pub fn variance_with_covariance(
         if not is_finite(expected_variance) {
             return Err("measurement source variance must be finite")
         }
+        if source.source_sigma != 0.0 and expected_variance == 0.0 {
+            return Err("measurement source variance underflows Float range")
+        }
         diagonal = model.matrix.get(index, index)
         mut diagonal_scale = abs(expected_variance)
         if abs(diagonal) > diagonal_scale {

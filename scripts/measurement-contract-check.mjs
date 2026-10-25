@@ -104,6 +104,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /bounded SourceCovariance API for dimensionless scalar measurements using J·Σ·Jᵀ/i.test(lab)
       && /SourceCovariance is experimental and limited to dense covariance matrices for at most 64 dimensionless scalar sources/i.test(lab)
       && /its relative tolerance is at most 1e-6 \(default 1e-12\)/i.test(lab)
+      && /nonzero source sigma whose square underflows Float is rejected/i.test(lab)
       && /Covariance propagation for Measurement<Quantity<D>>, arrays and array reductions remains unsupported/i.test(lab),
     "scripts/lab-data.mjs: website Measurement covariance example or its experimental boundary is missing");
   const covarianceValidation = std.match(/fn covariance_validation_error\([\s\S]*?\n}\n/)?.[0] ?? "";
@@ -118,6 +119,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && /numeric\.eigen\(symmetric, absolute_tolerance\)/.test(covarianceValidation)
       && /covariance_validation_error\(model\.source_ids, model\.matrix, model\.relative_tolerance\)/.test(covariancePropagation)
       && /expected_variance = source\.source_sigma \* source\.source_sigma/.test(covariancePropagation)
+      && /source\.source_sigma != 0\.0 and expected_variance == 0\.0/.test(covariancePropagation)
       && /covariance diagonal must match the measurement source sigma/.test(covariancePropagation)
       && /term = gradient\[i\] \* covariance_entry \* gradient\[j\]/.test(covariancePropagation)
       && /variance is negative/.test(covariancePropagation),
@@ -125,6 +127,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
   check(errors, /SourceCovariance` valida entre 1 y 64 IDs[\s\S]{0,720}tolerancia relativa está acotada a[\s\S]{0,120}\(0, 1e-6\][\s\S]{0,1200}J · Σ · Jᵀ/i.test(design)
       && /los pares simétricos que difieren dentro de esa\s+tolerancia se promedian explícitamente/i.test(design)
       && /La matriz se vuelve a validar al propagar/i.test(design)
+      && /subdesborda[\s\S]{0,120}la propagación se rechaza explícitamente/i.test(design)
       && /no acepta[\s\S]{0,140}covarianza entre elementos/i.test(design),
     "docs/design/25-mediciones-e-incertidumbre.md: scalar covariance contract, mutation guard or scope boundary is incomplete");
   check(errors, tests.includes("std_measurements_covariance_matches_analytic_oracle_and_wasi")
@@ -134,6 +137,7 @@ export function validateMeasurementContract(root = repositoryRoot) {
       && covarianceExample.includes("measurements.variance_with_covariance")
       && covarianceExample.includes("indefinite covariance")
       && covarianceExample.includes("excessive covariance tolerance")
+      && covarianceExample.includes("underflowed source variance")
       && covarianceExample.includes("source variance mismatch"),
     "Measurement covariance: analytical oracle, runtime parity and validation regressions are missing");
   check(errors, tests.includes("measurement_array_structural_ownership_matches_interpreter_native_and_wasi")
