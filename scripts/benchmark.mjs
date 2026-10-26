@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import os from "node:os";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -194,8 +194,9 @@ function runtimeContextFor(sourcePath, index) {
   if (declaredInputs.length === 0) return { cwd: repo, inputs: [] };
 
   const stem = sourcePath.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
-  const cwd = join(outputDir, "runtime-inputs", `${stem}-${process.pid}-${index}`);
-  mkdirSync(cwd, { recursive: true });
+  const runtimeInputRoot = join(outputDir, "runtime-inputs");
+  mkdirSync(runtimeInputRoot, { recursive: true });
+  const cwd = mkdtempSync(join(runtimeInputRoot, `${stem}-${process.pid}-${index}-`));
   const inputs = declaredInputs.map(({ path: sourcePath, stagedAs }) => {
     const source = resolve(repo, sourcePath);
     if (!existsSync(source)) throw new Error(`runtime input not found: ${sourcePath}`);
