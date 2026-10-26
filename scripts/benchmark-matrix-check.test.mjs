@@ -58,3 +58,14 @@ test("the matrix requires exactly one report for each platform", () => {
   assert.ok(validateBenchmarkMatrix(matrix().slice(0, 2)).some((error) => error.includes("missing the win32 report")));
   assert.ok(validateBenchmarkMatrix([...matrix(), entry("linux")]).some((error) => error.includes("duplicate linux report")));
 });
+
+test("the matrix rejects duplicate workloads and runtime inputs inside a report", () => {
+  const duplicatedWorkload = matrix();
+  duplicatedWorkload[0].report.workloads.push({ ...duplicatedWorkload[0].report.workloads[0] });
+  assert.ok(validateBenchmarkMatrix(duplicatedWorkload).some((error) => error.includes("duplicate workload")));
+
+  const duplicatedInput = matrix();
+  const input = duplicatedInput[1].report.workloads[0].runtimeInputs[0];
+  duplicatedInput[1].report.workloads[0].runtimeInputs.push({ ...input });
+  assert.ok(validateBenchmarkMatrix(duplicatedInput).some((error) => error.includes("duplicate runtime input")));
+});

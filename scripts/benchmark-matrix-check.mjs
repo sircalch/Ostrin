@@ -17,7 +17,10 @@ function workloadMap(report, label, errors) {
   for (const workload of Array.isArray(workloads) ? workloads : []) {
     check(errors, typeof workload?.workload === "string" && workload.workload.length > 0,
       `${label}: workload path is missing`);
-    if (typeof workload?.workload === "string") map.set(workload.workload, workload);
+    if (typeof workload?.workload === "string") {
+      check(errors, !map.has(workload.workload), `${label}: duplicate workload ${workload.workload}`);
+      map.set(workload.workload, workload);
+    }
   }
   return map;
 }
@@ -30,6 +33,7 @@ function inputMap(workload, label, errors) {
     const key = `${input?.path}\0${input?.stagedAs}`;
     check(errors, typeof input?.path === "string" && typeof input?.stagedAs === "string",
       `${label}: runtime input path or staged name is missing`);
+    check(errors, !map.has(key), `${label}: duplicate runtime input ${key.replaceAll("\0", " → ")}`);
     map.set(key, input);
   }
   return map;
