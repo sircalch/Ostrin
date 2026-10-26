@@ -39,6 +39,7 @@ function fixture() {
     commit: "a".repeat(40),
     git: { commit: "a".repeat(40), clean: true },
     compiler: "compiler/target/release/ostrinc",
+    compilerSha256: "d".repeat(64),
     compilerVersion: "ostrinc 0.1.0",
     node: "v24.0.0",
     host: {
@@ -68,6 +69,7 @@ function fixture() {
       workload: relativeWorkload,
       sourceBytes: source.byteLength,
       sourceSha256: digest(source),
+      executableSha256: "e".repeat(64),
       runtimeInputs: [],
       outputBytes: 1,
       outputSha256: "b".repeat(64),

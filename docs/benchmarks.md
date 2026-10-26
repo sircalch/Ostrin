@@ -17,9 +17,9 @@ para observar el coste semántico de las unidades; no es una comparación con
 otros lenguajes. El runner comprueba además que sus valores numéricos coincidan
 dentro de una tolerancia declarada. Cada ejecución comprueba que ambos caminos impriman
 exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
-schema 3 incluye el hash exacto de cada fuente, commit y estado del checkout,
-sistema operativo, CPU, compilador C, defaults administrados por el compilador e
-inputs de flags, además de cada muestra y
+schema 3 incluye el hash exacto de cada fuente, compilador Ostrin y ejecutable
+nativo, commit y estado del checkout, sistema operativo, CPU, compilador C,
+defaults administrados por el compilador e inputs de flags, además de cada muestra y
 estadísticas de dispersión (mínimo, máximo, media, mediana, p95 y desviación
 estándar). El gate [`benchmark-contract-check.mjs`](../scripts/benchmark-contract-check.mjs)
 rechaza informes incompletos o inconsistentes. La memoria pico del proceso hijo y

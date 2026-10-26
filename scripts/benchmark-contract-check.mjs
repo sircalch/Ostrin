@@ -103,6 +103,7 @@ function validateWorkload(errors, workload, index, report, root) {
     }
   }
   check(errors, /^[a-f0-9]{64}$/.test(workload.sourceSha256 || ""), `${label}: sourceSha256 is not a SHA-256 digest`);
+  check(errors, /^[a-f0-9]{64}$/.test(workload.executableSha256 || ""), `${label}: executableSha256 is not a SHA-256 digest`);
   check(errors, /^[a-f0-9]{64}$/.test(workload.outputSha256 || ""), `${label}: outputSha256 is not a SHA-256 digest`);
   check(errors, Number.isInteger(report.iterations) && report.iterations >= 1, "report: iterations must be a positive integer");
   for (const mode of ["interpreter", "native"]) {
@@ -148,6 +149,7 @@ export function validateBenchmarkReport(report, root = repositoryRoot) {
   check(errors, /^[a-f0-9]{40}$/.test(report.commit || ""), "report: commit must be a full Git revision");
   check(errors, report.git && typeof report.git.clean === "boolean", "report: Git cleanliness is missing");
   check(errors, typeof report.compiler === "string" && report.compiler.length > 0, "report: compiler path is missing");
+  check(errors, /^[a-f0-9]{64}$/.test(report.compilerSha256 || ""), "report: compilerSha256 is not a SHA-256 digest");
   check(errors, typeof report.compilerVersion === "string" && report.compilerVersion.length > 0, "report: compiler version is missing");
   check(errors, /^v\d+/.test(report.node || ""), "report: Node.js version is missing");
   check(errors, Number.isInteger(report.iterations) && report.iterations >= 1, "report: iterations must be a positive integer");

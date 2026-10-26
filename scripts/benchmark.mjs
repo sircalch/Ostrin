@@ -70,6 +70,7 @@ const compiler = process.env.OSTRIN_COMPILER || join(repo, "compiler", "target",
 if (!existsSync(compiler)) {
   throw new Error(`compiler not found at ${compiler}; run cargo build --release --manifest-path compiler/Cargo.toml first`);
 }
+const compilerSha256 = outputHash(readFileSync(compiler));
 
 function run(command, args, label, cwd = repo) {
   const started = performance.now();
@@ -237,6 +238,7 @@ function benchmarkWorkload(sourcePath, index) {
     nativeCompileMs.push(compile.elapsedMs);
   }
   if (!existsSync(executable)) throw new Error(`native compilation did not create ${executable}`);
+  const executableSha256 = outputHash(readFileSync(executable));
 
   const expected = normalizeOutput(run(compiler, ["--run", source], `interpreter warmup ${sourcePath}`, runtimeContext.cwd).stdout);
   const nativeWarmup = normalizeOutput(run(executable, [], `native warmup ${sourcePath}`, runtimeContext.cwd).stdout);
@@ -268,6 +270,7 @@ function benchmarkWorkload(sourcePath, index) {
     workload: sourcePath.replaceAll("\\", "/"),
     sourceBytes: sourceBytes.byteLength,
     sourceSha256: outputHash(sourceBytes),
+    executableSha256,
     runtimeInputs: runtimeContext.inputs,
     outputBytes: Buffer.byteLength(expected),
     outputSha256: outputHash(expected),
@@ -302,6 +305,7 @@ const report = {
   commit: git.commit,
   git,
   compiler: relative(repo, compiler).replaceAll("\\", "/"),
+  compilerSha256,
   compilerVersion: run(compiler, ["--version"], "compiler version").stdout.trim(),
   node: process.version,
   host: hostMetadata(),
