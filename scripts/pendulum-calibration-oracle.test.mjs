@@ -71,6 +71,9 @@ export function pendulumCalibrationOracle(parameters) {
     ...fit,
     independentStandardUncertainty: Math.sqrt(independentVariance),
     standardUncertainty: Math.sqrt(totalVariance),
+    periodMarginalStandardUncertainty: Math.sqrt(
+      parameters.period_repeat_sigma_s ** 2 + parameters.clock_zero_sigma_s ** 2,
+    ),
     rulerZeroEffect,
     clockZeroEffect,
   };
@@ -85,6 +88,8 @@ test("pendulum workflow has a finite-difference oracle for its declared syntheti
   assert.ok(Math.abs(result.slope - 4.025) < 0.0001);
   assert.ok(Math.abs(result.rSquared - 0.999979) < 1e-6);
   assert.ok(Math.abs(result.independentStandardUncertainty - 0.04826689993) < 1e-9);
+  assert.ok(Math.abs(result.periodMarginalStandardUncertainty - 0.00208806130178211) < 1e-15);
+  assert.equal(result.periodMarginalStandardUncertainty.toFixed(4), "0.0021");
   assert.ok(Math.abs(result.rulerZeroEffect) < 1e-8, "a shared ruler zero shift should cancel in a fit with an intercept");
   assert.ok(Math.abs(result.clockZeroEffect) > 0, "a shared clock zero shift should affect period squared");
 });

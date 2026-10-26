@@ -92,6 +92,11 @@ fn analyze(
         print("input error: standard uncertainties must be non-negative")
         return
     }
+    period_marginal_uncertainty = sqrt(period_repeat_sigma * period_repeat_sigma + clock_zero_sigma * clock_zero_sigma)
+    if not is_finite(period_marginal_uncertainty) {
+        print("input error: combined period uncertainty is outside the finite range")
+        return
+    }
     if not is_finite(shared_source_correlation)
     or shared_source_correlation < -1.0 or shared_source_correlation > 1.0
     {
@@ -157,7 +162,7 @@ fn analyze(
                                 (i + 1).to_string(),
                                 four(length_value),
                                 four(period_inputs[i]),
-                                four(period_repeat_sigma),
+                                four(period_marginal_uncertainty),
                                 four(period_value),
                                 four(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution)),
                         ])

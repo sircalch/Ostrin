@@ -35,6 +35,11 @@ independent. This is first-order uncertainty propagation. The band in the plot
 shows ±2 residual standard deviations; it is not labeled as a confidence or
 prediction interval.
 
+The table's marginal `u(T)` combines repeatability and clock-zero uncertainty as
+`sqrt(sigma_repeat² + sigma_clock_zero²)`. The uncertainty in `T²` is propagated
+through the squared measurement while retaining the shared clock source, so its
+contribution remains correlated across readings.
+
 The independent implementation in
 `scripts/pendulum-calibration-oracle.test.mjs` uses centered OLS and symmetric
 finite differences instead of the Ostrin derivative expressions. The Rust

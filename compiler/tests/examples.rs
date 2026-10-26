@@ -12595,6 +12595,10 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
     assert_eq!(interpreted_report, expected);
     assert!(interpreted_svg.contains("Pendulum calibration · linearized model"));
     assert!(interpreted_svg.contains("Synthetic pendulum calibration inputs"));
+    assert!(
+        interpreted_svg.contains("0.0021"),
+        "the input table must include both repeatability and shared clock-offset uncertainty in u(T)"
+    );
     assert!(interpreted_svg.contains("data-table-row=\"5\""));
 
     let wasi_c = work.join("pendulum-wasi.c");
