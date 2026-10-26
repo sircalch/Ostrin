@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "aa3fb286910cb39f41fa6d755c6ea9dbca4dd91a",
-    "evidenceRevision": "a76e1ef3257913341203cfbe3a0bc7fe401972f7",
+    "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
+    "evidenceRevision": "6bc76d56b45bdd55408639685f17e0869d578c2d",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "lastValidatedRemotePullRequestHead": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
-    "lastObservedRemotePullRequestHead": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
+    "lastObservedRemotePullRequestHead": "275ce78e6279c6e79b6b1017ac1af8bdb6fc0ea8",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -82,13 +82,16 @@
     "local-validation-33-unit-6-differential-384-integration-passed-on-source-aa3fb28",
     "30-experiment-bundles-12-r1-r2-replays-website-linguist-project-plan-readiness-synchronized",
     "pr-235-a4a17ee-all-five-required-checks-green-fresh-review-no-substantive-findings-p2s-resolved",
-    "pr-236-7f4d90b-all-six-required-checks-green-fresh-review-no-findings"
+    "pr-236-7f4d90b-all-six-required-checks-green-fresh-review-no-findings",
+    "pr-237-p2-clock-offset-contribution-in-reported-period-uncertainty-fixed-source-b2143da",
+    "pr-237-source-b2143da-full-cargo-423-focused-js-67-project-plan-linguist-website-and-30-replays-pass",
+    "pr-237-evidence-6bc76d5-regenerated-all-30-provenance-bundles-r3-ledger-and-public-lab-svg"
   ],
   "currentPackage": {
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "local-validation-green; PR #237 opened at checkpoint head 6ff483d; state update and exact new-head CI/review pending; R3 remains OPEN",
+    "status": "P2 corrected locally on source b2143da; evidence/site regenerated on 6bc76d5; PR remote head 275ce78 has 3/5 workflows still running and one open P2 thread reviewed on 6ff483d; push checkpoint then require exact-head CI and fresh review; R3 remains OPEN",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -101,7 +104,9 @@
       "Full Cargo suite passed on the exact source tree: 33 unit, 6 differential and 384 integration tests.",
       "Focused test covers interpreter/native report and SVG parity, WASI C emission and native live_allocations=0.",
       "Independent centered-OLS and finite-difference oracle passed, including shared-offset cancellation and clock-uncertainty sensitivity.",
+      "Review P2 fixed: displayed marginal u(T) includes repeatability and shared clock-zero uncertainty; independent oracle and interpreter/native SVG assertion expect 0.0021 s.",
       "All 12 registered R1/R2 experiment replays passed, including pendulum-calibration.",
+      "All 30 source-backed SVG replays match their bundles after the source revision pin and website figure/data were regenerated.",
       "Website check passed: 17 public pages, 306 examples, 384 integration tests and WASM artifact.",
       "Project-plan check reports 7,261 HIR/IR bodies (7,220 IR + 41 HIR), zero AST fallback; Linguist reports 306 examples.",
       "R3 readiness is OPEN: 30/30 base contracts, 30/30 closed entry rows, 0/30 host captures, 12 R2, 18 R0, R3 scorecard 0.",
@@ -110,12 +115,12 @@
     "activePullRequests": [
       237
     ],
-    "sourceRevision": "aa3fb286910cb39f41fa6d755c6ea9dbca4dd91a",
-    "evidenceRevision": "a76e1ef3257913341203cfbe3a0bc7fe401972f7",
+    "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
+    "evidenceRevision": "6bc76d56b45bdd55408639685f17e0869d578c2d",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231"
   },
   "pending": [
-    "Commit and push the PR/checkpoint state update, then require fresh exact-head Ostrin CI, Browser audit, native ASan/UBSan, CodeQL, Security audit and Codex review.",
+    "Commit and push the corrected source, regenerated evidence/site and checkpoint; then require fresh exact-head Ostrin CI, Browser audit, native ASan/UBSan, CodeQL, Security audit and Codex review.",
     "PR #237 is open and mergeable; do not merge until explicit PR-specific authorization is confirmed.",
     "PR #235 and #236 remain open, fully green and reviewed; await explicit PR-specific integration authorization.",
     "Continue R3 contract and host-bound evidence for 30 bundles; local report remains 0/30 authentic host captures and R3=0.",
@@ -156,42 +161,49 @@
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Published v0.2.0 remains frozen; no tag or release action is authorized."
   ],
-  "next": "Record PR #237 in the authoritative checkpoint, push the new head, and wait for all required checks and a fresh review on that exact head. Keep all three PRs open pending explicit integration authorization.",
+  "next": "Push the corrected source/evidence/checkpoint for PR #237; reply to and resolve its obsolete P2 after the fix is visible, request fresh Codex review, and validate every required check on the resulting exact head. Keep PR #235, #236 and #237 open pending explicit integration authorization.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
+    "remoteHead": "275ce78e6279c6e79b6b1017ac1af8bdb6fc0ea8",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "runs": {
       "ostrinCi": {
-        "id": 40248688870,
+        "id": 40248805545,
         "status": "in_progress"
       },
       "browserAudit": {
-        "id": 40248688878,
+        "id": 40248805494,
         "status": "in_progress"
       },
       "nativeSanitizers": {
-        "id": 40248688887,
+        "id": 40248805491,
         "status": "in_progress"
       },
       "codeql": {
-        "id": 40248688872,
-        "status": "in_progress"
+        "id": 40248805533,
+        "status": "success"
       },
       "securityAudit": {
-        "id": 40248688871,
-        "status": "in_progress"
+        "id": 40248805604,
+        "status": "success"
       }
     },
-    "openReviewThreads": [],
+    "openReviewThreads": [
+      {
+        "id": "PRRT_kwDOUfdO4s6wGlfN",
+        "priority": "P2",
+        "reviewedHead": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
+        "status": "locally-fixed; reply and resolve after push"
+      }
+    ],
     "resolvedReviewThreads": [],
     "review": {
-      "status": "pending",
-      "head": null
+      "status": "commented-with-p2",
+      "head": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb"
     },
-    "note": "All five required workflows were running on head 6ff483d when observed. This checkpoint commit will create a new exact PR head; previous results do not validate that update."
+    "note": "Observed on remote head 275ce78: Ostrin CI, Browser audit and Native sanitizers were in progress; CodeQL and Security audit succeeded. The open P2 review was made on 6ff483d. The local source/evidence correction has not yet been pushed; none of these remote checks validates it."
   },
   "remotePullRequestObservations": [
     {
@@ -239,21 +251,21 @@
     {
       "number": 237,
       "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "head": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
+      "head": "275ce78e6279c6e79b6b1017ac1af8bdb6fc0ea8",
       "base": "69c962dee40a4b12606d131df0e8655b90924516",
       "state": "open-mergeable",
       "checks": {
         "ostrinCi": "in_progress",
         "browserAudit": "in_progress",
         "nativeSanitizers": "in_progress",
-        "codeql": "in_progress",
-        "securityAudit": "in_progress"
+        "codeql": "success",
+        "securityAudit": "success"
       },
       "review": {
-        "status": "pending",
-        "openThreads": 0
+      "status": "commented-with-p2-reviewed-on-6ff483d; local-fix-not-yet-pushed",
+        "openThreads": 1
       },
-      "note": "PR created after local validation; this checkpoint update will supersede this head, so all checks must be re-read on the resulting exact head."
+      "note": "Local correction on b2143da and regenerated evidence on 6bc76d5 are not yet pushed; remote head 275ce78 checks do not validate them. Require fresh exact-head CI and review after push."
     }
   ]
 }
