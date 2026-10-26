@@ -13,7 +13,7 @@
     "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
     "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
-    "lastValidatedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
+    "lastValidatedRemotePullRequestHead": "f7bdd32526d38900eee234eeb67feca39d950529",
     "lastObservedRemotePullRequestHead": "f7bdd32526d38900eee234eeb67feca39d950529",
     "releaseTag": "v0.2.0"
   },
@@ -94,13 +94,14 @@
     "m1-pendulum-performance-windows-x64-recorded-5-compile-and-7-interpreter-native-samples-on-61ea27c",
     "pr237-e76f2fc-browser-artifact-replayed-all-30-bundles-tested-sha-70e5b4c",
     "benchmark-workload-path-canonicalization-two-regressions-and-local-windows-5-compile-7-interpreter-native-run",
-    "benchmark-relative-compiler-override-local-run-and-analysis-error-output-guard-15-tests"
+    "benchmark-relative-compiler-override-local-run-and-analysis-error-output-guard-15-tests",
+    "pr237-f7bdd32-cross-platform-normalized-hash-and-output-gate-green-after-windows-retry; browser-artifact-replay-all-30-and-read-random-evidence-verified"
   ],
   "currentPackage": {
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 remains OPEN/MERGEABLE at remote head f7bdd32526d38900eee234eeb67feca39d950529, base 69c962dee40a4b12606d131df0e8655b90924516. Compiler benchmarks passed on Linux, macOS, and Windows after retrying Windows job 121701086049; cross-platform provenance aggregation job 121702374533 passed. Security audit, CodeQL, and Browser audit passed. Browser run 40359011330 replayed all 30 R0/R1/R2 bundles from the downloaded candidate artifact; the archived read/random evidence matched all 30. Its verified evidence artifact is 12668290322 (GitHub digest sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0). Ostrin CI still has Windows compiler tests in progress; ASan is in progress and UBSan passed. Local duplicate-entry guard is committed as aeb54c046e5dc0dce28cb670d417079ef28ede45 with 23 focused benchmark JS tests and local benchmark/web/project-plan/Linguist/readiness gates passing; this commit is not pushed or remotely validated. Latest formal review remains stale at af2044d with two outdated P2 threads open. Global R3 remains 0; this run is host-bound supported-scope evidence, not cross-platform equivalence. Keep PR #237 open.",
+    "status": "PR #237 is OPEN/MERGEABLE at remote head f7bdd32526d38900eee234eeb67feca39d950529, base 69c962dee40a4b12606d131df0e8655b90924516. All six exact-head workflows passed: Ostrin CI 40359011293, Browser audit 40359011330, native ASan/UBSan 40359011304, CodeQL 40359011337, Security audit 40359011287, and compiler benchmarks 40359011261 including cross-platform aggregation 121702374533. Windows benchmark job 121699076885 failed once at native iteration 5 with exit 3221225477 / 0xC0000005; retry 121701086049 passed. Browser artifact 12668290322 (sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0) independently replayed all 30 archived R0/R1/R2 bundles and matched read/random evidence. Local duplicate-entry guard and checkpoint commits are not part of f7 and require their own exact-head CI. Latest formal review is stale at af2044d, with two outdated P2 threads; keep PR #237 open and do not merge.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -134,7 +135,8 @@
       "f7bdd32-local-benchmark-matrix-duplicate-workload-and-runtime-input-guard-added; 23 focused JS tests, benchmark contract, website, project plan, linguist, readiness all pass; not pushed",
       "pr-237-head-f7bdd32-windows-benchmark-native-iteration-5-exit-3221225477; targeted retry initiated; cross-platform aggregate skipped pending all platform artifacts",
       "pr-237-f7bdd32-windows-benchmark-retry-job-121701086049-passed; cross-platform-provenance-job-121702374533-passed; Linux-macOS-Windows-artifacts-12667352616-12665894757-12668390302",
-      "pr-237-f7bdd32-browser-run-40359011330-replayed-all-30-downloaded-bundles-and-verified-read-random-evidence-artifact-12668290322-digest-47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0"
+      "pr-237-f7bdd32-browser-run-40359011330-replayed-all-30-downloaded-bundles-and-verified-read-random-evidence-artifact-12668290322-digest-47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0",
+      "pr-237-f7bdd32-all-six-exact-head-workflows-green; Windows benchmark retry passed; Browser artifact replayed 30/30; global R3 remains 0"
     ],
     "activePullRequests": [
       237
@@ -146,110 +148,143 @@
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Commit and push the canonical benchmark content hashes, platform matrix identity/output gate, website/docs changes and this checkpoint to the existing PR #237; then require fresh exact-head checks and review. Do not merge #237.",
+    "Push the four local follow-up commits after f7bdd32 with a normal fast-forward, then require exact-new-head checks and a fresh formal review. Do not merge PR #237 without PR-specific authorization.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
-    "Continue broader Measurement covariance, compiler typing/ownership, host-specific R3 promotion and performance work with separately validated evidence; the current M1 timing run is a one-host baseline and does not close Gate F."
+    "Continue broader Measurement covariance, compiler typing/ownership, R3-profile boundaries, and performance work with separately validated evidence; current timing is host-specific and does not close Gate F."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40146766244,
+    "runId": 40359011293,
     "status": "success",
-    "head": "0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714",
+    "head": "f7bdd32526d38900eee234eeb67feca39d950529",
     "relatedRuns": [
       {
-        "workflow": "Deploy website",
-        "runId": 40146766218,
-        "status": "success"
+        "workflow": "Browser audit",
+        "runId": 40359011330,
+        "status": "success",
+        "replayedBundles": 30,
+        "artifactId": 12668290322,
+        "artifactDigest": "sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0"
       },
       {
-        "workflow": "Browser audit",
-        "runId": 40146766130,
+        "workflow": "Native sanitizers",
+        "runId": 40359011304,
+        "status": "success",
+        "asan": "success",
+        "ubsan": "success"
+      },
+      {
+        "workflow": "Compiler benchmarks",
+        "runId": 40359011261,
+        "status": "success",
+        "windowsRetryJob": 121701086049,
+        "crossPlatformJob": 121702374533
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 40359011337,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 40146766195,
-        "status": "success"
-      },
-      {
-        "workflow": "CodeQL",
-        "runId": 40146766125,
+        "runId": 40359011287,
         "status": "success"
       }
     ],
-    "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
+    "note": "All six exact f7bdd32 workflows are green. Windows native iteration 5 had one access-violation failure before its targeted retry passed; this remains recorded as a stability risk, not hidden by the retry. This validates f7 only; follow-up local benchmark-matrix duplicate rejection requires new exact-head CI."
   },
   "blockers": [
-    "PR #237 has two older unresolved/outdated P2 review threads; fixes are present, but latest GitHub review is for af2044d, not current head 977042e. Exact 977042e CI is green after a successful Windows retry; new local canonical-hash/matrix-gate changes require their own exact-head validation and fresh review before any integration.",
+    "The f7bdd32 remote head is fully green across six workflows, but the latest formal review is stale at af2044d and two outdated P2 threads need fresh review. Four local follow-up commits are not part of f7 and require exact-head CI after push; PR #237 remains unmerged and has no merge authorization.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Finish review of the local normalized-hash and cross-platform gate diff, commit/push it to PR #237, request fresh review for the new head, then require all exact-head CI checks before further integration decisions.",
+  "next": "Push the four local follow-up commits to PR #237 with a normal fast-forward after confirming the remote head is still f7bdd32. Then verify checks on the new exact head and request fresh review; do not merge.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "977042e831fefddc4c3b5853c089081e912e51b0",
+    "remoteHead": "f7bdd32526d38900eee234eeb67feca39d950529",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "checks": {
       "ostrinCi": {
-        "id": 40354860107,
-        "status": "success"
-      },
-      "browserAudit": {
-        "id": 40354859894,
-        "status": "success"
-      },
-      "nativeSanitizers": {
-        "id": 40354860335,
-        "status": "success"
-      },
-      "codeql": {
-        "id": 40354860214,
-        "status": "success"
-      },
-      "securityAudit": {
-        "id": 40354859816,
-        "status": "success"
-      },
-      "compilerBenchmarks": {
-        "id": 40354859957,
+        "id": 40359011293,
         "status": "success",
         "ubuntu": "success",
         "macos": "success",
-        "windows": "success-after-targeted-retry"
+        "windows": "success",
+        "websiteAndBrowser": "success"
+      },
+      "browserAudit": {
+        "id": 40359011330,
+        "status": "success",
+        "artifactId": 12668290322,
+        "replayedBundles": 30
+      },
+      "nativeSanitizers": {
+        "id": 40359011304,
+        "status": "success",
+        "asan": "success",
+        "ubsan": "success"
+      },
+      "codeql": {
+        "id": 40359011337,
+        "status": "success"
+      },
+      "securityAudit": {
+        "id": 40359011287,
+        "status": "success"
+      },
+      "compilerBenchmarks": {
+        "id": 40359011261,
+        "status": "success",
+        "ubuntu": "success",
+        "macos": "success",
+        "windows": "success-after-retry",
+        "crossPlatformProvenance": "success"
       }
     },
     "windowsBenchmarkRetry": {
-      "jobId": 121689344184,
+      "failedJobId": 121699076885,
+      "failedResult": "native iteration 5 exit 3221225477 / 0xC0000005",
+      "retryJobId": 121701086049,
       "status": "success",
-      "artifactId": 12665882385,
-      "artifactDigest": "sha256:c213c57be8eed22fec7016fa59d4c9c1a999ed3909cc782234158a23d9020b1e",
-      "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
-      "rawSourceSha256": "52810f9ba6697387cda3a7da70f13aab838081df88b7adba9f214d2ff3189216",
-      "rawInputSha256": "ffc54e19a9023676c1174140f5edede36458da04bc427aaa4adbcc51af6fd2b9"
+      "crossPlatformAggregateJobId": 121702374533,
+      "artifacts": {
+        "windows": {
+          "id": 12668390302,
+          "digest": "sha256:7dc0f486195c8ac04b0e7bce81547cf6ea86bacb337c7118350a3b1968299864"
+        },
+        "linux": {
+          "id": 12667352616,
+          "digest": "sha256:ee48445bd7ab37fc4089a586259121dc793edd1b7cd6ecbaced8fc1f0a0ab8dd"
+        },
+        "macos": {
+          "id": 12665894757,
+          "digest": "sha256:f71a5244b48da252e50ac89772a0637a61fae4734396535ae80593e25dc3a827"
+        }
+      }
     },
     "review": {
-      "latestSubmittedReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-      "status": "no GitHub review recorded for 977042e; two older P2 threads remain unresolved/outdated"
+      "latestSubmittedReviewHead": "af2044dac7",
+      "status": "no formal review on f7bdd32; two fixed-but-outdated P2 threads still need fresh exact-head review"
     },
     "openReviewThreads": [
       {
         "path": "scripts/benchmark.mjs",
         "priority": "P2",
         "status": "unresolved-outdated",
-        "summary": "Canonicalize workload paths before selecting runtime inputs."
+        "summary": "Canonicalize workload paths before selecting runtime inputs; fix is present, but fresh exact-head review is needed."
       },
       {
         "path": "scripts/benchmark.mjs",
         "priority": "P2",
         "status": "unresolved-outdated",
-        "summary": "Resolve the compiler path before changing the runtime directory."
+        "summary": "Resolve relative compiler path before changing runtime directory; fix is present, but fresh exact-head review is needed."
       }
     ],
-    "note": "These results are exact for 977042e. The local canonical-hash and cross-platform-matrix changes are not covered by these checks; do not merge on their basis."
+    "localFollowUp": "four local commits after f7bdd32 contain duplicate benchmark matrix workload/input guards and checkpoint evidence; they are not included in these f7 checks."
   },
   "remotePullRequestObservations": [
     {
