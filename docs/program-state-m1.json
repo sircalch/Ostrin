@@ -14,7 +14,7 @@
     "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "lastValidatedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
-    "lastObservedRemotePullRequestHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+    "lastObservedRemotePullRequestHead": "858863465d954854a722f034bbbe31149a4c2dd8",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -100,7 +100,7 @@
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 remains OPEN/MERGEABLE at exact remote head af2044d. The canonical workload-path fix is pushed. Ubuntu and Windows Server 2025 benchmark jobs succeeded on this head; macOS was queued at the last observation. Security audit and CodeQL succeeded; Ostrin CI was queued, Browser audit and Native sanitizers were in progress. Fresh review on af2044d found a P2: OSTRIN_COMPILER may be configured as a relative path and then fail after the benchmark switches to its staged input directory. The compiler path is now resolved to an absolute path locally. Also added a guard that rejects analysis-error diagnostics even when the subprocess exits successfully. These changes and the updated checkpoint are local and still need commit/push and fresh exact-head validation. Keep PR #237 open.",
+    "status": "PR #237 is OPEN/MERGEABLE at exact remote head 8588634. The workload-path correction, absolute OSTRIN_COMPILER resolution, and successful-analysis-output guard are present. Fresh exact-head checks were queued or in progress at the last observation: Ostrin CI queued; benchmark, security, CodeQL, Browser audit, and native sanitizers running. A fresh Codex review was requested for 8588634 after the relative-compiler correction. Prior af2044d benchmark jobs passed on Ubuntu and Windows Server 2025; macOS was canceled when 8588634 was pushed. Local Windows validation with a relative OSTRIN_COMPILER and ./ workload passed; 15 benchmark tests and the report contract pass. The workflow is now also being adjusted locally so its matrix explicitly exercises the relative compiler path on all three runners; that change and this checkpoint still need commit/push and a fresh exact-head validation. Keep #237 open.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -139,7 +139,7 @@
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Commit and push the relative OSTRIN_COMPILER path fix, successful-analysis-output guard and checkpoint. Then require fresh exact-head CI and review; prior head af2044d had Windows/Ubuntu benchmark success and macOS was still queued. Keep PR #237 open.",
+    "Commit and push the CI matrix configuration that supplies a relative OSTRIN_COMPILER path on each OS, with this checkpoint. Then require fresh exact-head checks and review; keep PR #237 open.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, host-specific R3 promotion and performance work with separately validated evidence; the current M1 timing run is a one-host baseline and does not close Gate F."
   ],
@@ -173,61 +173,61 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #237 review findings are corrected locally but not yet pushed. The older workload-path P2 is fixed on af2044d (thread remains unresolved/outdated); the current af2044d P2 requires resolving OSTRIN_COMPILER to an absolute path before execution from the staged runtime directory. Local regression tests and a relative-override benchmark run pass. On af2044d Ubuntu and Windows Server 2025 benchmark jobs succeeded; macOS was queued at the last observation. Fresh exact-head review/checks are required after pushing the corrections.",
+    "PR #237 has two older P2 review threads on scripts/benchmark.mjs. Workload-path normalization is on af2044d and relative compiler-path resolution plus rejection of analysis-error output is on 8588634; both corrections pass locally, but fresh review on 8588634 is pending. The new head checks are still running. Add CI coverage for the relative compiler override on Ubuntu/macOS/Windows, then verify exact-head workflows and review before resolving threads.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Commit and push the compiler-path correction, successful-output guard and checkpoint to PR #237. On the resulting head, verify all required checks and the fresh review. Resolve review threads only after confirming each correction is present in the exact head. Keep #237 open unless explicitly authorized.",
+  "next": "Commit and push the workflow change that exercises a relative OSTRIN_COMPILER path in the Ubuntu/macOS/Windows benchmark matrix and the updated checkpoint. Validate the new exact head and wait for fresh review; resolve findings only after confirming their fixes on that head. Keep #237 open unless explicitly authorized.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+    "remoteHead": "858863465d954854a722f034bbbe31149a4c2dd8",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "reviewDecision": "",
     "runs": {
       "ostrinCi": {
-        "id": 40353385962,
+        "id": 40354407982,
         "status": "queued"
       },
       "browserAudit": {
-        "id": 40353386090,
+        "id": 40354407888,
         "status": "in_progress"
       },
       "nativeSanitizers": {
-        "id": 40353386019,
+        "id": 40354407914,
         "status": "in_progress"
       },
       "codeql": {
-        "id": 40353386179,
-        "status": "success"
+        "id": 40354407803,
+        "status": "in_progress"
       },
       "securityAudit": {
-        "id": 40353386253,
-        "status": "success"
+        "id": 40354407878,
+        "status": "in_progress"
       },
       "compilerBenchmarks": {
-        "id": 40353386230,
+        "id": 40354407908,
         "status": "in_progress",
-        "ubuntu": "success",
-        "windows": "success",
-        "macos": "queued"
+        "ubuntu": "in_progress",
+        "windows": "in_progress",
+        "macos": "in_progress"
       }
     },
     "openReviewThreads": [
       {
         "path": "scripts/benchmark.mjs",
         "priority": "P2",
-        "status": "corrected on af2044d; unresolved and outdated",
+        "status": "corrected on af2044d; thread unresolved and outdated",
         "summary": "Normalize workload paths before selecting runtime inputs."
       },
       {
         "path": "scripts/benchmark.mjs",
         "priority": "P2",
-        "status": "corrected locally, not pushed",
-        "summary": "Resolve configured OSTRIN_COMPILER to an absolute path before invoking it from the staged runtime directory."
+        "status": "corrected on 8588634; thread unresolved and outdated",
+        "summary": "Resolve relative OSTRIN_COMPILER before invoking it from the staged runtime directory."
       }
     ],
     "resolvedReviewThreads": [
@@ -243,10 +243,10 @@
       }
     ],
     "review": {
-      "status": "fresh Codex review on af2044d found a P2 about relative compiler overrides; path fix is local and requires push plus fresh review",
-      "head": "af2044dac7a4821b86e619fc0acad3cf3e3b8384"
+      "status": "fresh Codex review requested for 8588634; findings on prior heads have local/pushed fixes, but no fresh no-findings result yet",
+      "head": "858863465d954854a722f034bbbe31149a4c2dd8"
     },
-    "note": "On exact head af2044d, Ubuntu and Windows Server 2025 benchmark jobs succeeded; macOS remained queued. The older Windows Server failure on 092e64c did not reproduce on this head. Other checks remain queued or in progress as recorded."
+    "note": "All status snapshots are for 8588634. Older head checks are not evidence for the new workflow matrix configuration."
   },
   "remotePullRequestObservations": [
     {
@@ -415,6 +415,29 @@
       "review": {
         "head": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
         "status": "fresh Codex review found P2: resolve relative OSTRIN_COMPILER paths before using staged cwd; local fix not pushed",
+        "openThreads": 2,
+        "resolvedThreads": 2
+      },
+      "integration": "not merged; no PR #237 merge authorization"
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "observedAt": "2026-10-26",
+      "head": "858863465d954854a722f034bbbe31149a4c2dd8",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "queued",
+        "browserAudit": "in_progress",
+        "nativeSanitizers": "in_progress",
+        "codeql": "in_progress",
+        "securityAudit": "in_progress",
+        "compilerBenchmarks": "in_progress on Ubuntu/macOS/Windows"
+      },
+      "review": {
+        "head": "858863465d954854a722f034bbbe31149a4c2dd8",
+        "status": "fresh Codex review requested; 2 outdated/unresolved P2 threads have code fixes on exact/current head",
         "openThreads": 2,
         "resolvedThreads": 2
       },

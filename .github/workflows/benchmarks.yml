@@ -51,6 +51,8 @@ jobs:
       - name: Build release compiler
         run: cargo build --release --manifest-path compiler/Cargo.toml
       - name: Run file-backed pendulum benchmark
+        env:
+          OSTRIN_COMPILER: ${{ runner.os == 'Windows' && './compiler/target/release/ostrinc.exe' || './compiler/target/release/ostrinc' }}
         run: node scripts/benchmark.mjs --iterations 7 --warmups 1 --compile-iterations 5 --workloads examples/viz_pendulum_calibration.ostrin
       - name: Validate reproducibility contract
         run: |
