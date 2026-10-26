@@ -14,7 +14,7 @@
     "evidenceRevision": "a76e1ef3257913341203cfbe3a0bc7fe401972f7",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "lastValidatedRemotePullRequestHead": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
-    "lastObservedRemotePullRequestHead": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
+    "lastObservedRemotePullRequestHead": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -88,7 +88,7 @@
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "local-validation-green; source, evidence and dashboard recorded; awaiting push and exact-head CI/review; R3 remains OPEN",
+    "status": "local-validation-green; PR #237 opened at checkpoint head 6ff483d; state update and exact new-head CI/review pending; R3 remains OPEN",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -107,16 +107,19 @@
       "R3 readiness is OPEN: 30/30 base contracts, 30/30 closed entry rows, 0/30 host captures, 12 R2, 18 R0, R3 scorecard 0.",
       "Quality scorecard workingTreeDirty=false; v0.2.0 still reports 12/12 READY and remains frozen."
     ],
-    "activePullRequests": [],
+    "activePullRequests": [
+      237
+    ],
     "sourceRevision": "aa3fb286910cb39f41fa6d755c6ea9dbca4dd91a",
     "evidenceRevision": "a76e1ef3257913341203cfbe3a0bc7fe401972f7",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231"
   },
   "pending": [
-    "Push codex/m1-reference-workflow and open a substantive PR for the dimensional pendulum workflow; require fresh CI, sanitizer, browser and review results on its exact head.",
-    "PR #235 and #236 are individually mergeable with all required checks green and review clear; await explicit PR-specific authorization before either merge.",
-    "Continue R3 contract and host-bound evidence for 30 bundles; current local report is 0/30 host captures and does not establish cross-platform reproducibility.",
-    "Continue broad Measurement covariance, compiler typing/ownership and workflow-level profiling only with separately validated evidence."
+    "Commit and push the PR/checkpoint state update, then require fresh exact-head Ostrin CI, Browser audit, native ASan/UBSan, CodeQL, Security audit and Codex review.",
+    "PR #237 is open and mergeable; do not merge until explicit PR-specific authorization is confirmed.",
+    "PR #235 and #236 remain open, fully green and reviewed; await explicit PR-specific integration authorization.",
+    "Continue R3 contract and host-bound evidence for 30 bundles; local report remains 0/30 authentic host captures and R3=0.",
+    "Continue broader Measurement covariance, compiler typing/ownership and profiling only with separately validated evidence."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
@@ -148,51 +151,47 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "Integration of PR #235 and #236 awaits explicit PR-specific authorization; no merge has been performed.",
+    "Integration of PR #235, #236 and #237 awaits explicit PR-specific authorization; no merge has been performed.",
     "R3 remains OPEN: local checkout has 0/30 authentic host captures; no cross-platform reproducibility claim.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Published v0.2.0 remains frozen; no tag or release action is authorized."
   ],
-  "next": "Push and open the substantive pendulum-calibration PR, then validate the exact new head and record its CI and review. Keep #235 and #236 open until PR-specific integration authorization arrives.",
+  "next": "Record PR #237 in the authoritative checkpoint, push the new head, and wait for all required checks and a fresh review on that exact head. Keep all three PRs open pending explicit integration authorization.",
   "latestPullRequestValidation": {
-    "number": 236,
-    "url": "https://github.com/sircalch/Ostrin/pull/236",
-    "remoteHead": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
+    "number": 237,
+    "url": "https://github.com/sircalch/Ostrin/pull/237",
+    "remoteHead": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "runs": {
       "ostrinCi": {
-        "id": 40245148101,
-        "status": "success"
+        "id": 40248688870,
+        "status": "in_progress"
       },
       "browserAudit": {
-        "id": 40245148240,
-        "status": "success"
+        "id": 40248688878,
+        "status": "in_progress"
       },
       "nativeSanitizers": {
-        "id": 40245148162,
-        "status": "success"
+        "id": 40248688887,
+        "status": "in_progress"
       },
       "codeql": {
-        "id": 40245148198,
-        "status": "success"
+        "id": 40248688872,
+        "status": "in_progress"
       },
       "securityAudit": {
-        "id": 40245148067,
-        "status": "success"
-      },
-      "deployWebsite": {
-        "id": 40245148106,
-        "status": "success"
+        "id": 40248688871,
+        "status": "in_progress"
       }
     },
     "openReviewThreads": [],
     "resolvedReviewThreads": [],
     "review": {
-      "status": "completed-no-substantive-findings",
-      "head": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f"
+      "status": "pending",
+      "head": null
     },
-    "note": "All six required workflow runs and fresh Codex review are green on the exact current head. This PR is not merged; no PR-specific authorization to integrate it has been recorded."
+    "note": "All five required workflows were running on head 6ff483d when observed. This checkpoint commit will create a new exact PR head; previous results do not validate that update."
   },
   "remotePullRequestObservations": [
     {
@@ -236,6 +235,25 @@
         "openThreads": 0
       },
       "integration": "not merged; explicit PR-specific authorization required"
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "head": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "in_progress",
+        "browserAudit": "in_progress",
+        "nativeSanitizers": "in_progress",
+        "codeql": "in_progress",
+        "securityAudit": "in_progress"
+      },
+      "review": {
+        "status": "pending",
+        "openThreads": 0
+      },
+      "note": "PR created after local validation; this checkpoint update will supersede this head, so all checks must be re-read on the resulting exact head."
     }
   ]
 }
