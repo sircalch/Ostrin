@@ -15,6 +15,7 @@ import {
   validateCheckedInQuantityFloatPair,
 } from "./benchmark-pair-contract.mjs";
 import {
+  assertBenchmarkWorkloadSucceeded,
   repositoryRelativeWorkloadPath,
   runtimeInputFilesFor,
 } from "./benchmark-runtime-inputs.mjs";
@@ -66,7 +67,8 @@ if (normalizedWorkloadPaths.some((value) => value === floatArrayWorkload || valu
   validateCheckedInQuantityFloatPair(repo);
 }
 
-const compiler = process.env.OSTRIN_COMPILER || join(repo, "compiler", "target", "release", process.platform === "win32" ? "ostrinc.exe" : "ostrinc");
+const compiler = resolve(repo, process.env.OSTRIN_COMPILER
+  || join(repo, "compiler", "target", "release", process.platform === "win32" ? "ostrinc.exe" : "ostrinc"));
 if (!existsSync(compiler)) {
   throw new Error(`compiler not found at ${compiler}; run cargo build --release --manifest-path compiler/Cargo.toml first`);
 }
@@ -81,6 +83,12 @@ function run(command, args, label, cwd = repo) {
     throw new Error(`${label} failed (${result.status}):\n${result.stdout}\n${result.stderr}`);
   }
   return { elapsedMs, stdout: result.stdout, stderr: result.stderr };
+}
+
+function runBenchmarkWorkload(command, args, label, cwd) {
+  const result = run(command, args, label, cwd);
+  assertBenchmarkWorkloadSucceeded(result.stdout, result.stderr, label);
+  return result;
 }
 
 mkdirSync(outputDir, { recursive: true });
@@ -239,22 +247,26 @@ function benchmarkWorkload(sourcePath, index) {
   if (!existsSync(executable)) throw new Error(`native compilation did not create ${executable}`);
   const executableSha256 = outputHash(readFileSync(executable));
 
-  const expected = normalizeOutput(run(compiler, ["--run", source], `interpreter warmup ${sourcePath}`, runtimeContext.cwd).stdout);
-  const nativeWarmup = normalizeOutput(run(executable, [], `native warmup ${sourcePath}`, runtimeContext.cwd).stdout);
+  const expected = normalizeOutput(runBenchmarkWorkload(
+    compiler, ["--run", source], `interpreter warmup ${sourcePath}`, runtimeContext.cwd,
+  ).stdout);
+  const nativeWarmup = normalizeOutput(runBenchmarkWorkload(
+    executable, [], `native warmup ${sourcePath}`, runtimeContext.cwd,
+  ).stdout);
   if (expected !== nativeWarmup) {
     throw new Error(`interpreter/native output mismatch for ${sourcePath}:\ninterpreter=${expected}\nnative=${nativeWarmup}`);
   }
 
   for (let warmup = 0; warmup < warmups; warmup += 1) {
-    run(compiler, ["--run", source], `interpreter warmup ${sourcePath} ${warmup + 1}`, runtimeContext.cwd);
-    run(executable, [], `native warmup ${sourcePath} ${warmup + 1}`, runtimeContext.cwd);
+    runBenchmarkWorkload(compiler, ["--run", source], `interpreter warmup ${sourcePath} ${warmup + 1}`, runtimeContext.cwd);
+    runBenchmarkWorkload(executable, [], `native warmup ${sourcePath} ${warmup + 1}`, runtimeContext.cwd);
   }
 
   const interpreter = [];
   const native = [];
   for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const interpreted = run(compiler, ["--run", source], `interpreter iteration ${sourcePath} ${iteration + 1}`, runtimeContext.cwd);
-    const compiled = run(executable, [], `native iteration ${sourcePath} ${iteration + 1}`, runtimeContext.cwd);
+    const interpreted = runBenchmarkWorkload(compiler, ["--run", source], `interpreter iteration ${sourcePath} ${iteration + 1}`, runtimeContext.cwd);
+    const compiled = runBenchmarkWorkload(executable, [], `native iteration ${sourcePath} ${iteration + 1}`, runtimeContext.cwd);
     if (normalizeOutput(interpreted.stdout) !== expected || normalizeOutput(compiled.stdout) !== expected) {
       throw new Error(`output changed during iteration ${iteration + 1} for ${sourcePath}`);
     }
