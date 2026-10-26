@@ -308,7 +308,7 @@ fn analyze(
     print("g = " + four(gravity) + " m/s²; linearized standard uncertainty = " + four(gravity_uncertainty) + " m/s²")
     print("shared-source correlation (ruler zero, clock zero) = " + four(shared_source_correlation))
     print("independent variance contribution = " + (sqrt(variance_independent)).to_string() + " m/s²")
-    print(viz.grid([fit_figure.svg(), input_table.svg()], 2, 680, 420, title: "Reproducible pendulum calibration"))
+    print(viz.grid([fit_figure.svg(), input_table.svg()], 1, 680, 420, title: "Reproducible pendulum calibration"))
 }
 
 fn main() -> Void {

@@ -13,7 +13,7 @@ test("the executable replay registry includes every source-backed R1/R2 bundle",
     return level === "R1" || level === "R2";
   });
   assert.deepEqual(listExecutableReplayIds(), expected);
-  assert.equal(expected.length, 11);
+  assert.equal(expected.length, 12);
 });
 
 test("WASI read evidence requires declared files and exact bytes actually read", () => {

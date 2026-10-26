@@ -182,7 +182,7 @@ test("R3 source read audit does not treat a local read_file function as filesyst
   writeFileSync(filePath, JSON.stringify(bundle));
 
   const audit = buildReadiness(root).gapDiagnostics.externalInputEvidence.sourceReadAudit;
-  assert.equal(audit.directReadFileCallCount, 21);
+  assert.equal(audit.directReadFileCallCount, 22);
   assert.equal(audit.shadowedReadFileCallCount, 1);
   assert.equal(audit.qualifiedReadFileCallCount, 1);
   assert.deepEqual(audit.undeclaredLiteralReadPaths, []);
@@ -772,20 +772,20 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles > 0);
   assert.ok(reproducibilityEvidence.embeddedInputSnapshotBundles <= report.bundleCount);
   assert.ok(reproducibilityEvidence.declaredEmbeddedInputSnapshotCount > 0);
-  assert.equal(reproducibilityEvidence.ciVerifiedExecutionBundles, 29);
+  assert.equal(reproducibilityEvidence.ciVerifiedExecutionBundles, 30);
   assert.equal(reproducibilityEvidence.recordedVerifiedReplayBundles, report.bundleCount);
-  assert.equal(reproducibilityEvidence.numericComparisonNotClaimedBundles, 29);
+  assert.equal(reproducibilityEvidence.numericComparisonNotClaimedBundles, 30);
   assert.equal(reproducibilityEvidence.numericPolicyToleranceMentionBundles, report.bundleCount);
   assert.match(reproducibilityEvidence.interpretation, /do not establish completeness/i);
   assert.equal(externalInputEvidence.declaredInputRecords, report.bundleCount);
-  assert.equal(externalInputEvidence.externalSnapshotInputRecords, 11);
-  assert.equal(externalInputEvidence.bundlesWithExternalSnapshotInputs, 11);
-  assert.equal(externalInputEvidence.externalSnapshotInputsWithMatchingEmbeddedDeclaration, 11);
+  assert.equal(externalInputEvidence.externalSnapshotInputRecords, 12);
+  assert.equal(externalInputEvidence.bundlesWithExternalSnapshotInputs, 12);
+  assert.equal(externalInputEvidence.externalSnapshotInputsWithMatchingEmbeddedDeclaration, 12);
   assert.equal(externalInputEvidence.externalSnapshotInputsMissingMatchingEmbeddedDeclaration, 0);
-  assert.equal(externalInputEvidence.bundlesWithFilesystemReadCapability, 11);
+  assert.equal(externalInputEvidence.bundlesWithFilesystemReadCapability, 12);
   assert.equal(externalInputEvidence.sourceReadAudit.sourceBundleCount, report.bundleCount);
-  assert.equal(externalInputEvidence.sourceReadAudit.bundlesWithDirectReadFileCalls, 11);
-  assert.equal(externalInputEvidence.sourceReadAudit.literalReadPathCallCount, 21);
+  assert.equal(externalInputEvidence.sourceReadAudit.bundlesWithDirectReadFileCalls, 12);
+  assert.equal(externalInputEvidence.sourceReadAudit.literalReadPathCallCount, 22);
   assert.equal(externalInputEvidence.sourceReadAudit.dynamicReadCallCount, 0);
   assert.equal(externalInputEvidence.sourceReadAudit.readFileReferenceCount, 0);
   assert.equal(externalInputEvidence.sourceReadAudit.shadowedReadFileCallCount, 0);
@@ -794,6 +794,6 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   assert.deepEqual(externalInputEvidence.sourceReadAudit.declaredSnapshotsWithoutDirectRead, []);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.sourceReadsWithoutFilesystemCapability, []);
   assert.deepEqual(externalInputEvidence.sourceReadAudit.filesystemCapabilitiesWithoutDirectRead, []);
-  assert.deepEqual(externalInputEvidence.inputKinds, { "external-snapshot": 11, parameters: 18 });
+  assert.deepEqual(externalInputEvidence.inputKinds, { "external-snapshot": 12, parameters: 18 });
   assert.match(externalInputEvidence.interpretation, /cannot detect reads hidden behind aliases/i);
 });

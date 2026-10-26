@@ -6,7 +6,8 @@ visualization path. It reads the checked-in JSON fixture, assigns dimensions to
 the length and period readings, squares the period with `Measurement` arithmetic,
 fits `T² = slope · L + intercept`, estimates `g = 4π² / slope`, propagates
 first-order source sensitivities, and renders the fit, uncertainty bars and input
-table as one SVG.
+table as one SVG. The chart and table are stacked to keep their labels readable
+when the gallery scales the figure down on a narrow mobile screen.
 
 The six rows in `experiments/pendulum-calibration.inputs.json` are **synthetic**.
 The shared ruler-zero/clock-zero correlation is also a declared synthetic input;

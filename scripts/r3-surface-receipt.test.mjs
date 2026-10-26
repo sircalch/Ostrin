@@ -120,9 +120,9 @@ test("archived R0 bundles are accepted only with matching host and bundle invent
 
 test("offline replay registry reads fixture contracts without building the native compiler", () => {
   const ids = listExecutableReplayIds();
-  assert.equal(ids.length, 11);
+  assert.equal(ids.length, 12);
   assert.ok(ids.includes("surface"));
-  assert.ok(ids.every((id) => ["lines", "surface", "histogram", "boxplot", "scatter-fit", "violin", "hexbin", "bars", "point-cloud", "fft", "dashboard"].includes(id)));
+  assert.ok(ids.every((id) => ["lines", "surface", "histogram", "boxplot", "scatter-fit", "violin", "hexbin", "bars", "point-cloud", "fft", "dashboard", "pendulum-calibration"].includes(id)));
 });
 
 test("archived replay maturity and membership are bound to the tested run inventory", () => {
@@ -312,9 +312,9 @@ test("a surface receipt binds the run and every archived R0/R1/R2 bundle", () =>
   assert.deepEqual(verifySurfaceReceipt(receipt, text, fakeWasm, expectedRun), []);
   assert.equal(receipt.fixtureSourceRevision, JSON.parse(text).provenance.commit);
   assert.equal(receipt.compilerWasmSha256, sha256(fakeWasm));
-  assert.equal(Object.keys(receipt.replayBundles).length, 29);
+  assert.equal(Object.keys(receipt.replayBundles).length, 30);
   assert.equal(Object.values(receipt.replayBundles).filter((item) => item.level === "R0").length, 18);
-  assert.equal(Object.values(receipt.replayBundles).filter((item) => item.level === "R2").length, 11);
+  assert.equal(Object.values(receipt.replayBundles).filter((item) => item.level === "R2").length, 12);
   assert.equal(receipt.replayBundles.surface.bundleSha256, receipt.bundleSha256);
 
   const historicalInventory = {
