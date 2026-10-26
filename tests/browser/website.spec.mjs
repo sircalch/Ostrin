@@ -401,6 +401,13 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.locator("#viz-table .sl-provenance")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
   await expect(page.locator("#viz-table img.viz-image")).toHaveAttribute("src", /^data:image\/svg\+xml/);
 
+  const pendulumRun = page.locator('[data-viz-run="pendulum-calibration"]');
+  await expect(pendulumRun).toBeEnabled();
+  await pendulumRun.click();
+  await expect(page.locator("#viz-pendulum-calibration .sl-provenance")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator("#viz-pendulum-calibration img.viz-image")).toHaveAttribute("src", /^data:image\/svg\+xml/);
+  await expect(page.locator("#viz-pendulum-calibration .viz-printed")).toContainText("g = 9.8084 m/s²");
+
   // The explorer shows the SVG in a sandboxed frame where its own tooltips and hover styles work.
   await page.locator('[data-viz-explore="scatter-fit"]').click();
   const scatterFrame = page.frameLocator(".viz-frame-live");

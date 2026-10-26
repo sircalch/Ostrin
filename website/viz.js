@@ -366,6 +366,73 @@ async function downloadExperimentBundle(url, title) {
   downloadBlob(blob, `${fileStem(title)}.ostrin-experiment.json`);
 }
 
+function safeRelativeFilePath(value) {
+  return typeof value === "string"
+    && value.length > 0
+    && !value.startsWith("/")
+    && !value.includes("\\")
+    && !value.split("/").some((part) => !part || part === "." || part === "..");
+}
+
+async function sha256Text(value) {
+  if (!globalThis.crypto?.subtle) throw new Error("live replay requires Web Crypto to verify its experiment inputs");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `sha256:${hex}`;
+}
+
+function runtimeFilesForParameters(files, parameters, values) {
+  const updated = Object.assign(Object.create(null), files);
+  for (const [path, content] of Object.entries(files)) {
+    if (!path.endsWith(".json")) continue;
+    let document;
+    try { document = JSON.parse(content); } catch { continue; }
+    if (!document?.parameters || typeof document.parameters !== "object" || Array.isArray(document.parameters)) continue;
+    let changed = false;
+    for (const parameter of parameters) {
+      if (!Object.hasOwn(document.parameters, parameter.name)) continue;
+      const value = Number(values[parameter.name]);
+      if (!Number.isFinite(value)) continue;
+      document.parameters[parameter.name] = value;
+      changed = true;
+    }
+    if (changed) updated[path] = `${JSON.stringify(document, null, 2)}\n`;
+  }
+  return updated;
+}
+
+async function runtimeFilesForFigure(figure) {
+  const files = Object.assign(Object.create(null), { "main.ostrin": figure.code });
+  if (!figure.bundle) return files;
+
+  const response = await fetch(figure.bundle, { cache: "no-store" });
+  if (!response.ok) throw new Error(`experiment input snapshot unavailable (HTTP ${response.status})`);
+  const bundle = await response.json();
+  if (bundle.id !== figure.id || !bundle.files || !Array.isArray(bundle.manifest?.files)) {
+    throw new Error("experiment input snapshot does not match this gallery figure");
+  }
+
+  const seenInputs = new Set();
+  for (const entry of bundle.manifest.files) {
+    if (entry.kind !== "source" && entry.kind !== "input") continue;
+    if (!safeRelativeFilePath(entry.path)) throw new Error("experiment bundle contains an unsafe file path");
+    const content = bundle.files[entry.path];
+    if (typeof content !== "string") throw new Error(`experiment bundle is missing ${entry.path}`);
+    if (await sha256Text(content) !== entry.sha256) throw new Error(`experiment bundle integrity check failed for ${entry.path}`);
+
+    if (entry.kind === "source") {
+      if (content !== figure.code) throw new Error("experiment bundle source differs from the displayed gallery source");
+    } else {
+      if (entry.path === "main.ostrin" || seenInputs.has(entry.path)) {
+        throw new Error("experiment bundle contains a duplicate or reserved runtime input path");
+      }
+      seenInputs.add(entry.path);
+      files[entry.path] = content;
+    }
+  }
+  return files;
+}
+
 async function exportPng(source, title, fraction = 0, scale = 2) {
   const staticSource = staticSvgAt(source, fraction);
   const dimensions = svgDimensions(staticSource);
@@ -886,6 +953,7 @@ function explorer() {
   let cameraGeneration = 0;
   let cameraRendering = false;
   let cameraQueued = false;
+  let cameraRuntimeFiles = {};
   let selectedIndex = null;
   let eventContracts = [];
   let contractState = new Map();
@@ -927,7 +995,8 @@ function explorer() {
     try {
       const { runOstrinc } = await runtime();
       const source = sourceForRun();
-      const result = await runOstrinc({ "main.ostrin": source }, ["--run", "main.ostrin"]);
+      const runtimeFiles = runtimeFilesForParameters(cameraRuntimeFiles, sourceControls, sourceValues);
+      const result = await runOstrinc({ ...runtimeFiles, "main.ostrin": source }, ["--run", "main.ostrin"]);
       const stdout = result.lines.filter(([kind]) => kind === "out").map(([, text]) => text);
       const rendered = svgOf(stdout);
       if (generation !== cameraGeneration) return;
@@ -1627,6 +1696,7 @@ function explorer() {
       svg = text;
       zoom = 100;
       cameraSource = camera?.source ?? "";
+      cameraRuntimeFiles = camera?.runtimeFiles ?? {};
       cameraEnabled = Boolean(camera?.camera);
       shareState = camera?.id ? { id: camera.id, initial: camera.initialState ?? null } : null;
       prepareSourceParameters(camera?.controls ?? [], camera?.initialState?.parameters ?? {});
@@ -1740,6 +1810,7 @@ function card(figure) {
       source: figure.code,
       camera: is3d,
       controls: figure.controls ?? [],
+      runtimeFiles: await runtimeFilesForFigure(figure),
       initialState: state?.figureId === figure.id ? state : null,
       onSvg(nextSvg) {
         liveSvg = nextSvg;
@@ -1763,7 +1834,8 @@ function card(figure) {
     try {
       const { runOstrinc } = await runtime();
       status.textContent = "running…";
-      const { code: exit, lines } = await runOstrinc({ "main.ostrin": figure.code }, ["--run", "main.ostrin"]);
+      const files = await runtimeFilesForFigure(figure);
+      const { code: exit, lines } = await runOstrinc(files, ["--run", "main.ostrin"]);
       const stdout = lines.filter(([kind]) => kind === "out").map(([, text]) => text);
       const { svg, printed: text } = svgOf(stdout);
       const elapsed = Math.round(performance.now() - started);
@@ -1781,7 +1853,10 @@ function card(figure) {
         status.textContent = `exit ${exit}`;
       }
     } catch (error) {
-      status.textContent = `could not run: ${error.message ?? error}`;
+      const message = error.message ?? String(error);
+      printed.textContent = message;
+      provenance.dataset.state = "error";
+      status.textContent = `could not run: ${message}`;
     } finally {
       run.disabled = false;
     }

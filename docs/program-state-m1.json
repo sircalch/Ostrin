@@ -11,10 +11,10 @@
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
     "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
-    "evidenceRevision": "61ea27c43269245b7e9fdc75a2aba465eb1b57af",
+    "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "lastValidatedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
-    "lastObservedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
+    "lastObservedRemotePullRequestHead": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -98,7 +98,7 @@
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 remote head e76f2fc73575474011bb52e1a6b34658cf9b8a80 is OPEN/MERGEABLE and all ten required checks have succeeded, including macOS, ASan and UBSan. The earlier macOS failure on 2f8e06d was not reproduced; its cause remains unconfirmed and the improved diagnostics stay in the test. Browser artifact 12622700135 reports 30/30 capture-ready bundles, and an independent replay passed for all 30 on tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The prior P2 review thread is resolved, but no fresh formal review decision is recorded for e76f2fc. The local benchmark/evidence package extends beyond the remote head and has not been pushed, so the green checks do not validate it.",
+    "status": "At the last remote observation, PR #237 head 01f51f1001cbdea71a81a4c59f3be215b13c7a51 was OPEN/MERGEABLE. Compiler tests passed on Linux, macOS and Windows; CodeQL, Rust dependency audit, Browser audit and UBSan passed. The Website/browser CI job and ASan were still running. Fresh Codex review on that head found an open P2: the Viz gallery live runner omitted the bundle's data.json snapshot. The local fix verifies source and input SHA-256 values, passes verified inputs into browser WASI, and updates JSON-backed controls for interactive reruns. The focused Chromium gallery test, website check, lab-data consistency check, project-plan, Linguist and benchmark contract checks pass locally. The fix and multi-platform benchmark workflow update are not yet validated on GitHub. Previous head e76f2fc had all ten required checks green; its macOS failure on 2f8e06d was not reproduced and its cause remains unknown. Browser artifact 12622700135 was replayed against tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a, with all 30 bundles matching; global R3 remains 0.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -129,13 +129,13 @@
       237
     ],
     "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
-    "evidenceRevision": "61ea27c43269245b7e9fdc75a2aba465eb1b57af",
+    "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "benchmarkEvidencePath": "validation/m1-pendulum-performance-windows.json",
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Push the local benchmark/evidence package to the existing PR #237 branch without merging; then require all checks on its new exact head and request a fresh review.",
+    "Push the locally validated PR #237 P2 correction and cross-platform benchmark workflow update; then require checks and a fresh review on the exact new head. Keep PR #237 open.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, host-specific R3 promotion and performance work with separately validated evidence; the current M1 timing run is a one-host baseline and does not close Gate F."
   ],
@@ -169,13 +169,13 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "The ten required checks are green on PR #237 head e76f2fc. The local benchmark/evidence package is not on that head; it needs a new exact-head CI run and fresh review after push. The earlier macOS failure on 2f8e06d was not reproduced on e76f2fc.",
+    "PR #237 has an open P2 review finding on head 01f51f1: Viz Run live did not stage its data.json input. A fix and browser regression test pass locally but are not yet on GitHub. Publish them and validate the exact new head. Earlier head e76f2fc passed its required checks; the one-off macOS failure on 2f8e06d remains unexplained.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Push the recorded Windows benchmark and R3 artifact evidence package to PR #237, request a fresh Codex review on the new head, and require all checks on that exact head. Keep the PR open unless the user explicitly authorizes merging.",
+  "next": "Push the locally validated gallery input-staging fix and the benchmark workflow matrix to PR #237; resolve the P2 only after the fix is present, then require all checks and a fresh review on the exact new head. Keep the PR open unless the user explicitly authorizes merging.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
@@ -335,6 +335,28 @@
         "globalR3Score": 0
       },
       "note": "Exact remote e76f2fc: all ten required checks, including ASan and UBSan, succeeded; macOS passed once after a failure on 2f8e06d whose cause remains unknown. All 30 artifact bundles independently replayed. The local performance/evidence package is not covered by these checks."
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "head": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "compilerTests": "success (ubuntu-latest, macos-latest, windows-latest)",
+        "websiteAndBrowser": "in progress",
+        "browserAudit": "success",
+        "nativeSanitizers": "ASan in progress; UBSan success",
+        "codeql": "success",
+        "dependencyAudit": "success",
+        "combinedStatus": "empty; no Ostrin CI run was returned for this observation"
+      },
+      "review": {
+        "head": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
+        "status": "fresh Codex review found P2: gallery Run live omits the file-backed data.json input; local fix and Chromium regression test passed, not yet pushed",
+        "openThreads": 1
+      },
+      "integration": "not merged; no merge authorization for PR #237"
     }
   ]
 }
