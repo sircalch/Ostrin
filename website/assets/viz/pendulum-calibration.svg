@@ -68,7 +68,7 @@
 <line x1="66" y1="62" x2="66" y2="368" stroke="#9ca3af" stroke-width="1"/>
 <text x="363" y="408" text-anchor="middle" font-size="12" fill="#1f2937">Length L [m]</text>
 <text x="16" y="215" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 215)">Period squared T² [s²]</text>
-<g class="legend"><rect x="76" y="72" width="205.6" height="82" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><rect x="84" y="81" width="14" height="10" fill="#dbeafe" fill-opacity="0.7"/><text x="104" y="90" text-anchor="start" font-size="11" fill="#1f2937">±2 residual SD</text></g><g class="legend-item" data-viz-series-id="1"><circle cx="91" cy="104" r="4" fill="#1e3a8a"/><text x="104" y="108" text-anchor="start" font-size="11" fill="#1f2937">standard uncertainty in T²</text></g><g class="legend-item" data-viz-series-id="2"><circle cx="91" cy="122" r="4" fill="#2563eb"/><text x="104" y="126" text-anchor="start" font-size="11" fill="#1f2937">measured periods</text></g><g class="legend-item" data-viz-series-id="3"><line x1="83" y1="140" x2="99" y2="140" stroke="#dc2626" stroke-width="2.5"/><text x="104" y="144" text-anchor="start" font-size="11" fill="#1f2937">OLS fit</text></g></g>  <ostrin-provenance source-hash="sha256:5d2c0ef9638ef04f57df61c6a2e8a58143418c244766595167e55aae7fe34a55" data-hash="sha256:edb01eb0318bb633d26bd845e6df41b20ab4c454212387e646104292888ca023" seed="seed=deterministic" compiler="ostrinc 0.2.0" />
+<g class="legend"><rect x="76" y="72" width="205.6" height="82" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><rect x="84" y="81" width="14" height="10" fill="#dbeafe" fill-opacity="0.7"/><text x="104" y="90" text-anchor="start" font-size="11" fill="#1f2937">±2 residual SD</text></g><g class="legend-item" data-viz-series-id="1"><circle cx="91" cy="104" r="4" fill="#1e3a8a"/><text x="104" y="108" text-anchor="start" font-size="11" fill="#1f2937">standard uncertainty in T²</text></g><g class="legend-item" data-viz-series-id="2"><circle cx="91" cy="122" r="4" fill="#2563eb"/><text x="104" y="126" text-anchor="start" font-size="11" fill="#1f2937">measured periods</text></g><g class="legend-item" data-viz-series-id="3"><line x1="83" y1="140" x2="99" y2="140" stroke="#dc2626" stroke-width="2.5"/><text x="104" y="144" text-anchor="start" font-size="11" fill="#1f2937">OLS fit</text></g></g>  <ostrin-provenance source-hash="sha256:ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923" data-hash="sha256:edb01eb0318bb633d26bd845e6df41b20ab4c454212387e646104292888ca023" seed="seed=deterministic" compiler="ostrinc 0.2.0" />
 </svg>
 <svg x="0" y="460" role="table" data-ostrin-table="true" xmlns="http://www.w3.org/2000/svg" width="900" height="264" viewBox="0 0 900 264" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
@@ -95,8 +95,8 @@
 <text class="table-value" data-table-column="1" x="126" y="94" text-anchor="start" font-size="11" fill="#1f2937">0.25</text>
 <rect class="table-cell" role="cell" data-table-column="2" x="218" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.0037</title></rect>
 <text class="table-value" data-table-column="2" x="230" y="94" text-anchor="start" font-size="11" fill="#1f2937">1.0037</text>
-<rect class="table-cell" role="cell" data-table-column="3" x="322" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.002</title></rect>
-<text class="table-value" data-table-column="3" x="334" y="94" text-anchor="start" font-size="11" fill="#1f2937">0.002</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="94" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
 <rect class="table-cell" role="cell" data-table-column="4" x="426" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.0074</title></rect>
 <text class="table-value" data-table-column="4" x="438" y="94" text-anchor="start" font-size="11" fill="#1f2937">1.0074</text>
 <rect class="table-cell" role="cell" data-table-column="5" x="530" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0042</title></rect>
@@ -109,8 +109,8 @@
 <text class="table-value" data-table-column="1" x="126" y="122" text-anchor="start" font-size="11" fill="#1f2937">0.35</text>
 <rect class="table-cell" role="cell" data-table-column="2" x="218" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.186</title></rect>
 <text class="table-value" data-table-column="2" x="230" y="122" text-anchor="start" font-size="11" fill="#1f2937">1.186</text>
-<rect class="table-cell" role="cell" data-table-column="3" x="322" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.002</title></rect>
-<text class="table-value" data-table-column="3" x="334" y="122" text-anchor="start" font-size="11" fill="#1f2937">0.002</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="122" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
 <rect class="table-cell" role="cell" data-table-column="4" x="426" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.4066</title></rect>
 <text class="table-value" data-table-column="4" x="438" y="122" text-anchor="start" font-size="11" fill="#1f2937">1.4066</text>
 <rect class="table-cell" role="cell" data-table-column="5" x="530" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.005</title></rect>
@@ -123,8 +123,8 @@
 <text class="table-value" data-table-column="1" x="126" y="150" text-anchor="start" font-size="11" fill="#1f2937">0.45</text>
 <rect class="table-cell" role="cell" data-table-column="2" x="218" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.3473</title></rect>
 <text class="table-value" data-table-column="2" x="230" y="150" text-anchor="start" font-size="11" fill="#1f2937">1.3473</text>
-<rect class="table-cell" role="cell" data-table-column="3" x="322" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.002</title></rect>
-<text class="table-value" data-table-column="3" x="334" y="150" text-anchor="start" font-size="11" fill="#1f2937">0.002</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="150" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
 <rect class="table-cell" role="cell" data-table-column="4" x="426" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.8152</title></rect>
 <text class="table-value" data-table-column="4" x="438" y="150" text-anchor="start" font-size="11" fill="#1f2937">1.8152</text>
 <rect class="table-cell" role="cell" data-table-column="5" x="530" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0056</title></rect>
@@ -137,8 +137,8 @@
 <text class="table-value" data-table-column="1" x="126" y="178" text-anchor="start" font-size="11" fill="#1f2937">0.55</text>
 <rect class="table-cell" role="cell" data-table-column="2" x="218" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.4869</title></rect>
 <text class="table-value" data-table-column="2" x="230" y="178" text-anchor="start" font-size="11" fill="#1f2937">1.4869</text>
-<rect class="table-cell" role="cell" data-table-column="3" x="322" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.002</title></rect>
-<text class="table-value" data-table-column="3" x="334" y="178" text-anchor="start" font-size="11" fill="#1f2937">0.002</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="178" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
 <rect class="table-cell" role="cell" data-table-column="4" x="426" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>2.2109</title></rect>
 <text class="table-value" data-table-column="4" x="438" y="178" text-anchor="start" font-size="11" fill="#1f2937">2.2109</text>
 <rect class="table-cell" role="cell" data-table-column="5" x="530" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0062</title></rect>
@@ -151,8 +151,8 @@
 <text class="table-value" data-table-column="1" x="126" y="206" text-anchor="start" font-size="11" fill="#1f2937">0.65</text>
 <rect class="table-cell" role="cell" data-table-column="2" x="218" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.6191</title></rect>
 <text class="table-value" data-table-column="2" x="230" y="206" text-anchor="start" font-size="11" fill="#1f2937">1.6191</text>
-<rect class="table-cell" role="cell" data-table-column="3" x="322" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.002</title></rect>
-<text class="table-value" data-table-column="3" x="334" y="206" text-anchor="start" font-size="11" fill="#1f2937">0.002</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="206" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
 <rect class="table-cell" role="cell" data-table-column="4" x="426" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>2.6215</title></rect>
 <text class="table-value" data-table-column="4" x="438" y="206" text-anchor="start" font-size="11" fill="#1f2937">2.6215</text>
 <rect class="table-cell" role="cell" data-table-column="5" x="530" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0068</title></rect>
@@ -165,8 +165,8 @@
 <text class="table-value" data-table-column="1" x="126" y="234" text-anchor="start" font-size="11" fill="#1f2937">0.75</text>
 <rect class="table-cell" role="cell" data-table-column="2" x="218" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.7369</title></rect>
 <text class="table-value" data-table-column="2" x="230" y="234" text-anchor="start" font-size="11" fill="#1f2937">1.7369</text>
-<rect class="table-cell" role="cell" data-table-column="3" x="322" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.002</title></rect>
-<text class="table-value" data-table-column="3" x="334" y="234" text-anchor="start" font-size="11" fill="#1f2937">0.002</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="234" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
 <rect class="table-cell" role="cell" data-table-column="4" x="426" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>3.0168</title></rect>
 <text class="table-value" data-table-column="4" x="438" y="234" text-anchor="start" font-size="11" fill="#1f2937">3.0168</text>
 <rect class="table-cell" role="cell" data-table-column="5" x="530" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0073</title></rect>

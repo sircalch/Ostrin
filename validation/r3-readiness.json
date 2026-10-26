@@ -620,7 +620,7 @@
               {
                 "kind": "literal",
                 "path": "data.json",
-                "line": 315
+                "line": 320
               }
             ],
             "declaredSnapshotPaths": [
