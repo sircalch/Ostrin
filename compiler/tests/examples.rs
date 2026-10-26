@@ -12644,7 +12644,9 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
         .expect("failed to run native pendulum workflow");
     assert!(
         native.status.success(),
-        "pendulum workflow native run failed: {}",
+        "pendulum workflow native run failed with status {}:\nstdout:\n{}\nstderr:\n{}",
+        native.status,
+        String::from_utf8_lossy(&native.stdout),
         String::from_utf8_lossy(&native.stderr)
     );
     assert_eq!(
