@@ -101,7 +101,7 @@ check(audit.includes("**" + facts.examples + "** `.ostrin` source files")
   && audit.includes(`Compiler suite: **${facts.integrationTests} integration**, **${facts.differentialTests} differential** and **${facts.unitTests} unit** tests.`),
   "docs/website-audit.md: inventory counts drifted from source");
 const projectStatus = read("ESTADO_Y_PLAN.md");
-check(projectStatus.includes(`· ${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
+check(projectStatus.includes(`${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
   && projectStatus.includes(`# ${facts.differentialTests} diferenciales + ${facts.integrationTests} de integración + ${facts.unitTests} unitarias`),
   "ESTADO_Y_PLAN.md: compiler test counts drifted from source");
 const changelog = read("CHANGELOG.md");
