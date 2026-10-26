@@ -1804,13 +1804,20 @@ function card(figure) {
   explore.addEventListener("click", async () => {
     const text = liveSvg ?? await fetch(figure.svg).then((response) => response.text());
     const is3d = figure.code.includes("viz.scene3d(");
+    let runtimeFiles;
+    try {
+      runtimeFiles = await runtimeFilesForFigure(figure);
+    } catch (error) {
+      status.textContent = `could not load experiment inputs: ${error.message ?? error}`;
+      return;
+    }
     const state = readVizState();
     const explorerConfig = {
       id: figure.id,
       source: figure.code,
       camera: is3d,
       controls: figure.controls ?? [],
-      runtimeFiles: await runtimeFilesForFigure(figure),
+      runtimeFiles,
       initialState: state?.figureId === figure.id ? state : null,
       onSvg(nextSvg) {
         liveSvg = nextSvg;
