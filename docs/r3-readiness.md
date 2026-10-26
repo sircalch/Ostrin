@@ -240,3 +240,15 @@ de efectos sigue siendo experimental, y el recibo no demuestra equivalencia num�
 plataformas ni completitud formal de entradas dinámicas. El scorecard público conserva **R3=0**
 y los 30 bundles versionados mantienen R0/R2; este corte no promociona automáticamente `surface`
 ni el inventario completo a R3.
+
+El Browser audit del PR #237 en el head `e76f2fc73575474011bb52e1a6b34658cf9b8a80` generó el
+artefacto host-bound [12622700135](https://github.com/sircalch/Ostrin/actions/runs/40254605182/artifacts/12622700135)
+(digest informado por GitHub `sha256:d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404`).
+El paquete declara 30/30 bundles capture-ready y 30/30 filas de efecto de entrada cerradas. Su
+recibo registra `tested_sha` `70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a`, que es el merge sintético
+evaluado por Actions, no el head de la rama. Después de descargar los bytes del artefacto,
+`node scripts/experiment-replay.mjs --replay-artifact-all <directorio> --run-id 40254605182
+--tested-sha 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a` reejecutó y cotejó los 30 bundles; todos
+dieron `match`, incluidas las evidencias WASI de lectura de archivos y azar determinista. Esta
+captura y replay amplían la evidencia para ese run y host; no cambian el nivel de los bundles ni
+el scorecard global, que permanece **R3=0**.

@@ -68,3 +68,32 @@ pwsh -File scripts/profile-process-memory.ps1 -BinaryPath "path\to\pendulum.exe"
 ```
 
 The supplied revision IDs are provenance labels, not a signed build attestation. Memory values are sampled lower bounds from one Windows host and one workload. They include process/runtime overhead, are not allocation counts or leak checks, do not establish memory-safety guarantees, and exclude compiler-build memory. The busy-spin profiler changes timing, so it omits elapsed-time results; use the separately recorded benchmark for timing.
+
+## End-to-end timing evidence
+
+[`validation/m1-pendulum-performance-windows.json`](../validation/m1-pendulum-performance-windows.json)
+records a clean-checkout benchmark at commit
+`61ea27c43269245b7e9fdc75a2aba465eb1b57af`. It binds the workload source,
+checked-in input, Ostrin compiler binary, and generated native executable by
+SHA-256. The fixture was staged as `data.json` in an ignored, isolated runtime
+directory; the benchmark verifies that staged bytes match the checked-in input
+before timing. Seven interpreter and native runs produced matching output, and
+five native compilation runs provide a repeated compile-time estimate.
+
+On Windows 11 x64 with an AMD Ryzen 7 5700X, median `ostrinc --compile` process
+time was 7,022.824 ms (five samples; standard deviation 45.313 ms). The
+end-to-end workflow medians were 209.013 ms interpreted and 14.175 ms native
+(seven samples each). These process durations include startup, JSON input,
+analysis, uncertainty propagation and SVG generation. They do not isolate the
+numerical kernel or predict performance on other machines. The measurement is
+one host-specific baseline, not a general speed claim. The separate memory
+profile above measures sampled process memory; neither report measures managed
+allocation counts or isolates the abstraction overhead of this complete workflow.
+
+Reproduce the timing run with:
+
+```text
+cargo build --release --manifest-path compiler/Cargo.toml
+node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5
+node scripts/benchmark-contract-check.mjs
+```

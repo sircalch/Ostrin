@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-25",
+  "updatedAt": "2026-10-26",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -11,10 +11,10 @@
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
     "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
-    "evidenceRevision": "6bc76d56b45bdd55408639685f17e0869d578c2d",
+    "evidenceRevision": "61ea27c43269245b7e9fdc75a2aba465eb1b57af",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
-    "lastValidatedRemotePullRequestHead": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
-    "lastObservedRemotePullRequestHead": "2f8e06d55995feef46c10487508de3aa932e7c0a",
+    "lastValidatedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
+    "lastObservedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -89,13 +89,16 @@
     "pr-237-head-2f8e06d-browser-audit-website-linux-windows-codeql-security-green-macos-failed",
     "r3-run-40253064496-host-artifact-30-of-30-ready-and-independent-replay-pass",
     "m1-pendulum-native-memory-profiler-seven-run-hash-checked-evidence",
-    "macos-native-failure-diagnostic-improved-and-focused-windows-test-passed"
+    "macos-native-failure-diagnostic-improved-and-focused-windows-test-passed",
+    "m1-benchmark-runner-stages-and-hashes-file-backed-runtime-inputs-and-repeats-compile-timings",
+    "m1-pendulum-performance-windows-x64-recorded-5-compile-and-7-interpreter-native-samples-on-61ea27c",
+    "pr237-e76f2fc-browser-artifact-replayed-all-30-bundles-tested-sha-70e5b4c"
   ],
   "currentPackage": {
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 remote head 2f8e06d55995feef46c10487508de3aa932e7c0a: Browser audit, website checks, Linux/Windows compiler jobs, CodeQL and dependency audit passed; macOS compiler job failed in the pendulum workflow native run; ASan remains in progress and UBSan passed. CI artifact 12620783908 has 30/30 structurally ready bundles and all 30 replays pass offline against tested SHA 5518954fd2faeb13e6e662ea5ff466d16d058d10; scorecard R3 remains 0. Local process-memory profiler/evidence and improved native-failure diagnostics are prepared but not yet pushed.",
+    "status": "PR #237 remote head e76f2fc73575474011bb52e1a6b34658cf9b8a80 is OPEN/MERGEABLE and all ten required checks have succeeded, including macOS, ASan and UBSan. The earlier macOS failure on 2f8e06d was not reproduced; its cause remains unconfirmed and the improved diagnostics stay in the test. Browser artifact 12622700135 reports 30/30 capture-ready bundles, and an independent replay passed for all 30 on tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The prior P2 review thread is resolved, but no fresh formal review decision is recorded for e76f2fc. The local benchmark/evidence package extends beyond the remote head and has not been pushed, so the green checks do not validate it.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -116,21 +119,25 @@
       "R3 readiness is OPEN: 30/30 base contracts, 30/30 closed entry rows, 0/30 host captures, 12 R2, 18 R0, R3 scorecard 0.",
       "Quality scorecard workingTreeDirty=false; v0.2.0 still reports 12/12 READY and remains frozen.",
       "Browser audit run 40253064496 on PR head 2f8e06d produced verified host evidence artifact 12620783908 (digest sha256:8940e61c01c11c7bbf3179b557d6adb4685ab0ffe83d3d7509de8079f7c75610); artifact readiness is 30/30 with 30 closed entry rows, and independent replay of all 30 passes for run 40253064496/tested SHA 5518954fd2faeb13e6e662ea5ff466d16d058d10; global quality scorecard R3 remains 0.",
-      "Windows x64 native-process profile: 7 runs, median sampled working set 5,181,440 bytes, median private usage 737,280 bytes, minimum 110 live samples; compiler, source, fixture, runtime input, executable and stdout hashes are recorded in validation/m1-pendulum-process-memory.json."
+      "Windows x64 native-process profile: 7 runs, median sampled working set 5,181,440 bytes, median private usage 737,280 bytes, minimum 110 live samples; compiler, source, fixture, runtime input, executable and stdout hashes are recorded in validation/m1-pendulum-process-memory.json.",
+      "Benchmark runner now stages and hashes the checked-in pendulum input in an isolated ignored directory, repeats native compilation when requested, and records compiler/executable SHA-256; 12 benchmark contract/page/Float-Quantity tests pass.",
+      "M1 timing evidence validation/m1-pendulum-performance-windows.json records a clean Windows 11 x64 run at benchmark commit 61ea27c with 5 compile samples and 7 interpreter/native samples; median compile 7,022.824 ms, interpreter end-to-end 209.013 ms, native end-to-end 14.175 ms. These include startup/input/analysis/SVG and are one-host evidence, not general speed claims.",
+      "Compiler SHA-256 ae1b5effd967b04cbe8b4f7dfd91b5e3246915c8d0e9339ab7079a8d19f97d66; generated executable SHA-256 da9e7b96f707997eaf1dd49cba9f459a06010cc6b6ed4f509486d14a5cdbea81; source SHA-256 ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923; input SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9.",
+      "Browser audit artifact 12622700135, SHA-256 d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404, is 30/30 capture-ready with 30 closed entry-effect rows. Offline replay independently matched all 30 R0/R1/R2 bundles for run 40254605182 and tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The global R3 score remains 0."
     ],
     "activePullRequests": [
       237
     ],
     "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
-    "evidenceRevision": "6bc76d56b45bdd55408639685f17e0869d578c2d",
-    "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231"
+    "evidenceRevision": "61ea27c43269245b7e9fdc75a2aba465eb1b57af",
+    "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
+    "benchmarkEvidencePath": "validation/m1-pendulum-performance-windows.json",
+    "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Commit and push the native-process memory profiler/evidence and macOS failure diagnostics, then require fresh exact-head CI and review; do not merge PR #237 without specific authorization.",
-    "PR #237 is open and mergeable; do not merge until explicit PR-specific authorization is confirmed.",
-    "PR #235 and #236 remain open, fully green and reviewed; await explicit PR-specific integration authorization.",
-    "Continue broader Measurement covariance, compiler typing/ownership and profiling only with separately validated evidence.",
-    "R3 artifact-level capture is 30/30 READY and all 30 archived replays pass, but scorecard R3 remains 0; decide and document the remaining promotion contract without claiming cross-platform equivalence."
+    "Push the local benchmark/evidence package to the existing PR #237 branch without merging; then require all checks on its new exact head and request a fresh review.",
+    "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
+    "Continue broader Measurement covariance, compiler typing/ownership, host-specific R3 promotion and performance work with separately validated evidence; the current M1 timing run is a one-host baseline and does not close Gate F."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
@@ -162,57 +169,68 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "Integration of PR #235, #236 and #237 awaits explicit PR-specific authorization; no merge has been performed.",
-    "R3 remains OPEN globally: the local report is 0/30 host captures, while CI artifact 12620783908 is structurally READY for 30/30 and all 30 archived replays passed; scorecard R3 stays 0.",
+    "The ten required checks are green on PR #237 head e76f2fc. The local benchmark/evidence package is not on that head; it needs a new exact-head CI run and fresh review after push. The earlier macOS failure on 2f8e06d was not reproduced on e76f2fc.",
+    "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
-    "Published v0.2.0 remains frozen; no tag or release action is authorized.",
-    "PR #237 fails the macOS compiler workflow on the pendulum native execution; the test now reports status/stdout/stderr, but the macOS cause remains unresolved."
+    "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
+    "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Commit the reproducible Windows process-memory profile package and macOS native failure diagnostics to the same PR, then inspect the exact new CI head, capture the new host evidence artifact and replay all 30 bundles; diagnose/fix the macOS native process result before seeking fresh review. Keep PR #237 open and v0.2.0 unchanged.",
+  "next": "Push the recorded Windows benchmark and R3 artifact evidence package to PR #237, request a fresh Codex review on the new head, and require all checks on that exact head. Keep the PR open unless the user explicitly authorizes merging.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "2f8e06d55995feef46c10487508de3aa932e7c0a",
+    "remoteHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
+    "reviewDecision": "",
     "runs": {
       "ostrinCi": {
-        "id": 40253064515,
-        "status": "failure"
+        "id": 40254605179,
+        "status": "success"
       },
       "browserAudit": {
-        "id": 40253064496,
+        "id": 40254605182,
         "status": "success"
       },
       "nativeSanitizers": {
-        "id": 40253064507,
-        "status": "in_progress",
-        "asan": "in_progress",
+        "id": 40254605451,
+        "status": "success",
+        "asan": "success",
         "ubsan": "success"
       },
       "codeql": {
-        "id": 40253064509,
+        "id": 40254605183,
         "status": "success"
       },
       "securityAudit": {
-        "id": 40253064545,
+        "id": 40254605202,
         "status": "success"
       }
     },
-    "openReviewThreads": [
+    "openReviewThreads": [],
+    "resolvedReviewThreads": [
       {
         "id": "PRRT_kwDOUfdO4s6wGlfN",
         "priority": "P2",
-        "reviewedHead": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb",
-        "status": "locally-fixed; reply and resolve after push"
+        "resolution": "resolved on GitHub; correction describes marginal u(T) including repeatability and shared clock-zero uncertainty"
       }
     ],
-    "resolvedReviewThreads": [],
     "review": {
-      "status": "commented-with-p2",
+      "status": "existing P2 resolved; no fresh formal review decision observed on e76f2fc",
       "head": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb"
     },
-    "note": "Exact remote head 2f8e06d: Browser audit and Website and browser checks passed, as did Linux and Windows compiler jobs, CodeQL and dependency audit. The macOS examples job failed in the pendulum workflow native process; an earlier attempt at the prior head had interpreter/native output mismatch. Native stderr was empty and the current assertion omitted process status/stdout, so the test now includes those diagnostics locally. UBSan passed; ASan is still running. No merge is authorized. R3 host evidence artifact 12620783908 passed offline replay for all 30 bundles, but quality-scorecard reproducibility.R3 remains 0."
+    "browserArtifact": {
+      "id": 12622700135,
+      "name": "ostrin-r3-host-evidence-40254605182-attempt-1",
+      "url": "https://github.com/sircalch/Ostrin/actions/runs/40254605182/artifacts/12622700135",
+      "digest": "sha256:d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404",
+      "testedSha": "70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a",
+      "captureReadyCount": 30,
+      "closedEntryEffectBundleCount": 30,
+      "independentlyReplayedBundles": 30,
+      "globalR3Score": 0
+    },
+    "note": "All ten required checks passed on the exact remote head e76f2fc. These checks do not validate the local benchmark/evidence package prepared after that head."
   },
   "remotePullRequestObservations": [
     {
@@ -290,6 +308,33 @@
         "securityAudit": "success"
       },
       "note": "Browser and website CI generated a 30/30 host-ready artifact whose 30 R0/R1/R2 replays independently passed for tested SHA 5518954fd2faeb13e6e662ea5ff466d16d058d10. This does not change the global R3 score (0)."
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "head": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "success",
+        "browserAudit": "success",
+        "nativeSanitizers": "success",
+        "codeql": "success",
+        "securityAudit": "success"
+      },
+      "review": {
+        "status": "existing P2 resolved; no new formal decision recorded on this head",
+        "openThreads": 0
+      },
+      "browserArtifact": {
+        "id": 12622700135,
+        "url": "https://github.com/sircalch/Ostrin/actions/runs/40254605182/artifacts/12622700135",
+        "digest": "sha256:d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404",
+        "testedSha": "70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a",
+        "replayedBundles": 30,
+        "globalR3Score": 0
+      },
+      "note": "Exact remote e76f2fc: all ten required checks, including ASan and UBSan, succeeded; macOS passed once after a failure on 2f8e06d whose cause remains unknown. All 30 artifact bundles independently replayed. The local performance/evidence package is not covered by these checks."
     }
   ]
 }
