@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizedTextSha256 } from "./benchmark-content-hash.mjs";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const reportPath = path.join(repositoryRoot, "target", "benchmarks", "benchmark.json");
@@ -74,6 +75,7 @@ function validateWorkload(errors, workload, index, report, root) {
     const sourceBytes = readFileSync(source);
     check(errors, workload.sourceBytes === sourceBytes.byteLength, `${label}: sourceBytes does not match the checked-in workload`);
     check(errors, workload.sourceSha256 === sha256(sourceBytes), `${label}: sourceSha256 does not match the checked-in workload`);
+    check(errors, workload.sourceContentSha256 === normalizedTextSha256(sourceBytes), `${label}: sourceContentSha256 does not match the normalized source text`);
   } else {
     check(errors, false, `${label}: workload source does not exist (${workload.workload})`);
   }
@@ -93,16 +95,20 @@ function validateWorkload(errors, workload, index, report, root) {
     check(errors, Number.isInteger(input.sizeBytes) && input.sizeBytes >= 0, `${inputLabel}: sizeBytes is invalid`);
     check(errors, /^[a-f0-9]{64}$/.test(input.sha256 || ""), `${inputLabel}: sha256 is invalid`);
     check(errors, input.stagedSha256 === input.sha256, `${inputLabel}: staged input hash differs from its source hash`);
+    check(errors, input.contentSha256 === null || /^[a-f0-9]{64}$/.test(input.contentSha256 || ""), `${inputLabel}: contentSha256 is invalid`);
+    check(errors, input.stagedContentSha256 === input.contentSha256, `${inputLabel}: staged content hash differs from its source content hash`);
     if (relativeInput && !relativeInput.startsWith("..") && !path.isAbsolute(relativeInput)
       && existsSync(inputPath) && statSync(inputPath).isFile()) {
       const inputBytes = readFileSync(inputPath);
       check(errors, input.sizeBytes === inputBytes.byteLength, `${inputLabel}: sizeBytes does not match the checked-in input`);
       check(errors, input.sha256 === sha256(inputBytes), `${inputLabel}: sha256 does not match the checked-in input`);
+      check(errors, input.contentSha256 === normalizedTextSha256(inputBytes), `${inputLabel}: contentSha256 does not match the normalized input text`);
     } else {
       check(errors, false, `${inputLabel}: input source is missing or not a file (${input.path})`);
     }
   }
   check(errors, /^[a-f0-9]{64}$/.test(workload.sourceSha256 || ""), `${label}: sourceSha256 is not a SHA-256 digest`);
+  check(errors, /^[a-f0-9]{64}$/.test(workload.sourceContentSha256 || ""), `${label}: sourceContentSha256 is not a SHA-256 digest`);
   check(errors, /^[a-f0-9]{64}$/.test(workload.executableSha256 || ""), `${label}: executableSha256 is not a SHA-256 digest`);
   check(errors, /^[a-f0-9]{64}$/.test(workload.outputSha256 || ""), `${label}: outputSha256 is not a SHA-256 digest`);
   check(errors, Number.isInteger(report.iterations) && report.iterations >= 1, "report: iterations must be a positive integer");
@@ -170,6 +176,7 @@ export function validateBenchmarkReport(report, root = repositoryRoot) {
   check(errors, typeof nativeCompile?.cCompiler?.command === "string" && typeof nativeCompile?.cCompiler?.version === "string", "report: C compiler metadata is missing");
   check(errors, nativeCompile?.environment && Object.prototype.hasOwnProperty.call(nativeCompile.environment, "OSTRIN_CC") && Object.prototype.hasOwnProperty.call(nativeCompile.environment, "OSTRIN_CFLAGS"), "report: compiler environment inputs are missing");
   check(errors, typeof report.methodology?.clock === "string" && typeof report.methodology?.outputCheck === "string" && typeof report.methodology?.memory === "string", "report: benchmark methodology is incomplete");
+  check(errors, typeof report.methodology?.contentHashNormalization === "string" && report.methodology.contentHashNormalization.length > 0, "report: content hash normalization is undocumented");
 
   check(errors, Array.isArray(report.workloads) && report.workloads.length > 0, "report: no workloads recorded");
   for (const [index, workload] of (report.workloads || []).entries()) validateWorkload(errors, workload, index, report, root);

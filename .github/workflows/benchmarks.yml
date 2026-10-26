@@ -57,11 +57,11 @@ jobs:
       - name: Validate reproducibility contract
         run: |
           node scripts/benchmark-contract-check.mjs
-          node --test scripts/benchmark-contract-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs scripts/benchmark-runtime-inputs.test.mjs
+          node --test scripts/benchmark-content-hash.test.mjs scripts/benchmark-contract-check.test.mjs scripts/benchmark-matrix-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs scripts/benchmark-runtime-inputs.test.mjs
       - name: Publish benchmark summary
         shell: bash
         run: |
-          node -e 'const fs=require("node:fs"); const r=JSON.parse(fs.readFileSync("target/benchmarks/benchmark.json", "utf8")); const w=r.workloads[0]; const lines=[`### ${w.workload}`, `- Host: ${r.host.platform}/${r.host.arch} · ${r.host.cpu.model.trim()}`, `- Commit: ${r.commit}`, `- Compiler SHA-256: ${r.compilerSha256}`, `- Compile median (${w.nativeCompileStatistics.samples} samples): ${w.nativeCompileStatistics.medianMs} ms`, `- Interpreter median (${w.statistics.interpreter.samples} runs): ${w.interpreterMedianMs} ms`, `- Native median (${w.statistics.native.samples} runs): ${w.nativeMedianMs} ms`, `- End-to-end ratio: ${w.interpreterToNativeMedianRatio}x`, `- Timings include startup, runtime input, analysis, uncertainty propagation, and SVG generation. Runner timings are host-specific and are not a general speed claim.`]; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n")+"\n");'
+          node -e 'const fs=require("node:fs"); const r=JSON.parse(fs.readFileSync("target/benchmarks/benchmark.json", "utf8")); const w=r.workloads[0]; const lines=[`### ${w.workload}`, `- Host: ${r.host.platform}/${r.host.arch} · ${r.host.cpu.model.trim()}`, `- Commit: ${r.commit}`, `- Compiler SHA-256: ${r.compilerSha256}`, `- Normalized source SHA-256: ${w.sourceContentSha256}`, `- Compile median (${w.nativeCompileStatistics.samples} samples): ${w.nativeCompileStatistics.medianMs} ms`, `- Interpreter median (${w.statistics.interpreter.samples} runs): ${w.interpreterMedianMs} ms`, `- Native median (${w.statistics.native.samples} runs): ${w.nativeMedianMs} ms`, `- End-to-end ratio: ${w.interpreterToNativeMedianRatio}x`, `- Timings include startup, runtime input, analysis, uncertainty propagation, and SVG generation. Runner timings are host-specific and are not a general speed claim.`]; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n")+"\n");'
       - name: Upload benchmark artifact
         uses: actions/upload-artifact@v4
         with:
@@ -69,3 +69,25 @@ jobs:
           path: target/benchmarks/benchmark.json
           if-no-files-found: error
           retention-days: 30
+
+  cross-platform-provenance:
+    name: Cross-platform provenance
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Download platform benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ostrin-benchmark-*-${{ github.sha }}
+          path: target/benchmarks/ci-matrix
+          merge-multiple: false
+      - name: Compare cross-platform provenance and output
+        run: node scripts/benchmark-matrix-check.mjs target/benchmarks/ci-matrix

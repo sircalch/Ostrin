@@ -19,6 +19,7 @@ import {
   repositoryRelativeWorkloadPath,
   runtimeInputFilesFor,
 } from "./benchmark-runtime-inputs.mjs";
+import { normalizedTextSha256 } from "./benchmark-content-hash.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(scriptDir, "..");
@@ -226,6 +227,8 @@ function runtimeContextFor(sourcePath, index) {
       sizeBytes: bytes.byteLength,
       sha256: digest,
       stagedSha256: stagedDigest,
+      contentSha256: normalizedTextSha256(bytes),
+      stagedContentSha256: normalizedTextSha256(readFileSync(destination)),
     };
   });
   return { cwd, inputs };
@@ -281,6 +284,7 @@ function benchmarkWorkload(sourcePath, index) {
     workload: sourcePath.replaceAll("\\", "/"),
     sourceBytes: sourceBytes.byteLength,
     sourceSha256: outputHash(sourceBytes),
+    sourceContentSha256: normalizedTextSha256(sourceBytes),
     executableSha256,
     runtimeInputs: runtimeContext.inputs,
     outputBytes: Buffer.byteLength(expected),
@@ -326,6 +330,7 @@ const report = {
   methodology: {
     clock: "node:perf_hooks performance.now wall-clock process duration",
     outputCheck: "normalized UTF-8 stdout must match interpreter and native output exactly",
+    contentHashNormalization: "sourceContentSha256 and runtime input contentSha256 hash UTF-8 text after converting CRLF and CR line endings to LF; sourceSha256 and runtime input sha256 hash exact worktree bytes",
     quantityFloatPair,
     memory: "not captured; peak child RSS and allocation counters are a planned metric",
   },

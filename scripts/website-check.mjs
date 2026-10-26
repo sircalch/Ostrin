@@ -389,6 +389,7 @@ const benchmarks = read("website/benchmarks.html");
 check(benchmarks.includes('<script src="benchmark-data.js" defer></script>'), "benchmarks.html: missing generated benchmark data");
 check(benchmarks.includes('<script src="benchmarks.js" defer></script>'), "benchmarks.html: missing benchmark renderer");
 check(benchmarks.includes("data-benchmark-rows"), "benchmarks.html: missing benchmark table");
+check(benchmarks.includes("data-benchmark-source-hash"), "benchmarks.html: missing normalized source identity");
 const benchmarkData = read("website/benchmark-data.js");
 check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.includes('"schema": 1'),
   "website/benchmark-data.js: missing generated benchmark record");

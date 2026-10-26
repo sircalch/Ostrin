@@ -100,7 +100,7 @@
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 is OPEN/MERGEABLE at exact remote head 8588634. The workload-path correction, absolute OSTRIN_COMPILER resolution, and successful-analysis-output guard are present. Fresh exact-head checks were queued or in progress at the last observation: Ostrin CI queued; benchmark, security, CodeQL, Browser audit, and native sanitizers running. A fresh Codex review was requested for 8588634 after the relative-compiler correction. Prior af2044d benchmark jobs passed on Ubuntu and Windows Server 2025; macOS was canceled when 8588634 was pushed. Local Windows validation with a relative OSTRIN_COMPILER and ./ workload passed; 15 benchmark tests and the report contract pass. The workflow is now also being adjusted locally so its matrix explicitly exercises the relative compiler path on all three runners; that change and this checkpoint still need commit/push and a fresh exact-head validation. Keep #237 open.",
+    "status": "PR #237 remains OPEN/MERGEABLE at exact remote head 977042e831fefddc4c3b5853c089081e912e51b0, base 69c962dee40a4b12606d131df0e8655b90924516. All six exact-head workflows completed successfully: Ostrin CI, Browser audit, native sanitizers, CodeQL, Security audit, and compiler benchmarks. The first Windows benchmark attempt failed on native iteration 5 with index out of bounds: 1; targeted retry job 121689344184 succeeded and uploaded Windows artifact 12665882385. Linux/macOS/Windows reports have the same output SHA-256. Inspection found raw source/input hashes differ on Windows because its checkout uses CRLF; the local benchmark report confirms LF-normalized source/input content hashes. A local package now adds normalized content hashes, a three-platform identity/output gate, focused tests, docs and visible website provenance. Local benchmark contract, 23 benchmark JS tests, website-check, project-plan-check, linguist-check and v0.2-readiness-check pass. These local edits are not yet committed or remotely validated. The latest GitHub Codex review is for af2044d, not 977042e; two older P2 threads remain unresolved/outdated. Keep PR #237 open.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -127,7 +127,10 @@
       "Compiler SHA-256 ae1b5effd967b04cbe8b4f7dfd91b5e3246915c8d0e9339ab7079a8d19f97d66; generated executable SHA-256 da9e7b96f707997eaf1dd49cba9f459a06010cc6b6ed4f509486d14a5cdbea81; source SHA-256 ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923; input SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9.",
       "Browser audit artifact 12622700135, SHA-256 d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404, is 30/30 capture-ready with 30 closed entry-effect rows. Offline replay independently matched all 30 R0/R1/R2 bundles for run 40254605182 and tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The global R3 score remains 0.",
       "Benchmark workload path canonicalization covers canonical, ./, backslash-relative and absolute paths, while outside-repository paths receive no fixture inputs; the new 2 regression tests and all 14 related benchmark JS tests pass. The benchmark contract checker passes, and a local Windows 11 full-style run (5 compile, 7 interpreter, 7 native samples) completed with the expected scientific output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3; this run used a dirty worktree and is diagnostic, not a clean released benchmark record.",
-      "Benchmark workload aliases canonical, ./, backslash-relative and absolute are normalized before runtime input and pair-contract selection. Fourteen prior benchmark tests plus the new output-error guard test now pass (15 total); the contract checker and actual local Windows run with relative OSTRIN_COMPILER plus ./ workload pass. The run staged data.json SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9 and produced scientific output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3. This local diagnostic was run from a dirty worktree and is not a clean cross-platform performance record."
+      "Benchmark workload aliases canonical, ./, backslash-relative and absolute are normalized before runtime input and pair-contract selection. Fourteen prior benchmark tests plus the new output-error guard test now pass (15 total); the contract checker and actual local Windows run with relative OSTRIN_COMPILER plus ./ workload pass. The run staged data.json SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9 and produced scientific output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3. This local diagnostic was run from a dirty worktree and is not a clean cross-platform performance record.",
+      "pr-237-head-977042e-six-workflows-green-after-windows-benchmark-retry-job-121689344184",
+      "pr-237-linux-macos-windows-benchmark-output-sha-equal-16853e67-windows-artifact-12665882385-digest-c213c57be8eed22fec7016fa59d4c9c1a999ed3909cc782234158a23d9020b1e",
+      "pr-237-cross-platform-raw-source-and-input-sha-differ-by-windows-crlf-checkout; local-canonical-content-hash-and-matrix-gate-implementation-pending-exact-head-validation"
     ],
     "activePullRequests": [
       237
@@ -139,7 +142,7 @@
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Commit and push the CI matrix configuration that supplies a relative OSTRIN_COMPILER path on each OS, with this checkpoint. Then require fresh exact-head checks and review; keep PR #237 open.",
+    "Commit and push the canonical benchmark content hashes, platform matrix identity/output gate, website/docs changes and this checkpoint to the existing PR #237; then require fresh exact-head checks and review. Do not merge #237.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, host-specific R3 promotion and performance work with separately validated evidence; the current M1 timing run is a one-host baseline and does not close Gate F."
   ],
@@ -173,80 +176,76 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #237 has two older P2 review threads on scripts/benchmark.mjs. Workload-path normalization is on af2044d and relative compiler-path resolution plus rejection of analysis-error output is on 8588634; both corrections pass locally, but fresh review on 8588634 is pending. The new head checks are still running. Add CI coverage for the relative compiler override on Ubuntu/macOS/Windows, then verify exact-head workflows and review before resolving threads.",
+    "PR #237 has two older unresolved/outdated P2 review threads; fixes are present, but latest GitHub review is for af2044d, not current head 977042e. Exact 977042e CI is green after a successful Windows retry; new local canonical-hash/matrix-gate changes require their own exact-head validation and fresh review before any integration.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Commit and push the workflow change that exercises a relative OSTRIN_COMPILER path in the Ubuntu/macOS/Windows benchmark matrix and the updated checkpoint. Validate the new exact head and wait for fresh review; resolve findings only after confirming their fixes on that head. Keep #237 open unless explicitly authorized.",
+  "next": "Finish review of the local normalized-hash and cross-platform gate diff, commit/push it to PR #237, request fresh review for the new head, then require all exact-head CI checks before further integration decisions.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "858863465d954854a722f034bbbe31149a4c2dd8",
+    "remoteHead": "977042e831fefddc4c3b5853c089081e912e51b0",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
-    "reviewDecision": "",
-    "runs": {
+    "checks": {
       "ostrinCi": {
-        "id": 40354407982,
-        "status": "queued"
+        "id": 40354860107,
+        "status": "success"
       },
       "browserAudit": {
-        "id": 40354407888,
-        "status": "in_progress"
+        "id": 40354859894,
+        "status": "success"
       },
       "nativeSanitizers": {
-        "id": 40354407914,
-        "status": "in_progress"
+        "id": 40354860335,
+        "status": "success"
       },
       "codeql": {
-        "id": 40354407803,
-        "status": "in_progress"
+        "id": 40354860214,
+        "status": "success"
       },
       "securityAudit": {
-        "id": 40354407878,
-        "status": "in_progress"
+        "id": 40354859816,
+        "status": "success"
       },
       "compilerBenchmarks": {
-        "id": 40354407908,
-        "status": "in_progress",
-        "ubuntu": "in_progress",
-        "windows": "in_progress",
-        "macos": "in_progress"
+        "id": 40354859957,
+        "status": "success",
+        "ubuntu": "success",
+        "macos": "success",
+        "windows": "success-after-targeted-retry"
       }
+    },
+    "windowsBenchmarkRetry": {
+      "jobId": 121689344184,
+      "status": "success",
+      "artifactId": 12665882385,
+      "artifactDigest": "sha256:c213c57be8eed22fec7016fa59d4c9c1a999ed3909cc782234158a23d9020b1e",
+      "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+      "rawSourceSha256": "52810f9ba6697387cda3a7da70f13aab838081df88b7adba9f214d2ff3189216",
+      "rawInputSha256": "ffc54e19a9023676c1174140f5edede36458da04bc427aaa4adbcc51af6fd2b9"
+    },
+    "review": {
+      "latestSubmittedReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+      "status": "no GitHub review recorded for 977042e; two older P2 threads remain unresolved/outdated"
     },
     "openReviewThreads": [
       {
         "path": "scripts/benchmark.mjs",
         "priority": "P2",
-        "status": "corrected on af2044d; thread unresolved and outdated",
-        "summary": "Normalize workload paths before selecting runtime inputs."
+        "status": "unresolved-outdated",
+        "summary": "Canonicalize workload paths before selecting runtime inputs."
       },
       {
         "path": "scripts/benchmark.mjs",
         "priority": "P2",
-        "status": "corrected on 8588634; thread unresolved and outdated",
-        "summary": "Resolve relative OSTRIN_COMPILER before invoking it from the staged runtime directory."
+        "status": "unresolved-outdated",
+        "summary": "Resolve the compiler path before changing the runtime directory."
       }
     ],
-    "resolvedReviewThreads": [
-      {
-        "id": "PRRT_kwDOUfdO4s6wGlfN",
-        "priority": "P2",
-        "resolution": "marginal u(T) includes repeatability and shared clock-zero uncertainty"
-      },
-      {
-        "id": "PRRT_kwDOUfdO4s6wHTTa",
-        "priority": "P2",
-        "resolution": "gallery Run live verifies and stages the linked experiment bundle inputs"
-      }
-    ],
-    "review": {
-      "status": "fresh Codex review requested for 8588634; findings on prior heads have local/pushed fixes, but no fresh no-findings result yet",
-      "head": "858863465d954854a722f034bbbe31149a4c2dd8"
-    },
-    "note": "All status snapshots are for 8588634. Older head checks are not evidence for the new workflow matrix configuration."
+    "note": "These results are exact for 977042e. The local canonical-hash and cross-platform-matrix changes are not covered by these checks; do not merge on their basis."
   },
   "remotePullRequestObservations": [
     {
@@ -442,6 +441,42 @@
         "resolvedThreads": 2
       },
       "integration": "not merged; no PR #237 merge authorization"
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "observedAt": "2026-10-26",
+      "head": "977042e831fefddc4c3b5853c089081e912e51b0",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "success",
+        "browserAudit": "success",
+        "nativeSanitizers": "success",
+        "codeql": "success",
+        "securityAudit": "success",
+        "compilerBenchmarks": "success-after-windows-retry"
+      },
+      "windowsBenchmark": {
+        "initialJobId": 121684773760,
+        "initialResult": "failure-native-iteration-5-index-out-of-bounds-1",
+        "retryJobId": 121689344184,
+        "retryResult": "success",
+        "artifactId": 12665882385,
+        "artifactDigest": "sha256:c213c57be8eed22fec7016fa59d4c9c1a999ed3909cc782234158a23d9020b1e"
+      },
+      "crossPlatformEvidence": {
+        "sourceRevision": "977042e831fefddc4c3b5853c089081e912e51b0",
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "windowsLineEndings": "CRLF",
+        "unixLineEndings": "LF",
+        "interpretation": "raw source/input hashes are checkout-byte hashes; normalized content hash and aggregate CI gate are implemented locally but await exact-head validation"
+      },
+      "review": {
+        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+        "currentHeadReviewed": false,
+        "unresolvedThreads": 2
+      }
     }
   ]
 }
