@@ -32,6 +32,27 @@ una referencia gruesa del costo en la misma máquina; incluye arranque de proces
 envoltorios `Result`, ownership y gestión de mediciones, por lo que no aísla el
 costo del campo de identidad.
 
+La batería también incluye `viz_pendulum_calibration.ostrin`, el flujo científico
+M1. El runner copia su snapshot versionado a un directorio aislado dentro de
+`target/benchmarks/runtime-inputs`, registra ruta, tamaño y SHA-256 del snapshot,
+y comprueba que el hash copiado sea idéntico antes de medir. El intérprete y el
+binario nativo se ejecutan desde ese mismo directorio y sus salidas deben coincidir
+exactamente. Las duraciones interpretadas y nativas son de extremo a extremo:
+incluyen arranque del proceso, lectura del JSON, análisis, propagación de
+incertidumbre y renderizado SVG; no aíslan el tiempo del núcleo numérico. La
+compilación se mide aparte. `--compile-iterations N` repite esa medición y el
+informe conserva muestras, mediana y dispersión; por defecto se hace una sola
+compilación para limitar el costo de la batería completa.
+
+Para repetir la medición enfocada del flujo M1 con siete muestras de ejecución y
+cinco muestras de compilación:
+
+```text
+cargo build --release --manifest-path compiler/Cargo.toml
+node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5
+node scripts/benchmark-contract-check.mjs
+```
+
 El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
 manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
 mediciones son evidencia de una carga concreta; no representan por sí solas el

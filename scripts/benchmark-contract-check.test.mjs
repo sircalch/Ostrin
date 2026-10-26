@@ -21,7 +21,9 @@ function stats(samples) {
     minMs: sorted[0],
     maxMs: sorted.at(-1),
     meanMs: mean,
-    medianMs: sorted[1],
+    medianMs: sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)],
     p95Ms: lower === upper ? sorted[lower] : sorted[lower] + ((sorted[upper] - sorted[lower]) * (rank - lower)),
     stdevMs: Math.sqrt(variance),
   };
@@ -60,14 +62,18 @@ function fixture() {
     },
     iterations: 3,
     warmups: 1,
+    compileIterations: 3,
     workloads: [{
       index: 0,
       workload: relativeWorkload,
       sourceBytes: source.byteLength,
       sourceSha256: digest(source),
+      runtimeInputs: [],
       outputBytes: 1,
       outputSha256: "b".repeat(64),
       nativeCompileMs: 4,
+      nativeCompileMsSamples: [3, 4, 5],
+      nativeCompileStatistics: stats([3, 4, 5]),
       interpreterMs,
       nativeMs,
       statistics: { interpreter: stats(interpreterMs), native: stats(nativeMs) },
@@ -109,4 +115,37 @@ test("the ratio contract accounts for rounding amplified by a small native media
   assert.deepEqual(validateBenchmarkReport(report), []);
   workload.interpreterToNativeMedianRatio = 100;
   assert.ok(validateBenchmarkReport(report).some((error) => error.includes("ratio is not linked to medians")));
+});
+
+test("file-backed workloads bind staged runtime inputs to checked-in bytes", () => {
+  const report = fixture();
+  const relativeInput = "experiments/pendulum-calibration.inputs.json";
+  const input = readFileSync(path.join(repositoryRoot, relativeInput));
+  report.workloads[0].runtimeInputs = [{
+    path: relativeInput,
+    stagedAs: "data.json",
+    sizeBytes: input.byteLength,
+    sha256: digest(input),
+    stagedSha256: digest(input),
+  }];
+  assert.deepEqual(validateBenchmarkReport(report), []);
+
+  report.workloads[0].runtimeInputs[0].stagedAs = "../outside.json";
+  report.workloads[0].runtimeInputs[0].stagedSha256 = "c".repeat(64);
+  const errors = validateBenchmarkReport(report);
+  assert.ok(errors.some((error) => error.includes("stagedAs must stay within")));
+  assert.ok(errors.some((error) => error.includes("staged input hash differs")));
+
+  report.workloads[0].runtimeInputs[0].path = "";
+  assert.doesNotThrow(() => validateBenchmarkReport(report));
+  assert.ok(validateBenchmarkReport(report).some((error) => error.includes("source path escapes repository")));
+});
+
+test("compile timing samples and their median must match the declared compile count", () => {
+  const report = fixture();
+  report.workloads[0].nativeCompileMs = 100;
+  const errors = validateBenchmarkReport(report);
+  assert.ok(errors.some((error) => error.includes("native compile median is not linked")));
+  report.workloads[0].nativeCompileMsSamples.pop();
+  assert.ok(validateBenchmarkReport(report).some((error) => error.includes("nativeCompileMsSamples count")));
 });

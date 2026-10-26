@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -77,6 +77,31 @@ function validateWorkload(errors, workload, index, report, root) {
   } else {
     check(errors, false, `${label}: workload source does not exist (${workload.workload})`);
   }
+  const runtimeInputs = workload.runtimeInputs ?? [];
+  check(errors, Array.isArray(runtimeInputs), `${label}: runtimeInputs must be an array`);
+  for (const [inputIndex, input] of (Array.isArray(runtimeInputs) ? runtimeInputs : []).entries()) {
+    const inputLabel = `${label}.runtimeInputs[${inputIndex}]`;
+    check(errors, input && typeof input === "object", `${inputLabel}: input record is missing`);
+    if (!input || typeof input !== "object") continue;
+    const inputPath = path.resolve(root, input.path || "");
+    const relativeInput = path.relative(root, inputPath);
+    check(errors, relativeInput && !relativeInput.startsWith("..") && !path.isAbsolute(relativeInput), `${inputLabel}: source path escapes repository`);
+    check(errors, typeof input.stagedAs === "string" && input.stagedAs.length > 0
+      && !path.isAbsolute(input.stagedAs)
+      && !input.stagedAs.replaceAll("\\", "/").split("/").some((part) => part === ".."),
+    `${inputLabel}: stagedAs must stay within the staging directory`);
+    check(errors, Number.isInteger(input.sizeBytes) && input.sizeBytes >= 0, `${inputLabel}: sizeBytes is invalid`);
+    check(errors, /^[a-f0-9]{64}$/.test(input.sha256 || ""), `${inputLabel}: sha256 is invalid`);
+    check(errors, input.stagedSha256 === input.sha256, `${inputLabel}: staged input hash differs from its source hash`);
+    if (relativeInput && !relativeInput.startsWith("..") && !path.isAbsolute(relativeInput)
+      && existsSync(inputPath) && statSync(inputPath).isFile()) {
+      const inputBytes = readFileSync(inputPath);
+      check(errors, input.sizeBytes === inputBytes.byteLength, `${inputLabel}: sizeBytes does not match the checked-in input`);
+      check(errors, input.sha256 === sha256(inputBytes), `${inputLabel}: sha256 does not match the checked-in input`);
+    } else {
+      check(errors, false, `${inputLabel}: input source is missing or not a file (${input.path})`);
+    }
+  }
   check(errors, /^[a-f0-9]{64}$/.test(workload.sourceSha256 || ""), `${label}: sourceSha256 is not a SHA-256 digest`);
   check(errors, /^[a-f0-9]{64}$/.test(workload.outputSha256 || ""), `${label}: outputSha256 is not a SHA-256 digest`);
   check(errors, Number.isInteger(report.iterations) && report.iterations >= 1, "report: iterations must be a positive integer");
@@ -86,6 +111,13 @@ function validateWorkload(errors, workload, index, report, root) {
     if (!Array.isArray(samples) || samples.length === 0) continue;
     check(errors, samples.every((sample) => finite(sample) && sample >= 0), `${label}: ${mode}Ms contains an invalid duration`);
     validateStatistics(errors, workload.statistics?.[mode], samples, `${label}.${mode}`);
+  }
+  const compileSamples = workload.nativeCompileMsSamples;
+  check(errors, Array.isArray(compileSamples) && compileSamples.length === report.compileIterations, `${label}: nativeCompileMsSamples count does not match compileIterations`);
+  if (Array.isArray(compileSamples) && compileSamples.length > 0) {
+    check(errors, compileSamples.every((sample) => finite(sample) && sample >= 0), `${label}: nativeCompileMsSamples contains an invalid duration`);
+    validateStatistics(errors, workload.nativeCompileStatistics, compileSamples, `${label}.nativeCompile`);
+    check(errors, closeEnough(workload.nativeCompileMs, workload.nativeCompileStatistics?.medianMs), `${label}: native compile median is not linked to statistics`);
   }
   check(errors, closeEnough(workload.interpreterMedianMs, workload.statistics?.interpreter?.medianMs), `${label}: interpreter median is not linked to statistics`);
   check(errors, closeEnough(workload.nativeMedianMs, workload.statistics?.native?.medianMs), `${label}: native median is not linked to statistics`);
@@ -120,6 +152,7 @@ export function validateBenchmarkReport(report, root = repositoryRoot) {
   check(errors, /^v\d+/.test(report.node || ""), "report: Node.js version is missing");
   check(errors, Number.isInteger(report.iterations) && report.iterations >= 1, "report: iterations must be a positive integer");
   check(errors, Number.isInteger(report.warmups) && report.warmups >= 0, "report: warmups must be a non-negative integer");
+  check(errors, Number.isInteger(report.compileIterations) && report.compileIterations >= 1, "report: compileIterations must be a positive integer");
 
   const host = report.host;
   check(errors, host && typeof host === "object", "report: host metadata is missing");
