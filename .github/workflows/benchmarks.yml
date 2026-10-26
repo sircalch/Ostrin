@@ -55,7 +55,7 @@ jobs:
       - name: Validate reproducibility contract
         run: |
           node scripts/benchmark-contract-check.mjs
-          node --test scripts/benchmark-contract-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs
+          node --test scripts/benchmark-contract-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs scripts/benchmark-runtime-inputs.test.mjs
       - name: Publish benchmark summary
         shell: bash
         run: |

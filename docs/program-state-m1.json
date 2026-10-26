@@ -14,7 +14,7 @@
     "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "lastValidatedRemotePullRequestHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
-    "lastObservedRemotePullRequestHead": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
+    "lastObservedRemotePullRequestHead": "092e64c04bde04ba327195612aacd1357c3c43ff",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -92,13 +92,14 @@
     "macos-native-failure-diagnostic-improved-and-focused-windows-test-passed",
     "m1-benchmark-runner-stages-and-hashes-file-backed-runtime-inputs-and-repeats-compile-timings",
     "m1-pendulum-performance-windows-x64-recorded-5-compile-and-7-interpreter-native-samples-on-61ea27c",
-    "pr237-e76f2fc-browser-artifact-replayed-all-30-bundles-tested-sha-70e5b4c"
+    "pr237-e76f2fc-browser-artifact-replayed-all-30-bundles-tested-sha-70e5b4c",
+    "benchmark-workload-path-canonicalization-two-regressions-and-local-windows-5-compile-7-interpreter-native-run"
   ],
   "currentPackage": {
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "At the last remote observation, PR #237 head 01f51f1001cbdea71a81a4c59f3be215b13c7a51 was OPEN/MERGEABLE. Compiler tests passed on Linux, macOS and Windows; CodeQL, Rust dependency audit, Browser audit and UBSan passed. The Website/browser CI job and ASan were still running. Fresh Codex review on that head found an open P2: the Viz gallery live runner omitted the bundle's data.json snapshot. The local fix verifies source and input SHA-256 values, passes verified inputs into browser WASI, and updates JSON-backed controls for interactive reruns. The focused Chromium gallery test, website check, lab-data consistency check, project-plan, Linguist and benchmark contract checks pass locally. The fix and multi-platform benchmark workflow update are not yet validated on GitHub. Previous head e76f2fc had all ten required checks green; its macOS failure on 2f8e06d was not reproduced and its cause remains unknown. Browser artifact 12622700135 was replayed against tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a, with all 30 bundles matching; global R3 remains 0.",
+    "status": "PR #237 is OPEN/MERGEABLE at remote head 092e64c. The gallery input-staging fix and cross-platform benchmark workflow are present. Exact-head review found one open P2 in scripts/benchmark.mjs: workload aliases such as ./examples/... and absolute paths did not select registered runtime inputs. That correction is implemented locally, covered by two new tests, and exercised by a full local Windows 11 run (5 native compiles, 7 interpreter and 7 native runs; output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3); it is not pushed yet. Exact-head compiler benchmarks run 40257492360 passed on Ubuntu/macOS and failed on Windows Server 2025 at native warmup with Ostrin index out of bounds: 5. Local Windows 11 does not reproduce this host-specific failure. Ostrin CI, Browser audit and Native sanitizers were still in progress at the last observation; CodeQL and Security audit succeeded. Keep #237 open and do not infer that checks for older heads validate this correction.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -120,10 +121,11 @@
       "Quality scorecard workingTreeDirty=false; v0.2.0 still reports 12/12 READY and remains frozen.",
       "Browser audit run 40253064496 on PR head 2f8e06d produced verified host evidence artifact 12620783908 (digest sha256:8940e61c01c11c7bbf3179b557d6adb4685ab0ffe83d3d7509de8079f7c75610); artifact readiness is 30/30 with 30 closed entry rows, and independent replay of all 30 passes for run 40253064496/tested SHA 5518954fd2faeb13e6e662ea5ff466d16d058d10; global quality scorecard R3 remains 0.",
       "Windows x64 native-process profile: 7 runs, median sampled working set 5,181,440 bytes, median private usage 737,280 bytes, minimum 110 live samples; compiler, source, fixture, runtime input, executable and stdout hashes are recorded in validation/m1-pendulum-process-memory.json.",
-      "Benchmark runner now stages and hashes the checked-in pendulum input in an isolated ignored directory, repeats native compilation when requested, and records compiler/executable SHA-256; 12 benchmark contract/page/Float-Quantity tests pass.",
+      "Benchmark runner now stages and hashes the checked-in pendulum input in an isolated ignored directory, repeats native compilation when requested, and records compiler/executable SHA-256; 14 benchmark contract/page/Float-Quantity/runtime-input tests pass.",
       "M1 timing evidence validation/m1-pendulum-performance-windows.json records a clean Windows 11 x64 run at benchmark commit 61ea27c with 5 compile samples and 7 interpreter/native samples; median compile 7,022.824 ms, interpreter end-to-end 209.013 ms, native end-to-end 14.175 ms. These include startup/input/analysis/SVG and are one-host evidence, not general speed claims.",
       "Compiler SHA-256 ae1b5effd967b04cbe8b4f7dfd91b5e3246915c8d0e9339ab7079a8d19f97d66; generated executable SHA-256 da9e7b96f707997eaf1dd49cba9f459a06010cc6b6ed4f509486d14a5cdbea81; source SHA-256 ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923; input SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9.",
-      "Browser audit artifact 12622700135, SHA-256 d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404, is 30/30 capture-ready with 30 closed entry-effect rows. Offline replay independently matched all 30 R0/R1/R2 bundles for run 40254605182 and tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The global R3 score remains 0."
+      "Browser audit artifact 12622700135, SHA-256 d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404, is 30/30 capture-ready with 30 closed entry-effect rows. Offline replay independently matched all 30 R0/R1/R2 bundles for run 40254605182 and tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The global R3 score remains 0.",
+      "Benchmark workload path canonicalization covers canonical, ./, backslash-relative and absolute paths, while outside-repository paths receive no fixture inputs; the new 2 regression tests and all 14 related benchmark JS tests pass. The benchmark contract checker passes, and a local Windows 11 full-style run (5 compile, 7 interpreter, 7 native samples) completed with the expected scientific output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3; this run used a dirty worktree and is diagnostic, not a clean released benchmark record."
     ],
     "activePullRequests": [
       237
@@ -135,7 +137,7 @@
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Push the locally validated PR #237 P2 correction and cross-platform benchmark workflow update; then require checks and a fresh review on the exact new head. Keep PR #237 open.",
+    "Commit and push the benchmark workload-path correction and its regression tests to PR #237; require fresh exact-head checks and review. Investigate the Windows Server 2025 native warmup failure (index out of bounds: 5) if it recurs; keep PR #237 open.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, host-specific R3 promotion and performance work with separately validated evidence; the current M1 timing run is a one-host baseline and does not close Gate F."
   ],
@@ -169,68 +171,75 @@
     "note": "All 8 post-merge checks for main SHA 0a3a824 completed successfully. R3 host-evidence artifact 12581253033 (SHA-256 b784c8ea765717765ee6057d0f302c352c889c99d8611a9ec229aefd1131bbd3) was inspected: 29 bundle records and 116 manifest file hash/size pairs match; every record and receipt identifies tested/head SHA 0a3a824. This closes artifact inspection, not cross-platform reproducibility claims."
   },
   "blockers": [
-    "PR #237 has an open P2 review finding on head 01f51f1: Viz Run live did not stage its data.json input. A fix and browser regression test pass locally but are not yet on GitHub. Publish them and validate the exact new head. Earlier head e76f2fc passed its required checks; the one-off macOS failure on 2f8e06d remains unexplained.",
+    "PR #237 has one open P2 on head 092e64c: canonicalize workload paths before selecting runtime inputs. The correction now passes locally but is not pushed; resolve only after the fix is present and reviewed on a new exact head. The compiler benchmark workflow for 092e64c failed on Windows Server 2025 during native warmup with index out of bounds: 5; Ubuntu/macOS passed. A local Windows 11 5+7 sample run passed, so hosted Windows behavior still needs exact-head verification.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Push the locally validated gallery input-staging fix and the benchmark workflow matrix to PR #237; resolve the P2 only after the fix is present, then require all checks and a fresh review on the exact new head. Keep the PR open unless the user explicitly authorizes merging.",
+  "next": "Commit and push the canonical workload-path correction, its two regression tests and this checkpoint to PR #237. On the resulting head, verify every required check and fresh review. If Windows benchmark fails again, diagnose the native runtime failure rather than treating the Linux/macOS results or local Windows 11 run as cross-host clearance. Keep PR #237 open unless explicitly authorized.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
+    "remoteHead": "092e64c04bde04ba327195612aacd1357c3c43ff",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "reviewDecision": "",
     "runs": {
       "ostrinCi": {
-        "id": 40254605179,
-        "status": "success"
+        "id": 40257492215,
+        "status": "in_progress"
       },
       "browserAudit": {
-        "id": 40254605182,
-        "status": "success"
+        "id": 40257492255,
+        "status": "in_progress"
       },
       "nativeSanitizers": {
-        "id": 40254605451,
-        "status": "success",
-        "asan": "success",
-        "ubsan": "success"
+        "id": 40257492226,
+        "status": "in_progress"
       },
       "codeql": {
-        "id": 40254605183,
+        "id": 40257492376,
         "status": "success"
       },
       "securityAudit": {
-        "id": 40254605202,
+        "id": 40257492261,
         "status": "success"
+      },
+      "compilerBenchmarks": {
+        "id": 40257492360,
+        "status": "failure",
+        "ubuntu": "success",
+        "macos": "success",
+        "windows": "failure at native warmup: Ostrin index out of bounds: 5",
+        "localWindows11Reproduction": "full-style 5 compile + 7 interpreter/native samples passed; diagnostic only"
       }
     },
-    "openReviewThreads": [],
+    "openReviewThreads": [
+      {
+        "path": "scripts/benchmark.mjs",
+        "priority": "P2",
+        "status": "corrected locally, not pushed",
+        "summary": "Normalize workload paths before runtime-input lookup; regression tests cover ./ and absolute paths."
+      }
+    ],
     "resolvedReviewThreads": [
       {
         "id": "PRRT_kwDOUfdO4s6wGlfN",
         "priority": "P2",
-        "resolution": "resolved on GitHub; correction describes marginal u(T) including repeatability and shared clock-zero uncertainty"
+        "resolution": "marginal u(T) includes repeatability and shared clock-zero uncertainty"
+      },
+      {
+        "id": "PRRT_kwDOUfdO4s6wHTTa",
+        "priority": "P2",
+        "resolution": "gallery Run live verifies and stages the linked experiment bundle inputs"
       }
     ],
     "review": {
-      "status": "existing P2 resolved; no fresh formal review decision observed on e76f2fc",
-      "head": "6ff483d9f269af94a7dc057e2b4896b2c8c02ddb"
+      "status": "fresh Codex review on this head found the open benchmark workload-path P2; local correction now passes regression and workflow tests but requires push and fresh exact-head review",
+      "head": "092e64c04bde04ba327195612aacd1357c3c43ff"
     },
-    "browserArtifact": {
-      "id": 12622700135,
-      "name": "ostrin-r3-host-evidence-40254605182-attempt-1",
-      "url": "https://github.com/sircalch/Ostrin/actions/runs/40254605182/artifacts/12622700135",
-      "digest": "sha256:d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404",
-      "testedSha": "70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a",
-      "captureReadyCount": 30,
-      "closedEntryEffectBundleCount": 30,
-      "independentlyReplayedBundles": 30,
-      "globalR3Score": 0
-    },
-    "note": "All ten required checks passed on the exact remote head e76f2fc. These checks do not validate the local benchmark/evidence package prepared after that head."
+    "note": "The exact 092e64c benchmark matrix has a Windows Server 2025 native warmup failure. Other exact-head workflows listed as in progress must be rechecked; results from earlier heads do not validate later commits."
   },
   "remotePullRequestObservations": [
     {
@@ -357,6 +366,29 @@
         "openThreads": 1
       },
       "integration": "not merged; no merge authorization for PR #237"
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "observedAt": "2026-10-26",
+      "head": "092e64c04bde04ba327195612aacd1357c3c43ff",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "in_progress",
+        "browserAudit": "in_progress",
+        "nativeSanitizers": "in_progress",
+        "codeql": "success",
+        "securityAudit": "success",
+        "compilerBenchmarks": "Windows failure (native warmup index out of bounds: 5); Ubuntu/macOS success"
+      },
+      "review": {
+        "head": "092e64c04bde04ba327195612aacd1357c3c43ff",
+        "status": "open P2 on scripts/benchmark.mjs: canonicalize workload paths before runtime-input selection; local correction and regression tests not yet pushed",
+        "openThreads": 1,
+        "resolvedThreads": 2
+      },
+      "integration": "not merged; no PR #237 merge authorization"
     }
   ]
 }

@@ -14,6 +14,10 @@ import {
   quantityArrayWorkload,
   validateCheckedInQuantityFloatPair,
 } from "./benchmark-pair-contract.mjs";
+import {
+  repositoryRelativeWorkloadPath,
+  runtimeInputFilesFor,
+} from "./benchmark-runtime-inputs.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(scriptDir, "..");
@@ -37,12 +41,6 @@ const defaultWorkloads = [
   "examples/viz_pendulum_calibration.ostrin",
 ];
 
-const runtimeInputFiles = new Map([
-  ["examples/viz_pendulum_calibration.ostrin", [
-    { path: "experiments/pendulum-calibration.inputs.json", stagedAs: "data.json" },
-  ]],
-]);
-
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
   return index === -1 ? fallback : Number(process.argv[index + 1]);
@@ -61,7 +59,9 @@ if (!Number.isInteger(iterations) || iterations < 1
   throw new Error("--iterations and --compile-iterations must be >= 1 and --warmups must be >= 0");
 }
 if (workloadPaths.length === 0) throw new Error("--workloads must contain at least one source path");
-const normalizedWorkloadPaths = workloadPaths.map((value) => value.replaceAll("\\", "/"));
+const normalizedWorkloadPaths = workloadPaths.map((value) => (
+  repositoryRelativeWorkloadPath(repo, value) || value.replaceAll("\\", "/")
+));
 if (normalizedWorkloadPaths.some((value) => value === floatArrayWorkload || value === quantityArrayWorkload)) {
   validateCheckedInQuantityFloatPair(repo);
 }
@@ -190,8 +190,7 @@ function executableName(source) {
 }
 
 function runtimeContextFor(sourcePath, index) {
-  const normalizedSourcePath = sourcePath.replaceAll("\\", "/");
-  const declaredInputs = runtimeInputFiles.get(normalizedSourcePath) || [];
+  const declaredInputs = runtimeInputFilesFor(repo, sourcePath);
   if (declaredInputs.length === 0) return { cwd: repo, inputs: [] };
 
   const stem = sourcePath.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
