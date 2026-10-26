@@ -53,11 +53,14 @@ node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin 
 node scripts/benchmark-contract-check.mjs
 ```
 
-El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
-manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
-mediciones son evidencia de una carga concreta; no representan por sí solas el
-rendimiento de todo el lenguaje. La ampliación prevista cubre arrays, cantidades,
-métodos numéricos y cargas científicas antes de establecer umbrales.
+El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) ejecuta el
+flujo file-backed del péndulo en Ubuntu, macOS y Windows cuando se solicita
+manualmente, cada lunes o cuando cambia el compilador, el runner o sus datos en
+un PR o en `main`. Cada plataforma conserva un artefacto separado por commit
+durante 30 días, con siete ejecuciones del intérprete, siete nativas y cinco
+compilaciones. Los runners compartidos varían entre ejecuciones: estos informes
+son mediciones con procedencia por host, no umbrales de regresión ni evidencia
+de velocidad general o equivalencia temporal entre sistemas.
 
 El historial local [`validation/benchmark-history.json`](../validation/benchmark-history.json)
 conserva ejecuciones reales de snapshots versionados. Cada entrada mantiene el
