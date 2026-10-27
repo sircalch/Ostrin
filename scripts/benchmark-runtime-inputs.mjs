@@ -24,7 +24,7 @@ export function runtimeInputFilesFor(repositoryRoot, sourcePath) {
 
 export function assertBenchmarkWorkloadSucceeded(stdout, stderr, label) {
   const diagnostic = `${stdout}\n${stderr}`.match(
-    /(?:^|\r?\n)\s*(?:input|fit|measurement|uncertainty) error:/i,
+    /(?:^|\r?\n)\s*(?:input|fit|measurement|uncertainty) error:[^\r\n]*/i,
   );
   if (diagnostic) {
     throw new Error(`${label} reported an analysis error instead of a benchmark result: ${diagnostic[0].trim()}`);

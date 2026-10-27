@@ -12638,26 +12638,59 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
         "pendulum workflow native compile failed: {}",
         String::from_utf8_lossy(&native_compile.stderr)
     );
-    let native = Command::new(&exe)
+    for repeat in 0..8 {
+        let native = Command::new(&exe)
+            .current_dir(&work)
+            .output()
+            .expect("failed to run native pendulum workflow");
+        assert!(
+            native.status.success(),
+            "pendulum workflow native run {repeat} failed with status {}:\nstdout:\n{}\nstderr:\n{}",
+            native.status,
+            String::from_utf8_lossy(&native.stdout),
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            interpreted_stdout,
+            "interpreter and native figure/report should match byte-for-byte on run {repeat}"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "pendulum workflow run {repeat} leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+
+    fs::remove_file(work.join("data.json")).expect("failed to remove pendulum input snapshot");
+    let missing_interpreter = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .arg("--run")
+        .arg(&source)
+        .output()
+        .expect("failed to check missing pendulum input in the interpreter");
+    assert!(missing_interpreter.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_interpreter.stdout).trim_end()
+            == "input error: could not read data.json",
+        "interpreter should report a stable missing-input error: {}",
+        String::from_utf8_lossy(&missing_interpreter.stdout)
+    );
+    let missing_native = Command::new(&exe)
         .current_dir(&work)
         .output()
-        .expect("failed to run native pendulum workflow");
+        .expect("failed to check missing pendulum input in the native binary");
+    assert!(missing_native.status.success());
     assert!(
-        native.status.success(),
-        "pendulum workflow native run failed with status {}:\nstdout:\n{}\nstderr:\n{}",
-        native.status,
-        String::from_utf8_lossy(&native.stdout),
-        String::from_utf8_lossy(&native.stderr)
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
-        interpreted_stdout,
-        "interpreter and native figure/report should match byte-for-byte"
+        String::from_utf8_lossy(&missing_native.stdout).trim_end()
+            == "input error: could not read data.json",
+        "native binary should report a stable missing-input error: {}",
+        String::from_utf8_lossy(&missing_native.stdout)
     );
     assert!(
-        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
-        "pendulum workflow leaked: {}",
-        String::from_utf8_lossy(&native.stderr)
+        String::from_utf8_lossy(&missing_native.stderr).contains("live_allocations=0"),
+        "missing-input native path leaked: {}",
+        String::from_utf8_lossy(&missing_native.stderr)
     );
     let _ = fs::remove_dir_all(&work);
 }

@@ -317,12 +317,14 @@ fn analyze(
 }
 
 fn main() -> Void {
-    loaded = read_file("data.json")
-    if loaded.is_err() {
-        print("input error: could not read data.json")
-        return
+    loaded = match read_file("data.json") {
+        Ok(contents) => contents,
+        Err(_message) => {
+            print("input error: could not read data.json")
+            return
+        },
     }
-    parsed = json.parse(loaded.unwrap())
+    parsed = json.parse(loaded)
     if parsed.is_err() {
         print("input error: data.json is not valid JSON")
         return

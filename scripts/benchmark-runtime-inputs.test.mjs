@@ -46,6 +46,6 @@ test("benchmark samples reject successful processes that print analysis-error di
   }
   assert.throws(
     () => assertBenchmarkWorkloadSucceeded("", "input error: missing data.json", "native"),
-    /reported an analysis error instead of a benchmark result/,
+    /reported an analysis error instead of a benchmark result: input error: missing data\.json/,
   );
 });
