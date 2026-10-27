@@ -12567,6 +12567,8 @@ fn pendulum_calibration_workflow_matches_interpreter_native_and_wasi_emission() 
     let _ = fs::remove_dir_all(&work);
     fs::create_dir_all(&work).expect("failed to create pendulum workflow input directory");
     let source = example_path("viz_pendulum_calibration.ostrin");
+    let staged_source = work.join("viz_pendulum_calibration.ostrin");
+    fs::copy(&source, &staged_source).expect("failed to stage pendulum source");
     let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../experiments/pendulum-calibration.inputs.json");
     fs::copy(&data, work.join("data.json")).expect("failed to stage pendulum input snapshot");
@@ -12580,7 +12582,7 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
     let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
         .current_dir(&work)
         .arg("--run")
-        .arg(&source)
+        .arg(&staged_source)
         .output()
         .expect("failed to run pendulum workflow in the interpreter");
     assert!(
@@ -12606,7 +12608,7 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
         .current_dir(&work)
         .args(["--emit-c", "--target", "wasm32-wasi", "--out"])
         .arg(&wasi_c)
-        .arg(&source)
+        .arg(&staged_source)
         .output()
         .expect("failed to emit pendulum workflow for WASI");
     assert!(
@@ -12626,7 +12628,7 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
     let native_compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
         .current_dir(&work)
         .args(["--compile", "--leak-check", "--out", &exe_text])
-        .arg(&source)
+        .arg(&staged_source)
         .output()
         .expect("failed to compile pendulum workflow natively");
     if skip_if_no_c_compiler(&native_compile) {
@@ -12666,7 +12668,7 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
     let missing_interpreter = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
         .current_dir(&work)
         .arg("--run")
-        .arg(&source)
+        .arg(&staged_source)
         .output()
         .expect("failed to check missing pendulum input in the interpreter");
     assert!(missing_interpreter.status.success());
