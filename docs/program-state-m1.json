@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-26",
+  "updatedAt": "2026-10-28",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -13,8 +13,8 @@
     "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
     "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
-    "lastValidatedRemotePullRequestHead": "f7bdd32526d38900eee234eeb67feca39d950529",
-    "lastObservedRemotePullRequestHead": "f7bdd32526d38900eee234eeb67feca39d950529",
+    "lastValidatedRemotePullRequestHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+    "lastObservedRemotePullRequestHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -148,7 +148,7 @@
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "Push the four local follow-up commits after f7bdd32 with a normal fast-forward, then require exact-new-head checks and a fresh formal review. Do not merge PR #237 without PR-specific authorization.",
+    "PR #237 is open and mergeable at exact head 0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a; all six required workflows are green. Fresh formal review for this head is still pending. Do not merge without PR-specific authorization.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, R3-profile boundaries, and performance work with separately validated evidence; current timing is host-specific and does not close Gate F."
   ],
@@ -200,49 +200,55 @@
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Push the four local follow-up commits to PR #237 with a normal fast-forward after confirming the remote head is still f7bdd32. Then verify checks on the new exact head and request fresh review; do not merge.",
+  "next": "Wait for fresh formal review on exact head 0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a; resolve any substantive findings, then leave PR #237 ready for explicit merge authorization.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "f7bdd32526d38900eee234eeb67feca39d950529",
+    "remoteHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "checks": {
       "ostrinCi": {
-        "id": 40359011293,
+        "id": 40449574751,
         "status": "success",
         "ubuntu": "success",
         "macos": "success",
         "windows": "success",
-        "websiteAndBrowser": "success"
+        "websiteAndBrowser": "success",
+        "runId": 40449574751
       },
       "browserAudit": {
-        "id": 40359011330,
+        "id": 40449574781,
         "status": "success",
         "artifactId": 12668290322,
-        "replayedBundles": 30
+        "replayedBundles": 30,
+        "runId": 40449574781
       },
       "nativeSanitizers": {
-        "id": 40359011304,
+        "id": 40449574760,
         "status": "success",
         "asan": "success",
-        "ubsan": "success"
+        "ubsan": "success",
+        "runId": 40449574760
       },
       "codeql": {
-        "id": 40359011337,
-        "status": "success"
+        "id": 40449574782,
+        "status": "success",
+        "runId": 40449574782
       },
       "securityAudit": {
-        "id": 40359011287,
-        "status": "success"
+        "id": 40449574747,
+        "status": "success",
+        "runId": 40449574747
       },
       "compilerBenchmarks": {
-        "id": 40359011261,
+        "id": 40449574816,
         "status": "success",
         "ubuntu": "success",
         "macos": "success",
         "windows": "success-after-retry",
-        "crossPlatformProvenance": "success"
+        "crossPlatformProvenance": "success",
+        "runId": 40449574816
       }
     },
     "windowsBenchmarkRetry": {
@@ -268,7 +274,10 @@
     },
     "review": {
       "latestSubmittedReviewHead": "af2044dac7",
-      "status": "no formal review on f7bdd32; two fixed-but-outdated P2 threads still need fresh exact-head review"
+      "status": "no formal review on f7bdd32; two fixed-but-outdated P2 threads still need fresh exact-head review",
+      "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+      "currentHeadReviewed": false,
+      "unresolvedOutdatedThreads": 2
     },
     "openReviewThreads": [
       {
@@ -284,7 +293,10 @@
         "summary": "Resolve relative compiler path before changing runtime directory; fix is present, but fresh exact-head review is needed."
       }
     ],
-    "localFollowUp": "four local commits after f7bdd32 contain duplicate benchmark matrix workload/input guards and checkpoint evidence; they are not included in these f7 checks."
+    "localFollowUp": "four local commits after f7bdd32 contain duplicate benchmark matrix workload/input guards and checkpoint evidence; they are not included in these f7 checks.",
+    "observedAt": "2026-10-28",
+    "head": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+    "integration": "not merged; no PR #237 merge authorization"
   },
   "remotePullRequestObservations": [
     {
@@ -595,6 +607,28 @@
         "digest": "sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0",
         "replayedBundles": 30,
         "globalR3Score": 0
+      },
+      "review": {
+        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+        "currentHeadReviewed": false,
+        "unresolvedOutdatedThreads": 2
+      },
+      "integration": "not merged; no PR #237 merge authorization"
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "observedAt": "2026-10-28",
+      "head": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "success",
+        "browserAudit": "success",
+        "nativeSanitizers": "success",
+        "compilerBenchmarks": "success",
+        "codeql": "success",
+        "securityAudit": "success"
       },
       "review": {
         "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
