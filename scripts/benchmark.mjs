@@ -239,6 +239,11 @@ function benchmarkWorkload(sourcePath, index) {
   if (!existsSync(source)) throw new Error(`workload not found: ${sourcePath}`);
   const sourceBytes = readFileSync(source);
   const runtimeContext = runtimeContextFor(sourcePath, index);
+  let runtimeInvocation = 0;
+  const runtimeCwd = () => runtimeContextFor(
+    sourcePath,
+    `${index}-${runtimeInvocation++}`,
+  ).cwd;
   const executable = executableName(sourcePath);
   const nativeCompileMs = [];
   for (let compileIteration = 0; compileIteration < compileIterations; compileIteration += 1) {
@@ -251,25 +256,25 @@ function benchmarkWorkload(sourcePath, index) {
   const executableSha256 = outputHash(readFileSync(executable));
 
   const expected = normalizeOutput(runBenchmarkWorkload(
-    compiler, ["--run", source], `interpreter warmup ${sourcePath}`, runtimeContext.cwd,
+    compiler, ["--run", source], `interpreter warmup ${sourcePath}`, runtimeCwd(),
   ).stdout);
   const nativeWarmup = normalizeOutput(runBenchmarkWorkload(
-    executable, [], `native warmup ${sourcePath}`, runtimeContext.cwd,
+    executable, [], `native warmup ${sourcePath}`, runtimeCwd(),
   ).stdout);
   if (expected !== nativeWarmup) {
     throw new Error(`interpreter/native output mismatch for ${sourcePath}:\ninterpreter=${expected}\nnative=${nativeWarmup}`);
   }
 
   for (let warmup = 0; warmup < warmups; warmup += 1) {
-    runBenchmarkWorkload(compiler, ["--run", source], `interpreter warmup ${sourcePath} ${warmup + 1}`, runtimeContext.cwd);
-    runBenchmarkWorkload(executable, [], `native warmup ${sourcePath} ${warmup + 1}`, runtimeContext.cwd);
+    runBenchmarkWorkload(compiler, ["--run", source], `interpreter warmup ${sourcePath} ${warmup + 1}`, runtimeCwd());
+    runBenchmarkWorkload(executable, [], `native warmup ${sourcePath} ${warmup + 1}`, runtimeCwd());
   }
 
   const interpreter = [];
   const native = [];
   for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const interpreted = runBenchmarkWorkload(compiler, ["--run", source], `interpreter iteration ${sourcePath} ${iteration + 1}`, runtimeContext.cwd);
-    const compiled = runBenchmarkWorkload(executable, [], `native iteration ${sourcePath} ${iteration + 1}`, runtimeContext.cwd);
+    const interpreted = runBenchmarkWorkload(compiler, ["--run", source], `interpreter iteration ${sourcePath} ${iteration + 1}`, runtimeCwd());
+    const compiled = runBenchmarkWorkload(executable, [], `native iteration ${sourcePath} ${iteration + 1}`, runtimeCwd());
     if (normalizeOutput(interpreted.stdout) !== expected || normalizeOutput(compiled.stdout) !== expected) {
       throw new Error(`output changed during iteration ${iteration + 1} for ${sourcePath}`);
     }
