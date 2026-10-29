@@ -12,6 +12,7 @@ import {
   compareQuantityFloatOutputs,
   floatArrayWorkload,
   quantityArrayWorkload,
+  selectQuantityFloatPair,
   validateCheckedInQuantityFloatPair,
 } from "./benchmark-pair-contract.mjs";
 import {
@@ -310,11 +311,14 @@ function benchmarkWorkload(sourcePath, index) {
   };
 }
 
-const measuredWorkloads = workloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index));
-const selectedFloatWorkload = measuredWorkloads.find((workload) => workload.workload === floatArrayWorkload);
-const selectedQuantityWorkload = measuredWorkloads.find((workload) => workload.workload === quantityArrayWorkload);
-const quantityFloatPair = selectedFloatWorkload && selectedQuantityWorkload
-  ? compareQuantityFloatOutputs(selectedFloatWorkload.normalizedOutput, selectedQuantityWorkload.normalizedOutput)
+// Use the repository-relative spelling for both execution and report selection.
+// Equivalent inputs such as `./examples/...` or an absolute path must still
+// select the checked-in float/quantity pair so the runtime comparison cannot
+// be silently skipped because of a spelling mismatch.
+const measuredWorkloads = normalizedWorkloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index));
+const selectedQuantityFloatPair = selectQuantityFloatPair(measuredWorkloads);
+const quantityFloatPair = selectedQuantityFloatPair
+  ? compareQuantityFloatOutputs(selectedQuantityFloatPair.float.normalizedOutput, selectedQuantityFloatPair.quantity.normalizedOutput)
   : null;
 const workloads = measuredWorkloads.map(({ normalizedOutput, ...workload }) => workload);
 
