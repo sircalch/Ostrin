@@ -13,8 +13,8 @@
     "sourceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "evidenceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
-    "lastValidatedRemotePullRequestHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
-    "lastObservedRemotePullRequestHead": "7d4679f67650460c2b2ac02d0c67a17425f38cde",
+    "lastValidatedRemotePullRequestHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
+    "lastObservedRemotePullRequestHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -96,13 +96,14 @@
     "benchmark-workload-path-canonicalization-two-regressions-and-local-windows-5-compile-7-interpreter-native-run",
     "benchmark-relative-compiler-override-local-run-and-analysis-error-output-guard-15-tests",
     "pr237-f7bdd32-cross-platform-normalized-hash-and-output-gate-green-after-windows-retry; browser-artifact-replay-all-30-and-read-random-evidence-verified",
-    "pr-237-review-p2-float-quantity-pair-selection-fixed-source-7d4679f"
+    "pr-237-review-p2-float-quantity-pair-selection-fixed-source-7d4679f",
+    "pr-237-head-1c08d0e-six-required-workflows-green-fresh-review-no-major-findings"
   ],
   "currentPackage": {
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 is OPEN/MERGEABLE at remote head 7d4679f67650460c2b2ac02d0c67a17425f38cde, base 69c962dee40a4b12606d131df0e8655b90924516. Source/evidence remains c885f7b; the follow-up fixes benchmark Float/Quantity pairing after workload-path normalization and adds a regression test. Exact-head CI and fresh review are required for 7d4679f. Do not merge.",
+    "status": "PR #237 is OPEN/MERGEABLE at remote head 1c08d0e76c49393869a1af988af47e9c4c17b8ca, base 69c962dee40a4b12606d131df0e8655b90924516. Source/evidence remains c885f7b; the follow-up fix at 7d4679f normalizes benchmark Float/Quantity pairing and adds a regression test. Six exact-head workflows are green and fresh review found no major issues. Do not merge without explicit authorization.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -140,7 +141,8 @@
       "pr-237-f7bdd32-all-six-exact-head-workflows-green; Windows benchmark retry passed; Browser artifact replayed 30/30; global R3 remains 0",
       "Local c885f7b package: pendulum scalar-key source check, focused interpreter/native/WASI/leak test, 20-iteration Windows native benchmark, website-check, 30 experiment replays, and 34 replay/oracle tests pass.",
       "Benchmark provenance P2 fixed in scripts/benchmark-contract-check.mjs and scripts/benchmark-matrix-check.mjs; missing or null runtimeInputs are now rejected with two regression tests.",
-      "Fresh review P2 fixed in scripts/benchmark.mjs: measured workloads now use normalized repository-relative names before Float/Quantity pairing; 22 focused benchmark tests pass and an equivalent ./ workload run reports quantityFloatPair."
+      "Fresh review P2 fixed in scripts/benchmark.mjs: measured workloads now use normalized repository-relative names before Float/Quantity pairing; 22 focused benchmark tests pass and an equivalent ./ workload run reports quantityFloatPair.",
+      "Exact 1c08d0e head: Ostrin CI 40820122832, Browser audit 40820122834, Native sanitizers 40820122977, Compiler benchmarks 40820122897, CodeQL 40820122820 and Security audit 40820122947 all succeeded; fresh Codex review 6488332772 found no major issues."
     ],
     "activePullRequests": [
       237
@@ -152,19 +154,19 @@
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "PR #237 is open and mergeable at exact head 7d4679f67650460c2b2ac02d0c67a17425f38cde; exact-head CI and fresh formal review are pending. The previous a259c067 head had Ostrin CI and macOS/Windows benchmark failures; those results do not validate 7d4679f. Do not merge without PR-specific authorization.",
+    "PR #237 is open and mergeable at exact head 1c08d0e76c49393869a1af988af47e9c4c17b8ca; all six required workflows and fresh review are green/no-major-findings. Do not merge without PR-specific authorization.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, R3-profile boundaries, and performance work with separately validated evidence; current timing is host-specific and does not close Gate F."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40359011293,
+    "runId": 40820122832,
     "status": "success",
-    "head": "f7bdd32526d38900eee234eeb67feca39d950529",
+    "head": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
     "relatedRuns": [
       {
         "workflow": "Browser audit",
-        "runId": 40359011330,
+        "runId": 40820122834,
         "status": "success",
         "replayedBundles": 30,
         "artifactId": 12668290322,
@@ -172,43 +174,43 @@
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 40359011304,
+        "runId": 40820122977,
         "status": "success",
         "asan": "success",
         "ubsan": "success"
       },
       {
         "workflow": "Compiler benchmarks",
-        "runId": 40359011261,
+        "runId": 40820122897,
         "status": "success",
         "windowsRetryJob": 121701086049,
         "crossPlatformJob": 121702374533
       },
       {
         "workflow": "CodeQL",
-        "runId": 40359011337,
+        "runId": 40820122820,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 40359011287,
+        "runId": 40820122947,
         "status": "success"
       }
     ],
-    "note": "All six exact f7bdd32 workflows are green. Windows native iteration 5 had one access-violation failure before its targeted retry passed; this remains recorded as a stability risk, not hidden by the retry. This validates f7 only; follow-up local benchmark-matrix duplicate rejection requires new exact-head CI."
+    "note": "All six exact 1c08d0e workflows are green. Native sanitizer and website/browser checks completed successfully; this validates 1c08d0e only."
   },
   "blockers": [
-    "The c885f7b remote head has not completed exact-head validation yet. Previous a259c067 failures were macOS focused parity and Windows/macOS benchmark instability; the scalar-input correction is locally stable but requires fresh CI and review. PR #237 remains unmerged and has no merge authorization.",
+    "PR #237 exact head 1c08d0e has six green workflows and fresh review with no major findings; it remains unmerged and has no merge authorization.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Wait for exact-head CI and fresh formal review on 7d4679f67650460c2b2ac02d0c67a17425f38cde; resolve any substantive findings, then leave PR #237 ready for explicit merge authorization.",
+  "next": "Leave PR #237 unmerged until explicit PR-specific authorization; continue the next M1 engineering block independently while preserving the validated source/evidence distinction.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "7d4679f67650460c2b2ac02d0c67a17425f38cde",
+    "remoteHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "checks": {
@@ -253,29 +255,29 @@
       }
     },
     "review": {
-      "latestSubmittedReviewHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
-      "latestGitHubReviewHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
-      "currentHeadReviewed": false,
-      "status": "runtimeInputs and normalized Float/Quantity pairing P2s fixed on 7d4679f; fresh exact-head review pending",
+      "latestSubmittedReviewHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
+      "latestGitHubReviewHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
+      "currentHeadReviewed": true,
+      "status": "runtimeInputs and normalized Float/Quantity pairing P2s fixed; fresh exact-head review found no major issues",
       "unresolvedOutdatedThreads": 2
     },
     "openReviewThreads": [
       {
         "path": "scripts/benchmark-contract-check.mjs",
         "priority": "P2",
-        "status": "fixed-pending-exact-head-review",
-        "summary": "Missing and null runtimeInputs are rejected; exact-head review and CI are pending."
+        "status": "outdated-fixed",
+        "summary": "Missing and null runtimeInputs are rejected; the thread is outdated after the fix and current-head review found no major issues."
       },
       {
         "path": "scripts/benchmark-matrix-check.mjs",
         "priority": "P2",
-        "status": "fixed-pending-exact-head-review",
-        "summary": "Missing and null runtimeInputs are rejected; exact-head review and CI are pending."
+        "status": "outdated-fixed",
+        "summary": "Missing and null runtimeInputs are rejected; the thread is outdated after the fix and current-head review found no major issues."
       }
     ],
-    "localFollowUp": "four local commits after f7bdd32 contain duplicate benchmark matrix workload/input guards and checkpoint evidence; they are not included in these f7 checks.",
+    "localFollowUp": "The normalized Float/Quantity pairing fix is included in 1c08d0e and covered by exact-head CI and fresh review; no unpushed follow-up commits remain.",
     "observedAt": "2026-10-29",
-    "head": "7d4679f67650460c2b2ac02d0c67a17425f38cde",
+    "head": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
     "integration": "not merged; no PR #237 merge authorization"
   },
   "remotePullRequestObservations": [
