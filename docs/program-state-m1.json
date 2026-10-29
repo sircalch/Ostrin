@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-28",
+  "updatedAt": "2026-10-29",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
-    "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
+    "sourceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
+    "evidenceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "lastValidatedRemotePullRequestHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
-    "lastObservedRemotePullRequestHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+    "lastObservedRemotePullRequestHead": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -101,7 +101,7 @@
     "name": "dimensional-pendulum-calibration-reference-workflow",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 is OPEN/MERGEABLE at remote head f7bdd32526d38900eee234eeb67feca39d950529, base 69c962dee40a4b12606d131df0e8655b90924516. All six exact-head workflows passed: Ostrin CI 40359011293, Browser audit 40359011330, native ASan/UBSan 40359011304, CodeQL 40359011337, Security audit 40359011287, and compiler benchmarks 40359011261 including cross-platform aggregation 121702374533. Windows benchmark job 121699076885 failed once at native iteration 5 with exit 3221225477 / 0xC0000005; retry 121701086049 passed. Browser artifact 12668290322 (sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0) independently replayed all 30 archived R0/R1/R2 bundles and matched read/random evidence. Local duplicate-entry guard and checkpoint commits are not part of f7 and require their own exact-head CI. Latest formal review is stale at af2044d, with two outdated P2 threads; keep PR #237 open and do not merge.",
+    "status": "PR #237 is OPEN/MERGEABLE at remote head c885f7b11ab85ed53f7dfc39fa506da1cb9060f7, base 69c962dee40a4b12606d131df0e8655b90924516. The latest package fixes the runtimeInputs provenance P2 in both benchmark validators, moves the pendulum fixture to six explicit scalar fields while retaining the documented arrays, regenerates the source-backed bundle and website figure, and requires fresh exact-head CI and review. Do not merge.",
     "scope": [
       "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
       "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
@@ -136,19 +136,21 @@
       "pr-237-head-f7bdd32-windows-benchmark-native-iteration-5-exit-3221225477; targeted retry initiated; cross-platform aggregate skipped pending all platform artifacts",
       "pr-237-f7bdd32-windows-benchmark-retry-job-121701086049-passed; cross-platform-provenance-job-121702374533-passed; Linux-macOS-Windows-artifacts-12667352616-12665894757-12668390302",
       "pr-237-f7bdd32-browser-run-40359011330-replayed-all-30-downloaded-bundles-and-verified-read-random-evidence-artifact-12668290322-digest-47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0",
-      "pr-237-f7bdd32-all-six-exact-head-workflows-green; Windows benchmark retry passed; Browser artifact replayed 30/30; global R3 remains 0"
+      "pr-237-f7bdd32-all-six-exact-head-workflows-green; Windows benchmark retry passed; Browser artifact replayed 30/30; global R3 remains 0",
+      "Local c885f7b package: pendulum scalar-key source check, focused interpreter/native/WASI/leak test, 20-iteration Windows native benchmark, website-check, 30 experiment replays, and 34 replay/oracle tests pass.",
+      "Benchmark provenance P2 fixed in scripts/benchmark-contract-check.mjs and scripts/benchmark-matrix-check.mjs; missing or null runtimeInputs are now rejected with two regression tests."
     ],
     "activePullRequests": [
       237
     ],
-    "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
-    "evidenceRevision": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
+    "sourceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
+    "evidenceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
     "benchmarkEvidencePath": "validation/m1-pendulum-performance-windows.json",
     "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
   },
   "pending": [
-    "PR #237 is open and mergeable at exact head 0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a; all six required workflows are green. Fresh formal review for this head is still pending. Do not merge without PR-specific authorization.",
+    "PR #237 is open and mergeable at exact head c885f7b11ab85ed53f7dfc39fa506da1cb9060f7; exact-head CI and fresh formal review are pending. The previous a259c067 head had Ostrin CI and macOS/Windows benchmark failures; those results do not validate c885f7b. Do not merge without PR-specific authorization.",
     "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
     "Continue broader Measurement covariance, compiler typing/ownership, R3-profile boundaries, and performance work with separately validated evidence; current timing is host-specific and does not close Gate F."
   ],
@@ -194,61 +196,37 @@
     "note": "All six exact f7bdd32 workflows are green. Windows native iteration 5 had one access-violation failure before its targeted retry passed; this remains recorded as a stability risk, not hidden by the retry. This validates f7 only; follow-up local benchmark-matrix duplicate rejection requires new exact-head CI."
   },
   "blockers": [
-    "The f7bdd32 remote head is fully green across six workflows, but the latest formal review is stale at af2044d and two outdated P2 threads need fresh review. Four local follow-up commits are not part of f7 and require exact-head CI after push; PR #237 remains unmerged and has no merge authorization.",
+    "The c885f7b remote head has not completed exact-head validation yet. Previous a259c067 failures were macOS focused parity and Windows/macOS benchmark instability; the scalar-input correction is locally stable but requires fresh CI and review. PR #237 remains unmerged and has no merge authorization.",
     "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
     "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
     "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
     "Published v0.2.0 remains frozen. No tag or new release action is authorized."
   ],
-  "next": "Wait for fresh formal review on exact head 0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a; resolve any substantive findings, then leave PR #237 ready for explicit merge authorization.",
+  "next": "Wait for exact-head CI and fresh formal review on c885f7b11ab85ed53f7dfc39fa506da1cb9060f7; resolve any substantive findings, then leave PR #237 ready for explicit merge authorization.",
   "latestPullRequestValidation": {
     "number": 237,
     "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+    "remoteHead": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "state": "open-mergeable",
     "checks": {
       "ostrinCi": {
-        "id": 40449574751,
-        "status": "success",
-        "ubuntu": "success",
-        "macos": "success",
-        "windows": "success",
-        "websiteAndBrowser": "success",
-        "runId": 40449574751
+        "status": "pending"
       },
       "browserAudit": {
-        "id": 40449574781,
-        "status": "success",
-        "artifactId": 12668290322,
-        "replayedBundles": 30,
-        "runId": 40449574781
+        "status": "pending"
       },
       "nativeSanitizers": {
-        "id": 40449574760,
-        "status": "success",
-        "asan": "success",
-        "ubsan": "success",
-        "runId": 40449574760
+        "status": "pending"
       },
       "codeql": {
-        "id": 40449574782,
-        "status": "success",
-        "runId": 40449574782
+        "status": "pending"
       },
       "securityAudit": {
-        "id": 40449574747,
-        "status": "success",
-        "runId": 40449574747
+        "status": "pending"
       },
       "compilerBenchmarks": {
-        "id": 40449574816,
-        "status": "success",
-        "ubuntu": "success",
-        "macos": "success",
-        "windows": "success-after-retry",
-        "crossPlatformProvenance": "success",
-        "runId": 40449574816
+        "status": "pending"
       }
     },
     "windowsBenchmarkRetry": {
@@ -273,29 +251,29 @@
       }
     },
     "review": {
-      "latestSubmittedReviewHead": "af2044dac7",
-      "status": "no formal review on f7bdd32; two fixed-but-outdated P2 threads still need fresh exact-head review",
-      "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
+      "latestSubmittedReviewHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+      "latestGitHubReviewHead": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
       "currentHeadReviewed": false,
+      "status": "runtimeInputs P2 fixed on c885f7b; fresh exact-head review pending",
       "unresolvedOutdatedThreads": 2
     },
     "openReviewThreads": [
       {
-        "path": "scripts/benchmark.mjs",
+        "path": "scripts/benchmark-contract-check.mjs",
         "priority": "P2",
-        "status": "unresolved-outdated",
-        "summary": "Canonicalize workload paths before selecting runtime inputs; fix is present, but fresh exact-head review is needed."
+        "status": "fixed-pending-exact-head-review",
+        "summary": "Missing and null runtimeInputs are rejected; exact-head review and CI are pending."
       },
       {
-        "path": "scripts/benchmark.mjs",
+        "path": "scripts/benchmark-matrix-check.mjs",
         "priority": "P2",
-        "status": "unresolved-outdated",
-        "summary": "Resolve relative compiler path before changing runtime directory; fix is present, but fresh exact-head review is needed."
+        "status": "fixed-pending-exact-head-review",
+        "summary": "Missing and null runtimeInputs are rejected; exact-head review and CI are pending."
       }
     ],
     "localFollowUp": "four local commits after f7bdd32 contain duplicate benchmark matrix workload/input guards and checkpoint evidence; they are not included in these f7 checks.",
-    "observedAt": "2026-10-28",
-    "head": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
+    "observedAt": "2026-10-29",
+    "head": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
     "integration": "not merged; no PR #237 merge authorization"
   },
   "remotePullRequestObservations": [
@@ -634,6 +612,35 @@
         "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
         "currentHeadReviewed": false,
         "unresolvedOutdatedThreads": 2
+      },
+      "integration": "not merged; no PR #237 merge authorization"
+    },
+    {
+      "number": 237,
+      "url": "https://github.com/sircalch/Ostrin/pull/237",
+      "observedAt": "2026-10-29",
+      "head": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
+      "base": "69c962dee40a4b12606d131df0e8655b90924516",
+      "state": "open-mergeable",
+      "checks": {
+        "ostrinCi": "pending",
+        "browserAudit": "pending",
+        "nativeSanitizers": "pending",
+        "compilerBenchmarks": "pending",
+        "codeql": "pending",
+        "securityAudit": "pending"
+      },
+      "review": {
+        "status": "runtimeInputs P2 fixed locally; fresh exact-head review pending",
+        "currentHeadReviewed": false,
+        "openThreads": 2
+      },
+      "localEvidence": {
+        "focusedPendulum": "pass",
+        "benchmarkIterations": 20,
+        "experimentReplays": 30,
+        "replayOracleTests": 34,
+        "website": "pass"
       },
       "integration": "not merged; no PR #237 merge authorization"
     }
