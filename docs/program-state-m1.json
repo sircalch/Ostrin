@@ -215,22 +215,22 @@
     "state": "open-mergeable",
     "checks": {
       "ostrinCi": {
-        "status": "pending"
+        "status": "success"
       },
       "browserAudit": {
-        "status": "pending"
+        "status": "success"
       },
       "nativeSanitizers": {
-        "status": "pending"
+        "status": "success"
       },
       "codeql": {
-        "status": "pending"
+        "status": "success"
       },
       "securityAudit": {
-        "status": "pending"
+        "status": "success"
       },
       "compilerBenchmarks": {
-        "status": "pending"
+        "status": "success"
       }
     },
     "windowsBenchmarkRetry": {
