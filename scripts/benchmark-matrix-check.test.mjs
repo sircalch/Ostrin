@@ -36,6 +36,16 @@ test("the matrix accepts identical content with host-specific raw hashes", () =>
   assert.deepEqual(validateBenchmarkMatrix(matrix()), []);
 });
 
+test("the matrix rejects missing or null runtime input provenance", () => {
+  const missing = matrix();
+  delete missing[0].report.workloads[0].runtimeInputs;
+  assert.ok(validateBenchmarkMatrix(missing).some((error) => error.includes("runtimeInputs must be an array")));
+
+  const nullValue = matrix();
+  nullValue[1].report.workloads[0].runtimeInputs = null;
+  assert.ok(validateBenchmarkMatrix(nullValue).some((error) => error.includes("runtimeInputs must be an array")));
+});
+
 test("the matrix rejects a platform with different source or output content", () => {
   const reports = matrix({
     "win32": { sourceContentSha256: "f".repeat(64) },

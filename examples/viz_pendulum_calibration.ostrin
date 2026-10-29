@@ -36,6 +36,41 @@ fn input_numbers(object: Value, key: String) -> Result<List<Float>, String> {
     Ok(output)
 }
 
+fn input_scalar_series(object: Value, key: String) -> Result<List<Float>, String> {
+    mut output: List<Float> = []
+    first = input_number(object, key + "_1")
+    second = input_number(object, key + "_2")
+    third = input_number(object, key + "_3")
+    fourth = input_number(object, key + "_4")
+    fifth = input_number(object, key + "_5")
+    sixth = input_number(object, key + "_6")
+    match first {
+        Ok(number) => output.push(number),
+        Err(message) => { return Err(message) },
+    }
+    match second {
+        Ok(number) => output.push(number),
+        Err(message) => { return Err(message) },
+    }
+    match third {
+        Ok(number) => output.push(number),
+        Err(message) => { return Err(message) },
+    }
+    match fourth {
+        Ok(number) => output.push(number),
+        Err(message) => { return Err(message) },
+    }
+    match fifth {
+        Ok(number) => output.push(number),
+        Err(message) => { return Err(message) },
+    }
+    match sixth {
+        Ok(number) => output.push(number),
+        Err(message) => { return Err(message) },
+    }
+    Ok(output)
+}
+
 fn measured_length(value: Float, repeat_sigma: Float, zero_sigma: Float, source_id: String) -> Result<Measurement<Quantity<Length>>, String> {
     reading = measurements.from_quantity_source(value * (1 m), repeat_sigma * (1 m), source_id, "independent length reading")
     match reading {
@@ -336,8 +371,8 @@ fn main() -> Void {
         return
     }
     config = parameters.unwrap()
-    lengths = input_numbers(config, "length_m")
-    periods = input_numbers(config, "period_s")
+    lengths = input_scalar_series(config, "length_m")
+    periods = input_scalar_series(config, "period_s")
     length_sigma = input_number(config, "length_repeat_sigma_m")
     period_sigma = input_number(config, "period_repeat_sigma_s")
     ruler_zero_sigma = input_number(config, "ruler_zero_sigma_m")

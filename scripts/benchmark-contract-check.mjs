@@ -79,7 +79,7 @@ function validateWorkload(errors, workload, index, report, root) {
   } else {
     check(errors, false, `${label}: workload source does not exist (${workload.workload})`);
   }
-  const runtimeInputs = workload.runtimeInputs ?? [];
+  const runtimeInputs = workload.runtimeInputs;
   check(errors, Array.isArray(runtimeInputs), `${label}: runtimeInputs must be an array`);
   for (const [inputIndex, input] of (Array.isArray(runtimeInputs) ? runtimeInputs : []).entries()) {
     const inputLabel = `${label}.runtimeInputs[${inputIndex}]`;

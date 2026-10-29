@@ -94,6 +94,16 @@ test("schema 3 report records source, host, compiler, content identity and timin
   assert.deepEqual(validateBenchmarkReport(fixture()), []);
 });
 
+test("the contract rejects missing or null runtime input provenance", () => {
+  const missing = fixture();
+  delete missing.workloads[0].runtimeInputs;
+  assert.ok(validateBenchmarkReport(missing).some((error) => error.includes("runtimeInputs must be an array")));
+
+  const nullValue = fixture();
+  nullValue.workloads[0].runtimeInputs = null;
+  assert.ok(validateBenchmarkReport(nullValue).some((error) => error.includes("runtimeInputs must be an array")));
+});
+
 test("the contract rejects a changed workload even when output metadata looks valid", () => {
   const report = fixture();
   report.workloads[0].sourceSha256 = "c".repeat(64);

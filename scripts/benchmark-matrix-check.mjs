@@ -26,7 +26,7 @@ function workloadMap(report, label, errors) {
 }
 
 function inputMap(workload, label, errors) {
-  const inputs = workload?.runtimeInputs ?? [];
+  const inputs = workload?.runtimeInputs;
   check(errors, Array.isArray(inputs), `${label}: runtimeInputs must be an array`);
   const map = new Map();
   for (const input of Array.isArray(inputs) ? inputs : []) {
