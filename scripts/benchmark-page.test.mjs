@@ -28,6 +28,7 @@ function report() {
       workload: "examples/benchmark_numeric.ostrin",
       sourceBytes: 10,
       sourceSha256: "b".repeat(64),
+      sourceContentSha256: "d".repeat(64),
       outputBytes: 1,
       outputSha256: "c".repeat(64),
       nativeCompileMs: 1,
@@ -44,6 +45,7 @@ test("benchmark page accepts schema 3 and preserves provenance fields", () => {
   assert.equal(data.schema, 1);
   assert.equal(data.host.os.release, "6");
   assert.deepEqual(data.nativeCompile.compilerManagedDefaults, ["-O2"]);
+  assert.equal(data.workloads[0].sourceContentSha256, "d".repeat(64));
   assert.deepEqual(data.methodology.quantityFloatPair, report().methodology.quantityFloatPair);
   assert.match(renderPageData(data), /globalThis\.OSTRIN_BENCHMARK/);
 });

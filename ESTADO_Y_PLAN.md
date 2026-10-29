@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte de trabajo: 2026-10-24 · PR #233 integrado en `main` en `0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714`; los ocho checks posteriores al merge están verdes · 6 pruebas diferenciales, 383 de integración y 33 unitarias en verde. `main` remoto permanece en `0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714`. `v0.2.0` permanece publicada e intacta desde el tag `29c24c0bd607822dbc2609a54bfcce545ca563f6`; no se prepara un nuevo tag. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59`. El perfil `SourceCovariance` experimental cubre hasta 64 fuentes escalares adimensionales; la covarianza dimensional/de arrays, el ownership general y las operaciones numéricas de arrays siguen abiertos. El paquete está validado localmente y espera revisión y CI del nuevo head.*
+*Corte de trabajo: 2026-10-25 · `main` remoto en `69c962dee40a4b12606d131df0e8655b90924516`; el paquete de workflow científico de referencia está en `codex/m1-reference-workflow`, con fuente corregida en `b2143dac1ee5573d2da662d1b607f21cc5c9f98f`, evidencia y sitio regenerados en `6bc76d56b45bdd55408639685f17e0869d578c2d`, y scorecard/estado del panel sin cambios respecto a `01839b3601dfe8ee1794321c9c5f0e79fab1f231`. La tabla ahora presenta `u(T)=0.0021 s` con el cero compartido del reloj incluido; el hallazgo P2 quedó corregido en `b2143da` y está subido en PR #237 (head `5f7670f`), abierto y sin fusionar; la revisión nueva sigue pendiente. En ese head, las pruebas previas del sitio y del navegador terminaron; el Browser audit falló después en `website-check` por una expectativa de puntuación obsoleta, aunque el texto mantiene los conteos actuales 6/384/33. El inventario contiene 306 ejemplos `.ostrin`; la suite registra 6 pruebas diferenciales, 384 de integración y 33 unitarias en verde. `v0.2.0` permanece publicada e intacta desde el tag `29c24c0bd607822dbc2609a54bfcce545ca563f6`; no se prepara un nuevo tag. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59`. El workflow de péndulo usa datos sintéticos y propaga incertidumbre de primer orden con doce fuentes independientes y dos fuentes compartidas; no demuestra soporte general, seguridad total de memoria ni reproducibilidad entre plataformas. El perfil `SourceCovariance` experimental cubre hasta 64 fuentes escalares adimensionales; la covarianza dimensional/de arrays, el ownership general, R3 y las operaciones numéricas de arrays siguen abiertos.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -521,16 +521,17 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   galería de proyectos externos verificables, sin fabricar repositorios ni contar forks;
 - convertir cada experimento de Viz en un bundle reproducible descargable con `source.ostrin`,
   datos, figuras, `provenance.json`, manifest, commit, hashes, semilla, parámetros, cámara y
-  comando de replay. Las 29 figuras source-backed de la galería ya publican `ostrin.experiment/v0`
-  como artefactos con cuatro archivos y hashes calculados; la CI del sitio ejecuta los 29 con
+  comando de replay. Las 30 figuras source-backed de la galería ya publican `ostrin.experiment/v0`
+  como artefactos con cuatro archivos y hashes calculados; la CI del sitio ejecuta los 30 con
   `ostrinc.wasm` y compara el SVG byte a byte. Los bundles 3D registran además sus parámetros y
-  cámara, y los de azar conservan su semilla declarada. `surface` y `lines` ya añaden cortes
-  ejecutables input-driven: `surface` lee `data.json` y `lines` consume `parameters.samples`;
-  `scripts/experiment-replay.mjs --all` descubre en el registro source-backed y verifica los once
+  cámara, y los de azar conservan su semilla declarada. `surface`, `lines` y
+  `pendulum-calibration` ya añaden cortes ejecutables input-driven: leen `data.json` o
+  `parameters.samples` con snapshots y sensibilidad declarados;
+  `scripts/experiment-replay.mjs --all` descubre en el registro source-backed y verifica los doce
   bundles R1/R2 en WASI, demostrando que repetir la misma entrada y semilla conserva el SVG y que cambiar la entrada declarada cambia la figura; CI ya no
   mantiene una lista manual de IDs. `surface` y `lines` fueron los primeros cortes R2 porque sus snapshots
-  `data.json`, capacidades de filesystem y sensibilidad de parámetros están verificadas; ahora los once
-  cortes input-driven reclaman R2, los nueve de azar sembrado conservan su evidencia R1 y el checkout local mantiene R3 pendiente, aunque Website CI 38162721694 ya produjo evidencia host-bound 29/29. `histogram` fue el primer corte
+  `data.json`, capacidades de filesystem y sensibilidad de parámetros están verificadas; ahora los doce
+  cortes input-driven reclaman R2, los nueve de azar sembrado conservan su evidencia R1 y el checkout local mantiene R3 pendiente. Website CI 38162721694 produjo evidencia host-bound 29/29 en aquel corte histórico. `histogram` fue el primer corte
   R1, `boxplot` el segundo, `scatter-fit` el tercero, `violin` el cuarto, `hexbin` el quinto, `bars` el sexto, `point-cloud` el séptimo, `fft` el octavo y `dashboard` el noveno: los nueve consumen `seed` desde `data.json`, registran
   algoritmo/versión/partición; el replay repite la misma semilla para exigir determinismo y después cambia la semilla para exigir una figura distinta.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
@@ -544,7 +545,7 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   la sensibilidad de semilla verificados como evidencia R1 dentro de R2. Los dieciocho bundles restantes conservan R0 por
   ser deterministas o no declarar todavía una sensibilidad de entradas compatible. El documento 26
   define el alcance exacto del replay y exige tolerancias abs/rel por métrica antes de comparar plataformas;
-  los runtime snapshots declaran que esa comparación aún no se ejecuta. Los 29 bundles ya incluyen un
+  los runtime snapshots declaran que esa comparación aún no se ejecuta. Los 30 bundles ya incluyen un
   resumen normalizado del reporte experimental y conservador de efectos del compilador, con hashes del
   analizador. Falta capturar metadatos del host, registrar tolerancias aplicadas en resultados comparativos,
   extender el contrato input-driven a más fixtures y conservar R3 como pendiente;
@@ -619,7 +620,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 383 de integración + 33 unitarias
+    cargo test                                   # 6 diferenciales + 384 de integración + 33 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

@@ -26,9 +26,9 @@ El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.
 Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
 un bundle R0/R1/R2 a R3.
 
-El checkout local tiene los **29/29 bundles con los campos base completos**, incluidos
-`execution`, dependencias y scheduler declarado. Los **0/29** locales están listos para R3
-porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
+El checkout local tiene los **30/30 bundles con los campos base completos**, incluidos
+`execution`, dependencias y scheduler declarado. Los **0/30** locales están listos para R3
+porque no deben falsificar la captura del host. Los 30 bundles ya incluyen un resumen normalizado del
 reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
 la marca de que el análisis es experimental y conservador. El resumen conserva las llamadas locales,
 las llamadas no resueltas, los bordes simbólicos, la asociación entre operación y destinos locales,
@@ -44,11 +44,11 @@ siendo un requisito explícito del auditor y no se rellena con valores sintétic
 
 En el snapshot local del head `7d80ee1609cfc059658f5b6af0f33580b9ad4e5d`, las 29 firmas de `main`
 están cerradas; el inventario agregado contiene 74 bordes simbólicos y cero bordes sin resolver.
-El reporte versionado permanece **0/29 READY** porque los bundles locales no deben fingir una captura
+El reporte versionado permanece **0/30 READY** porque los bundles locales no deben fingir una captura
 de host.
 
 Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
-regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
+regenera los 30 bundles. En ese modo cada snapshot registra solo metadatos públicos
 del runner (`RUNNER_OS`, arquitectura, imagen, Node, WASI y hardware visible del proceso);
 no se guardan hostname, usuario ni rutas privadas. Cada captura registra también el repositorio,
 workflow, evento, ref, número de ejecución/intento, URL de Actions y el SHA probado como
@@ -145,11 +145,12 @@ Las referencias por sintaxis (identificador, ruta de miembro o ruta cualificada)
 agrupaciones textuales. El recorrido directo sigue solo aristas que coinciden exactamente con nombres
 registrados de función y no acredita alcanzabilidad dinámica completa.
 
-En el reporte local generado desde el código actual hay 29/29 filas de `main` cerradas, 74
-referencias a 10 callbacks simbólicos en el inventario global, cero llamadas no resueltas y 29/29
-capturas sin `provenance.runtime.host`. El recorrido directo encuentra siete referencias a dos
+En el reporte local generado desde el código actual hay 30/30 filas de `main` cerradas, 93
+referencias a 10 callbacks simbólicos en el inventario global, cero llamadas no resueltas y 30/30
+capturas sin `provenance.runtime.host`. El inventario registra 288 callsites de fuente localizados.
+El recorrido directo encuentra siete referencias a dos
 callbacks en siete bundles. Esos contadores describen vistas distintas del análisis; no prueban
-pureza ni sustituyen la captura de host. Por ello el reporte local continúa **OPEN**, con 0/29
+pureza ni sustituyen la captura de host. Por ello el reporte local continúa **OPEN**, con 0/30
 bundles R3 listos.
 
 `gapDiagnostics.reproducibilityEvidence` cuenta las declaraciones encontradas en los bundles:
@@ -237,5 +238,17 @@ Este recibo prueba el replay y la integridad para esa ejecución, en Node WASI P
 host declarado. La captura de CI no es una atestación criptográfica independiente, el analizador
 de efectos sigue siendo experimental, y el recibo no demuestra equivalencia numérica entre
 plataformas ni completitud formal de entradas dinámicas. El scorecard público conserva **R3=0**
-y los 29 bundles versionados mantienen R0/R2; este corte no promociona automáticamente `surface`
+y los 30 bundles versionados mantienen R0/R2; este corte no promociona automáticamente `surface`
 ni el inventario completo a R3.
+
+El Browser audit del PR #237 en el head `e76f2fc73575474011bb52e1a6b34658cf9b8a80` generó el
+artefacto host-bound [12622700135](https://github.com/sircalch/Ostrin/actions/runs/40254605182/artifacts/12622700135)
+(digest informado por GitHub `sha256:d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404`).
+El paquete declara 30/30 bundles capture-ready y 30/30 filas de efecto de entrada cerradas. Su
+recibo registra `tested_sha` `70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a`, que es el merge sintético
+evaluado por Actions, no el head de la rama. Después de descargar los bytes del artefacto,
+`node scripts/experiment-replay.mjs --replay-artifact-all <directorio> --run-id 40254605182
+--tested-sha 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a` reejecutó y cotejó los 30 bundles; todos
+dieron `match`, incluidas las evidencias WASI de lectura de archivos y azar determinista. Esta
+captura y replay amplían la evidencia para ese run y host; no cambian el nivel de los bundles ni
+el scorecard global, que permanece **R3=0**.

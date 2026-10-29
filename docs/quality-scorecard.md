@@ -19,7 +19,7 @@ publica:
   [`validation/ast-fallback-ledger.json`](../validation/ast-fallback-ledger.json);
 - celdas `TESTED`, `SUPPORTED` y `KNOWN LIMITATION` de la matriz de ownership;
 - distribución R0/R1/R2/R3 del registro de experimentos;
-- estado de auditoría R3 para los 29 bundles publicados;
+- estado de auditoría R3 para los 30 bundles registrados;
 - bundles R3 con inventario de efectos parcial y total de llamadas sin clasificar;
 - estado de cada criterio de readiness de v0.2;
 - presencia de validación numérica, auditoría web, Linguist y auditoría de ramas.

@@ -2,36 +2,92 @@ name: Compiler benchmarks
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/benchmarks.yml"
+      - "compiler/**"
+      - "examples/viz_pendulum_calibration.ostrin"
+      - "experiments/pendulum-calibration.inputs.json"
+      - "scripts/benchmark*.mjs"
   schedule:
     - cron: "23 3 * * 1"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/benchmarks.yml"
+      - "compiler/**"
+      - "examples/viz_pendulum_calibration.ostrin"
+      - "experiments/pendulum-calibration.inputs.json"
+      - "scripts/benchmark*.mjs"
+
+concurrency:
+  group: ostrin-benchmarks-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   benchmark:
-    name: Interpreter versus native benchmark
+    name: Pendulum benchmark (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.98.1
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Build release compiler
+        run: cargo build --release --manifest-path compiler/Cargo.toml
+      - name: Run file-backed pendulum benchmark
+        env:
+          OSTRIN_COMPILER: ${{ runner.os == 'Windows' && './compiler/target/release/ostrinc.exe' || './compiler/target/release/ostrinc' }}
+        run: node scripts/benchmark.mjs --iterations 7 --warmups 1 --compile-iterations 5 --workloads examples/viz_pendulum_calibration.ostrin
+      - name: Validate reproducibility contract
+        run: |
+          node scripts/benchmark-contract-check.mjs
+          node --test scripts/benchmark-content-hash.test.mjs scripts/benchmark-contract-check.test.mjs scripts/benchmark-matrix-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs scripts/benchmark-runtime-inputs.test.mjs
+      - name: Publish benchmark summary
+        shell: bash
+        run: |
+          node -e 'const fs=require("node:fs"); const r=JSON.parse(fs.readFileSync("target/benchmarks/benchmark.json", "utf8")); const w=r.workloads[0]; const lines=[`### ${w.workload}`, `- Host: ${r.host.platform}/${r.host.arch} · ${r.host.cpu.model.trim()}`, `- Commit: ${r.commit}`, `- Compiler SHA-256: ${r.compilerSha256}`, `- Normalized source SHA-256: ${w.sourceContentSha256}`, `- Compile median (${w.nativeCompileStatistics.samples} samples): ${w.nativeCompileStatistics.medianMs} ms`, `- Interpreter median (${w.statistics.interpreter.samples} runs): ${w.interpreterMedianMs} ms`, `- Native median (${w.statistics.native.samples} runs): ${w.nativeMedianMs} ms`, `- End-to-end ratio: ${w.interpreterToNativeMedianRatio}x`, `- Timings include startup, runtime input, analysis, uncertainty propagation, and SVG generation. Runner timings are host-specific and are not a general speed claim.`]; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n")+"\n");'
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ostrin-benchmark-${{ runner.os }}-${{ github.sha }}
+          path: target/benchmarks/benchmark.json
+          if-no-files-found: error
+          retention-days: 30
+
+  cross-platform-provenance:
+    name: Cross-platform provenance
+    needs: benchmark
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.98.1
-      - name: Build release compiler
-        run: cargo build --release --manifest-path compiler/Cargo.toml
-      - name: Run deterministic benchmark
-        run: node scripts/benchmark.mjs --iterations 7 --warmups 1
-      - name: Validate reproducibility contract
-        run: |
-          node scripts/benchmark-contract-check.mjs
-          node --test scripts/benchmark-contract-check.test.mjs scripts/benchmark-page.test.mjs
-      - name: Publish benchmark summary
-        run: |
-          node -e 'const r=require("./target/benchmarks/benchmark.json"); for (const w of r.workloads) console.log(`${w.workload}: interpreter ${w.interpreterMedianMs} ms, native ${w.nativeMedianMs} ms, ratio ${w.interpreterToNativeMedianRatio}x`);' >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload benchmark artifact
-        uses: actions/upload-artifact@v4
         with:
-          name: ostrin-benchmark-${{ github.sha }}
-          path: target/benchmarks/benchmark.json
-          if-no-files-found: error
-          retention-days: 14
+          fetch-depth: 0
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Download platform benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ostrin-benchmark-*-${{ github.sha }}
+          path: target/benchmarks/ci-matrix
+          merge-multiple: false
+      - name: Compare cross-platform provenance and output
+        run: node scripts/benchmark-matrix-check.mjs target/benchmarks/ci-matrix

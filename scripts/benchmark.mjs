@@ -4,16 +4,23 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import os from "node:os";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   compareQuantityFloatOutputs,
   floatArrayWorkload,
   quantityArrayWorkload,
+  selectQuantityFloatPair,
   validateCheckedInQuantityFloatPair,
 } from "./benchmark-pair-contract.mjs";
+import {
+  assertBenchmarkWorkloadSucceeded,
+  repositoryRelativeWorkloadPath,
+  runtimeInputFilesFor,
+} from "./benchmark-runtime-inputs.mjs";
+import { normalizedTextSha256 } from "./benchmark-content-hash.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(scriptDir, "..");
@@ -34,6 +41,7 @@ const defaultWorkloads = [
   "benchmarks/temperature-point.ostrin",
   "benchmarks/measurement-source-identity.ostrin",
   "examples/measurement_covariance.ostrin",
+  "examples/viz_pendulum_calibration.ostrin",
 ];
 
 function option(name, fallback) {
@@ -43,33 +51,46 @@ function option(name, fallback) {
 
 const iterations = option("--iterations", 7);
 const warmups = option("--warmups", 1);
+const compileIterations = option("--compile-iterations", 1);
 const workloadIndex = process.argv.indexOf("--workloads");
 const workloadPaths = workloadIndex === -1
   ? defaultWorkloads
   : process.argv[workloadIndex + 1].split(",").map((value) => value.trim()).filter(Boolean);
-if (!Number.isInteger(iterations) || iterations < 1 || !Number.isInteger(warmups) || warmups < 0) {
-  throw new Error("--iterations must be >= 1 and --warmups must be >= 0");
+if (!Number.isInteger(iterations) || iterations < 1
+  || !Number.isInteger(warmups) || warmups < 0
+  || !Number.isInteger(compileIterations) || compileIterations < 1) {
+  throw new Error("--iterations and --compile-iterations must be >= 1 and --warmups must be >= 0");
 }
 if (workloadPaths.length === 0) throw new Error("--workloads must contain at least one source path");
-const normalizedWorkloadPaths = workloadPaths.map((value) => value.replaceAll("\\", "/"));
+const normalizedWorkloadPaths = workloadPaths.map((value) => (
+  repositoryRelativeWorkloadPath(repo, value) || value.replaceAll("\\", "/")
+));
 if (normalizedWorkloadPaths.some((value) => value === floatArrayWorkload || value === quantityArrayWorkload)) {
   validateCheckedInQuantityFloatPair(repo);
 }
 
-const compiler = process.env.OSTRIN_COMPILER || join(repo, "compiler", "target", "release", process.platform === "win32" ? "ostrinc.exe" : "ostrinc");
+const compiler = resolve(repo, process.env.OSTRIN_COMPILER
+  || join(repo, "compiler", "target", "release", process.platform === "win32" ? "ostrinc.exe" : "ostrinc"));
 if (!existsSync(compiler)) {
   throw new Error(`compiler not found at ${compiler}; run cargo build --release --manifest-path compiler/Cargo.toml first`);
 }
+const compilerSha256 = outputHash(readFileSync(compiler));
 
-function run(command, args, label) {
+function run(command, args, label, cwd = repo) {
   const started = performance.now();
-  const result = spawnSync(command, args, { cwd: repo, encoding: "utf8", timeout: 120000 });
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", timeout: 120000 });
   const elapsedMs = performance.now() - started;
   if (result.error) throw new Error(`${label}: ${result.error.message}`);
   if (result.status !== 0) {
     throw new Error(`${label} failed (${result.status}):\n${result.stdout}\n${result.stderr}`);
   }
   return { elapsedMs, stdout: result.stdout, stderr: result.stderr };
+}
+
+function runBenchmarkWorkload(command, args, label, cwd) {
+  const result = run(command, args, label, cwd);
+  assertBenchmarkWorkloadSucceeded(result.stdout, result.stderr, label);
+  return result;
 }
 
 mkdirSync(outputDir, { recursive: true });
@@ -178,31 +199,83 @@ function executableName(source) {
   return join(outputDir, `${stem}${process.platform === "win32" ? ".exe" : ""}`);
 }
 
+function runtimeContextFor(sourcePath, index) {
+  const declaredInputs = runtimeInputFilesFor(repo, sourcePath);
+  if (declaredInputs.length === 0) return { cwd: repo, inputs: [] };
+
+  const stem = sourcePath.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+  const runtimeInputRoot = join(outputDir, "runtime-inputs");
+  mkdirSync(runtimeInputRoot, { recursive: true });
+  const cwd = mkdtempSync(join(runtimeInputRoot, `${stem}-${process.pid}-${index}-`));
+  const inputs = declaredInputs.map(({ path: sourcePath, stagedAs }) => {
+    const source = resolve(repo, sourcePath);
+    if (!existsSync(source)) throw new Error(`runtime input not found: ${sourcePath}`);
+    const destination = resolve(cwd, stagedAs);
+    const relativeDestination = relative(cwd, destination);
+    if (!relativeDestination || relativeDestination === ".."
+      || relativeDestination.startsWith(`..${sep}`) || isAbsolute(relativeDestination)) {
+      throw new Error(`runtime input destination escapes its staging directory: ${stagedAs}`);
+    }
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(source, destination);
+    const bytes = readFileSync(source);
+    const digest = outputHash(bytes);
+    const stagedDigest = outputHash(readFileSync(destination));
+    if (digest !== stagedDigest) throw new Error(`staged runtime input changed while copying: ${sourcePath}`);
+    return {
+      path: sourcePath,
+      stagedAs: relative(cwd, destination).replaceAll("\\", "/"),
+      sizeBytes: bytes.byteLength,
+      sha256: digest,
+      stagedSha256: stagedDigest,
+      contentSha256: normalizedTextSha256(bytes),
+      stagedContentSha256: normalizedTextSha256(readFileSync(destination)),
+    };
+  });
+  return { cwd, inputs };
+}
+
 function benchmarkWorkload(sourcePath, index) {
   const source = resolve(repo, sourcePath);
   if (!existsSync(source)) throw new Error(`workload not found: ${sourcePath}`);
   const sourceBytes = readFileSync(source);
+  const runtimeContext = runtimeContextFor(sourcePath, index);
+  let runtimeInvocation = 0;
+  const runtimeCwd = () => runtimeContextFor(
+    sourcePath,
+    `${index}-${runtimeInvocation++}`,
+  ).cwd;
   const executable = executableName(sourcePath);
-  rmSync(executable, { force: true });
-  const compile = run(compiler, ["--compile", "--out", executable, source], `native compilation ${sourcePath}`);
+  const nativeCompileMs = [];
+  for (let compileIteration = 0; compileIteration < compileIterations; compileIteration += 1) {
+    rmSync(executable, { force: true });
+    const compile = run(compiler, ["--compile", "--out", executable, source], `native compilation ${sourcePath} ${compileIteration + 1}`);
+    if (!existsSync(executable)) throw new Error(`native compilation did not create ${executable}`);
+    nativeCompileMs.push(compile.elapsedMs);
+  }
   if (!existsSync(executable)) throw new Error(`native compilation did not create ${executable}`);
+  const executableSha256 = outputHash(readFileSync(executable));
 
-  const expected = normalizeOutput(run(compiler, ["--run", source], `interpreter warmup ${sourcePath}`).stdout);
-  const nativeWarmup = normalizeOutput(run(executable, [], `native warmup ${sourcePath}`).stdout);
+  const expected = normalizeOutput(runBenchmarkWorkload(
+    compiler, ["--run", source], `interpreter warmup ${sourcePath}`, runtimeCwd(),
+  ).stdout);
+  const nativeWarmup = normalizeOutput(runBenchmarkWorkload(
+    executable, [], `native warmup ${sourcePath}`, runtimeCwd(),
+  ).stdout);
   if (expected !== nativeWarmup) {
     throw new Error(`interpreter/native output mismatch for ${sourcePath}:\ninterpreter=${expected}\nnative=${nativeWarmup}`);
   }
 
   for (let warmup = 0; warmup < warmups; warmup += 1) {
-    run(compiler, ["--run", source], `interpreter warmup ${sourcePath} ${warmup + 1}`);
-    run(executable, [], `native warmup ${sourcePath} ${warmup + 1}`);
+    runBenchmarkWorkload(compiler, ["--run", source], `interpreter warmup ${sourcePath} ${warmup + 1}`, runtimeCwd());
+    runBenchmarkWorkload(executable, [], `native warmup ${sourcePath} ${warmup + 1}`, runtimeCwd());
   }
 
   const interpreter = [];
   const native = [];
   for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const interpreted = run(compiler, ["--run", source], `interpreter iteration ${sourcePath} ${iteration + 1}`);
-    const compiled = run(executable, [], `native iteration ${sourcePath} ${iteration + 1}`);
+    const interpreted = runBenchmarkWorkload(compiler, ["--run", source], `interpreter iteration ${sourcePath} ${iteration + 1}`, runtimeCwd());
+    const compiled = runBenchmarkWorkload(executable, [], `native iteration ${sourcePath} ${iteration + 1}`, runtimeCwd());
     if (normalizeOutput(interpreted.stdout) !== expected || normalizeOutput(compiled.stdout) !== expected) {
       throw new Error(`output changed during iteration ${iteration + 1} for ${sourcePath}`);
     }
@@ -217,10 +290,15 @@ function benchmarkWorkload(sourcePath, index) {
     workload: sourcePath.replaceAll("\\", "/"),
     sourceBytes: sourceBytes.byteLength,
     sourceSha256: outputHash(sourceBytes),
+    sourceContentSha256: normalizedTextSha256(sourceBytes),
+    executableSha256,
+    runtimeInputs: runtimeContext.inputs,
     outputBytes: Buffer.byteLength(expected),
     outputSha256: outputHash(expected),
     normalizedOutput: expected,
-    nativeCompileMs: Number(compile.elapsedMs.toFixed(3)),
+    nativeCompileMs: Number(median(nativeCompileMs).toFixed(3)),
+    nativeCompileMsSamples: nativeCompileMs.map((value) => Number(value.toFixed(3))),
+    nativeCompileStatistics: statistic(nativeCompileMs),
     interpreterMs: interpreter.map((value) => Number(value.toFixed(3))),
     nativeMs: native.map((value) => Number(value.toFixed(3))),
     statistics: {
@@ -233,11 +311,14 @@ function benchmarkWorkload(sourcePath, index) {
   };
 }
 
-const measuredWorkloads = workloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index));
-const selectedFloatWorkload = measuredWorkloads.find((workload) => workload.workload === floatArrayWorkload);
-const selectedQuantityWorkload = measuredWorkloads.find((workload) => workload.workload === quantityArrayWorkload);
-const quantityFloatPair = selectedFloatWorkload && selectedQuantityWorkload
-  ? compareQuantityFloatOutputs(selectedFloatWorkload.normalizedOutput, selectedQuantityWorkload.normalizedOutput)
+// Use the repository-relative spelling for both execution and report selection.
+// Equivalent inputs such as `./examples/...` or an absolute path must still
+// select the checked-in float/quantity pair so the runtime comparison cannot
+// be silently skipped because of a spelling mismatch.
+const measuredWorkloads = normalizedWorkloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index));
+const selectedQuantityFloatPair = selectQuantityFloatPair(measuredWorkloads);
+const quantityFloatPair = selectedQuantityFloatPair
+  ? compareQuantityFloatOutputs(selectedQuantityFloatPair.float.normalizedOutput, selectedQuantityFloatPair.quantity.normalizedOutput)
   : null;
 const workloads = measuredWorkloads.map(({ normalizedOutput, ...workload }) => workload);
 
@@ -248,6 +329,7 @@ const report = {
   commit: git.commit,
   git,
   compiler: relative(repo, compiler).replaceAll("\\", "/"),
+  compilerSha256,
   compilerVersion: run(compiler, ["--version"], "compiler version").stdout.trim(),
   node: process.version,
   host: hostMetadata(),
@@ -257,11 +339,13 @@ const report = {
   methodology: {
     clock: "node:perf_hooks performance.now wall-clock process duration",
     outputCheck: "normalized UTF-8 stdout must match interpreter and native output exactly",
+    contentHashNormalization: "sourceContentSha256 and runtime input contentSha256 hash UTF-8 text after converting CRLF and CR line endings to LF; sourceSha256 and runtime input sha256 hash exact worktree bytes",
     quantityFloatPair,
     memory: "not captured; peak child RSS and allocation counters are a planned metric",
   },
   iterations,
   warmups,
+  compileIterations,
 };
 
 const reportPath = join(outputDir, "benchmark.json");

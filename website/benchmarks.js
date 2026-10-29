@@ -13,6 +13,8 @@ if (!report) {
   text("[data-benchmark-compiler]", report.compiler);
   text("[data-benchmark-environment]", `${report.platform} / ${report.arch} · ${report.node}`);
   text("[data-benchmark-samples]", `${report.iterations} samples · ${report.warmups} warmup`);
+  const contentHash = report.workloads.find((workload) => /^[a-f0-9]{64}$/.test(workload.sourceContentSha256 || ""))?.sourceContentSha256;
+  text("[data-benchmark-source-hash]", contentHash || "Not recorded in this historical snapshot");
 
   const body = document.querySelector("[data-benchmark-rows]");
   for (const workload of report.workloads) {

@@ -2,8 +2,8 @@
   "schema": "ostrin.r3-readiness/v1",
   "status": "OPEN",
   "inventory": {
-    "expectedCount": 29,
-    "discoveredCount": 29,
+    "expectedCount": 30,
+    "discoveredCount": 30,
     "missing": [],
     "unexpected": [],
     "status": "READY"
@@ -21,24 +21,24 @@
     "provenance.execution",
     "provenance.figure_metadata"
   ],
-  "bundleCount": 29,
-  "baseReadyCount": 29,
+  "bundleCount": 30,
+  "baseReadyCount": 30,
   "extensionReadyCount": 0,
   "readyCount": 0,
-  "openCount": 29,
+  "openCount": 30,
   "captureReadyCount": 0,
-  "captureOpenCount": 29,
+  "captureOpenCount": 30,
   "incompleteEffectBundleCount": 0,
-  "closedEntryEffectBundleCount": 29,
-  "knownEffectCallCount": 21026,
-  "symbolicEffectCallCount": 83,
+  "closedEntryEffectBundleCount": 30,
+  "knownEffectCallCount": 22331,
+  "symbolicEffectCallCount": 93,
   "unresolvedEffectCallCount": 0,
   "gapDiagnostics": {
     "captureGaps": {
       "missingExtensionFields": [
         {
           "field": "provenance.runtime.host",
-          "bundleCount": 29,
+          "bundleCount": 30,
           "bundles": [
             "animation",
             "bars",
@@ -56,6 +56,7 @@
             "lorenz",
             "ode",
             "orbits",
+            "pendulum-calibration",
             "point-cloud",
             "provenance",
             "quiver",
@@ -86,67 +87,67 @@
       },
       "topOperations": [],
       "symbolicInventoryStatus": "available",
-      "symbolicInventoryBundleCount": 29,
+      "symbolicInventoryBundleCount": 30,
       "symbolicInventoryUnavailableBundleCount": 0,
-      "symbolicCallbackReferences": 83,
+      "symbolicCallbackReferences": 93,
       "uniqueSymbolicCallbacks": 10,
-      "observedSymbolicCallbackReferences": 83,
+      "observedSymbolicCallbackReferences": 93,
       "topSymbolicCallbacks": [
         {
           "operation": "std.viz::grid_of.f",
-          "references": 29,
-          "bundleCount": 29
+          "references": 30,
+          "bundleCount": 30
         },
         {
           "operation": "std.numeric::bisect.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::derivative.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::golden_min.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::newton.df",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::newton.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::rk4.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::rk45.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::secant.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         },
         {
           "operation": "std.numeric::simpson.f",
-          "references": 6,
-          "bundleCount": 6
+          "references": 7,
+          "bundleCount": 7
         }
       ],
       "directReachability": {
         "method": "follow function_calls edges only when the operation exactly matches a function key",
         "status": "available",
-        "availableBundleCount": 29,
+        "availableBundleCount": 30,
         "unavailableBundleCount": 0,
         "symbolicCallbackReferences": 7,
         "uniqueSymbolicCallbacks": 2,
@@ -181,37 +182,37 @@
       "status": "available",
       "countUnit": "bundle_function_operation_edges",
       "localTargetAssociationComplete": true,
-      "bundleCount": 29,
-      "availableBundleCount": 29,
+      "bundleCount": 30,
+      "availableBundleCount": 30,
       "unavailableBundleCount": 0,
       "invalidBundleCount": 0,
-      "edgeCount": 21109,
-      "categorizedEdgeCount": 21109,
+      "edgeCount": 22424,
+      "categorizedEdgeCount": 22424,
       "uncategorizedEdgeCount": 0,
-      "localFunctionEdgeCount": 9335,
-      "staticLocalFunctionEdgeCount": 9335,
+      "localFunctionEdgeCount": 9792,
+      "staticLocalFunctionEdgeCount": 9792,
       "genericTraitCandidateEdgeCount": 0,
-      "localTargetCandidateCount": 9335,
+      "localTargetCandidateCount": 9792,
       "multiTargetEdgeCount": 0,
-      "resolvedCallSiteCount": 245,
-      "locatedCallSiteCount": 245,
+      "resolvedCallSiteCount": 288,
+      "locatedCallSiteCount": 288,
       "unlocatedCallSiteCount": 0,
       "categoryCounts": {
-        "resolvedLocalOperations": 9335,
-        "effectClassifiedOperations": 11747,
-        "effectFreeIntrinsics": 8884,
+        "resolvedLocalOperations": 9792,
+        "effectClassifiedOperations": 12657,
+        "effectFreeIntrinsics": 9557,
         "compilerBuiltinCallbacks": 0,
-        "indirectOperations": 83,
+        "indirectOperations": 93,
         "unresolvedOperations": 0,
-        "symbolicCallbacks": 83
+        "symbolicCallbacks": 93
       },
       "sourceSiteAssociationsValid": true,
       "interpretation": "Call sites are statically analyzed source occurrences associated with compiler-emitted local targets. They are not runtime traces or proof of runtime dispatch, purity, or semantic soundness."
     },
     "entrypointEffects": {
       "countUnit": "one recorded entry function per experiment bundle",
-      "availableBundleCount": 29,
-      "closedBundleCount": 29,
+      "availableBundleCount": 30,
+      "closedBundleCount": 30,
       "openBundleCount": 0,
       "unavailableBundleCount": 0,
       "unresolvedCallReferences": 0,
@@ -330,6 +331,13 @@
           "symbolicCallbacks": []
         },
         {
+          "bundle": "pendulum-calibration",
+          "entry": "main",
+          "status": "closed",
+          "unresolvedCalls": [],
+          "symbolicCallbacks": []
+        },
+        {
           "bundle": "point-cloud",
           "entry": "main",
           "status": "closed",
@@ -424,31 +432,31 @@
       "interpretation": "This reports the recorded entry function row separately from module-wide inventory. It is diagnostic only and does not prove complete runtime reachability, host capture or R3 readiness."
     },
     "reproducibilityEvidence": {
-      "embeddedInputSnapshotBundles": 11,
-      "declaredEmbeddedInputSnapshotCount": 11,
-      "ciVerifiedExecutionBundles": 29,
-      "recordedVerifiedReplayBundles": 29,
-      "numericComparisonNotClaimedBundles": 29,
-      "numericPolicyToleranceMentionBundles": 29,
+      "embeddedInputSnapshotBundles": 12,
+      "declaredEmbeddedInputSnapshotCount": 12,
+      "ciVerifiedExecutionBundles": 30,
+      "recordedVerifiedReplayBundles": 30,
+      "numericComparisonNotClaimedBundles": 30,
+      "numericPolicyToleranceMentionBundles": 30,
       "interpretation": "Counts reflect declarations in the local bundle files. Embedded snapshot declarations do not establish completeness of external inputs; verified-in-ci labels and recorded replay statuses are not re-executed by this diagnostic; mentioning numeric tolerances does not mean they were assessed or scientifically justified."
     },
     "externalInputEvidence": {
-      "declaredInputRecords": 29,
-      "externalSnapshotInputRecords": 11,
-      "bundlesWithExternalSnapshotInputs": 11,
-      "externalSnapshotInputsWithMatchingEmbeddedDeclaration": 11,
+      "declaredInputRecords": 30,
+      "externalSnapshotInputRecords": 12,
+      "bundlesWithExternalSnapshotInputs": 12,
+      "externalSnapshotInputsWithMatchingEmbeddedDeclaration": 12,
       "externalSnapshotInputsMissingMatchingEmbeddedDeclaration": 0,
-      "bundlesWithFilesystemReadCapability": 11,
+      "bundlesWithFilesystemReadCapability": 12,
       "inputKinds": {
-        "external-snapshot": 11,
+        "external-snapshot": 12,
         "parameters": 18
       },
       "bundlesMissingSnapshotDeclaration": [],
       "sourceReadAudit": {
-        "sourceBundleCount": 29,
-        "bundlesWithDirectReadFileCalls": 11,
-        "directReadFileCallCount": 21,
-        "literalReadPathCallCount": 21,
+        "sourceBundleCount": 30,
+        "bundlesWithDirectReadFileCalls": 12,
+        "directReadFileCallCount": 22,
+        "literalReadPathCallCount": 22,
         "dynamicReadCallCount": 0,
         "readFileReferenceCount": 0,
         "shadowedReadFileCallCount": 0,
@@ -597,6 +605,22 @@
                 "kind": "literal",
                 "path": "data.json",
                 "line": 6
+              }
+            ],
+            "declaredSnapshotPaths": [
+              "data.json"
+            ],
+            "undeclaredLiteralPaths": [],
+            "unreferencedSnapshotPaths": []
+          },
+          {
+            "bundle": "pendulum-calibration",
+            "sourceAvailable": true,
+            "calls": [
+              {
+                "kind": "literal",
+                "path": "data.json",
+                "line": 320
               }
             ],
             "declaredSnapshotPaths": [
@@ -768,7 +792,7 @@
       "effectCoverage": {
         "complete": true,
         "count_unit": "distinct_function_operation_edges",
-        "known_calls": 1247,
+        "known_calls": 1253,
         "symbolic_calls": 10,
         "unresolved_calls": 0
       },
@@ -1340,6 +1364,48 @@
         "complete": true,
         "count_unit": "distinct_function_operation_edges",
         "known_calls": 887,
+        "symbolic_calls": 10,
+        "unresolved_calls": 0
+      },
+      "entryEffectClosure": {
+        "entry": "main",
+        "status": "closed",
+        "unresolvedCalls": [],
+        "symbolicCallbacks": []
+      }
+    },
+    {
+      "file": "website/assets/experiments/pendulum-calibration.ostrin-experiment.json",
+      "id": "pendulum-calibration",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ],
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "measurement"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "type_errors": 0,
+        "variables": []
+      },
+      "effectCoverage": {
+        "complete": true,
+        "count_unit": "distinct_function_operation_edges",
+        "known_calls": 1299,
         "symbolic_calls": 10,
         "unresolved_calls": 0
       },

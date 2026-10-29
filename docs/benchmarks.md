@@ -17,9 +17,9 @@ para observar el coste semántico de las unidades; no es una comparación con
 otros lenguajes. El runner comprueba además que sus valores numéricos coincidan
 dentro de una tolerancia declarada. Cada ejecución comprueba que ambos caminos impriman
 exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
-schema 3 incluye el hash exacto de cada fuente, commit y estado del checkout,
-sistema operativo, CPU, compilador C, defaults administrados por el compilador e
-inputs de flags, además de cada muestra y
+schema 3 incluye el hash exacto de cada fuente, compilador Ostrin y ejecutable
+nativo, commit y estado del checkout, sistema operativo, CPU, compilador C,
+defaults administrados por el compilador e inputs de flags, además de cada muestra y
 estadísticas de dispersión (mínimo, máximo, media, mediana, p95 y desviación
 estándar). El gate [`benchmark-contract-check.mjs`](../scripts/benchmark-contract-check.mjs)
 rechaza informes incompletos o inconsistentes. La memoria pico del proceso hijo y
@@ -32,11 +32,35 @@ una referencia gruesa del costo en la misma máquina; incluye arranque de proces
 envoltorios `Result`, ownership y gestión de mediciones, por lo que no aísla el
 costo del campo de identidad.
 
-El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
-manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
-mediciones son evidencia de una carga concreta; no representan por sí solas el
-rendimiento de todo el lenguaje. La ampliación prevista cubre arrays, cantidades,
-métodos numéricos y cargas científicas antes de establecer umbrales.
+La batería también incluye `viz_pendulum_calibration.ostrin`, el flujo científico
+M1. El runner copia su snapshot versionado a un directorio aislado dentro de
+`target/benchmarks/runtime-inputs`, registra ruta, tamaño y SHA-256 del snapshot,
+y comprueba que el hash copiado sea idéntico antes de medir. El intérprete y el
+binario nativo se ejecutan desde ese mismo directorio y sus salidas deben coincidir
+exactamente. Las duraciones interpretadas y nativas son de extremo a extremo:
+incluyen arranque del proceso, lectura del JSON, análisis, propagación de
+incertidumbre y renderizado SVG; no aíslan el tiempo del núcleo numérico. La
+compilación se mide aparte. `--compile-iterations N` repite esa medición y el
+informe conserva muestras, mediana y dispersión; por defecto se hace una sola
+compilación para limitar el costo de la batería completa.
+
+Para repetir la medición enfocada del flujo M1 con siete muestras de ejecución y
+cinco muestras de compilación:
+
+```text
+cargo build --release --manifest-path compiler/Cargo.toml
+node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5
+node scripts/benchmark-contract-check.mjs
+```
+
+El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) ejecuta el
+flujo file-backed del péndulo en Ubuntu, macOS y Windows cuando se solicita
+manualmente, cada lunes o cuando cambia el compilador, el runner o sus datos en
+un PR o en `main`. Cada plataforma conserva un artefacto separado por commit
+durante 30 días, con siete ejecuciones del intérprete, siete nativas y cinco
+compilaciones. Los runners compartidos varían entre ejecuciones: estos informes
+son mediciones con procedencia por host, no umbrales de regresión ni evidencia
+de velocidad general o equivalencia temporal entre sistemas.
 
 El historial local [`validation/benchmark-history.json`](../validation/benchmark-history.json)
 conserva ejecuciones reales de snapshots versionados. Cada entrada mantiene el

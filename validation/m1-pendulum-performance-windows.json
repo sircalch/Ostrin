@@ -1,0 +1,131 @@
+{
+  "schema": 3,
+  "workloads": [
+    {
+      "index": 0,
+      "workload": "examples/viz_pendulum_calibration.ostrin",
+      "sourceBytes": 16511,
+      "sourceSha256": "ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923",
+      "executableSha256": "da9e7b96f707997eaf1dd49cba9f459a06010cc6b6ed4f509486d14a5cdbea81",
+      "runtimeInputs": [
+        {
+          "path": "experiments/pendulum-calibration.inputs.json",
+          "stagedAs": "data.json",
+          "sizeBytes": 1270,
+          "sha256": "f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9",
+          "stagedSha256": "f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9"
+        }
+      ],
+      "outputBytes": 25629,
+      "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+      "nativeCompileMs": 7022.824,
+      "nativeCompileMsSamples": [
+        7022.824,
+        7033.694,
+        6927.683,
+        7050.142,
+        6970.488
+      ],
+      "nativeCompileStatistics": {
+        "samples": 5,
+        "minMs": 6927.683,
+        "maxMs": 7050.142,
+        "meanMs": 7000.966,
+        "medianMs": 7022.824,
+        "p95Ms": 7046.852,
+        "stdevMs": 45.313
+      },
+      "interpreterMs": [
+        205.819,
+        209.013,
+        203.977,
+        198.884,
+        213.971,
+        227.207,
+        220.413
+      ],
+      "nativeMs": [
+        12.404,
+        14.175,
+        13.722,
+        13.972,
+        14.671,
+        15.424,
+        14.247
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 198.884,
+          "maxMs": 227.207,
+          "meanMs": 211.326,
+          "medianMs": 209.013,
+          "p95Ms": 225.169,
+          "stdevMs": 9.152
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 12.404,
+          "maxMs": 15.424,
+          "meanMs": 14.088,
+          "medianMs": 14.175,
+          "p95Ms": 15.198,
+          "stdevMs": 0.857
+        }
+      },
+      "interpreterMedianMs": 209.013,
+      "nativeMedianMs": 14.175,
+      "interpreterToNativeMedianRatio": 14.746
+    }
+  ],
+  "commit": "61ea27c43269245b7e9fdc75a2aba465eb1b57af",
+  "git": {
+    "commit": "61ea27c43269245b7e9fdc75a2aba465eb1b57af",
+    "clean": true
+  },
+  "compiler": "compiler/target/release/ostrinc.exe",
+  "compilerSha256": "ae1b5effd967b04cbe8b4f7dfd91b5e3246915c8d0e9339ab7079a8d19f97d66",
+  "compilerVersion": "ostrinc 0.2.0",
+  "node": "v24.19.0",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "os": {
+      "type": "Windows_NT",
+      "release": "10.0.26200",
+      "version": "Windows 11 Pro"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 5700X 8-Core Processor             ",
+      "logicalCores": 16
+    },
+    "memoryBytes": 34278834176
+  },
+  "platform": "win32",
+  "arch": "x64",
+  "nativeCompile": {
+    "target": "native",
+    "cCompiler": {
+      "command": "gcc",
+      "version": "gcc (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r8) 13.2.0"
+    },
+    "compilerManagedDefaults": [
+      "-O2",
+      "-ffp-contract=off"
+    ],
+    "argvCapture": "not intercepted; see compiler/src/main.rs",
+    "environment": {
+      "OSTRIN_CC": null,
+      "OSTRIN_CFLAGS": null
+    }
+  },
+  "methodology": {
+    "clock": "node:perf_hooks performance.now wall-clock process duration",
+    "outputCheck": "normalized UTF-8 stdout must match interpreter and native output exactly",
+    "quantityFloatPair": null,
+    "memory": "not captured; peak child RSS and allocation counters are a planned metric"
+  },
+  "iterations": 7,
+  "warmups": 1,
+  "compileIterations": 5
+}

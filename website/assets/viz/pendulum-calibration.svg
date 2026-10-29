@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="880" viewBox="0 0 680 880" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
+<rect width="680" height="880" fill="#ffffff"/>
+
+<text x="20" y="28" text-anchor="start" font-size="18" fill="#1f2937" font-weight="700">Reproducible pendulum calibration</text>
+<svg x="0" y="40" xmlns="http://www.w3.org/2000/svg" width="680" height="420" viewBox="0 0 680 420" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
+<rect width="680" height="420" fill="#ffffff"/>
+
+<text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Pendulum calibration · linearized model</text>
+<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">Synthetic input snapshot · OLS fit of T² against L · first-order source propagation</text>
+<defs><clipPath id="clip4193441366038351924"><rect x="66" y="62" width="594" height="306"/></clipPath></defs>
+<line x1="77.42" y1="62" x2="77.42" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="77.42" y1="368" x2="77.42" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="77.42" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.25</text>
+<line x1="134.54" y1="62" x2="134.54" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="134.54" y1="368" x2="134.54" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="134.54" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.30</text>
+<line x1="191.65" y1="62" x2="191.65" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="191.65" y1="368" x2="191.65" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="191.65" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.35</text>
+<line x1="248.77" y1="62" x2="248.77" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="248.77" y1="368" x2="248.77" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="248.77" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.40</text>
+<line x1="305.88" y1="62" x2="305.88" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="305.88" y1="368" x2="305.88" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="305.88" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.45</text>
+<line x1="363" y1="62" x2="363" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="363" y1="368" x2="363" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="363" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.50</text>
+<line x1="420.12" y1="62" x2="420.12" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="420.12" y1="368" x2="420.12" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="420.12" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.55</text>
+<line x1="477.23" y1="62" x2="477.23" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="477.23" y1="368" x2="477.23" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="477.23" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.60</text>
+<line x1="534.35" y1="62" x2="534.35" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="534.35" y1="368" x2="534.35" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="534.35" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.65</text>
+<line x1="591.46" y1="62" x2="591.46" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="591.46" y1="368" x2="591.46" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="591.46" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.70</text>
+<line x1="648.58" y1="62" x2="648.58" y2="368" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="648.58" y1="368" x2="648.58" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="648.58" y="386" text-anchor="middle" font-size="11" fill="#6b7280">0.75</text>
+<line x1="66" y1="353.97" x2="660" y2="353.97" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="353.97" x2="66" y2="353.97" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="357.97" text-anchor="end" font-size="11" fill="#6b7280">1.0</text>
+<line x1="66" y1="285.38" x2="660" y2="285.38" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="285.38" x2="66" y2="285.38" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="289.38" text-anchor="end" font-size="11" fill="#6b7280">1.5</text>
+<line x1="66" y1="216.79" x2="660" y2="216.79" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="216.79" x2="66" y2="216.79" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="220.79" text-anchor="end" font-size="11" fill="#6b7280">2.0</text>
+<line x1="66" y1="148.2" x2="660" y2="148.2" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="148.2" x2="66" y2="148.2" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="152.2" text-anchor="end" font-size="11" fill="#6b7280">2.5</text>
+<line x1="66" y1="79.61" x2="660" y2="79.61" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="79.61" x2="66" y2="79.61" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="83.61" text-anchor="end" font-size="11" fill="#6b7280">3.0</text>
+<g clip-path="url(#clip4193441366038351924)">
+<g class="viz-series" data-viz-series-id="0"><path d="M77.42 351.98 L191.65 296.77 L305.88 241.55 L420.12 186.34 L534.35 131.12 L648.58 75.91 L648.58 78.02 L534.35 133.23 L420.12 188.45 L305.88 243.66 L191.65 298.88 L77.42 354.09 Z" fill="#dbeafe" fill-opacity="0.2" stroke="none"/></g>
+<g class="viz-series" data-viz-series-id="1"><line x1="77.42" y1="353.53" x2="77.42" y2="352.38" stroke="#1e3a8a" stroke-width="1.5"/><line x1="73.42" y1="353.53" x2="81.42" y2="353.53" stroke="#1e3a8a" stroke-width="1.5"/><line x1="73.42" y1="352.38" x2="81.42" y2="352.38" stroke="#1e3a8a" stroke-width="1.5"/><circle class="pt" cx="77.42" cy="352.95" r="3.5" fill="#1e3a8a"><title>standard uncertainty in T²: 0.25: 1.007 ± 0.004</title></circle><line x1="191.65" y1="298.87" x2="191.65" y2="297.52" stroke="#1e3a8a" stroke-width="1.5"/><line x1="187.65" y1="298.87" x2="195.65" y2="298.87" stroke="#1e3a8a" stroke-width="1.5"/><line x1="187.65" y1="297.52" x2="195.65" y2="297.52" stroke="#1e3a8a" stroke-width="1.5"/><circle class="pt" cx="191.65" cy="298.2" r="3.5" fill="#1e3a8a"><title>standard uncertainty in T²: 0.35: 1.407 ± 0.005</title></circle><line x1="305.88" y1="242.91" x2="305.88" y2="241.37" stroke="#1e3a8a" stroke-width="1.5"/><line x1="301.88" y1="242.91" x2="309.88" y2="242.91" stroke="#1e3a8a" stroke-width="1.5"/><line x1="301.88" y1="241.37" x2="309.88" y2="241.37" stroke="#1e3a8a" stroke-width="1.5"/><circle class="pt" cx="305.88" cy="242.14" r="3.5" fill="#1e3a8a"><title>standard uncertainty in T²: 0.45: 1.815 ± 0.006</title></circle><line x1="420.12" y1="188.72" x2="420.12" y2="187.01" stroke="#1e3a8a" stroke-width="1.5"/><line x1="416.12" y1="188.72" x2="424.12" y2="188.72" stroke="#1e3a8a" stroke-width="1.5"/><line x1="416.12" y1="187.01" x2="424.12" y2="187.01" stroke="#1e3a8a" stroke-width="1.5"/><circle class="pt" cx="420.12" cy="187.87" r="3.5" fill="#1e3a8a"><title>standard uncertainty in T²: 0.55: 2.211 ± 0.006</title></circle><line x1="534.35" y1="132.47" x2="534.35" y2="130.61" stroke="#1e3a8a" stroke-width="1.5"/><line x1="530.35" y1="132.47" x2="538.35" y2="132.47" stroke="#1e3a8a" stroke-width="1.5"/><line x1="530.35" y1="130.61" x2="538.35" y2="130.61" stroke="#1e3a8a" stroke-width="1.5"/><circle class="pt" cx="534.35" cy="131.54" r="3.5" fill="#1e3a8a"><title>standard uncertainty in T²: 0.65: 2.621 ± 0.007</title></circle><line x1="648.58" y1="78.3" x2="648.58" y2="76.31" stroke="#1e3a8a" stroke-width="1.5"/><line x1="644.58" y1="78.3" x2="652.58" y2="78.3" stroke="#1e3a8a" stroke-width="1.5"/><line x1="644.58" y1="76.31" x2="652.58" y2="76.31" stroke="#1e3a8a" stroke-width="1.5"/><circle class="pt" cx="648.58" cy="77.31" r="3.5" fill="#1e3a8a"><title>standard uncertainty in T²: 0.75: 3.017 ± 0.007</title></circle></g>
+<g class="viz-series" data-viz-series-id="2"><g fill="#2563eb" fill-opacity="0.78" stroke="#ffffff" stroke-width="0.6"><circle class="pt" data-viz-index="0" cx="77.42" cy="352.95" r="5"><title>measured periods: (0.25, 1.007)</title></circle><circle class="pt" data-viz-index="1" cx="191.65" cy="298.2" r="5"><title>measured periods: (0.35, 1.407)</title></circle><circle class="pt" data-viz-index="2" cx="305.88" cy="242.14" r="5"><title>measured periods: (0.45, 1.815)</title></circle><circle class="pt" data-viz-index="3" cx="420.12" cy="187.87" r="5"><title>measured periods: (0.55, 2.211)</title></circle><circle class="pt" data-viz-index="4" cx="534.35" cy="131.54" r="5"><title>measured periods: (0.65, 2.621)</title></circle><circle class="pt" data-viz-index="5" cx="648.58" cy="77.31" r="5"><title>measured periods: (0.75, 3.017)</title></circle></g></g>
+<g class="viz-series" data-viz-series-id="3"><g class="series"><title>OLS fit</title><path d="M77.42 353.04 L191.65 297.82 L305.88 242.61 L420.12 187.39 L534.35 132.18 L648.58 76.96" fill="none" stroke="#dc2626" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></g></g>
+</g>
+<line x1="66" y1="368" x2="660" y2="368" stroke="#9ca3af" stroke-width="1"/>
+<line x1="66" y1="62" x2="66" y2="368" stroke="#9ca3af" stroke-width="1"/>
+<text x="363" y="408" text-anchor="middle" font-size="12" fill="#1f2937">Length L [m]</text>
+<text x="16" y="215" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 215)">Period squared T² [s²]</text>
+<g class="legend"><rect x="76" y="72" width="205.6" height="82" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><rect x="84" y="81" width="14" height="10" fill="#dbeafe" fill-opacity="0.7"/><text x="104" y="90" text-anchor="start" font-size="11" fill="#1f2937">±2 residual SD</text></g><g class="legend-item" data-viz-series-id="1"><circle cx="91" cy="104" r="4" fill="#1e3a8a"/><text x="104" y="108" text-anchor="start" font-size="11" fill="#1f2937">standard uncertainty in T²</text></g><g class="legend-item" data-viz-series-id="2"><circle cx="91" cy="122" r="4" fill="#2563eb"/><text x="104" y="126" text-anchor="start" font-size="11" fill="#1f2937">measured periods</text></g><g class="legend-item" data-viz-series-id="3"><line x1="83" y1="140" x2="99" y2="140" stroke="#dc2626" stroke-width="2.5"/><text x="104" y="144" text-anchor="start" font-size="11" fill="#1f2937">OLS fit</text></g></g>  <ostrin-provenance source-hash="sha256:92f5434b4d05c328e1447ef5004690d94966144961377dd7f966bf6f3bab3b21" data-hash="sha256:d7672d234a8d38d2ef537e900e8ec66d88d8cfeaf601c025fc312baa9d93e53c" seed="seed=deterministic" compiler="ostrinc 0.2.0" />
+</svg>
+<svg x="0" y="460" role="table" data-ostrin-table="true" xmlns="http://www.w3.org/2000/svg" width="900" height="264" viewBox="0 0 900 264" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
+<rect width="900" height="264" fill="#ffffff"/>
+
+<text x="16" y="29" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Synthetic pendulum calibration inputs</text>
+<rect class="table-header" data-table-column="0" x="10" y="48" width="104" height="28" fill="#1f2937"/>
+<text class="table-heading" data-table-column="0" x="22" y="66" text-anchor="start" font-size="11" fill="#ffffff" font-weight="600">n</text>
+<rect class="table-header" data-table-column="1" x="114" y="48" width="104" height="28" fill="#1f2937"/>
+<text class="table-heading" data-table-column="1" x="126" y="66" text-anchor="start" font-size="11" fill="#ffffff" font-weight="600">L [m]</text>
+<rect class="table-header" data-table-column="2" x="218" y="48" width="104" height="28" fill="#1f2937"/>
+<text class="table-heading" data-table-column="2" x="230" y="66" text-anchor="start" font-size="11" fill="#ffffff" font-weight="600">T [s]</text>
+<rect class="table-header" data-table-column="3" x="322" y="48" width="104" height="28" fill="#1f2937"/>
+<text class="table-heading" data-table-column="3" x="334" y="66" text-anchor="start" font-size="11" fill="#ffffff" font-weight="600">u(T) [s]</text>
+<rect class="table-header" data-table-column="4" x="426" y="48" width="104" height="28" fill="#1f2937"/>
+<text class="table-heading" data-table-column="4" x="438" y="66" text-anchor="start" font-size="11" fill="#ffffff" font-weight="600">T² [s²]</text>
+<rect class="table-header" data-table-column="5" x="530" y="48" width="104" height="28" fill="#1f2937"/>
+<text class="table-heading" data-table-column="5" x="542" y="66" text-anchor="start" font-size="11" fill="#ffffff" font-weight="600">u(T²) [s²]</text>
+<g class="table-body" role="rowgroup">
+<g class="table-row" role="row" data-table-row="0" data-viz-index="0" data-table-y="76">
+<rect class="table-cell" role="cell" data-table-column="0" x="10" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1</title></rect>
+<text class="table-value" data-table-column="0" x="22" y="94" text-anchor="start" font-size="11" fill="#1f2937">1</text>
+<rect class="table-cell" role="cell" data-table-column="1" x="114" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.25</title></rect>
+<text class="table-value" data-table-column="1" x="126" y="94" text-anchor="start" font-size="11" fill="#1f2937">0.25</text>
+<rect class="table-cell" role="cell" data-table-column="2" x="218" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.0037</title></rect>
+<text class="table-value" data-table-column="2" x="230" y="94" text-anchor="start" font-size="11" fill="#1f2937">1.0037</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="94" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
+<rect class="table-cell" role="cell" data-table-column="4" x="426" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.0074</title></rect>
+<text class="table-value" data-table-column="4" x="438" y="94" text-anchor="start" font-size="11" fill="#1f2937">1.0074</text>
+<rect class="table-cell" role="cell" data-table-column="5" x="530" y="76" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0042</title></rect>
+<text class="table-value" data-table-column="5" x="542" y="94" text-anchor="start" font-size="11" fill="#1f2937">0.0042</text>
+</g>
+<g class="table-row" role="row" data-table-row="1" data-viz-index="1" data-table-y="104">
+<rect class="table-cell" role="cell" data-table-column="0" x="10" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>2</title></rect>
+<text class="table-value" data-table-column="0" x="22" y="122" text-anchor="start" font-size="11" fill="#1f2937">2</text>
+<rect class="table-cell" role="cell" data-table-column="1" x="114" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.35</title></rect>
+<text class="table-value" data-table-column="1" x="126" y="122" text-anchor="start" font-size="11" fill="#1f2937">0.35</text>
+<rect class="table-cell" role="cell" data-table-column="2" x="218" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.186</title></rect>
+<text class="table-value" data-table-column="2" x="230" y="122" text-anchor="start" font-size="11" fill="#1f2937">1.186</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="122" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
+<rect class="table-cell" role="cell" data-table-column="4" x="426" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.4066</title></rect>
+<text class="table-value" data-table-column="4" x="438" y="122" text-anchor="start" font-size="11" fill="#1f2937">1.4066</text>
+<rect class="table-cell" role="cell" data-table-column="5" x="530" y="104" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.005</title></rect>
+<text class="table-value" data-table-column="5" x="542" y="122" text-anchor="start" font-size="11" fill="#1f2937">0.005</text>
+</g>
+<g class="table-row" role="row" data-table-row="2" data-viz-index="2" data-table-y="132">
+<rect class="table-cell" role="cell" data-table-column="0" x="10" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>3</title></rect>
+<text class="table-value" data-table-column="0" x="22" y="150" text-anchor="start" font-size="11" fill="#1f2937">3</text>
+<rect class="table-cell" role="cell" data-table-column="1" x="114" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.45</title></rect>
+<text class="table-value" data-table-column="1" x="126" y="150" text-anchor="start" font-size="11" fill="#1f2937">0.45</text>
+<rect class="table-cell" role="cell" data-table-column="2" x="218" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.3473</title></rect>
+<text class="table-value" data-table-column="2" x="230" y="150" text-anchor="start" font-size="11" fill="#1f2937">1.3473</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="150" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
+<rect class="table-cell" role="cell" data-table-column="4" x="426" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.8152</title></rect>
+<text class="table-value" data-table-column="4" x="438" y="150" text-anchor="start" font-size="11" fill="#1f2937">1.8152</text>
+<rect class="table-cell" role="cell" data-table-column="5" x="530" y="132" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0056</title></rect>
+<text class="table-value" data-table-column="5" x="542" y="150" text-anchor="start" font-size="11" fill="#1f2937">0.0056</text>
+</g>
+<g class="table-row" role="row" data-table-row="3" data-viz-index="3" data-table-y="160">
+<rect class="table-cell" role="cell" data-table-column="0" x="10" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>4</title></rect>
+<text class="table-value" data-table-column="0" x="22" y="178" text-anchor="start" font-size="11" fill="#1f2937">4</text>
+<rect class="table-cell" role="cell" data-table-column="1" x="114" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.55</title></rect>
+<text class="table-value" data-table-column="1" x="126" y="178" text-anchor="start" font-size="11" fill="#1f2937">0.55</text>
+<rect class="table-cell" role="cell" data-table-column="2" x="218" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.4869</title></rect>
+<text class="table-value" data-table-column="2" x="230" y="178" text-anchor="start" font-size="11" fill="#1f2937">1.4869</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="178" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
+<rect class="table-cell" role="cell" data-table-column="4" x="426" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>2.2109</title></rect>
+<text class="table-value" data-table-column="4" x="438" y="178" text-anchor="start" font-size="11" fill="#1f2937">2.2109</text>
+<rect class="table-cell" role="cell" data-table-column="5" x="530" y="160" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0062</title></rect>
+<text class="table-value" data-table-column="5" x="542" y="178" text-anchor="start" font-size="11" fill="#1f2937">0.0062</text>
+</g>
+<g class="table-row" role="row" data-table-row="4" data-viz-index="4" data-table-y="188">
+<rect class="table-cell" role="cell" data-table-column="0" x="10" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>5</title></rect>
+<text class="table-value" data-table-column="0" x="22" y="206" text-anchor="start" font-size="11" fill="#1f2937">5</text>
+<rect class="table-cell" role="cell" data-table-column="1" x="114" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.65</title></rect>
+<text class="table-value" data-table-column="1" x="126" y="206" text-anchor="start" font-size="11" fill="#1f2937">0.65</text>
+<rect class="table-cell" role="cell" data-table-column="2" x="218" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>1.6191</title></rect>
+<text class="table-value" data-table-column="2" x="230" y="206" text-anchor="start" font-size="11" fill="#1f2937">1.6191</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="206" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
+<rect class="table-cell" role="cell" data-table-column="4" x="426" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>2.6215</title></rect>
+<text class="table-value" data-table-column="4" x="438" y="206" text-anchor="start" font-size="11" fill="#1f2937">2.6215</text>
+<rect class="table-cell" role="cell" data-table-column="5" x="530" y="188" width="104" height="28" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"><title>0.0068</title></rect>
+<text class="table-value" data-table-column="5" x="542" y="206" text-anchor="start" font-size="11" fill="#1f2937">0.0068</text>
+</g>
+<g class="table-row" role="row" data-table-row="5" data-viz-index="5" data-table-y="216">
+<rect class="table-cell" role="cell" data-table-column="0" x="10" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>6</title></rect>
+<text class="table-value" data-table-column="0" x="22" y="234" text-anchor="start" font-size="11" fill="#1f2937">6</text>
+<rect class="table-cell" role="cell" data-table-column="1" x="114" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.75</title></rect>
+<text class="table-value" data-table-column="1" x="126" y="234" text-anchor="start" font-size="11" fill="#1f2937">0.75</text>
+<rect class="table-cell" role="cell" data-table-column="2" x="218" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>1.7369</title></rect>
+<text class="table-value" data-table-column="2" x="230" y="234" text-anchor="start" font-size="11" fill="#1f2937">1.7369</text>
+<rect class="table-cell" role="cell" data-table-column="3" x="322" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0021</title></rect>
+<text class="table-value" data-table-column="3" x="334" y="234" text-anchor="start" font-size="11" fill="#1f2937">0.0021</text>
+<rect class="table-cell" role="cell" data-table-column="4" x="426" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>3.0168</title></rect>
+<text class="table-value" data-table-column="4" x="438" y="234" text-anchor="start" font-size="11" fill="#1f2937">3.0168</text>
+<rect class="table-cell" role="cell" data-table-column="5" x="530" y="216" width="104" height="28" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="0.6"><title>0.0073</title></rect>
+<text class="table-value" data-table-column="5" x="542" y="234" text-anchor="start" font-size="11" fill="#1f2937">0.0073</text>
+</g>
+</g>
+<text class="table-footer" data-table-footer="true" x="16" y="257" text-anchor="start" font-size="10" fill="#6b7280">6 rows · 6 columns</text></svg>
+</svg>

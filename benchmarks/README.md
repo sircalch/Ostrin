@@ -17,6 +17,14 @@ warmups, per-sample timings and summary statistics (minimum, maximum, mean,
 median, p95 and standard deviation). The report labels those defaults as
 source-defined metadata; it does not pretend to intercept the compiler's
 internal subprocess argv.
+The raw `sourceSha256` and runtime-input `sha256` values cover the exact bytes
+in that runner's checkout and staged files. Windows checkouts can use CRLF
+while Unix checkouts use LF, so the report also records `sourceContentSha256`
+and runtime-input `contentSha256`, which normalize UTF-8 line endings to LF.
+The cross-platform workflow compares those content identities and exact output
+hashes for Linux, macOS and Windows while retaining the host-specific raw
+hashes and byte counts. Binary or invalid UTF-8 runtime inputs have no normalized
+text hash and are compared by their raw SHA-256.
 Results are machine-specific; a ratio is not a claim about another language or
 hardware. Peak child memory and allocation counters are still explicitly
 unmeasured and remain a future benchmark metric.
@@ -33,6 +41,7 @@ unmeasured and remain a future benchmark metric.
 | `numeric_svd.ostrin` | SVD, rank, condition number and least squares |
 | `numeric_complex_linear_algebra.ostrin` | dense split-complex solve and adjoint product |
 | `viz_scatter_fit.ostrin` | deterministic fit, band and SVG rendering |
+| `viz_pendulum_calibration.ostrin` | file-backed dimensional calibration, correlated uncertainty and scientific SVG output |
 | `temperature-float.ostrin` | scalar `Float` addition control |
 | `temperature-interval.ostrin` | linear `Quantity<Temperature>` additions in K |
 | `temperature-point.ostrin` | absolute Celsius point shifted by Kelvin intervals |

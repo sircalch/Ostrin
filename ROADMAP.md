@@ -177,23 +177,24 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
-   El primer artefacto web de alto retorno ya cubre las 29 figuras de la galería con bundles
+   El primer artefacto web de alto retorno ya cubre las 30 figuras de la galería con bundles
    source-backed `ostrin.experiment/v0`: cada descarga contiene código, entradas declaradas, SVG,
    manifest y `provenance.json` con hashes calculados y etiqueta de madurez R0/R1/R2. Ahora cada bundle
    también lleva un snapshot parcial `ostrin.runtime/v1` con target/WASI, hashes de lockfiles disponibles
-   y hashes de salida de la invocación verificada; los 29 bundles ya registran además el contrato base de ejecución, dependencias y scheduler declarado, pero esa instantánea parcial no sustituye el contrato R2/R3 completo. La CI del sitio reproduce los
-   29 programas con `ostrinc.wasm` y compara el SVG byte a byte; los once bundles input-driven (`surface`, `lines` y los nueve cortes de azar sembrado) son replays R2 de snapshot externo; los nueve de azar conservan además su evidencia de semilla R1; los 18 restantes conservan R0. No se reclama R3. Los manifiestos de figura ya serializan el estado vivo
+   y hashes de salida de la invocación verificada; los 30 bundles ya registran además el contrato base de ejecución, dependencias y scheduler declarado, pero esa instantánea parcial no sustituye el contrato R2/R3 completo. La CI del sitio reproduce los
+   30 programas con `ostrinc.wasm` y compara el SVG byte a byte; los doce bundles input-driven (`surface`, `lines`, `pendulum-calibration` y los nueve cortes de azar sembrado) son replays R2 de snapshot externo; los nueve de azar conservan además su evidencia de semilla R1; los 18 restantes conservan R0. No se reclama R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
    BibTeX con metadatos de fuente y versión. Los bundles que usan `rng(seed)` ahora incluyen
    evidencia source-backed del contrato `ostrin.rng/v1` (xoshiro256**, splitmix64, Marsaglia
    polar y `detmath::ln`) con hashes de las implementaciones intérprete/nativa. `histogram` consume
    `seed`, `parameters.samples` y `parameters.bins` desde `data.json`; la CI repite la misma entrada y semilla para exigir el mismo SVG, cambia la semilla y
-   exige una figura distinta; con el snapshot y la capacidad declarados, los nueve bundles de azar quedan incluidos en R2 y conservan la evidencia R1. Ya existen once cortes ejecutables
+   exige una figura distinta; con el snapshot y la capacidad declarados, los nueve bundles de azar quedan incluidos en R2 y conservan la evidencia R1. Ya existen doce cortes ejecutables
    input-driven:
    `surface` lee `data.json` y demuestra sensibilidad a `parameters.scale`; `lines` consume
-   `parameters.samples` con el mismo contrato genérico de sensibilidad. `histogram`, `boxplot`,
+   `parameters.samples` con el mismo contrato genérico de sensibilidad; `pendulum-calibration` usa
+   su snapshot sintético y verifica sensibilidad a la incertidumbre del reloj. `histogram`, `boxplot`,
    `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` consumen `seed` y parámetros declarados, y cambian su figura con una semilla alternativa. El comando
-   `scripts/experiment-replay.mjs --all` descubre los once replays R1/R2 desde el registro source-backed
+   `scripts/experiment-replay.mjs --all` descubre los doce replays R1/R2 desde el registro source-backed
    y CI ejecuta esa selección sin una lista manual. Los nueve
    experimentos de galería que consumen `rng(seed)` ya están incluidos en R2 con evidencia R1; los dieciocho restantes
    conservan R0 porque son deterministas o todavía no declaran una sensibilidad de entradas
@@ -236,7 +237,7 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    capacidades. `--provenance-report` está disponible; el artefacto se publica en
    [`website/provenance.html`](website/provenance.html) con hash de fuente, target, perfil WASI,
    hashes de lockfiles/manifiestos disponibles y límites de replay. El snapshot ostrin.runtime/v1
-   es parcial: los once bundles input-driven ya usan su extensión de snapshot de entrada para R2,
+   es parcial: los doce bundles input-driven ya usan su extensión de snapshot de entrada para R2,
    y los nueve casos sembrados conservan evidencia R1; esto aún no equivale al artefacto auditable R3 ni a checking estático.
 
 ## Horizonte posterior
