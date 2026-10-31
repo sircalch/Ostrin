@@ -13076,6 +13076,100 @@ fn main() -> Void {
 }
 
 #[test]
+fn temperature_point_measurement_arguments_returns_and_phis_preserve_ownership() {
+    let source = temp_source(
+        "temperature_point_measurement_arguments_returns_and_phis",
+        r#"import std.measurements
+fn point(value: Float) -> Measurement<TemperaturePoint> {
+    Measurement<TemperaturePoint> { value: temperature_point(value, "degC"), sources: [], known: true, reason: "" }
+}
+fn forward(value: Measurement<TemperaturePoint>) -> Measurement<TemperaturePoint> { value }
+fn choose(flag: Bool, left: Measurement<TemperaturePoint>, right: Measurement<TemperaturePoint>) -> Measurement<TemperaturePoint> {
+    if flag { left } else { right }
+}
+fn main() -> Void {
+    mut current = point(20.0)
+    alternate = point(30.0)
+    current = choose(true, forward(current), alternate)
+    mut i = 0
+    while i < 2 {
+        current = forward(current)
+        i = i + 1
+    }
+    print(current.value)
+    drop(current)
+    drop(alternate)
+}
+"#,
+    );
+    let expected = "20 degC (absolute)\n";
+
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "TemperaturePoint argument/return/Phi interpreter run failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &source]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&source);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "TemperaturePoint argument/return/Phi native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir=4 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "TemperaturePoint arguments, returns, Phi and loop-Phi must lower through IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &source]);
+    assert!(
+        wasi.status.success(),
+        "TemperaturePoint argument/return/Phi WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__TemperaturePoint"),
+        "WASI output omitted the concrete TemperaturePoint measurement type"
+    );
+
+    let exe = temp_artifact("temperature_point_measurement_arguments_returns_phis.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    assert!(
+        compile.status.success(),
+        "TemperaturePoint argument/return/Phi native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run TemperaturePoint argument/return/Phi binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&source);
+    assert!(
+        native.status.success(),
+        "TemperaturePoint argument/return/Phi native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "TemperaturePoint argument/return/Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn temperature_point_native_backend_matches_interpreter() {
     let file_arg = fixture_path("temperature_point_affine.ostrin.txt");
     let interpreted = run(&["--run", &file_arg]);

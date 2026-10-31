@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte de trabajo: 2026-10-24 · PR #233 integrado en `main` en `0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714`; los ocho checks posteriores al merge están verdes · 6 pruebas diferenciales, 384 de integración y 33 unitarias en verde. `main` remoto permanece en `0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714`. `v0.2.0` permanece publicada e intacta desde el tag `29c24c0bd607822dbc2609a54bfcce545ca563f6`; no se prepara un nuevo tag. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59`. El perfil `SourceCovariance` experimental cubre hasta 64 fuentes escalares adimensionales; la covarianza dimensional/de arrays, el ownership general y las operaciones numéricas de arrays siguen abiertos. El paquete está validado localmente y espera revisión y CI del nuevo head.*
+*Corte de trabajo: 2026-10-24 · PR #233 integrado en `main` en `0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714`; los ocho checks posteriores al merge están verdes · 6 pruebas diferenciales, 385 de integración y 33 unitarias en verde. `main` remoto permanece en `0a3a8243ecb2bbb6cd30b1d08c5c4682a66a3714`. `v0.2.0` permanece publicada e intacta desde el tag `29c24c0bd607822dbc2609a54bfcce545ca563f6`; no se prepara un nuevo tag. Los hashes RC anteriores pertenecen a `d0abbad0f674317c95c389b953507365f3fd1a59`. El perfil `SourceCovariance` experimental cubre hasta 64 fuentes escalares adimensionales; la covarianza dimensional/de arrays, el ownership general y las operaciones numéricas de arrays siguen abiertos. El paquete está validado localmente y espera revisión y CI del nuevo head.*
 
 Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
 `38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
@@ -619,7 +619,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 384 de integración + 33 unitarias
+    cargo test                                   # 6 diferenciales + 385 de integración + 33 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..
