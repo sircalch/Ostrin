@@ -21,6 +21,7 @@ import {
   runtimeInputFilesFor,
 } from "./benchmark-runtime-inputs.mjs";
 import { normalizedTextSha256 } from "./benchmark-content-hash.mjs";
+import { allocationScope, parseAllocationCounters } from "./benchmark-allocation-profile.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(scriptDir, "..");
@@ -52,6 +53,7 @@ function option(name, fallback) {
 const iterations = option("--iterations", 7);
 const warmups = option("--warmups", 1);
 const compileIterations = option("--compile-iterations", 1);
+const allocationProfile = process.argv.includes("--allocation-profile");
 const workloadIndex = process.argv.indexOf("--workloads");
 const workloadPaths = workloadIndex === -1
   ? defaultWorkloads
@@ -285,6 +287,22 @@ function benchmarkWorkload(sourcePath, index) {
 
   const interpreterMedianMs = median(interpreter);
   const nativeMedianMs = median(native);
+  // Run a separately compiled leak-check executable after timing. Its stderr
+  // counters describe managed allocation records, never RSS or allocated bytes.
+  let nativeAllocations;
+  if (allocationProfile) {
+    const profileExecutable = `${executable}.allocations${process.platform === "win32" ? ".exe" : ""}`;
+    rmSync(profileExecutable, { force: true });
+    run(compiler, ["--compile", "--leak-check", "--out", profileExecutable, source], `allocation build ${sourcePath}`);
+    const executableSha256 = outputHash(readFileSync(profileExecutable));
+    const samples = [];
+    for (let iteration = 0; iteration < iterations; iteration += 1) {
+      const result = runBenchmarkWorkload(profileExecutable, [], `allocation profile ${sourcePath} ${iteration + 1}`, runtimeCwd());
+      if (normalizeOutput(result.stdout) !== expected) throw new Error(`allocation build output differs for ${sourcePath}`);
+      samples.push({ ...parseAllocationCounters(result.stderr), outputSha256: outputHash(normalizeOutput(result.stdout)) });
+    }
+    nativeAllocations = { scope: allocationScope, timingIncluded: false, executableSha256, samples };
+  }
   return {
     index,
     workload: sourcePath.replaceAll("\\", "/"),
@@ -292,6 +310,7 @@ function benchmarkWorkload(sourcePath, index) {
     sourceSha256: outputHash(sourceBytes),
     sourceContentSha256: normalizedTextSha256(sourceBytes),
     executableSha256,
+    ...(nativeAllocations ? { nativeAllocations } : {}),
     runtimeInputs: runtimeContext.inputs,
     outputBytes: Buffer.byteLength(expected),
     outputSha256: outputHash(expected),
@@ -341,11 +360,14 @@ const report = {
     outputCheck: "normalized UTF-8 stdout must match interpreter and native output exactly",
     contentHashNormalization: "sourceContentSha256 and runtime input contentSha256 hash UTF-8 text after converting CRLF and CR line endings to LF; sourceSha256 and runtime input sha256 hash exact worktree bytes",
     quantityFloatPair,
-    memory: "not captured; peak child RSS and allocation counters are a planned metric",
+    memory: allocationProfile
+      ? "managed allocation counts captured separately with --leak-check; allocation bytes and peak child RSS are not measured"
+      : "not captured; enable --allocation-profile for managed allocation counters; RSS remains unmeasured",
   },
   iterations,
   warmups,
   compileIterations,
+  allocationProfile,
 };
 
 const reportPath = join(outputDir, "benchmark.json");

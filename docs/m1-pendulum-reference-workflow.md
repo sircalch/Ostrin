@@ -97,3 +97,12 @@ cargo build --release --manifest-path compiler/Cargo.toml
 node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5
 node scripts/benchmark-contract-check.mjs
 ```
+
+For managed allocation counts, append `--allocation-profile` to the benchmark
+command. It builds a separate leak-check executable and runs it against fresh
+copies of the same input. Each sample must match the timed workload's stdout
+identity and report zero live allocations. `nativeAllocations.samples` records
+managed live/peak/total counts; they measure neither allocated bytes nor process
+RSS. Profile-run times are excluded from timing statistics. This closes the
+capture mechanism for managed counts; kernel timing, startup isolation and
+scientific abstraction overhead still require separate measurements.

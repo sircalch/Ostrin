@@ -98,3 +98,23 @@ node scripts/benchmark-contract-check.mjs
 
 Puedes seleccionar una fuente concreta o una lista separada por comas con
 `--workloads examples/arrays.ostrin,examples/numeric_methods.ostrin`.
+
+## Contadores de asignaciones gestionadas
+
+`--allocation-profile` añade una compilación independiente con `--leak-check` después
+de las muestras de tiempo. Cada ejecución usa el mismo staging de entradas y debe
+producir el mismo hash de stdout que el intérprete y el binario cronometrado. El
+reporte conserva el SHA-256 de ese segundo ejecutable y los contadores originales
+`live`, `peak` y `total` de cada muestra. Se rechazan reportes ausentes, duplicados,
+malformados, con asignaciones vivas o inconsistentes con el resultado esperado.
+
+```text
+node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5 --allocation-profile
+node scripts/benchmark-contract-check.mjs
+```
+
+Los tiempos de este segundo ejecutable no se incorporan a las estadísticas. Los
+contadores describen registros del asignador gestionado de Ostrin; no cuentan bytes,
+asignaciones internas de libc, memoria del compilador ni RSS. No aíslan por sí solos
+el kernel numérico o el coste de las abstracciones científicas. Los informes
+históricos sin este campo siguen indicando que no capturaron esos contadores.

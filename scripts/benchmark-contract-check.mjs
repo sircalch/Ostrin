@@ -5,6 +5,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizedTextSha256 } from "./benchmark-content-hash.mjs";
+import { validateAllocationProfile } from "./benchmark-allocation-profile.mjs";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const reportPath = path.join(repositoryRoot, "target", "benchmarks", "benchmark.json");
@@ -112,6 +113,10 @@ function validateWorkload(errors, workload, index, report, root) {
   check(errors, /^[a-f0-9]{64}$/.test(workload.executableSha256 || ""), `${label}: executableSha256 is not a SHA-256 digest`);
   check(errors, /^[a-f0-9]{64}$/.test(workload.outputSha256 || ""), `${label}: outputSha256 is not a SHA-256 digest`);
   check(errors, Number.isInteger(report.iterations) && report.iterations >= 1, "report: iterations must be a positive integer");
+  if (report.allocationProfile === true || workload.nativeAllocations !== undefined) {
+    errors.push(...validateAllocationProfile(workload.nativeAllocations, report.iterations, workload.outputSha256)
+      .map((error) => `${label}: ${error}`));
+  }
   for (const mode of ["interpreter", "native"]) {
     const samples = workload[`${mode}Ms`];
     check(errors, Array.isArray(samples) && samples.length === report.iterations, `${label}: ${mode}Ms sample count does not match iterations`);

@@ -53,11 +53,11 @@ jobs:
       - name: Run file-backed pendulum benchmark
         env:
           OSTRIN_COMPILER: ${{ runner.os == 'Windows' && './compiler/target/release/ostrinc.exe' || './compiler/target/release/ostrinc' }}
-        run: node scripts/benchmark.mjs --iterations 7 --warmups 1 --compile-iterations 5 --workloads examples/viz_pendulum_calibration.ostrin
+        run: node scripts/benchmark.mjs --iterations 7 --warmups 1 --compile-iterations 5 --allocation-profile --workloads examples/viz_pendulum_calibration.ostrin
       - name: Validate reproducibility contract
         run: |
           node scripts/benchmark-contract-check.mjs
-          node --test scripts/benchmark-content-hash.test.mjs scripts/benchmark-contract-check.test.mjs scripts/benchmark-matrix-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs scripts/benchmark-runtime-inputs.test.mjs
+          node --test scripts/benchmark-allocation-profile.test.mjs scripts/benchmark-content-hash.test.mjs scripts/benchmark-contract-check.test.mjs scripts/benchmark-matrix-check.test.mjs scripts/benchmark-page.test.mjs scripts/benchmark-pair-contract.test.mjs scripts/benchmark-runtime-inputs.test.mjs
       - name: Publish benchmark summary
         shell: bash
         run: |

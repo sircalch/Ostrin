@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { repositoryRoot, validateBenchmarkReport } from "./benchmark-contract-check.mjs";
 import { normalizedTextSha256 } from "./benchmark-content-hash.mjs";
+import { allocationScope, parseAllocationCounters } from "./benchmark-allocation-profile.mjs";
 
 function digest(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -92,6 +93,23 @@ function fixture() {
 
 test("schema 3 report records source, host, compiler, content identity and timing provenance", () => {
   assert.deepEqual(validateBenchmarkReport(fixture()), []);
+});
+
+test("declared allocation profiling requires repeated counters and the original workload output", () => {
+  const report = fixture();
+  report.allocationProfile = true;
+  assert.ok(validateBenchmarkReport(report).some((error) => error.includes("allocation profile is missing")));
+  const workload = report.workloads[0];
+  workload.nativeAllocations = {
+    scope: allocationScope, timingIncluded: false, executableSha256: "c".repeat(64),
+    samples: Array.from({ length: 3 }, () => ({
+      ...parseAllocationCounters("ostrin memory: live_allocations=0 peak_allocations=7 total_allocations=31"),
+      outputSha256: workload.outputSha256,
+    })),
+  };
+  assert.deepEqual(validateBenchmarkReport(report), []);
+  workload.nativeAllocations.samples[1].outputSha256 = "f".repeat(64);
+  assert.ok(validateBenchmarkReport(report).some((error) => error.includes("output identity")));
 });
 
 test("the contract rejects missing or null runtime input provenance", () => {
