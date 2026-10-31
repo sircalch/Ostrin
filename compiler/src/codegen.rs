@@ -555,17 +555,6 @@ fn map_type_with_subst(
                 .iter()
                 .map(|a| map_type_with_subst(a, types, subst))
                 .collect::<Result<Vec<_>, _>>()?;
-            if name == "Measurement" || name.ends_with("::Measurement") {
-                if concrete
-                    .iter()
-                    .any(|arg| matches!(arg, CType::TemperaturePoint))
-                {
-                    return Err(
-                        "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
-                            .to_string(),
-                    );
-                }
-            }
             let mangled = instance_name(name, &concrete);
             types.seen.borrow_mut().push((name.clone(), concrete));
             Ok(if is_enum {
@@ -2341,17 +2330,6 @@ impl<'a> Codegen<'a> {
     }
 
     fn register_instance(&mut self, base: &str, args: &[CType]) -> Result<(), String> {
-        if base == "Measurement" || base.ends_with("::Measurement") {
-            if args
-                .iter()
-                .any(|arg| matches!(arg, CType::TemperaturePoint))
-            {
-                return Err(
-                    "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
-                        .to_string(),
-                );
-            }
-        }
         let mangled = instance_name(base, args);
         if !self.instances_done.insert(mangled.clone()) {
             return Ok(());
@@ -4156,6 +4134,7 @@ impl<'a> Codegen<'a> {
             Ty::Quantity(d) => CType::Quantity(self.substitute_dimension(d)),
             Ty::Sized(kind) => CType::Sized(*kind),
             Ty::Float32 => CType::Float32,
+            Ty::TemperaturePoint => CType::TemperaturePoint,
             Ty::Named(n) if n == "Rng" => CType::Rng,
             Ty::Applied(n, args) if n == "Array" && args.len() == 1 => {
                 let elem = self.ty_to_ctype(&args[0])?;
@@ -4663,6 +4642,7 @@ impl<'a> Codegen<'a> {
             (Ty::Quantity(a), CType::Quantity(b)) => &self.substitute_dimension(a) == b,
             (Ty::Sized(a), CType::Sized(b)) => a == b,
             (Ty::Float32, CType::Float32) => true,
+            (Ty::TemperaturePoint, CType::TemperaturePoint) => true,
             (Ty::Named(n), CType::Rng) => n == "Rng",
             (Ty::Applied(n, args), CType::Array(inner)) if n == "Array" && args.len() == 1 => {
                 self.ctype_agrees(&args[0], inner)
@@ -9950,6 +9930,7 @@ fn generate_impl(
     }
     if let Some(program) = &hir {
         codegen.register_hir_types(program);
+        codegen.flush_instances()?;
         codegen.sync_hir_instances(&mut hir_world);
     }
     // HIR type registration materializes concrete generic records and their
