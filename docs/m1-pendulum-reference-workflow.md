@@ -48,6 +48,10 @@ native live allocations, and WASI C emission. The experiment bundle replay gate
 binds the input snapshot and confirms that changing the declared clock-offset
 uncertainty changes the figure.
 
+The period is constructed once per observation and reused as both operands of
+`measurements.mul_quantity`. Both operands retain the same independent and shared
+source IDs; squaring a reading does not create a second independent observation.
+
 ## Scope
 
 This fixture demonstrates this one bounded example. It does not establish general

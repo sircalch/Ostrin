@@ -171,41 +171,36 @@ fn analyze(
         }
 
         length = measured_length(length_inputs[i], length_repeat_sigma, ruler_zero_sigma, "length-" + i.to_string())
-        period_left = measured_period(period_inputs[i], period_repeat_sigma, clock_zero_sigma, "period-" + i.to_string())
-        period_right = measured_period(period_inputs[i], period_repeat_sigma, clock_zero_sigma, "period-" + i.to_string())
+        period = measured_period(period_inputs[i], period_repeat_sigma, clock_zero_sigma, "period-" + i.to_string())
         match length {
-            Ok(measured_l) => match period_left {
-                Ok(measured_t_left) => match period_right {
-                    Ok(measured_t_right) => {
-                        measured_t_squared = measurements.mul_quantity(measured_t_left, measured_t_right).unwrap()
-                        length_value = measured_l.value.value() * measured_l.value.unit_scale()
-                        period_value = measured_t_squared.value.value() * measured_t_squared.value.unit_scale()
-                        length_contribution = measured_l.sources[0].contribution.value() * measured_l.sources[0].contribution.unit_scale()
-                        ruler_zero_contribution = measured_l.sources[1].contribution.value() * measured_l.sources[1].contribution.unit_scale()
-                        period_contribution = measured_t_squared.sources[0].contribution.value() * measured_t_squared.sources[0].contribution.unit_scale()
-                        clock_zero_contribution = measured_t_squared.sources[1].contribution.value() * measured_t_squared.sources[1].contribution.unit_scale()
+            Ok(measured_l) => match period {
+                Ok(measured_t) => {
+                    // Reusing this measurement preserves its source identities:
+                    // T * T is fully correlated with itself, not two readings.
+                    measured_t_squared = measurements.mul_quantity(measured_t, measured_t).unwrap()
+                    length_value = measured_l.value.value() * measured_l.value.unit_scale()
+                    period_value = measured_t_squared.value.value() * measured_t_squared.value.unit_scale()
+                    length_contribution = measured_l.sources[0].contribution.value() * measured_l.sources[0].contribution.unit_scale()
+                    ruler_zero_contribution = measured_l.sources[1].contribution.value() * measured_l.sources[1].contribution.unit_scale()
+                    period_contribution = measured_t_squared.sources[0].contribution.value() * measured_t_squared.sources[0].contribution.unit_scale()
+                    clock_zero_contribution = measured_t_squared.sources[1].contribution.value() * measured_t_squared.sources[1].contribution.unit_scale()
 
-                        lengths_m.push(length_value)
-                        periods_s.push(period_inputs[i])
-                        period_squares.push(period_value)
-                        length_reading_contributions.push(length_contribution)
-                        ruler_zero_contributions.push(ruler_zero_contribution)
-                        period_square_reading_contributions.push(period_contribution)
-                        clock_zero_contributions.push(clock_zero_contribution)
-                        period_square_marginal_uncertainties.push(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution))
-                        table_rows.push([
-                                (i + 1).to_string(),
-                                four(length_value),
-                                four(period_inputs[i]),
-                                four(period_marginal_uncertainty),
-                                four(period_value),
-                                four(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution)),
-                        ])
-                    },
-                    Err(message) => {
-                        print("measurement error: " + message)
-                        return
-                    },
+                    lengths_m.push(length_value)
+                    periods_s.push(period_inputs[i])
+                    period_squares.push(period_value)
+                    length_reading_contributions.push(length_contribution)
+                    ruler_zero_contributions.push(ruler_zero_contribution)
+                    period_square_reading_contributions.push(period_contribution)
+                    clock_zero_contributions.push(clock_zero_contribution)
+                    period_square_marginal_uncertainties.push(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution))
+                    table_rows.push([
+                            (i + 1).to_string(),
+                            four(length_value),
+                            four(period_inputs[i]),
+                            four(period_marginal_uncertainty),
+                            four(period_value),
+                            four(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution)),
+                    ])
                 },
                 Err(message) => {
                     print("measurement error: " + message)

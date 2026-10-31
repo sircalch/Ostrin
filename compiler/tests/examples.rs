@@ -12572,6 +12572,15 @@ fn pendulum_calibration_workflow_matches_interpreter_native_and_wasi_emission() 
     let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../experiments/pendulum-calibration.inputs.json");
     fs::copy(&data, work.join("data.json")).expect("failed to stage pendulum input snapshot");
+    let backend = run(&["--native-type-report", &source]);
+    assert!(backend.status.success(), "{}", stderr(&backend));
+    assert!(
+        stdout(&backend).contains("examples/viz_pendulum_calibration.ostrin ir=7 hir=2 ast=0")
+            && stdout(&backend).contains("ast-fallback: 0")
+            && stdout(&backend).contains("divergences: 0"),
+        "the dimensional workflow must preserve its typed backend profile: {}",
+        stdout(&backend)
+    );
     let expected = "workflow = dimensional pendulum calibration; synthetic data\n\
 observations = 6, repeatability sources = 12, shared sources = 2\n\
 fit: T² = 4.025 L + 0.0006 s²; R² = 0.999979\n\
