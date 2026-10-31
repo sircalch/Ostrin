@@ -4257,6 +4257,22 @@ impl<'a> Codegen<'a> {
                 }
             }
         }
+        // `register_instance` can discover impl methods while the HIR type
+        // prepass is flushing concrete records. Publish those methods after
+        // the flush so HIR/IR dispatch does not fall back to the legacy AST
+        // emitter for a newly materialized receiver.
+        for (owner, methods) in &self.methods {
+            for (name, method) in methods {
+                world.methods.insert(
+                    (owner.clone(), name.clone()),
+                    (
+                        method.c_name.clone(),
+                        method.param_types.iter().map(c_type_name).collect(),
+                        c_type_name(&method.return_type),
+                    ),
+                );
+            }
+        }
     }
 
     fn register_hir_type(&mut self, ty: &Ty) {
