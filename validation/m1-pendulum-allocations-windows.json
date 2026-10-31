@@ -1,0 +1,192 @@
+{
+  "schema": 3,
+  "workloads": [
+    {
+      "index": 0,
+      "workload": "examples/viz_pendulum_calibration.ostrin",
+      "sourceBytes": 18100,
+      "sourceSha256": "0005734e6406ed2983fa6c2e1a284d81db83e68f0a84032fe1cc48522ceb4dec",
+      "sourceContentSha256": "92f5434b4d05c328e1447ef5004690d94966144961377dd7f966bf6f3bab3b21",
+      "executableSha256": "b09297d7d2d2c7f7358c9a43d40ba30fd174394337c5462f5414c0dd88232852",
+      "nativeAllocations": {
+        "scope": "Ostrin managed allocation records; excludes allocation bytes, libc allocations and process RSS",
+        "timingIncluded": false,
+        "executableSha256": "07d86ff728bd8878407daee951622e60be568c23cf80c15d3c2ffe944b68c18c",
+        "samples": [
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          },
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          },
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          },
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          },
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          },
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          },
+          {
+            "live": 0,
+            "peak": 347,
+            "total": 12405,
+            "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12405",
+            "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3"
+          }
+        ]
+      },
+      "runtimeInputs": [
+        {
+          "path": "experiments/pendulum-calibration.inputs.json",
+          "stagedAs": "data.json",
+          "sizeBytes": 1619,
+          "sha256": "4f0c0596c38d682d881e8840e9d44f455d9a3a81658e9075b4146e657d99f09c",
+          "stagedSha256": "4f0c0596c38d682d881e8840e9d44f455d9a3a81658e9075b4146e657d99f09c",
+          "contentSha256": "7ec6de1e48e1b1b53e49d57d06e15726f3cfaec3077356f97d97012089c85e38",
+          "stagedContentSha256": "7ec6de1e48e1b1b53e49d57d06e15726f3cfaec3077356f97d97012089c85e38"
+        }
+      ],
+      "outputBytes": 25629,
+      "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+      "nativeCompileMs": 11114.674,
+      "nativeCompileMsSamples": [
+        11275.823,
+        13102.931,
+        10028.011,
+        10120.456,
+        11114.674
+      ],
+      "nativeCompileStatistics": {
+        "samples": 5,
+        "minMs": 10028.011,
+        "maxMs": 13102.931,
+        "meanMs": 11128.379,
+        "medianMs": 11114.674,
+        "p95Ms": 12737.509,
+        "stdevMs": 1108.828
+      },
+      "interpreterMs": [
+        340.851,
+        354.588,
+        321.889,
+        319.231,
+        337.718,
+        299.399,
+        308.14
+      ],
+      "nativeMs": [
+        49.296,
+        35.673,
+        37.255,
+        36.362,
+        33.894,
+        26.912,
+        28.501
+      ],
+      "statistics": {
+        "interpreter": {
+          "samples": 7,
+          "minMs": 299.399,
+          "maxMs": 354.588,
+          "meanMs": 325.974,
+          "medianMs": 321.889,
+          "p95Ms": 350.467,
+          "stdevMs": 17.986
+        },
+        "native": {
+          "samples": 7,
+          "minMs": 26.912,
+          "maxMs": 49.296,
+          "meanMs": 35.413,
+          "medianMs": 35.673,
+          "p95Ms": 45.684,
+          "stdevMs": 6.755
+        }
+      },
+      "interpreterMedianMs": 321.889,
+      "nativeMedianMs": 35.673,
+      "interpreterToNativeMedianRatio": 9.023
+    }
+  ],
+  "commit": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+  "git": {
+    "commit": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+    "clean": true
+  },
+  "compiler": "compiler/target/release/ostrinc.exe",
+  "compilerSha256": "ce280ba666b034434e9ef33f219d168617358dde8ee414fc9a8ce00cf25858dc",
+  "compilerVersion": "ostrinc 0.2.0",
+  "node": "v24.19.0",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "os": {
+      "type": "Windows_NT",
+      "release": "10.0.26200",
+      "version": "Windows 11 Pro"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 5700X 8-Core Processor             ",
+      "logicalCores": 16
+    },
+    "memoryBytes": 34278834176
+  },
+  "platform": "win32",
+  "arch": "x64",
+  "nativeCompile": {
+    "target": "native",
+    "cCompiler": {
+      "command": "gcc",
+      "version": "gcc (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r8) 13.2.0"
+    },
+    "compilerManagedDefaults": [
+      "-O2",
+      "-ffp-contract=off"
+    ],
+    "argvCapture": "not intercepted; see compiler/src/main.rs",
+    "environment": {
+      "OSTRIN_CC": null,
+      "OSTRIN_CFLAGS": null
+    }
+  },
+  "methodology": {
+    "clock": "node:perf_hooks performance.now wall-clock process duration",
+    "outputCheck": "normalized UTF-8 stdout must match interpreter and native output exactly",
+    "contentHashNormalization": "sourceContentSha256 and runtime input contentSha256 hash UTF-8 text after converting CRLF and CR line endings to LF; sourceSha256 and runtime input sha256 hash exact worktree bytes",
+    "quantityFloatPair": null,
+    "memory": "managed allocation counts captured separately with --leak-check; allocation bytes and peak child RSS are not measured"
+  },
+  "iterations": 7,
+  "warmups": 1,
+  "compileIterations": 5,
+  "allocationProfile": true
+}

@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-29",
+  "updatedAt": "2026-10-31",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
-    "evidenceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
-    "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
-    "lastValidatedRemotePullRequestHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
-    "lastObservedRemotePullRequestHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
+    "sourceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+    "evidenceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
+    "lastValidatedRemotePullRequestHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "lastObservedRemotePullRequestHead": "7f7a3ba341d17cbe127f0e7af6a68aa64fc29a64",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -77,576 +77,182 @@
     "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
-    "m1-dimensional-pendulum-calibration-workflow-interpreter-native-wasi-evidence",
-    "pendulum-calibration-independent-ols-and-uncertainty-oracle-and-r2-replay-passed",
-    "local-validation-33-unit-6-differential-384-integration-passed-on-source-aa3fb28",
-    "30-experiment-bundles-12-r1-r2-replays-website-linguist-project-plan-readiness-synchronized",
-    "pr-235-a4a17ee-all-five-required-checks-green-fresh-review-no-substantive-findings-p2s-resolved",
-    "pr-236-7f4d90b-all-six-required-checks-green-fresh-review-no-findings",
-    "pr-237-p2-clock-offset-contribution-in-reported-period-uncertainty-fixed-source-b2143da",
-    "pr-237-source-b2143da-full-cargo-423-focused-js-67-project-plan-linguist-website-and-30-replays-pass",
-    "pr-237-evidence-6bc76d5-regenerated-all-30-provenance-bundles-r3-ledger-and-public-lab-svg",
-    "pr-237-head-2f8e06d-browser-audit-website-linux-windows-codeql-security-green-macos-failed",
-    "r3-run-40253064496-host-artifact-30-of-30-ready-and-independent-replay-pass",
-    "m1-pendulum-native-memory-profiler-seven-run-hash-checked-evidence",
-    "macos-native-failure-diagnostic-improved-and-focused-windows-test-passed",
-    "m1-benchmark-runner-stages-and-hashes-file-backed-runtime-inputs-and-repeats-compile-timings",
-    "m1-pendulum-performance-windows-x64-recorded-5-compile-and-7-interpreter-native-samples-on-61ea27c",
-    "pr237-e76f2fc-browser-artifact-replayed-all-30-bundles-tested-sha-70e5b4c",
-    "benchmark-workload-path-canonicalization-two-regressions-and-local-windows-5-compile-7-interpreter-native-run",
-    "benchmark-relative-compiler-override-local-run-and-analysis-error-output-guard-15-tests",
-    "pr237-f7bdd32-cross-platform-normalized-hash-and-output-gate-green-after-windows-retry; browser-artifact-replay-all-30-and-read-random-evidence-verified",
-    "pr-237-review-p2-float-quantity-pair-selection-fixed-source-7d4679f",
-    "pr-237-head-1c08d0e-six-required-workflows-green-fresh-review-no-major-findings"
+    "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
+    "website-test-count-384-metadata-synchronized-pr239-29f8339",
+    "measurement-temperaturepoint-273e01e-five-workflows-green",
+    "temperaturepoint-shared-fixtures-34-programs-actual-wasi-7f7a3ba",
+    "pendulum-managed-allocation-profile-seven-runs-local-114e9c6"
   ],
   "currentPackage": {
-    "name": "dimensional-pendulum-calibration-reference-workflow",
+    "name": "pendulum-managed-allocation-profile",
     "branch": "codex/m1-reference-workflow",
-    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #237 is OPEN/MERGEABLE at remote head 1c08d0e76c49393869a1af988af47e9c4c17b8ca, base 69c962dee40a4b12606d131df0e8655b90924516. Source/evidence remains c885f7b; the follow-up fix at 7d4679f normalizes benchmark Float/Quantity pairing and adds a regression test. Six exact-head workflows are green and fresh review found no major issues. Do not merge without explicit authorization.",
+    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
+    "status": "Local source 114e9c6 and its clean-checkout allocation report are validated; the evidence/checkpoint commit will be pushed to the existing PR #237 and requires exact-head CI. No PR merge or release is authorized.",
+    "sourceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+    "compilerSourceRevision": "fcbe5284efffbb30d4acd10309aa04b31d8bdc45",
+    "evidenceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
     "scope": [
-      "synthetic dimensional pendulum calibration using Measurement<Quantity<Length>> and Measurement<Quantity<Time>>",
-      "ordinary least squares fit of T^2 against length and analytic uncertainty propagation into g",
-      "independent repeatability plus shared ruler-zero and clock-zero sources with declared 0.2 correlation",
-      "generated scientific SVG and accessible input/result table with uncertainty bars and residual band",
-      "bounded guards for invalid, non-finite and numerically unresolved inputs",
-      "Scientific Lab, experiment bundle, replay registry, website and documentation integration"
+      "opt-in separate --leak-check compilation after timing",
+      "record live/peak/total managed allocation counts, executable identity and matching stdout for every sample",
+      "validate counter/raw-report/output identity and wire the profile into the existing multiplatform pendulum benchmark"
     ],
     "evidence": [
-      "Full Cargo suite passed on the exact source tree: 33 unit, 6 differential and 384 integration tests.",
-      "Focused test covers interpreter/native report and SVG parity, WASI C emission and native live_allocations=0.",
-      "Independent centered-OLS and finite-difference oracle passed, including shared-offset cancellation and clock-uncertainty sensitivity.",
-      "Review P2 fixed: displayed marginal u(T) includes repeatability and shared clock-zero uncertainty; independent oracle and interpreter/native SVG assertion expect 0.0021 s.",
-      "All 12 registered R1/R2 experiment replays passed, including pendulum-calibration.",
-      "All 30 source-backed SVG replays match their bundles after the source revision pin and website figure/data were regenerated.",
-      "Website check passed: 17 public pages, 306 examples, 384 integration tests and WASM artifact.",
-      "Project-plan check reports 7,261 HIR/IR bodies (7,220 IR + 41 HIR), zero AST fallback; Linguist reports 306 examples.",
-      "R3 readiness is OPEN: 30/30 base contracts, 30/30 closed entry rows, 0/30 host captures, 12 R2, 18 R0, R3 scorecard 0.",
-      "Quality scorecard workingTreeDirty=false; v0.2.0 still reports 12/12 READY and remains frozen.",
-      "Browser audit run 40253064496 on PR head 2f8e06d produced verified host evidence artifact 12620783908 (digest sha256:8940e61c01c11c7bbf3179b557d6adb4685ab0ffe83d3d7509de8079f7c75610); artifact readiness is 30/30 with 30 closed entry rows, and independent replay of all 30 passes for run 40253064496/tested SHA 5518954fd2faeb13e6e662ea5ff466d16d058d10; global quality scorecard R3 remains 0.",
-      "Windows x64 native-process profile: 7 runs, median sampled working set 5,181,440 bytes, median private usage 737,280 bytes, minimum 110 live samples; compiler, source, fixture, runtime input, executable and stdout hashes are recorded in validation/m1-pendulum-process-memory.json.",
-      "Benchmark runner now stages and hashes the checked-in pendulum input in an isolated ignored directory, repeats native compilation when requested, and records compiler/executable SHA-256; 14 benchmark contract/page/Float-Quantity/runtime-input tests pass.",
-      "M1 timing evidence validation/m1-pendulum-performance-windows.json records a clean Windows 11 x64 run at benchmark commit 61ea27c with 5 compile samples and 7 interpreter/native samples; median compile 7,022.824 ms, interpreter end-to-end 209.013 ms, native end-to-end 14.175 ms. These include startup/input/analysis/SVG and are one-host evidence, not general speed claims.",
-      "Compiler SHA-256 ae1b5effd967b04cbe8b4f7dfd91b5e3246915c8d0e9339ab7079a8d19f97d66; generated executable SHA-256 da9e7b96f707997eaf1dd49cba9f459a06010cc6b6ed4f509486d14a5cdbea81; source SHA-256 ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923; input SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9.",
-      "Browser audit artifact 12622700135, SHA-256 d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404, is 30/30 capture-ready with 30 closed entry-effect rows. Offline replay independently matched all 30 R0/R1/R2 bundles for run 40254605182 and tested SHA 70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a. The global R3 score remains 0.",
-      "Benchmark workload path canonicalization covers canonical, ./, backslash-relative and absolute paths, while outside-repository paths receive no fixture inputs; the new 2 regression tests and all 14 related benchmark JS tests pass. The benchmark contract checker passes, and a local Windows 11 full-style run (5 compile, 7 interpreter, 7 native samples) completed with the expected scientific output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3; this run used a dirty worktree and is diagnostic, not a clean released benchmark record.",
-      "Benchmark workload aliases canonical, ./, backslash-relative and absolute are normalized before runtime input and pair-contract selection. Fourteen prior benchmark tests plus the new output-error guard test now pass (15 total); the contract checker and actual local Windows run with relative OSTRIN_COMPILER plus ./ workload pass. The run staged data.json SHA-256 f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9 and produced scientific output SHA-256 16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3. This local diagnostic was run from a dirty worktree and is not a clean cross-platform performance record.",
-      "pr-237-head-977042e-six-workflows-green-after-windows-benchmark-retry-job-121689344184",
-      "pr-237-linux-macos-windows-benchmark-output-sha-equal-16853e67-windows-artifact-12665882385-digest-c213c57be8eed22fec7016fa59d4c9c1a999ed3909cc782234158a23d9020b1e",
-      "pr-237-cross-platform-raw-source-and-input-sha-differ-by-windows-crlf-checkout; local-canonical-content-hash-and-matrix-gate-implementation-pending-exact-head-validation",
-      "f7bdd32-local-benchmark-matrix-duplicate-workload-and-runtime-input-guard-added; 23 focused JS tests, benchmark contract, website, project plan, linguist, readiness all pass; not pushed",
-      "pr-237-head-f7bdd32-windows-benchmark-native-iteration-5-exit-3221225477; targeted retry initiated; cross-platform aggregate skipped pending all platform artifacts",
-      "pr-237-f7bdd32-windows-benchmark-retry-job-121701086049-passed; cross-platform-provenance-job-121702374533-passed; Linux-macOS-Windows-artifacts-12667352616-12665894757-12668390302",
-      "pr-237-f7bdd32-browser-run-40359011330-replayed-all-30-downloaded-bundles-and-verified-read-random-evidence-artifact-12668290322-digest-47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0",
-      "pr-237-f7bdd32-all-six-exact-head-workflows-green; Windows benchmark retry passed; Browser artifact replayed 30/30; global R3 remains 0",
-      "Local c885f7b package: pendulum scalar-key source check, focused interpreter/native/WASI/leak test, 20-iteration Windows native benchmark, website-check, 30 experiment replays, and 34 replay/oracle tests pass.",
-      "Benchmark provenance P2 fixed in scripts/benchmark-contract-check.mjs and scripts/benchmark-matrix-check.mjs; missing or null runtimeInputs are now rejected with two regression tests.",
-      "Fresh review P2 fixed in scripts/benchmark.mjs: measured workloads now use normalized repository-relative names before Float/Quantity pairing; 22 focused benchmark tests pass and an equivalent ./ workload run reports quantityFloatPair.",
-      "Exact 1c08d0e head: Ostrin CI 40820122832, Browser audit 40820122834, Native sanitizers 40820122977, Compiler benchmarks 40820122897, CodeQL 40820122820 and Security audit 40820122947 all succeeded; fresh Codex review 6488332772 found no major issues."
+      "32 focused JavaScript tests passed (31 benchmark contracts plus independent pendulum oracle).",
+      "Clean source 114e9c6 benchmark: seven timing runs per backend, five compile samples and seven separate allocation runs; all profiled stdout hashes matched the timed workload.",
+      "All seven allocation runs reported live=0, peak=347, total=12405; no allocated-byte, libc-allocation or RSS inference is made.",
+      "Snapshot validation/m1-pendulum-allocations-windows.json SHA-256 d027768a2b91bd48e128280a6171c90d489b997b6eee9a021878b1adbbec5ee0; benchmark-contract-check passes.",
+      "Windows end-to-end medians: native 35.673 ms, interpreter 321.889 ms, compile 11114.674 ms. Different source/compiler/input provenance precludes a comparison with older snapshots.",
+      "PR #239 new source 7f7a3ba has a successful exact-source WASI workflow 41251579139; artifact 13060939257 includes the 34-program matrix. Its other required workflows remain pending and fresh automated review is blocked by Code Review quota; no repeated review request is planned."
     ],
     "activePullRequests": [
-      237
-    ],
-    "sourceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
-    "evidenceRevision": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
-    "dashboardRevision": "01839b3601dfe8ee1794321c9c5f0e79fab1f231",
-    "benchmarkEvidencePath": "validation/m1-pendulum-performance-windows.json",
-    "benchmarkEvidenceFileSha256": "ff54e5122391b10823a587e70f7d48fe1acd21b0b40437436bbf5dfb7095c11c"
+      235,
+      236,
+      237,
+      238,
+      239
+    ]
   },
   "pending": [
-    "PR #237 is open and mergeable at exact head 1c08d0e76c49393869a1af988af47e9c4c17b8ca; all six required workflows and fresh review are green/no-major-findings. Do not merge without PR-specific authorization.",
-    "PR #235 and #236 remain open and await explicit PR-specific integration authorization.",
-    "Continue broader Measurement covariance, compiler typing/ownership, R3-profile boundaries, and performance work with separately validated evidence; current timing is host-specific and does not close Gate F."
+    "Push the allocation profile and evidence through the existing PR #237; validate its new exact HEAD without using older green runs.",
+    "PR #239 at 7f7a3ba requires completion of its current CI; fresh automated review was rejected by the Code Review quota. Do not retry unchanged quota.",
+    "All five PRs #235-#239 remain unmerged and need explicit merge authorization.",
+    "M1 Gate F remains open for numerical-kernel/startup/abstraction isolation and measured optimization; managed allocation counts are now captured, allocated bytes and compiler memory are not.",
+    "Finish integration and validate all M1 acceptance criteria on the integrated reference workflow before marking the Goal complete."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40820122832,
+    "runId": 41248858683,
     "status": "success",
-    "head": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
+    "head": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
     "relatedRuns": [
       {
         "workflow": "Browser audit",
-        "runId": 40820122834,
-        "status": "success",
-        "replayedBundles": 30,
-        "artifactId": 12668290322,
-        "artifactDigest": "sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0"
+        "runId": 41248858643,
+        "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 40820122977,
+        "runId": 41248858644,
         "status": "success",
         "asan": "success",
         "ubsan": "success"
       },
       {
-        "workflow": "Compiler benchmarks",
-        "runId": 40820122897,
-        "status": "success",
-        "windowsRetryJob": 121701086049,
-        "crossPlatformJob": 121702374533
-      },
-      {
         "workflow": "CodeQL",
-        "runId": 40820122820,
+        "runId": 41248858648,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 40820122947,
+        "runId": 41248858645,
         "status": "success"
       }
     ],
-    "note": "All six exact 1c08d0e workflows are green. Native sanitizer and website/browser checks completed successfully; this validates 1c08d0e only."
+    "note": "Historical exact-head result for 273e01e; the shared-fixture/documentation extension requires fresh CI. Source and evidence references identify earlier commits intentionally; this checkpoint never claims its containing commit has already passed."
   },
   "blockers": [
-    "PR #237 exact head 1c08d0e has six green workflows and fresh review with no major findings; it remains unmerged and has no merge authorization.",
-    "R3 remains OPEN globally: prior CI artifact 12620783908 is 30/30 structurally READY and all archived replays pass, but quality-scorecard R3 remains 0; no cross-platform equivalence is claimed.",
-    "General dimensional/array Measurement ownership and covariance remain outside the bounded pendulum profile.",
-    "Performance Gate F remains partial: there is one Windows host timing baseline and one sampled memory profile; startup, numerical kernel, allocations and scientific-abstraction overhead are not isolated across hosts.",
-    "Published v0.2.0 remains frozen. No tag or new release action is authorized."
+    "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
+    "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Leave PR #237 unmerged until explicit PR-specific authorization; continue the next M1 engineering block independently while preserving the validated source/evidence distinction.",
+  "next": "Validate the next pushed PR #237 HEAD and the pending #239 runs once they change; independently investigate numerical-kernel versus rendering/startup cost without changing historical benchmark evidence or published v0.2.0.",
   "latestPullRequestValidation": {
-    "number": 237,
-    "url": "https://github.com/sircalch/Ostrin/pull/237",
-    "remoteHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
+    "number": 239,
+    "url": "https://github.com/sircalch/Ostrin/pull/239",
+    "remoteHead": "7f7a3ba341d17cbe127f0e7af6a68aa64fc29a64",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "open-mergeable",
+    "state": "open-mergeable-current-checks-pending",
     "checks": {
       "ostrinCi": {
-        "status": "success"
+        "status": "in_progress",
+        "runId": 41251559066
       },
       "browserAudit": {
-        "status": "success"
+        "status": "in_progress",
+        "runId": 41251559052
       },
       "nativeSanitizers": {
-        "status": "success"
+        "status": "in_progress",
+        "runId": 41251559032
       },
       "codeql": {
-        "status": "success"
+        "status": "success",
+        "runId": 41251559012
       },
       "securityAudit": {
-        "status": "success"
+        "status": "success",
+        "runId": 41251559036
       },
-      "compilerBenchmarks": {
-        "status": "success"
-      }
-    },
-    "windowsBenchmarkRetry": {
-      "failedJobId": 121699076885,
-      "failedResult": "native iteration 5 exit 3221225477 / 0xC0000005",
-      "retryJobId": 121701086049,
-      "status": "success",
-      "crossPlatformAggregateJobId": 121702374533,
-      "artifacts": {
-        "windows": {
-          "id": 12668390302,
-          "digest": "sha256:7dc0f486195c8ac04b0e7bce81547cf6ea86bacb337c7118350a3b1968299864"
-        },
-        "linux": {
-          "id": 12667352616,
-          "digest": "sha256:ee48445bd7ab37fc4089a586259121dc793edd1b7cd6ecbaced8fc1f0a0ab8dd"
-        },
-        "macos": {
-          "id": 12665894757,
-          "digest": "sha256:f71a5244b48da252e50ac89772a0637a61fae4734396535ae80593e25dc3a827"
-        }
+      "wasi": {
+        "status": "success",
+        "runId": 41251579139,
+        "artifactId": 13060939257
       }
     },
     "review": {
-      "latestSubmittedReviewHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
-      "latestGitHubReviewHead": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
-      "currentHeadReviewed": true,
-      "status": "runtimeInputs and normalized Float/Quantity pairing P2s fixed; fresh exact-head review found no major issues",
-      "unresolvedOutdatedThreads": 2
+      "latestSubmittedReviewHead": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
+      "latestGitHubReviewHead": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
+      "currentHeadReviewed": false,
+      "status": "Automated review request rejected by Code Review quota at comment 6550431542; clean receipt only on earlier 830ec3d.",
+      "unresolvedOutdatedThreads": 0
     },
-    "openReviewThreads": [
-      {
-        "path": "scripts/benchmark-contract-check.mjs",
-        "priority": "P2",
-        "status": "outdated-fixed",
-        "summary": "Missing and null runtimeInputs are rejected; the thread is outdated after the fix and current-head review found no major issues."
-      },
-      {
-        "path": "scripts/benchmark-matrix-check.mjs",
-        "priority": "P2",
-        "status": "outdated-fixed",
-        "summary": "Missing and null runtimeInputs are rejected; the thread is outdated after the fix and current-head review found no major issues."
-      }
-    ],
-    "localFollowUp": "The normalized Float/Quantity pairing fix is included in 1c08d0e and covered by exact-head CI and fresh review; no unpushed follow-up commits remain.",
-    "observedAt": "2026-10-29",
-    "head": "1c08d0e76c49393869a1af988af47e9c4c17b8ca",
-    "integration": "not merged; no PR #237 merge authorization"
+    "openReviewThreads": [],
+    "localFollowUp": "Shared fixture/native ASan/UBSan/WASI validations passed locally; current exact-source WASI run 41251579139 passed, other workflows pending.",
+    "observedAt": "2026-10-31",
+    "head": "7f7a3ba341d17cbe127f0e7af6a68aa64fc29a64",
+    "integration": "not merged; no PR #239 merge authorization"
   },
-  "remotePullRequestObservations": [
+  "activePullRequests": [
+    235,
+    236,
+    237,
+    238,
+    239
+  ],
+  "acceptanceCriteria": [
     {
-      "number": 235,
-      "url": "https://github.com/sircalch/Ostrin/pull/235",
-      "head": "a4a17eef19ee89ad059d6821c772e124ca6971c5",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "success",
-        "browserAudit": "success",
-        "nativeSanitizers": "success",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "review": {
-        "head": "a4a17eef19ee89ad059d6821c772e124ca6971c5",
-        "status": "completed-no-substantive-findings",
-        "openThreads": 0,
-        "resolvedThreads": 2
-      },
-      "integration": "not merged; explicit PR-specific authorization required"
+      "gate": "A-compiler",
+      "status": "OPEN",
+      "remaining": "Validate the integrated dimensional reference workflow and nested managed paths at its actual source revision."
     },
     {
-      "number": 236,
-      "url": "https://github.com/sircalch/Ostrin/pull/236",
-      "head": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "success",
-        "browserAudit": "success",
-        "nativeSanitizers": "success",
-        "codeql": "success",
-        "securityAudit": "success",
-        "deployWebsite": "success"
-      },
-      "review": {
-        "head": "7f4d90bdd34b1b30fe8ff7a31675af7734c1425f",
-        "status": "completed-no-substantive-findings",
-        "openThreads": 0
-      },
-      "integration": "not merged; explicit PR-specific authorization required"
+      "gate": "B-science",
+      "status": "OPEN",
+      "remaining": "Retain independent analytical/finite-difference oracle results for dimensional uncertainty and shared-source correlation."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "head": "275ce78e6279c6e79b6b1017ac1af8bdb6fc0ea8",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "in_progress",
-        "browserAudit": "in_progress",
-        "nativeSanitizers": "in_progress",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "review": {
-        "status": "commented-with-p2-reviewed-on-6ff483d; local-fix-not-yet-pushed",
-        "openThreads": 1
-      },
-      "note": "Local correction on b2143da and regenerated evidence on 6bc76d5 are not yet pushed; remote head 275ce78 checks do not validate them. Require fresh exact-head CI and review after push."
+      "gate": "C-memory",
+      "status": "OPEN",
+      "remaining": "Require leak-check/sanitizers for the integrated workflow; the TemperaturePoint profile proves only its tested structural paths."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "head": "2f8e06d55995feef46c10487508de3aa932e7c0a",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "failure-macos-only",
-        "browserAudit": "success",
-        "nativeSanitizers": "in_progress-asan-ubsan-success",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "note": "Browser and website CI generated a 30/30 host-ready artifact whose 30 R0/R1/R2 replays independently passed for tested SHA 5518954fd2faeb13e6e662ea5ff466d16d058d10. This does not change the global R3 score (0)."
+      "gate": "D-execution",
+      "status": "OPEN",
+      "remaining": "Record native multiplatform and actual WASI execution of the reference workflow; 34-program matrix is supporting evidence."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "head": "e76f2fc73575474011bb52e1a6b34658cf9b8a80",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "success",
-        "browserAudit": "success",
-        "nativeSanitizers": "success",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "review": {
-        "status": "existing P2 resolved; no new formal decision recorded on this head",
-        "openThreads": 0
-      },
-      "browserArtifact": {
-        "id": 12622700135,
-        "url": "https://github.com/sircalch/Ostrin/actions/runs/40254605182/artifacts/12622700135",
-        "digest": "sha256:d4d472c76d5000a3cc15b88aa26420a79f1d0b79614283207a8b29ec7aef1404",
-        "testedSha": "70e5b4c8f07ff5e1dbb86db19f7cfcb864a7fc6a",
-        "replayedBundles": 30,
-        "globalR3Score": 0
-      },
-      "note": "Exact remote e76f2fc: all ten required checks, including ASan and UBSan, succeeded; macOS passed once after a failure on 2f8e06d whose cause remains unknown. All 30 artifact bundles independently replayed. The local performance/evidence package is not covered by these checks."
+      "gate": "E-reproducibility",
+      "status": "OPEN",
+      "remaining": "Integrate bounded R3 inspect/verify/replay/compare evidence without promoting host-specific replay to cross-platform equivalence."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "head": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "compilerTests": "success (ubuntu-latest, macos-latest, windows-latest)",
-        "websiteAndBrowser": "in progress",
-        "browserAudit": "success",
-        "nativeSanitizers": "ASan in progress; UBSan success",
-        "codeql": "success",
-        "dependencyAudit": "success",
-        "combinedStatus": "empty; no Ostrin CI run was returned for this observation"
-      },
-      "review": {
-        "head": "01f51f1001cbdea71a81a4c59f3be215b13c7a51",
-        "status": "fresh Codex review found P2: gallery Run live omits the file-backed data.json input; local fix and Chromium regression test passed, not yet pushed",
-        "openThreads": 1
-      },
-      "integration": "not merged; no merge authorization for PR #237"
+      "gate": "F-performance",
+      "status": "OPEN",
+      "remaining": "Managed counts captured separately in seven verified pendulum runs; still isolate startup, numerical kernel, abstraction overhead and test a measured optimization."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "092e64c04bde04ba327195612aacd1357c3c43ff",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "in_progress",
-        "browserAudit": "in_progress",
-        "nativeSanitizers": "in_progress",
-        "codeql": "success",
-        "securityAudit": "success",
-        "compilerBenchmarks": "Windows failure (native warmup index out of bounds: 5); Ubuntu/macOS success"
-      },
-      "review": {
-        "head": "092e64c04bde04ba327195612aacd1357c3c43ff",
-        "status": "open P2 on scripts/benchmark.mjs: canonicalize workload paths before runtime-input selection; local correction and regression tests not yet pushed",
-        "openThreads": 1,
-        "resolvedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
+      "gate": "G-product",
+      "status": "OPEN",
+      "remaining": "Validate installation, tutorial, figure export and rendered reference workflow."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "queued",
-        "browserAudit": "in_progress",
-        "nativeSanitizers": "in_progress",
-        "codeql": "success",
-        "securityAudit": "success",
-        "compilerBenchmarks": "Ubuntu success; Windows Server 2025 success; macOS queued"
-      },
-      "review": {
-        "head": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-        "status": "fresh Codex review found P2: resolve relative OSTRIN_COMPILER paths before using staged cwd; local fix not pushed",
-        "openThreads": 2,
-        "resolvedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
+      "gate": "H-integration",
+      "status": "OPEN",
+      "remaining": "Integrate authorized packages only, then validate their combined source and CI; PRs #235-#239 remain open."
     },
     {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "858863465d954854a722f034bbbe31149a4c2dd8",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "queued",
-        "browserAudit": "in_progress",
-        "nativeSanitizers": "in_progress",
-        "codeql": "in_progress",
-        "securityAudit": "in_progress",
-        "compilerBenchmarks": "in_progress on Ubuntu/macOS/Windows"
-      },
-      "review": {
-        "head": "858863465d954854a722f034bbbe31149a4c2dd8",
-        "status": "fresh Codex review requested; 2 outdated/unresolved P2 threads have code fixes on exact/current head",
-        "openThreads": 2,
-        "resolvedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
-    },
-    {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "977042e831fefddc4c3b5853c089081e912e51b0",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "success",
-        "browserAudit": "success",
-        "nativeSanitizers": "success",
-        "codeql": "success",
-        "securityAudit": "success",
-        "compilerBenchmarks": "success-after-windows-retry"
-      },
-      "windowsBenchmark": {
-        "initialJobId": 121684773760,
-        "initialResult": "failure-native-iteration-5-index-out-of-bounds-1",
-        "retryJobId": 121689344184,
-        "retryResult": "success",
-        "artifactId": 12665882385,
-        "artifactDigest": "sha256:c213c57be8eed22fec7016fa59d4c9c1a999ed3909cc782234158a23d9020b1e"
-      },
-      "crossPlatformEvidence": {
-        "sourceRevision": "977042e831fefddc4c3b5853c089081e912e51b0",
-        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
-        "windowsLineEndings": "CRLF",
-        "unixLineEndings": "LF",
-        "interpretation": "raw source/input hashes are checkout-byte hashes; normalized content hash and aggregate CI gate are implemented locally but await exact-head validation"
-      },
-      "review": {
-        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-        "currentHeadReviewed": false,
-        "unresolvedThreads": 2
-      }
-    },
-    {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "f7bdd32526d38900eee234eeb67feca39d950529",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "compilerBenchmarks": "Windows failed native iteration 5 (exit 3221225477 / 0xC0000005); Windows job retry initiated; macOS and Ubuntu passed; cross-platform-provenance skipped",
-        "ostrinCi": "in_progress",
-        "browserAudit": "in_progress",
-        "nativeSanitizers": "in_progress",
-        "codeql": "in_progress",
-        "securityAudit": "in_progress"
-      },
-      "review": {
-        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-        "currentHeadReviewed": false,
-        "unresolvedOutdatedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
-    },
-    {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "f7bdd32526d38900eee234eeb67feca39d950529",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "compilerBenchmarks": "success after Windows retry; cross-platform-provenance aggregation success",
-        "ostrinCi": "in_progress",
-        "browserAudit": "in_progress",
-        "nativeSanitizers": "in_progress",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "windowsBenchmark": {
-        "failedAttemptJobId": 121699076885,
-        "failedAttempt": "native iteration 5 exited 3221225477 / 0xC0000005",
-        "retryJobId": 121701086049,
-        "retry": "success"
-      },
-      "crossPlatformArtifacts": {
-        "linux": 12667352616,
-        "macos": 12665894757,
-        "windows": 12668390302,
-        "aggregateJobId": 121702374533,
-        "aggregate": "success"
-      },
-      "review": {
-        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-        "currentHeadReviewed": false,
-        "unresolvedOutdatedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
-    },
-    {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-26",
-      "head": "f7bdd32526d38900eee234eeb67feca39d950529",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "compilerBenchmarks": "success after Windows retry; cross-platform-provenance success",
-        "ostrinCi": "Windows and macOS compiler tests success; Ubuntu success; Windows compiler test still in progress at observation",
-        "browserAudit": "success; replayed all 30 downloaded R0/R1/R2 bundles and verified read/random evidence",
-        "nativeSanitizers": "UBSan success; ASan in progress",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "browserEvidence": {
-        "runId": 40359011330,
-        "artifactId": 12668290322,
-        "digest": "sha256:47bb99c9ab7a86318725ab2ba26be3feac4c8196f83d2d9f25fb230b918ce6d0",
-        "replayedBundles": 30,
-        "globalR3Score": 0
-      },
-      "review": {
-        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-        "currentHeadReviewed": false,
-        "unresolvedOutdatedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
-    },
-    {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-28",
-      "head": "0a98ade6c11fb86ec67f3b776ccd09d1e563ff4a",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "success",
-        "browserAudit": "success",
-        "nativeSanitizers": "success",
-        "compilerBenchmarks": "success",
-        "codeql": "success",
-        "securityAudit": "success"
-      },
-      "review": {
-        "latestGitHubReviewHead": "af2044dac7a4821b86e619fc0acad3cf3e3b8384",
-        "currentHeadReviewed": false,
-        "unresolvedOutdatedThreads": 2
-      },
-      "integration": "not merged; no PR #237 merge authorization"
-    },
-    {
-      "number": 237,
-      "url": "https://github.com/sircalch/Ostrin/pull/237",
-      "observedAt": "2026-10-29",
-      "head": "c885f7b11ab85ed53f7dfc39fa506da1cb9060f7",
-      "base": "69c962dee40a4b12606d131df0e8655b90924516",
-      "state": "open-mergeable",
-      "checks": {
-        "ostrinCi": "pending",
-        "browserAudit": "pending",
-        "nativeSanitizers": "pending",
-        "compilerBenchmarks": "pending",
-        "codeql": "pending",
-        "securityAudit": "pending"
-      },
-      "review": {
-        "status": "runtimeInputs P2 fixed locally; fresh exact-head review pending",
-        "currentHeadReviewed": false,
-        "openThreads": 2
-      },
-      "localEvidence": {
-        "focusedPendulum": "pass",
-        "benchmarkIterations": 20,
-        "experimentReplays": 30,
-        "replayOracleTests": 34,
-        "website": "pass"
-      },
-      "integration": "not merged; no PR #237 merge authorization"
+      "gate": "I-documentation",
+      "status": "OPEN",
+      "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site."
     }
   ]
 }

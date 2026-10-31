@@ -106,3 +106,26 @@ managed live/peak/total counts; they measure neither allocated bytes nor process
 RSS. Profile-run times are excluded from timing statistics. This closes the
 capture mechanism for managed counts; kernel timing, startup isolation and
 scientific abstraction overhead still require separate measurements.
+
+## Managed allocation baseline
+
+`validation/m1-pendulum-allocations-windows.json` records a clean benchmark at
+`114e9c6cad7b4c72ca5867910a62b08e43e14291` (SHA-256
+`d027768a2b91bd48e128280a6171c90d489b997b6eee9a021878b1adbbec5ee0`).
+Seven separately profiled native runs each reported `live=0`, `peak=347` and
+`total=12405` managed allocation records. Every profiled run retained normalized
+stdout SHA-256 `16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3`.
+The report binds compiler, timed executable, leak-check executable, source and
+staged fixture bytes by hash. The compiler source tree is unchanged from the
+parent `fcbe5284efffbb30d4acd10309aa04b31d8bdc45`; this package changes profiling
+scripts rather than compiler behavior.
+
+For this Windows host, the separate timing samples had a native median of
+35.673 ms, interpreter median of 321.889 ms (seven runs each), and native compile
+median of 11114.674 ms (five samples). These remain end-to-end durations. The
+compiler/source/input identities differ from the earlier timing snapshot, so the
+numbers are not a before/after regression or improvement claim. The allocation
+runs contribute no timing values. Counts are not bytes/RSS, omit unmanaged
+library allocation, and do not attribute costs to numerical analysis versus SVG
+rendering. Kernel/startup/abstraction isolation remains open; 12405 total records
+provides a measured baseline for a later optimization.
