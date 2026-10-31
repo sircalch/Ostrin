@@ -2,16 +2,29 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { listExecutableReplayIds, readArchivedReplayBundle, replay } from "./experiment-replay.mjs";
-import { bundlePath, createSurfaceReceipt, verifySurfaceReceipt } from "./r3-surface-receipt.mjs";
+import { bundlePath, createSurfaceReceipt, verifySurfaceArtifact, verifySurfaceReceipt } from "./r3-surface-receipt.mjs";
 import { buildExperimentBundle, outputPathFor, repositoryRoot, verifyExperimentBundle } from "./experiment-bundle.mjs";
 
 const sha256 = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const canonicalJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const expectedRun = { runId: "1234", testedSha: "b".repeat(40) };
 const fakeWasm = Buffer.from("test-only WASM bytes");
+
+function copyArchivedBundles(root) {
+  const destination = path.join(root, "website/assets/experiments");
+  mkdirSync(destination, { recursive: true });
+  for (const file of readdirSync(path.join(repositoryRoot, "website/assets/experiments"))) {
+    if (file.endsWith(".ostrin-experiment.json")) {
+      copyFileSync(
+        path.join(repositoryRoot, "website/assets/experiments", file),
+        path.join(destination, file),
+      );
+    }
+  }
+}
 
 function runFor(bundle) {
   const text = canonicalJson(bundle);
@@ -190,6 +203,7 @@ test("a downloaded evidence package can be verified with its archived WASM", () 
     const receiptFile = path.join(root, "target/r3-ci/surface-replay-receipt.json");
     const wasmFile = path.join(root, "website/ostrinc.wasm");
     for (const file of [bundleFile, receiptFile, wasmFile]) mkdirSync(path.dirname(file), { recursive: true });
+    copyArchivedBundles(root);
     writeFileSync(bundleFile, bundleText);
     writeFileSync(receiptFile, canonicalJson(receipt));
     writeFileSync(wasmFile, fakeWasm);
@@ -220,6 +234,7 @@ test("offline replay rejects a self-consistent receipt with a forged figure", ()
     const wasmFile = path.join(root, "website/ostrinc.wasm");
     for (const file of [bundleFile, receiptFile, wasmFile]) mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(wasmFile, wasmBytes);
+    copyArchivedBundles(root);
     const verify = [path.join(repositoryRoot, "scripts/r3-surface-receipt.mjs"),
       "--verify-artifact", root, "--run-id", expectedRun.runId, "--tested-sha", expectedRun.testedSha];
     const execute = [path.join(repositoryRoot, "scripts/experiment-replay.mjs"),
@@ -248,6 +263,32 @@ test("offline replay rejects a self-consistent receipt with a forged figure", ()
     const falseReplay = spawnSync(process.execPath, execute, { cwd: repositoryRoot, encoding: "utf8" });
     assert.notEqual(falseReplay.status, 0);
     assert.match(falseReplay.stderr, /input-driven replay SVG differs from the published bundle/);
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-receipt-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("artifact verification rejects a receipt whose archived bundle inventory is incomplete", () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-receipt-artifact-"));
+  try {
+    const bundleText = canonicalJson(capturedSurface());
+    const receipt = createSurfaceReceipt(bundleText, replayProof(bundleText));
+    const bundleFile = path.join(root, "website/assets/experiments/surface.ostrin-experiment.json");
+    const receiptFile = path.join(root, "target/r3-ci/surface-replay-receipt.json");
+    const wasmFile = path.join(root, "website/ostrinc.wasm");
+    for (const file of [bundleFile, receiptFile, wasmFile]) mkdirSync(path.dirname(file), { recursive: true });
+    copyArchivedBundles(root);
+    writeFileSync(bundleFile, bundleText);
+    writeFileSync(receiptFile, canonicalJson(receipt));
+    writeFileSync(wasmFile, fakeWasm);
+    const omitted = readdirSync(path.join(root, "website/assets/experiments"))
+      .find((file) => file !== "surface.ostrin-experiment.json" && file.endsWith(".ostrin-experiment.json"));
+    rmSync(path.join(root, "website/assets/experiments", omitted));
+    assert.throws(
+      () => verifySurfaceArtifact(root, expectedRun),
+      /receipt inventory (omits archived bundles|names missing archived bundles)/,
+    );
   } finally {
     assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-receipt-artifact-")));
     rmSync(root, { recursive: true, force: true });
