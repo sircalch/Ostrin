@@ -13,8 +13,8 @@
     "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
     "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
-    "lastObservedRemotePullRequestHead": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
+    "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -77,13 +77,14 @@
     "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
-    "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd"
+    "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
+    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b"
   ],
   "currentPackage": {
     "name": "r3-restricted-artifact-inventory",
     "branch": "codex/m1-r3-restricted-receipt",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #238 is open and mergeable at 0480bfd6ca3e143016c17a7c48158debcac62e3b; five required workflows are green, fresh review found no major issues, and the prior P1 thread is resolved. Do not merge without explicit authorization.",
+    "status": "PR #238 is open and mergeable at d1974b052528eec47975297d094031c4081f0681; the metadata checkpoint head has all five required workflows green, fresh review found no major issues, and the prior P1 thread is resolved. Do not merge without explicit authorization.",
     "scope": [
       "bind downloaded R3 artifact verification to every archived ostrin.experiment/v0 bundle",
       "reject omitted, extra, malformed, duplicate, path-escaping, filename/ID-mismatched, maturity-mismatched and hash-mismatched bundles",
@@ -93,8 +94,8 @@
       "Source/evidence package commit 1841d180 adds complete archived inventory validation and documentation.",
       "Follow-up source fix 0480bfd binds each bundle filename to its declared fixture ID and adds a regression for renamed animation evidence.",
       "Local scripts/r3-surface-receipt.test.mjs: 17 tests passed; related readiness/replay/action tests: 44 passed.",
-      "Exact HEAD CI: Ostrin CI 41166401810, Browser audit 41166401894, Native sanitizers 41166401802 with ASan and UBSan success, CodeQL 41166401888 and Security audit 41166401809.",
-      "Fresh Codex review of 0480bfd found no major issues; the P1 filename/ID thread is resolved.",
+      "Exact metadata HEAD CI for d1974b052528eec47975297d094031c4081f0681: Ostrin CI 41167597498, Browser audit 41167597511, Native sanitizers 41167597496 with ASan and UBSan success, CodeQL 41167597546 and Security audit 41167597514.",
+      "Fresh Codex review of d1974b052528eec47975297d094031c4081f0681 found no major issues; the P1 filename/ID thread is resolved.",
       "R3 remains OPEN globally; this package improves evidence integrity and does not claim cross-platform equivalence or production readiness."
     ],
     "activePullRequests": [
@@ -106,88 +107,87 @@
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
   },
   "pending": [
-    "PR #238 remains open and unmerged; its exact validated code head is 0480bfd and no merge authorization exists.",
+    "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
     "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
     "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41166401810,
+    "runId": 41167597498,
     "status": "success",
-    "head": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
     "relatedRuns": [
       {
         "workflow": "Browser audit",
-        "runId": 41166401894,
+        "runId": 41167597511,
         "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 41166401802,
+        "runId": 41167597496,
         "status": "success",
         "asan": "success",
         "ubsan": "success"
       },
       {
         "workflow": "CodeQL",
-        "runId": 41166401888,
+        "runId": 41167597546,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 41166401809,
+        "runId": 41167597514,
         "status": "success"
       }
     ],
-    "note": "All five required workflows for PR #238 succeeded on the exact code head 0480bfd; the next metadata checkpoint commit requires its own exact-head validation."
+    "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
   },
   "blockers": [
-    "PR #238 metadata checkpoint follow-up must receive exact-head CI after this evidence update.",
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Validate the metadata checkpoint on the new PR #238 HEAD, keep both PRs unmerged without authorization, then continue the next independent M1 package.",
+  "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
     "number": 238,
     "url": "https://github.com/sircalch/Ostrin/pull/238",
-    "remoteHead": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "open-mergeable",
+    "state": "open-mergeable-exact-metadata-head-green",
     "checks": {
       "ostrinCi": {
         "status": "success",
-        "runId": 41166401810
+        "runId": 41167597498
       },
       "browserAudit": {
         "status": "success",
-        "runId": 41166401894
+        "runId": 41167597511
       },
       "nativeSanitizers": {
         "status": "success",
-        "runId": 41166401802,
+        "runId": 41167597496,
         "asan": "success",
         "ubsan": "success"
       },
       "codeql": {
         "status": "success",
-        "runId": 41166401888
+        "runId": 41167597546
       },
       "securityAudit": {
         "status": "success",
-        "runId": 41166401809
+        "runId": 41167597514
       }
     },
     "review": {
-      "latestSubmittedReviewHead": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
-      "latestGitHubReviewHead": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
       "currentHeadReviewed": true,
       "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
       "unresolvedOutdatedThreads": 0
     },
     "openReviewThreads": [],
-    "localFollowUp": "Metadata-only checkpoint update follows the validated code head; this new metadata HEAD must receive exact-head CI before it is treated as the latest validated revision.",
+    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
     "observedAt": "2026-10-31",
-    "head": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
     "integration": "not merged; no PR #238 merge authorization"
   },
   "activePullRequests": [
