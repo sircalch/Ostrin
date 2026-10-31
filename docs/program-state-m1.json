@@ -10,12 +10,13 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
-    "evidenceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+    "sourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
+    "evidenceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
-    "lastObservedRemotePullRequestHead": "7f7a3ba341d17cbe127f0e7af6a68aa64fc29a64",
-    "releaseTag": "v0.2.0"
+    "lastValidatedRemotePullRequestHead": "1352bf45ad0428221c207cc9bc23a5fa12618d4e",
+    "lastObservedRemotePullRequestHead": "1352bf45ad0428221c207cc9bc23a5fa12618d4e",
+    "releaseTag": "v0.2.0",
+    "revisionSemantics": "sourceRevision is the latest tested workflow tree; evidenceRevision is the committed ancestor recording allocation reports. Resolve the newly added WASI receipt recording commit with git log -1 --format=%H -- validation/m1-pendulum-wasi-linux.json; the checkpoint does not reference its own containing commit."
   },
   "completed": [
     "integrated-authorized-prs-225-230-231-227-226-229",
@@ -81,28 +82,35 @@
     "website-test-count-384-metadata-synchronized-pr239-29f8339",
     "measurement-temperaturepoint-273e01e-five-workflows-green",
     "temperaturepoint-shared-fixtures-34-programs-actual-wasi-7f7a3ba",
-    "pendulum-managed-allocation-profile-seven-runs-local-114e9c6"
+    "pendulum-managed-allocation-profile-seven-runs-local-114e9c6",
+    "pr237-1352bf4-all-fourteen-checks-green",
+    "pr239-7f7a3ba-all-ten-checks-green-and-wasi34",
+    "pendulum-reused-period-seven-samples-114-fewer-records-49374d7",
+    "pendulum-full-compiled-wasi-three-executions-clean-b8016ee"
   ],
   "currentPackage": {
-    "name": "pendulum-managed-allocation-profile",
+    "name": "pendulum-allocation-optimization-and-compiled-wasi",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
-    "status": "Local source 114e9c6 and its clean-checkout allocation report are validated; the evidence/checkpoint commit will be pushed to the existing PR #237 and requires exact-head CI. No PR merge or release is authorized.",
-    "sourceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
-    "compilerSourceRevision": "fcbe5284efffbb30d4acd10309aa04b31d8bdc45",
-    "evidenceRevision": "114e9c6cad7b4c72ca5867910a62b08e43e14291",
+    "status": "Source 49374d7 and clean compiled-WASI tree b8016ee validated locally. This substantive extension will be pushed to existing PR #237 and requires fresh exact-head CI/review. Earlier green checks do not approve the forthcoming head.",
+    "sourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
+    "evidenceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
     "scope": [
-      "opt-in separate --leak-check compilation after timing",
-      "record live/peak/total managed allocation counts, executable identity and matching stdout for every sample",
-      "validate counter/raw-report/output identity and wire the profile into the existing multiplatform pendulum benchmark"
+      "separate managed allocation capture and validation",
+      "reuse the period measurement while preserving self-correlation and exact report/SVG output",
+      "source-bound website/demo/bundle synchronization",
+      "actual compiled-WASI execution with isolated input, interpreter parity, leak counters and compiler/toolchain hashes"
     ],
     "evidence": [
-      "32 focused JavaScript tests passed (31 benchmark contracts plus independent pendulum oracle).",
-      "Clean source 114e9c6 benchmark: seven timing runs per backend, five compile samples and seven separate allocation runs; all profiled stdout hashes matched the timed workload.",
-      "All seven allocation runs reported live=0, peak=347, total=12405; no allocated-byte, libc-allocation or RSS inference is made.",
-      "Snapshot validation/m1-pendulum-allocations-windows.json SHA-256 d027768a2b91bd48e128280a6171c90d489b997b6eee9a021878b1adbbec5ee0; benchmark-contract-check passes.",
-      "Windows end-to-end medians: native 35.673 ms, interpreter 321.889 ms, compile 11114.674 ms. Different source/compiler/input provenance precludes a comparison with older snapshots.",
-      "PR #239 new source 7f7a3ba has a successful exact-source WASI workflow 41251579139; artifact 13060939257 includes the 34-program matrix. Its other required workflows remain pending and fresh automated review is blocked by Code Review quota; no repeated review request is planned."
+      "32 benchmark/oracle JavaScript tests and 33 experiment bundle/replay tests passed.",
+      "Clean Windows source 49374d7: seven samples live=0, peak=347, total=12291 versus baseline total=12405 (114 fewer records, approximately 0.92%). Same compiler hash, host, Node, flags, inputs and normalized report/SVG identity; no peak reduction.",
+      "Slower raw timing samples are preserved. Overlapping host build/sanitizer load prevents a causal timing conclusion; startup/kernel/rendering/abstraction isolation remains open.",
+      "Focused workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan. Its 7 IR / 2 HIR / 0 AST source-body profile is now asserted.",
+      "Clean b8016ee tree compiled/executed the full input-backed workflow under Node WASI three times with exact interpreter report/SVG parity and zero live allocations. validation/m1-pendulum-wasi-linux.json binds source, input, compiler, C compiler and WASM hashes.",
+      "A negative missing-toolchain run failed and removed the earlier success receipt, preventing stale success archival.",
+      "30 experiment replays / 12 demos passed; website 17 pages / 306 examples / 384 integration tests; project-plan 7220 IR + 41 HIR / 0 AST; distribution, Linguist, benchmark contract, format and diff checks passed.",
+      "Historical PR #237 head 1352bf4 passed all 14 checks including native benchmarks on three hosts and cross-platform provenance. Original report texts/IDs/hashes are archived in validation/m1-pendulum-allocation-ci-baseline.json; this does not validate the forthcoming head.",
+      "PR #239 exact head 7f7a3ba passed all 10 checks plus the 34-program WASI workflow 41251579139. Fresh automated review remains unavailable due Code Review quota. No merges performed."
     ],
     "activePullRequests": [
       235,
@@ -110,68 +118,79 @@
       237,
       238,
       239
-    ]
+    ],
+    "lastBenchmarkSourceRevision": "49374d7a47539d77c03b319c720c41bee6947ede",
+    "compilerCodeUnchangedSinceRevision": "fcbe5284efffbb30d4acd10309aa04b31d8bdc45",
+    "latestReceipt": {
+      "path": "validation/m1-pendulum-wasi-linux.json",
+      "testedSourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
+      "sha256": "fe612b7963a3d236cfa1a3ea528d4f6d964e2bf1fa456ea9bfd9acfaa8076bec",
+      "recordingRevision": "resolve with git log -1 --format=%H -- validation/m1-pendulum-wasi-linux.json"
+    }
   },
   "pending": [
-    "Push the allocation profile and evidence through the existing PR #237; validate its new exact HEAD without using older green runs.",
-    "PR #239 at 7f7a3ba requires completion of its current CI; fresh automated review was rejected by the Code Review quota. Do not retry unchanged quota.",
-    "All five PRs #235-#239 remain unmerged and need explicit merge authorization.",
-    "M1 Gate F remains open for numerical-kernel/startup/abstraction isolation and measured optimization; managed allocation counts are now captured, allocated bytes and compiler memory are not.",
-    "Finish integration and validate all M1 acceptance criteria on the integrated reference workflow before marking the Goal complete."
+    "Push through existing PR #237, then validate its actual new HEAD and standalone WASI workflow. Do not reuse green 1352bf4 checks.",
+    "New exact-head reviews remain pending; PR #239 automated review was rejected by Code Review quota. Do not repeat unchanged quota requests.",
+    "PRs #235-#239 remain unmerged and need explicit merge authorization.",
+    "M1 performance remains open for controlled startup/kernel/rendering/abstraction timing assessment; managed counts were reduced, allocated bytes and compiler memory are unmeasured.",
+    "Integrate and validate all M1 acceptance criteria on a combined reference-workflow source before closing the Goal."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41248858683,
+    "runId": 41252031294,
     "status": "success",
-    "head": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "head": "1352bf45ad0428221c207cc9bc23a5fa12618d4e",
     "relatedRuns": [
       {
+        "workflow": "Compiler benchmarks",
+        "runId": 41252031304,
+        "status": "success"
+      },
+      {
         "workflow": "Browser audit",
-        "runId": 41248858643,
+        "runId": 41252031324,
         "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 41248858644,
-        "status": "success",
-        "asan": "success",
-        "ubsan": "success"
+        "runId": 41252031293,
+        "status": "success"
       },
       {
         "workflow": "CodeQL",
-        "runId": 41248858648,
+        "runId": 41252031335,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 41248858645,
+        "runId": 41252031326,
         "status": "success"
       }
     ],
-    "note": "Historical exact-head result for 273e01e; the shared-fixture/documentation extension requires fresh CI. Source and evidence references identify earlier commits intentionally; this checkpoint never claims its containing commit has already passed."
+    "note": "Historical full fourteen-check result for 1352bf4. Benchmark artifacts execute synthetic merge tree 295c4cdef3c1406904c3f738ae7e5bde3f7eb1b5. This checkpoint does not claim its containing commit already passed."
   },
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Validate the next pushed PR #237 HEAD and the pending #239 runs once they change; independently investigate numerical-kernel versus rendering/startup cost without changing historical benchmark evidence or published v0.2.0.",
+  "next": "Validate the next PR #237 HEAD and dispatched WASI run after a state change; continue controlled numerical-kernel/startup/rendering profiling while integration is unavailable. No release or unauthorized merge.",
   "latestPullRequestValidation": {
     "number": 239,
     "url": "https://github.com/sircalch/Ostrin/pull/239",
     "remoteHead": "7f7a3ba341d17cbe127f0e7af6a68aa64fc29a64",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "open-mergeable-current-checks-pending",
+    "state": "open-mergeable-all-ten-checks-green-review-pending",
     "checks": {
       "ostrinCi": {
-        "status": "in_progress",
+        "status": "success",
         "runId": 41251559066
       },
       "browserAudit": {
-        "status": "in_progress",
+        "status": "success",
         "runId": 41251559052
       },
       "nativeSanitizers": {
-        "status": "in_progress",
+        "status": "success",
         "runId": 41251559032
       },
       "codeql": {
@@ -196,7 +215,7 @@
       "unresolvedOutdatedThreads": 0
     },
     "openReviewThreads": [],
-    "localFollowUp": "Shared fixture/native ASan/UBSan/WASI validations passed locally; current exact-source WASI run 41251579139 passed, other workflows pending.",
+    "localFollowUp": "Exact head 7f7a3ba passed all ten checks and standalone WASI 34-program run; Code Review quota prevents fresh automated review.",
     "observedAt": "2026-10-31",
     "head": "7f7a3ba341d17cbe127f0e7af6a68aa64fc29a64",
     "integration": "not merged; no PR #239 merge authorization"
@@ -222,12 +241,12 @@
     {
       "gate": "C-memory",
       "status": "OPEN",
-      "remaining": "Require leak-check/sanitizers for the integrated workflow; the TemperaturePoint profile proves only its tested structural paths."
+      "remaining": "Reused-period native/ASan/UBSan and compiled-WASI leak checks passed locally; require updated integrated-workflow checks before closing."
     },
     {
       "gate": "D-execution",
       "status": "OPEN",
-      "remaining": "Record native multiplatform and actual WASI execution of the reference workflow; 34-program matrix is supporting evidence."
+      "remaining": "Actual full compiled-WASI workflow ran three times at b8016ee; updated native multiplatform and exact-head WASI CI remain pending."
     },
     {
       "gate": "E-reproducibility",
@@ -237,7 +256,7 @@
     {
       "gate": "F-performance",
       "status": "OPEN",
-      "remaining": "Managed counts captured separately in seven verified pendulum runs; still isolate startup, numerical kernel, abstraction overhead and test a measured optimization."
+      "remaining": "Managed counts reduced by 114 in seven captures; controlled timing, startup/kernel/rendering/abstraction isolation, allocated bytes and compiler memory remain open."
     },
     {
       "gate": "G-product",

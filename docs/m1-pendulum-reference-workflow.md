@@ -185,3 +185,16 @@ input, compiler and WASM hashes, the tested revision and runner/toolchain inputs
 in `target/pendulum-wasi-check/report.json`. The standalone WASI workflow archives
 this receipt with the compiled program. This supports this one workflow; it does
 not establish complete WASI coverage or global R3.
+
+The local receipt `validation/m1-pendulum-wasi-linux.json` records a clean run at
+`b8016ee49b89f0d13852957ae2334f99ff5625c6` with Node v24.21.0 and pinned SDK 34.0.
+All three compiled WASI runs matched their interpreted full report/SVG and each
+reported live=0, peak=347, total=12291. Receipt SHA-256:
+`fe612b7963a3d236cfa1a3ea528d4f6d964e2bf1fa456ea9bfd9acfaa8076bec`. WASM SHA-256:
+`f9cae3fe7657cf05a52d632d05cebca4c8f513dba56c7996d7575903f6661fff`. This receipt keeps the final newline in its output hash;
+the benchmark snapshots instead trim stdout before hashing. The revision labels
+the checked-out test tree; the host compiler and configured C compiler are
+identified by actual file hashes, not a signed build attestation. The Windows
+worktree was checked from WSL using its Git metadata directory and the same
+`core.autocrlf=true` policy used by Git for Windows; raw source/input hashes bind
+the bytes actually compiled. The next pushed head still needs its own CI.
