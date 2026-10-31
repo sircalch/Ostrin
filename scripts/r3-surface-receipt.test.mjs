@@ -295,6 +295,33 @@ test("artifact verification rejects a receipt whose archived bundle inventory is
   }
 });
 
+test("artifact verification rejects a bundle filename that disagrees with its ID", () => {
+  const root = mkdtempSync(path.join(repositoryRoot, "target", "r3-receipt-artifact-"));
+  try {
+    const bundleText = canonicalJson(capturedSurface());
+    const receipt = createSurfaceReceipt(bundleText, replayProof(bundleText));
+    const bundleFile = path.join(root, "website/assets/experiments/surface.ostrin-experiment.json");
+    const receiptFile = path.join(root, "target/r3-ci/surface-replay-receipt.json");
+    const wasmFile = path.join(root, "website/ostrinc.wasm");
+    for (const file of [bundleFile, receiptFile, wasmFile]) mkdirSync(path.dirname(file), { recursive: true });
+    copyArchivedBundles(root);
+    writeFileSync(bundleFile, bundleText);
+    writeFileSync(receiptFile, canonicalJson(receipt));
+    writeFileSync(wasmFile, fakeWasm);
+    const original = path.join(root, "website/assets/experiments/animation.ostrin-experiment.json");
+    const renamed = path.join(root, "website/assets/experiments/renamed.ostrin-experiment.json");
+    copyFileSync(original, renamed);
+    rmSync(original);
+    assert.throws(
+      () => verifySurfaceArtifact(root, expectedRun),
+      /filename .* does not match fixture ID animation/,
+    );
+  } finally {
+    assert.ok(root.startsWith(path.join(repositoryRoot, "target", "r3-receipt-artifact-")));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 function capturedSurface() {
   const bundle = JSON.parse(readFileSync(bundlePath, "utf8"));
   bundle.provenance.runtime.host = {

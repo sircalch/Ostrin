@@ -264,6 +264,9 @@ export function validateArchivedReplayInventory(directory, replayBundles) {
       errors.push(`archived replay bundle ${file} has an invalid fixture ID`);
       continue;
     }
+    if (file !== `${id}.ostrin-experiment.json`) {
+      errors.push(`archived replay bundle filename ${file} does not match fixture ID ${id}`);
+    }
     if (Object.hasOwn(actual, id)) {
       errors.push(`archived replay inventory contains duplicate fixture ${id}`);
       continue;
