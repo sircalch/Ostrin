@@ -39,6 +39,16 @@
   oracle, interpreter/native parity, leak-check and optimized WASI execution;
   covariance for `Quantity` and measurement arrays remains unsupported.
 
+### Scientific workflow profiling
+
+- The experimental pendulum calibration example reuses each period measurement
+  when squaring it, preserving source correlation and the complete output. Seven
+  Windows captures reduce managed allocation records from 12405 to 12291, with
+  unchanged peak 347 and zero live records; no timing improvement is claimed.
+- `scripts/benchmark.mjs --allocation-profile` captures managed counters using a
+  separate leak-check executable after uninstrumented timing, with matching
+  output identity. These counters measure neither allocated bytes nor RSS.
+
 ## 0.2.0 (2026-10-15)
 
 ### Release summary

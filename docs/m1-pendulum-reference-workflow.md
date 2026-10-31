@@ -133,3 +133,55 @@ runs contribute no timing values. Counts are not bytes/RSS, omit unmanaged
 library allocation, and do not attribute costs to numerical analysis versus SVG
 rendering. Kernel/startup/abstraction isolation remains open; 12405 total records
 provides a measured baseline for a later optimization.
+
+## Tested allocation reduction
+
+The example now constructs each period measurement once and passes the same
+value as both operands of its square. Source IDs and first-order self-correlation
+are preserved. `validation/m1-pendulum-reuse-windows.json` records clean source
+`49374d7a47539d77c03b319c720c41bee6947ede` (report SHA-256
+`59b5449ecbcb90fa4a0c6b26d7a90cc6795ff5a39b621671b5c21e6bf27b7643`).
+The compiler binary, flags, Node version, host metadata and staged input hashes
+match the baseline at `114e9c6`; only the workflow source intentionally differs.
+All seven runs report `live=0`, `peak=347`, `total=12291`: 114 fewer managed
+allocation records per run (about 0.92%), with no peak-count reduction.
+The normalized output hash is unchanged, covering the complete report and SVG.
+The focused test also protects the workflow's 7 IR / 2 HIR / 0 AST source-body
+profile, eight native replays, missing-input cleanup and WASI C emission.
+GCC ASan with leak detection and UBSan both passed for this focused test on Linux.
+
+This is an allocation-count improvement, not a timing improvement. The new
+Windows native/interpreter/compile medians were 75.219 / 571.970 / 12482.022 ms;
+the host had overlapping build and sanitizer activity during collection.
+These slower observed timings remain in the raw report. No causal speedup or
+regression conclusion is drawn from this uncontrolled timing comparison.
+Startup, kernel/rendering cost and scientific abstraction overhead remain open.
+
+The preceding benchmark CI at PR head `1352bf4` passed on Linux, macOS and
+Windows, including the cross-platform provenance check. It ran synthetic merge
+revision `295c4cdef3c1406904c3f738ae7e5bde3f7eb1b5`, rather than either local
+source revision above. The three original report texts, artifact IDs and hashes
+are archived in `validation/m1-pendulum-allocation-ci-baseline.json` (run
+[41252031304](https://github.com/sircalch/Ostrin/actions/runs/41252031304)).
+Each host supplied seven zero-live samples. Linux/macOS reported 12356 total
+records and Windows 12405, all with peak 347. Counts can differ by runtime/host;
+matching output for these captures does not establish general platform
+reproducibility. That older successful run does not validate the updated PR head.
+
+## Compiled WASI execution check
+
+With the host compiler built and the pinned WASI SDK configured through
+`OSTRIN_WASI_CC` and `OSTRIN_WASI_SYSROOT`, run:
+
+```text
+node scripts/pendulum-wasi-check.mjs
+```
+
+This compiles the actual file-backed workflow to WASI with leak-check enabled,
+then executes it three times under Node 24 WASI Preview 1. Every run stages the
+checked-in input in an isolated directory and must match the interpreter's full
+report and SVG, with zero live managed allocations. The receipt records source,
+input, compiler and WASM hashes, the tested revision and runner/toolchain inputs
+in `target/pendulum-wasi-check/report.json`. The standalone WASI workflow archives
+this receipt with the compiled program. This supports this one workflow; it does
+not establish complete WASI coverage or global R3.
