@@ -20,6 +20,12 @@
 
 ### Scientific measurement
 
+- Added a development-only structural `Measurement<TemperaturePoint>` profile with
+  empty sources. Constructor, alias, argument/return, field replacement and branch/loop
+  Phi tests use typed IR, native leak-check and shared WASI execution fixtures.
+  Dynamic unknown-state reasons exercise managed payload destruction. Absolute-point
+  uncertainty propagation, covariance, point arrays and measurement conversion remain
+  unsupported; this does not change the published v0.2.0 binaries.
 - Added experimental dense `SourceCovariance` propagation for at most 64
   dimensionless scalar sources using `J·Σ·Jᵀ`. The implementation checks shape,
   finite values, bounded symmetry/PSD tolerance and source variances. A diagonal

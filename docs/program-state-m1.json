@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "sourceRevision": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "evidenceRevision": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "29f8339ad27865627d1021534bda7881f315c177",
-    "lastObservedRemotePullRequestHead": "29f8339ad27865627d1021534bda7881f315c177",
+    "lastValidatedRemotePullRequestHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "lastObservedRemotePullRequestHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -78,17 +78,20 @@
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
     "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
-    "website-test-count-384-metadata-synchronized-pr239-29f8339"
+    "website-test-count-384-metadata-synchronized-pr239-29f8339",
+    "measurement-temperaturepoint-273e01e-five-workflows-green"
   ],
   "currentPackage": {
     "name": "measurement-temperaturepoint-hir-ir-and-website-metadata",
     "branch": "codex/m1-temperature-measurement",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-temperature-measurement",
-    "status": "PR #239 is open and unmerged at 29f8339ad27865627d1021534bda7881f315c177; all five required workflows are green and fresh Codex review found no major issues. Do not merge without explicit authorization.",
+    "status": "Shared native/WASI fixtures and affine-profile documentation validated locally on an extension of 273e01e; the next pushed HEAD requires its own CI and review. The preceding 273e01e HEAD has all five workflows green. PR #239 remains unmerged.",
     "scope": [
       "lower Measurement<TemperaturePoint> through HIR and IR with typed list ownership",
       "publish methods discovered while flushing generic HIR instances",
-      "synchronize generated website and documentation test counts after the new regression"
+      "synchronize generated website and documentation test counts after the new regression",
+      "run the same field and Phi fixtures natively and in WASI with dynamic reason strings and repeated fresh replacements",
+      "require successful WASI leak-check output; document the empty-source structural boundary"
     ],
     "evidence": [
       "Local focused Measurement<TemperaturePoint> constructor and field replacement tests pass with interpreter/native/WASI parity, ast-fallback: 0 and live_allocations=0.",
@@ -96,104 +99,160 @@
       "website-check: ok (17 public pages, 305 examples, 384 integration tests); project-plan-check and linguist-check pass; cargo fmt --check and git diff --check pass.",
       "Exact HEAD 29f8339ad27865627d1021534bda7881f315c177 remote workflows: Ostrin CI 41246123265, Browser audit 41246123145, Native sanitizers 41246123164 with ASan and UBSan success, CodeQL 41246123123 and Security audit 41246123213.",
       "Fresh Codex review of 29f8339ad2 found no major issues; PR #239 has one resolved P2 thread and remains unmerged.",
-      "R3 remains OPEN globally; this package does not claim production readiness, cross-platform equivalence or v0.2.0 changes."
+      "R3 remains OPEN globally; this package does not claim production readiness, cross-platform equivalence or v0.2.0 changes.",
+      "273e01e exact CI: Ostrin CI 41248858683, Browser audit 41248858643, Native sanitizers 41248858644 (ASan/UBSan), CodeQL 41248858648 and Security audit 41248858645 all passed; 385 integration + 6 differential + 33 unit tests in the source inventory.",
+      "Local extension: Windows GCC focused profile 3/3 passed; Linux/WSL GCC ASan with leak detection 3/3 and UBSan 3/3 passed on the shared fixtures.",
+      "Local extension: all 34 programs compiled and executed using wasi-sdk 34.0 (pinned Linux archive SHA-256 b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4) and Node WASI; both TemperaturePoint measurement fixtures required live_allocations=0.",
+      "Local extension: website-check (17 pages, 305 examples, 385 integration tests), Measurement contract plus 18 tests, project-plan-check, distribution-check, cargo fmt and git diff --check passed. No performance claim or affine uncertainty API was added."
     ],
     "activePullRequests": [
+      235,
+      236,
       237,
       238,
       239
     ],
-    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "sourceRevision": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "evidenceRevision": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
   },
   "pending": [
-    "PR #239 remains open and unmerged; merge only with explicit authorization.",
-    "PR #237 and PR #238 remain open and unmerged; do not merge without PR-specific authorization.",
-    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization."
+    "Push the shared-fixture/actual-WASI/documentation package in PR #239 and require checks plus review for the resulting HEAD.",
+    "PRs #235-#239 remain unmerged; no PR-specific merge authorization exists for this set.",
+    "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
+    "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41246123265,
+    "runId": 41248858683,
     "status": "success",
-    "head": "29f8339ad27865627d1021534bda7881f315c177",
+    "head": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
     "relatedRuns": [
       {
         "workflow": "Browser audit",
-        "runId": 41246123145,
+        "runId": 41248858643,
         "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 41246123164,
+        "runId": 41248858644,
         "status": "success",
         "asan": "success",
         "ubsan": "success"
       },
       {
         "workflow": "CodeQL",
-        "runId": 41246123123,
+        "runId": 41248858648,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 41246123213,
+        "runId": 41248858645,
         "status": "success"
       }
     ],
-    "note": "All five required workflows for PR #239 succeeded on exact head 29f8339; fresh Codex review found no major issues."
+    "note": "Historical exact-head result for 273e01e; the shared-fixture/documentation extension requires fresh CI. Source and evidence references identify earlier commits intentionally; this checkpoint never claims its containing commit has already passed."
   },
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Keep PRs #237, #238 and #239 unmerged without explicit authorization, then continue the next independent M1 package.",
+  "next": "Confirm PR #239 checks/review on the new pushed HEAD once; while they run, inspect the pendulum workflow performance gaps and prepare an independent local package without merging other PRs.",
   "latestPullRequestValidation": {
     "number": 239,
     "url": "https://github.com/sircalch/Ostrin/pull/239",
-    "remoteHead": "29f8339ad27865627d1021534bda7881f315c177",
+    "remoteHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "open-mergeable-exact-head-green",
+    "state": "preceding-head-green-local-extension-pending-push-ci-review",
     "checks": {
       "ostrinCi": {
         "status": "success",
-        "runId": 41246123265
+        "runId": 41248858683
       },
       "browserAudit": {
         "status": "success",
-        "runId": 41246123145
+        "runId": 41248858643
       },
       "nativeSanitizers": {
         "status": "success",
-        "runId": 41246123164,
+        "runId": 41248858644,
         "asan": "success",
         "ubsan": "success"
       },
       "codeql": {
         "status": "success",
-        "runId": 41246123123
+        "runId": 41248858648
       },
       "securityAudit": {
         "status": "success",
-        "runId": 41246123213
+        "runId": 41248858645
       }
     },
     "review": {
-      "latestSubmittedReviewHead": "29f8339ad27865627d1021534bda7881f315c177",
-      "latestGitHubReviewHead": "29f8339ad27865627d1021534bda7881f315c177",
-      "currentHeadReviewed": true,
-      "status": "fresh review found no major issues; P2 method-publication thread fixed and resolved",
+      "latestSubmittedReviewHead": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
+      "latestGitHubReviewHead": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
+      "currentHeadReviewed": false,
+      "status": "Clean receipt exists on 830ec3d; the updated shared-fixture profile requires fresh review.",
       "unresolvedOutdatedThreads": 0
     },
     "openReviewThreads": [],
-    "localFollowUp": "Measurement<TemperaturePoint> HIR/IR and website metadata package validated; no release or tag changes.",
+    "localFollowUp": "Shared dynamic-payload fixtures passed native Windows, local Linux GCC ASan/UBSan and actual 34-program WASI execution; push together with documentation/checkpoint and validate the resulting head.",
     "observedAt": "2026-10-31",
-    "head": "29f8339ad27865627d1021534bda7881f315c177",
+    "head": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
     "integration": "not merged; no PR #239 merge authorization"
   },
   "activePullRequests": [
+    235,
+    236,
     237,
     238,
     239
+  ],
+  "acceptanceCriteria": [
+    {
+      "gate": "A-compiler",
+      "status": "OPEN",
+      "remaining": "Validate the integrated dimensional reference workflow and nested managed paths at its actual source revision."
+    },
+    {
+      "gate": "B-science",
+      "status": "OPEN",
+      "remaining": "Retain independent analytical/finite-difference oracle results for dimensional uncertainty and shared-source correlation."
+    },
+    {
+      "gate": "C-memory",
+      "status": "OPEN",
+      "remaining": "Require leak-check/sanitizers for the integrated workflow; the TemperaturePoint profile proves only its tested structural paths."
+    },
+    {
+      "gate": "D-execution",
+      "status": "OPEN",
+      "remaining": "Record native multiplatform and actual WASI execution of the reference workflow; 34-program matrix is supporting evidence."
+    },
+    {
+      "gate": "E-reproducibility",
+      "status": "OPEN",
+      "remaining": "Integrate bounded R3 inspect/verify/replay/compare evidence without promoting host-specific replay to cross-platform equivalence."
+    },
+    {
+      "gate": "F-performance",
+      "status": "OPEN",
+      "remaining": "Isolate startup, numerical kernel, managed allocations and abstraction overhead; assess measured bottlenecks."
+    },
+    {
+      "gate": "G-product",
+      "status": "OPEN",
+      "remaining": "Validate installation, tutorial, figure export and rendered reference workflow."
+    },
+    {
+      "gate": "H-integration",
+      "status": "OPEN",
+      "remaining": "Integrate authorized packages only, then validate their combined source and CI; PRs #235-#239 remain open."
+    },
+    {
+      "gate": "I-documentation",
+      "status": "OPEN",
+      "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site."
+    }
   ]
 }

@@ -1,0 +1,20 @@
+import std.measurements
+
+record Sample { mut reading: Measurement<TemperaturePoint> }
+
+fn main() -> Void {
+    mut sample = Sample { reading: Measurement<TemperaturePoint> {
+        value: temperature_point(20.0, "degC"), sources: [], known: false,
+        reason: "sensor " + "offline"
+    } }
+    alias = sample
+    sample.reading = Measurement<TemperaturePoint> {
+        value: temperature_point(30.0, "degC"), sources: [], known: false,
+        reason: "replacement " + "offline"
+    }
+    print(alias.reading.value)
+    print(sample.reading.value)
+    print(alias.reading.reason)
+    drop(alias)
+    drop(sample)
+}

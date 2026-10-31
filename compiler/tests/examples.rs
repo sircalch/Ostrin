@@ -12993,22 +12993,8 @@ fn native_temperature_point_measurement_matches_interpreter_and_wasi() {
 
 #[test]
 fn temperature_point_measurement_field_replacement_preserves_alias_ownership() {
-    let source = temp_source(
-        "temperature_point_measurement_field_replacement",
-        r#"import std.measurements
-record Sample { mut reading: Measurement<TemperaturePoint> }
-fn main() -> Void {
-    mut sample = Sample { reading: Measurement<TemperaturePoint> { value: temperature_point(20.0, "degC"), sources: [], known: true, reason: "" } }
-    alias = sample
-    sample.reading = Measurement<TemperaturePoint> { value: temperature_point(30.0, "degC"), sources: [], known: true, reason: "" }
-    print(alias.reading.value)
-    print(sample.reading.value)
-    drop(alias)
-    drop(sample)
-}
-"#,
-    );
-    let expected = "30 degC (absolute)\n30 degC (absolute)\n";
+    let source = fixture_path("temperature_point_measurement_field.ostrin.txt");
+    let expected = "30 degC (absolute)\n30 degC (absolute)\nreplacement offline\n";
 
     let interpreted = run(&["--run", &source]);
     assert!(
@@ -13020,7 +13006,6 @@ fn main() -> Void {
 
     let report = run(&["--native-type-report", &source]);
     if skip_if_no_c_compiler(&report) {
-        let _ = fs::remove_file(&source);
         return;
     }
     assert!(
@@ -13058,7 +13043,6 @@ fn main() -> Void {
         .output()
         .expect("run TemperaturePoint field replacement binary");
     let _ = fs::remove_file(&exe);
-    let _ = fs::remove_file(&source);
     assert!(
         native.status.success(),
         "TemperaturePoint field replacement native run failed: {}",
@@ -13077,32 +13061,8 @@ fn main() -> Void {
 
 #[test]
 fn temperature_point_measurement_arguments_returns_and_phis_preserve_ownership() {
-    let source = temp_source(
-        "temperature_point_measurement_arguments_returns_and_phis",
-        r#"import std.measurements
-fn point(value: Float) -> Measurement<TemperaturePoint> {
-    Measurement<TemperaturePoint> { value: temperature_point(value, "degC"), sources: [], known: true, reason: "" }
-}
-fn forward(value: Measurement<TemperaturePoint>) -> Measurement<TemperaturePoint> { value }
-fn choose(flag: Bool, left: Measurement<TemperaturePoint>, right: Measurement<TemperaturePoint>) -> Measurement<TemperaturePoint> {
-    if flag { left } else { right }
-}
-fn main() -> Void {
-    mut current = point(20.0)
-    alternate = point(30.0)
-    current = choose(true, forward(current), alternate)
-    mut i = 0
-    while i < 2 {
-        current = forward(current)
-        i = i + 1
-    }
-    print(current.value)
-    drop(current)
-    drop(alternate)
-}
-"#,
-    );
-    let expected = "20 degC (absolute)\n";
+    let source = fixture_path("temperature_point_measurement_phis.ostrin.txt");
+    let expected = "20 degC (absolute)\n30 degC (absolute)\n42 degC (absolute)\nsensor 42\n20 degC (absolute)\nsensor 20\n";
 
     let interpreted = run(&["--run", &source]);
     assert!(
@@ -13114,7 +13074,6 @@ fn main() -> Void {
 
     let report = run(&["--native-type-report", &source]);
     if skip_if_no_c_compiler(&report) {
-        let _ = fs::remove_file(&source);
         return;
     }
     assert!(
@@ -13152,7 +13111,6 @@ fn main() -> Void {
         .output()
         .expect("run TemperaturePoint argument/return/Phi binary");
     let _ = fs::remove_file(&exe);
-    let _ = fs::remove_file(&source);
     assert!(
         native.status.success(),
         "TemperaturePoint argument/return/Phi native run failed: {}",

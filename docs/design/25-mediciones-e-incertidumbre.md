@@ -180,10 +180,24 @@ la incertidumbre con la regla matemática correspondiente.
 una medición de punto absoluto, su valor nominal pertenecerá al espacio afín y la incertidumbre
 pertenecerá al intervalo lineal `Quantity<Temperature>`. En una conversión Celsius/Fahrenheit, el
 valor nominal aplica escala y offset; la incertidumbre aplica sólo el factor de escala. El modelo
-actual `Sensitivity { coefficient: Float, sigma: Float }` no guarda unidad ni dimensión de fuente,
-por lo que no puede expresar este contrato. El backend nativo rechaza actualmente
-`Measurement<TemperaturePoint>`; el almacenamiento genérico en el intérprete no habilita
-propagación, conversión ni salida científica para ese tipo.
+actual `Sensitivity<T>` usa `contribution: T`: no distingue el tipo nominal del tipo de intervalo,
+por lo que no puede expresar este contrato para puntos absolutos. El backend de desarrollo admite
+un **perfil estructural de `Measurement<TemperaturePoint>` con `sources: []`**: construcción,
+lectura del nominal, alias, argumentos, retornos, campo y reemplazo, ambas ramas de un `Phi`,
+loop-Phi con valores nuevos y destrucción. Los fixtures
+`compiler/tests/fixtures/temperature_point_measurement_field.ostrin.txt` y
+`compiler/tests/fixtures/temperature_point_measurement_phis.ostrin.txt` comparten las pruebas
+nativas y la matriz WASI. Usan `reason` dinámico en estado desconocido para ejercitar su
+retención y liberación; los reportes exigen cero fallbacks AST y cero divergencias de tipos.
+La matriz WASI compila y ejecuta esos fixtures con `--leak-check` y exige
+`live_allocations=0`, igual que las regresiones nativas incluidas en las suites ASan/UBSan.
+
+Este perfil no habilita fuentes de incertidumbre de puntos absolutos, propagación, covarianza ni
+conversión automática de una medición completa. Una conversión explícita del nominal mediante
+`temperature_point_to` sigue siendo una operación escalar; no convierte incertidumbre. Arrays,
+closures y tareas de este payload requieren evidencia propia. El contrato científico afín sigue
+pendiente de separar nominales de puntos y contribuciones de intervalos. Estos cambios son de
+desarrollo y no alteran los binarios publicados de `v0.2.0`.
 
 ### 5.2 Estados de conocimiento
 
