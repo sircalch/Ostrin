@@ -35,6 +35,11 @@ jobs:
           echo "OSTRIN_WASI_CC=$sdk/bin/clang" >> "$GITHUB_ENV"
           echo "OSTRIN_WASI_SYSROOT=$sdk/share/wasi-sysroot" >> "$GITHUB_ENV"
 
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
       - name: Build release compiler
         run: cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
 
@@ -68,6 +73,21 @@ jobs:
         env:
           NODE_NO_WARNINGS: "1"
         run: node scripts/wasi-program-check.mjs
+
+      - name: Execute the file-backed pendulum workflow under WASI
+        env:
+          NODE_NO_WARNINGS: "1"
+        run: node scripts/pendulum-wasi-check.mjs
+
+      - name: Archive pendulum WASI execution evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ostrin-pendulum-wasi-${{ github.sha }}
+          path: |
+            target/pendulum-wasi-check/report.json
+            target/pendulum-wasi-check/pendulum.wasm
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Package and checksum standalone workflow artifact
         shell: bash

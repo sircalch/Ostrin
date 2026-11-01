@@ -1,0 +1,78 @@
+{
+  "schema": "ostrin.process-memory-profile/v1",
+  "generatedAtUtc": "2026-10-26T01:26:35.2018268Z",
+  "sourceRevision": "b2143dac1ee5573d2da662d1b607f21cc5c9f98f",
+  "testedBinaryRevision": "a9e1f3099fe1219cf7f4cac33b9e79548433969d",
+  "binarySha256": "e7f06774fa25873c101ac9a4d83ca3f392d7357c00c984b33645c115d8eff15a",
+  "compilerVersion": "ostrinc 0.2.0",
+  "compilerSha256": "ae1b5effd967b04cbe8b4f7dfd91b5e3246915c8d0e9339ab7079a8d19f97d66",
+  "workloadSourceSha256": "ce3059591d458c72072fb74f0d6f6a63eeb27eba335bc74f2241fe4c457b6923",
+  "fixtureSha256": "f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9",
+  "runtimeInputSha256": "f5b42fbe665cc1095f63ffd4f780498c2225040f10c7171706e485efd3ea1be9",
+  "backend": "native",
+  "workloadOutputSha256": "ca8f0ab2480660e2153bbd9eafa9aef785411ba41c2eac23a09bff554dc33579",
+  "host": {
+    "os": "Windows 10.0.26200.0",
+    "architecture": "x64",
+    "processorCount": 16
+  },
+  "method": "Launch one native child process per run; poll GetProcessMemoryInfo with a busy-spin while it is alive; retain the maximum observed WorkingSetSize and PrivateUsage.",
+  "revisionProvenance": "Source and tested-tree revisions are supplied by the operator; binary/compiler/source/input hashes identify bytes but are not a signed build attestation.",
+  "memoryStatus": "sampled-lower-bound",
+  "runs": [
+    {
+      "run": 1,
+      "sampledPeakWorkingSetBytes": 5197824,
+      "sampledPeakPrivateBytes": 749568,
+      "liveMemorySamples": 110
+    },
+    {
+      "run": 2,
+      "sampledPeakWorkingSetBytes": 5148672,
+      "sampledPeakPrivateBytes": 741376,
+      "liveMemorySamples": 454
+    },
+    {
+      "run": 3,
+      "sampledPeakWorkingSetBytes": 5181440,
+      "sampledPeakPrivateBytes": 737280,
+      "liveMemorySamples": 499
+    },
+    {
+      "run": 4,
+      "sampledPeakWorkingSetBytes": 5169152,
+      "sampledPeakPrivateBytes": 741376,
+      "liveMemorySamples": 440
+    },
+    {
+      "run": 5,
+      "sampledPeakWorkingSetBytes": 5193728,
+      "sampledPeakPrivateBytes": 737280,
+      "liveMemorySamples": 450
+    },
+    {
+      "run": 6,
+      "sampledPeakWorkingSetBytes": 5177344,
+      "sampledPeakPrivateBytes": 737280,
+      "liveMemorySamples": 472
+    },
+    {
+      "run": 7,
+      "sampledPeakWorkingSetBytes": 5201920,
+      "sampledPeakPrivateBytes": 737280,
+      "liveMemorySamples": 691
+    }
+  ],
+  "summary": {
+    "runCount": 7,
+    "medianSampledPeakWorkingSetBytes": 5181440,
+    "medianSampledPeakPrivateBytes": 737280,
+    "minimumLiveMemorySamples": 110
+  },
+  "limitations": [
+    "One Windows host and one native workflow binary; samples can miss brief peaks and are lower bounds.",
+    "Values include process and runtime overhead, are not allocation counts or leak checks, and do not include compiler build memory.",
+    "This profiler adds monitoring overhead, so it omits elapsed-time results and makes no cross-platform or general performance claim.",
+    "The supplied revision IDs do not prove which compiler built the native binary; the report records and checks the available byte hashes separately."
+  ]
+}

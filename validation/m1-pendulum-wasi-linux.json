@@ -1,0 +1,71 @@
+{
+  "schema": "ostrin.pendulum-wasi/v1",
+  "status": "pass",
+  "sourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
+  "gitClean": true,
+  "compilerSha256": "c654e1c66d835ec99dca235de82dea329a01a3b696f16e7351504fb6dbf4d4af",
+  "compilerVersion": "ostrinc 0.2.0",
+  "source": {
+    "path": "examples/viz_pendulum_calibration.ostrin",
+    "sha256": "2eb383b703cda40d3ce082a05a66b0ebb596f962abcda716756fc4c7d00cdedb"
+  },
+  "input": {
+    "path": "experiments/pendulum-calibration.inputs.json",
+    "stagedAs": "data.json",
+    "sha256": "4f0c0596c38d682d881e8840e9d44f455d9a3a81658e9075b4146e657d99f09c"
+  },
+  "wasmSha256": "f9cae3fe7657cf05a52d632d05cebca4c8f513dba56c7996d7575903f6661fff",
+  "compilerArguments": [
+    "--compile",
+    "--target",
+    "wasm32-wasi",
+    "--leak-check"
+  ],
+  "toolchain": {
+    "cc": "/home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/bin/clang",
+    "ccSha256": "061f88b9f4c48f3742434c2513d5038ab7fa4dc27abff5cb13b5eaedcb51d6ea",
+    "ccVersion": "clang version 23.1.0-wasi-sdk (https://github.com/llvm/llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)\nTarget: wasm32-unknown-wasip1\nThread model: posix\nInstalledDir: /home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/bin\nConfiguration file: /home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/bin/clang.cfg",
+    "sysroot": "/home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/share/wasi-sysroot",
+    "sdkArchiveSha256": "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4",
+    "cflags": null
+  },
+  "runner": {
+    "node": "v24.21.0",
+    "wasi": "preview1",
+    "host": "linux/x64"
+  },
+  "outputCheck": "exact UTF-8 report and SVG parity with interpreter after CRLF normalization",
+  "scope": "One synthetic workflow; no general WASI coverage, timing equivalence or global R3 claim.",
+  "samples": [
+    {
+      "outputSha256": "cb0c2065869d599c63ee2be8b79e73d5bd48798b43ce12a6748f1e199c209c71",
+      "outputBytes": 25631,
+      "allocations": {
+        "live": 0,
+        "peak": 347,
+        "total": 12291,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12291"
+      }
+    },
+    {
+      "outputSha256": "cb0c2065869d599c63ee2be8b79e73d5bd48798b43ce12a6748f1e199c209c71",
+      "outputBytes": 25631,
+      "allocations": {
+        "live": 0,
+        "peak": 347,
+        "total": 12291,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12291"
+      }
+    },
+    {
+      "outputSha256": "cb0c2065869d599c63ee2be8b79e73d5bd48798b43ce12a6748f1e199c209c71",
+      "outputBytes": 25631,
+      "allocations": {
+        "live": 0,
+        "peak": 347,
+        "total": 12291,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=347 total_allocations=12291"
+      }
+    }
+  ]
+}

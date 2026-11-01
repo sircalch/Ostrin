@@ -162,9 +162,9 @@ test("scorecard separates closed entry rows from module-wide symbolic effect inv
   assert.equal(scorecard.r3.callResolutionEvidence.invalidBundleCount, 0);
   assert.deepEqual(scorecard.r3.sourceReadAudit, {
     sourceBundleCount: scorecard.r3.bundleCount,
-    bundlesWithDirectReadFileCalls: 11,
-    directReadFileCallCount: 21,
-    literalReadPathCallCount: 21,
+    bundlesWithDirectReadFileCalls: 12,
+    directReadFileCallCount: 22,
+    literalReadPathCallCount: 22,
     dynamicReadCallCount: 0,
     readFileReferenceCount: 0,
     shadowedReadFileCallCount: 0,

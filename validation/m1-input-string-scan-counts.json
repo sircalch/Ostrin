@@ -1,0 +1,52 @@
+{
+  "scope": "Deterministic scan counters between load_analysis entry and analyze entry; code-point offset steps and byte scans are distinct units. Counter instrumentation is not timing evidence. Input variants differ only in legal leading JSON whitespace.",
+  "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+  "baselineCSha256": "9b036bba41e3b669c71ef1edb05103ff6f841a7d4466750f0712fb4ed76ef91b",
+  "countedCSha256": "ae92857ded1753cc73b0d2f00d084f78c2dbcf94ab9909ab3cf0d94e9f34bc48",
+  "samples": [
+    {
+      "inputBytes": 1668,
+      "leadingJsonWhitespaceBytes": 0,
+      "inputSha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf",
+      "lengthCalls": 3705,
+      "lengthBytes": 6171620,
+      "offsetCalls": 2128,
+      "offsetSteps": 1662188
+    },
+    {
+      "inputBytes": 3336,
+      "leadingJsonWhitespaceBytes": 1668,
+      "inputSha256": "1303ff1bc8d1d4656b564204396719fe323e19236f179e19be1def4a37638056",
+      "lengthCalls": 7041,
+      "lengthBytes": 23472116,
+      "offsetCalls": 3796,
+      "offsetSteps": 6595298
+    },
+    {
+      "inputBytes": 5004,
+      "leadingJsonWhitespaceBytes": 3336,
+      "inputSha256": "59404b692acaf010eae2131fed2fc4e09fd0f870edcfca734d566fda751c817e",
+      "lengthCalls": 10377,
+      "lengthBytes": 51901508,
+      "offsetCalls": 5464,
+      "offsetSteps": 14310632
+    }
+  ],
+  "schema": "ostrin.m1-input-string-scans/v1",
+  "status": "local-counter-probe-no-runtime-optimization",
+  "reproducerScriptUtf8": "from pathlib import Path\nimport re, subprocess, json, hashlib\n\nroot = Path(__file__).resolve().parents[2]\nout = Path(__file__).resolve().parent / 'scan-counts'\nout.mkdir(exist_ok=True)\nsource = (root / 'target/native-phase-profile/emitted.c').read_text(encoding='utf-8')\nprefix = '''static bool ostrin_scan_active = false;\nstatic uint64_t ostrin_length_calls = 0, ostrin_length_bytes = 0;\nstatic uint64_t ostrin_offset_calls = 0, ostrin_offset_steps = 0;\n__attribute__((destructor)) static void ostrin_scan_report(void) {\n    fprintf(stderr, \"ostrin scans: {\\\\\\\"lengthCalls\\\\\\\":%llu,\\\\\\\"lengthBytes\\\\\\\":%llu,\\\\\\\"offsetCalls\\\\\\\":%llu,\\\\\\\"offsetSteps\\\\\\\":%llu}\\\\n\",\n      (unsigned long long)ostrin_length_calls, (unsigned long long)ostrin_length_bytes,\n      (unsigned long long)ostrin_offset_calls, (unsigned long long)ostrin_offset_steps);\n}\n'''\nsource = source.replace('static int64_t ostrin_s_length(const char* s) {', prefix + '''static int64_t ostrin_s_length(const char* s) {\n    if (ostrin_scan_active) ostrin_length_calls++;''', 1)\nold='for (; *s; s++) if (((unsigned char)*s & 0xC0) != 0x80) n++;'\nassert source.count(old)==1\nsource=source.replace(old, 'for (; *s; s++) { if (ostrin_scan_active) ostrin_length_bytes++; if (((unsigned char)*s & 0xC0) != 0x80) n++; }')\nsource=source.replace('static size_t ostrin_s_byte_offset(const char* s, int64_t index) {', '''static size_t ostrin_s_byte_offset(const char* s, int64_t index) {\n    if (ostrin_scan_active) ostrin_offset_calls++;''',1)\nold='for (int64_t i = 0; i < index; i++) {'\nassert source.count(old)==1\nsource=source.replace(old,old+'\\n        if (ostrin_scan_active) ostrin_offset_steps++;')\nfor fn,flag in [('load_analysis','true'),('analyze','false')]:\n    pattern=r'(^[^;{}\\n]*\\bostrin_fn_'+fn+r'\\([^;{}]*\\)\\s*\\{)'\n    source,n=re.subn(pattern,lambda m:m[1]+'\\n    ostrin_scan_active = '+flag+';',source,flags=re.M)\n    assert n==1,(fn,n)\n(out/'counted.c').write_bytes(source.encode('utf-8'))\nsubprocess.run(['gcc','counted.c','-o','counted','-O2','-pthread','-lm','-ffp-contract=off'],cwd=out,check=True)\ndata=(root/'experiments/pendulum-calibration.inputs.json').read_bytes()\nexpected=(root/'target/native-phase-profile/expected.stdout').read_text(encoding='utf-8').strip()\nsamples=[]\nfor padding in [0,len(data),2*len(data)]:\n    staged=b' '*padding+data\n    (out/'data.json').write_bytes(staged)\n    r=subprocess.run([str(out/'counted')],cwd=out,capture_output=True,text=True,check=True)\n    assert r.stdout.replace('\\r\\n','\\n').strip()==expected\n    assert 'live_allocations=0' in r.stderr\n    line=next(line for line in r.stderr.splitlines() if line.startswith('ostrin scans: '))\n    samples.append({'inputBytes':len(staged),'leadingJsonWhitespaceBytes':padding,'inputSha256':hashlib.sha256(staged).hexdigest(),**json.loads(line[len('ostrin scans: '):])})\nreceipt={'scope':'Deterministic scan counters between load_analysis entry and analyze entry; code-point offset steps and byte scans are distinct units. Counter instrumentation is not timing evidence. Input variants differ only in legal leading JSON whitespace.', 'sourceRevision':'434f3a258315a0ab8a4d2e37d4b3a9b7329befd2','baselineCSha256':hashlib.sha256((root/'target/native-phase-profile/emitted.c').read_bytes()).hexdigest(),'countedCSha256':hashlib.sha256(source.encode()).hexdigest(),'samples':samples}\n(out/'report.json').write_text(json.dumps(receipt,indent=2)+'\\n',encoding='utf-8')\nprint(json.dumps(samples))\n",
+  "reproducerScriptSha256": "e7644b9f8ffb8306675812b23d56de118dc6ddb080bd35c2d0e166b2384e6a25",
+  "reproduction": [
+    "Build the host compiler from sourceRevision. Emit --leak-check C for examples/viz_pendulum_calibration.ostrin into target/native-phase-profile/emitted.c.",
+    "Generate target/native-phase-profile/expected.stdout using scripts/benchmark-phases.mjs; its phase timings are independent from this counter probe.",
+    "Extract reproducerScriptUtf8 to target/utf8-cache-experiment/count-scans.py. Run python3 target/utf8-cache-experiment/count-scans.py on Linux with GCC."
+  ],
+  "interpretation": "With unchanged scientific values/output, increasing input bytes 3x using legal JSON whitespace increases length byte scans about 8.4x and offset code-point steps about 8.6x. This is consistent with repeated quadratic scans in the input stage. These are deterministic work counts, not runtime or speedup measurements.",
+  "limitations": [
+    "Linux/GCC emitted-C probe; no production runtime change.",
+    "Counters cover load_analysis entry until analyze entry, including decoding and input extraction, not only one parser function.",
+    "Length byte counts and code-point offset steps use different units and must not be added.",
+    "Output/report parity and live_allocations=0 checked for every input.",
+    "The separate allocation-cache timing prototype is provisional and is not accepted performance evidence."
+  ]
+}

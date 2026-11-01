@@ -174,6 +174,15 @@ export const experimentFixtures = Object.freeze({
     outputPath: "website/assets/experiments/scatter-fit.ostrin-experiment.json",
     sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
+  "pendulum-calibration": Object.freeze({
+    id: "pendulum-calibration",
+    title: "Dimensional pendulum calibration",
+    sourcePath: "examples/viz_pendulum_calibration.ostrin",
+    inputPath: "experiments/pendulum-calibration.inputs.json",
+    figurePath: "website/assets/viz/pendulum-calibration.svg",
+    outputPath: "website/assets/experiments/pendulum-calibration.ostrin-experiment.json",
+    sourceRevision: "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
+  }),
   units: Object.freeze({
     id: "units",
     title: "Unit-aware axes",

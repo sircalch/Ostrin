@@ -33,6 +33,7 @@ export function pageDataFromReport(report) {
       workload: String(workload.workload),
       sourceBytes: finite(workload.sourceBytes, `${workload.workload}.sourceBytes`),
       sourceSha256: String(workload.sourceSha256),
+      sourceContentSha256: String(workload.sourceContentSha256 ?? ""),
       outputBytes: finite(workload.outputBytes, `${workload.workload}.outputBytes`),
       outputSha256: String(workload.outputSha256),
       nativeCompileMs: finite(workload.nativeCompileMs, `${workload.workload}.nativeCompileMs`),

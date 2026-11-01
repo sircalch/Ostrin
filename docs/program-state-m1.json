@@ -15,7 +15,8 @@
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
     "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
     "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
-    "releaseTag": "v0.2.0"
+    "releaseTag": "v0.2.0",
+    "revisionSemantics": "sourceRevision identifies the tested compiler tree; programSourceRevision identifies the application change; evidenceRevision records the source-bound receipts. dashboardRevision identifies the clean tree used to regenerate metrics. Receipt recording commits also resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
   },
   "completed": [
     "integrated-authorized-prs-225-230-231-227-226-229",
@@ -109,31 +110,58 @@
     "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green",
     "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
     "website-test-count-384-metadata-synchronized-pr239-29f8339",
-    "measurement-temperaturepoint-273e01e-five-workflows-green"
+    "measurement-temperaturepoint-273e01e-five-workflows-green",
+    "authorized-prs-225-230-231-227-226-229-integrated",
+    "measurement-array-structural-profile-merged-pr233",
+    "scalar-covariance-analytical-native-numeric-and-wasi-evidence-preserved",
+    "pr239-7f7a3ba-ten-checks-green-and-wasi34",
+    "pr237-c80d26e-fourteen-checks-green-and-standalone-wasi-run41253542664",
+    "period-reuse-seven-allocation-samples-114-fewer-records-source49374d7",
+    "typed-analysis-result-and-render-boundary-source5960371",
+    "separated-workflow-windows-linux-asan-ubsan-and-compiled-wasi-three-runs",
+    "linux-gcc-seven-paired-wall-and-thread-cpu-phase-samples-sourcee612d73",
+    "current-windows-linux-backend-ratchets8789ir46hir0ast-sourcee612d73",
+    "native-report-svg-export-procedure-tested-windows-and-linux",
+    "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source",
+    "pr237-728d224-fourteen-checks-green-and-wasi-run41257538742",
+    "authoritative-json-arrays-analytical-three-row-case-and-covariance-limit-source3b60f21",
+    "ten-compiled-wasi-input-cases-and-seven-paired-phase-captures-clean3b60f21",
+    "hir-unwrap-uaf-reproduced-then-corrected-source434f3a2",
+    "source434f3a2-full-linux424-tests-pass-and-focused-windows-asan-ubsan-pass",
+    "source434f3a2-ten-compiled-wasi-cases-and-seven-native-phase-pairs-pass",
+    "input-stage-repeated-utf8-work-isolated-by-three-whitespace-only-counter-probes"
   ],
   "currentPackage": {
-    "name": "measurement-temperaturepoint-hir-ir-and-website-metadata",
-    "branch": "codex/m1-temperature-measurement",
-    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-temperature-measurement",
-    "status": "Shared native/WASI fixtures and affine-profile documentation validated locally on an extension of 273e01e; the next pushed HEAD requires its own CI and review. The preceding 273e01e HEAD has all five workflows green. PR #239 remains unmerged.",
+    "name": "hir-unwrap-ownership-and-owned-iterator-cleanup",
+    "branch": "codex/m1-reference-workflow",
+    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
+    "status": "Compiler source 434f3a2 passes all 424 local Linux tests, focused Windows/ASan/UBSan, ten compiled-WASI cases and numerical validation. Historical 13e53ce fails Windows and macOS; require fresh corrected-head CI before integration.",
+    "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+    "evidenceRevision": "f22840f81b7e4a535f9f2e6f619c8fddda659ffb",
     "scope": [
-      "lower Measurement<TemperaturePoint> through HIR and IR with typed list ownership",
-      "publish methods discovered while flushing generic HIR instances",
-      "synchronize generated website and documentation test counts after the new regression",
-      "run the same field and Phi fixtures natively and in WASI with dynamic reason strings and repeated fresh replacements",
-      "require successful WASI leak-check output; document the empty-source structural boundary"
+      "HIR borrowed Option/Result unwrap payload classification, including strings",
+      "owned temporary iterable cleanup on return, with break/continue lifetime preserved",
+      "deterministic regression for aliases, loop exits and error paths",
+      "preserve reproducible before/after ASan evidence and macOS crash/signature artifact",
+      "ten-case WASI, current phase capture and unchanged scientific output",
+      "record input-stage UTF-8 scan counts; no runtime optimization shipped"
     ],
     "evidence": [
-      "Local focused Measurement<TemperaturePoint> constructor and field replacement tests pass with interpreter/native/WASI parity, ast-fallback: 0 and live_allocations=0.",
-      "Local generic-method regression passes after publishing flushed methods into hir_world.",
-      "website-check: ok (17 public pages, 305 examples, 384 integration tests); project-plan-check and linguist-check pass; cargo fmt --check and git diff --check pass.",
-      "Exact HEAD 29f8339ad27865627d1021534bda7881f315c177 remote workflows: Ostrin CI 41246123265, Browser audit 41246123145, Native sanitizers 41246123164 with ASan and UBSan success, CodeQL 41246123123 and Security audit 41246123213.",
-      "Fresh Codex review of 29f8339ad2 found no major issues; PR #239 has one resolved P2 thread and remains unmerged.",
-      "R3 remains OPEN globally; this package does not claim production readiness, cross-platform equivalence or v0.2.0 changes.",
-      "273e01e exact CI: Ostrin CI 41248858683, Browser audit 41248858643, Native sanitizers 41248858644 (ASan/UBSan), CodeQL 41248858648 and Security audit 41248858645 all passed; 385 integration + 6 differential + 33 unit tests in the source inventory.",
-      "Local extension: Windows GCC focused profile 3/3 passed; Linux/WSL GCC ASan with leak detection 3/3 and UBSan 3/3 passed on the shared fixtures.",
-      "Local extension: all 34 programs compiled and executed using wasi-sdk 34.0 (pinned Linux archive SHA-256 b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4) and Node WASI; both TemperaturePoint measurement fixtures required live_allocations=0.",
-      "Local extension: website-check (17 pages, 305 examples, 385 integration tests), Measurement contract plus 18 tests, project-plan-check, distribution-check, cargo fmt and git diff --check passed. No performance claim or affine uncertainty API was added."
+      "Focused workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan: canonical six-row parity, analytical three-row result g=pi^2, seven rejected-input paths and zero live allocations.",
+      "Current source profile 9 IR / 2 HIR / 0 AST. Removing the obsolete scalar-loader function removes one IR body; no AST fallback was introduced.",
+      "Current aggregate ratchet passed on Windows and Linux: 8788 IR + 46 HIR / 0 AST, 245 measured source modules, zero type divergences. Original logs: validation/m1-array-input-backend-inventory.json.",
+      "Clean 3b60f21 compiled-WASI run passed all ten cases: three baseline report/SVG repeats, one independent analytical three-row case and six exact rejected-input cases. Each input text hashes to its recorded bytes and every run reports live=0. Receipt: validation/m1-pendulum-array-input-wasi-linux.json.",
+      "Clean 3b60f21 seven paired native phase captures retained exact interpreted baseline output and zero-live counters. Old output identity is unchanged; input/source bytes changed, so timing differences are not a controlled speed comparison. Receipt: validation/m1-pendulum-array-input-phases-linux.json.",
+      "42 benchmark/oracle/plan tests and 33 bundle/replay tests passed; all 30 experiment replays and 12 demos matched the regenerated source-backed figures. Distribution, Linguist and project-plan gates passed.",
+      "Historical 728d224 passed fourteen checks, the three-host benchmark/provenance matrix and standalone WASI run 41257538742. Its Linux phase artifact was downloaded and inspected; input-stage CPU exceeded analysis/rendering there as well, without a cross-host timing equivalence claim.",
+      "PR #239 remains exact-head 7f7a3ba ten-check/WASI34 green; automated fresh review remains unavailable due the earlier quota rejection. No PR merge, tag or release performed.",
+      "Actual head 0b011dd: macOS CI run 41260414100 job 124712327766 failed (383 passed, 1 failed) on first native pendulum execution with SIGTRAP and empty output. Compiler/runtime remain unchanged. The separate macOS benchmark passed, so the failure requires diagnosis rather than an assumed platform-wide rejection.",
+      "Source 434f3a2: complete Linux GCC suite passed 33 unit + 6 differential + 385 integration = 424 tests. Ratchet stays 8788 IR + 46 HIR / 0 AST and zero divergences.",
+      "Focused regression and scientific workflow pass on Windows and Linux GCC ASan with leak detection plus UBSan. Same small program fails before the fix with an ASan heap-use-after-free and passes afterward with output 6/6/2 and live=0.",
+      "Clean source 434f3a2: ten actual compiled-WASI cases and seven native phase pairs passed with report/SVG parity and zero live allocations. Phase timings were captured alongside the full compiler suite and are not a controlled speed comparison.",
+      "Windows numerical validation retained 80 report and 136 emitted-value comparisons, absolute difference zero and live_allocations=0. Thirty focused JavaScript tests passed.",
+      "Observed exact head 13e53ce CI: Linux and site passed; Windows failed the second pendulum replay with index out of bounds, and macOS failed with libmalloc invalid free. ASan/UBSan workflow passed that historical head; these results do not override the reproduced bug.",
+      "Deterministic input-stage probe: 1668/3336/5004 bytes of otherwise identical JSON produce 6171620/23472116/51901508 String.length byte visits and 1662188/6595298/14310632 indexed code-point steps. All output and zero-live checks pass; no timing or optimization claim."
     ],
     "activePullRequests": [
       235,
@@ -142,9 +170,40 @@
       238,
       239
     ],
-    "sourceRevision": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
-    "evidenceRevision": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
-    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
+    "lastBenchmarkSourceRevision": "49374d7a47539d77c03b319c720c41bee6947ede",
+    "programSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
+    "receipts": [
+      {
+        "path": "validation/m1-pendulum-array-input-wasi-linux.json",
+        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
+      },
+      {
+        "path": "validation/m1-pendulum-array-input-phases-linux.json",
+        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
+      },
+      {
+        "path": "validation/m1-array-input-backend-inventory.json",
+        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
+      },
+      {
+        "path": "validation/m1-hir-unwrap-ownership.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      },
+      {
+        "path": "validation/m1-pendulum-hir-ownership-wasi-linux.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      },
+      {
+        "path": "validation/m1-pendulum-hir-ownership-phases-linux.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      },
+      {
+        "path": "validation/m1-input-string-scan-counts.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      }
+    ],
+    "lastPhaseProfileSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+    "compilerSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
   },
   "pending": [
     "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
@@ -162,7 +221,11 @@
     "Push the shared-fixture/actual-WASI/documentation package in PR #239 and require checks plus review for the resulting HEAD.",
     "PRs #235-#239 remain unmerged; no PR-specific merge authorization exists for this set.",
     "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
-    "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS."
+    "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS.",
+    "Push corrected source/evidence in PR #237 and validate the actual new HEAD CI, especially Windows/macOS, native sanitizers, standalone WASI and phase artifacts. Historical failures and green checks remain source-scoped.",
+    "New exact-head review and explicit merge authorization remain pending for PRs #235-#239; do not repeat unchanged Code Review quota requests.",
+    "Repeated UTF-8 scans are isolated by deterministic input-stage counts; implement and benchmark a bounded correction after current-head ownership validation. Measurement overhead, pure loader time, allocated bytes and compiler memory remain open.",
+    "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
@@ -238,6 +301,11 @@
         "workflow": "Security audit",
         "runId": 41248858645,
         "status": "success"
+      },
+      {
+        "workflow": "Native sanitizers",
+        "runId": 41261253440,
+        "status": "success"
       }
     ],
     "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
@@ -251,7 +319,8 @@
     "PR #235 has two P2 review threads on old head f58ed2e. Their fixes are locally validated, but the branch has not yet been updated and no exact-head CI or fresh review exists for the fixes.",
     "R3 remains OPEN: host capture is missing from 29/29 bundles; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
     "The broader M1 acceptance gates for performance, end-to-end reproducibility, visual quality, and multi-platform execution remain incomplete.",
-    "Published v0.2.0 remains frozen."
+    "Published v0.2.0 remains frozen.",
+    "PR #237 integration remains blocked pending exact corrected-head Windows/macOS CI; prior 13e53ce failed those jobs. Local source434f3a2 correction is validated but not a substitute for remote integration evidence."
   ],
   "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
@@ -282,6 +351,11 @@
       "securityAudit": {
         "status": "success",
         "runId": 41167597514
+      },
+      "wasi": {
+        "status": "success",
+        "runId": 41251579139,
+        "artifactId": 13060939257
       },
       "successful": 10,
       "failing": 0,
@@ -383,6 +457,49 @@
       "gate": "I-documentation",
       "status": "OPEN",
       "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site."
+    },
+    {
+      "gate": "A-compiler",
+      "status": "OPEN",
+      "remaining": "HIR unwrap and iterable lifetime correction passes complete local Linux suite and focused Windows checks; require the corrected remote HEAD and integration.",
+      "evidenceStatus": "LOCAL_FULL_SUITE_PASS_NEW_HEAD_CI_PENDING"
+    },
+    {
+      "gate": "B-science",
+      "status": "OPEN",
+      "remaining": "Same authoritative arrays now feed application/oracle; retain six-row finite-difference and three-row analytical evidence on the integrated source.",
+      "evidenceStatus": "REFERENCE_CASE_PASS"
+    },
+    {
+      "gate": "C-memory",
+      "status": "OPEN",
+      "remaining": "Before/after ASan UAF reproduction and bounded corrected workflow pass focused ASan/leaks, UBSan and ten compiled-WASI cases. Require fresh remote Windows/macOS and sanitizer suites; general ownership remains open.",
+      "evidenceStatus": "LOCAL_ASAN_UBSAN_LEAK_AND_WASI_PASS"
+    },
+    {
+      "gate": "D-execution",
+      "status": "OPEN",
+      "remaining": "Corrected source runs locally on Windows/Linux and passes ten compiled-WASI cases; require actual new-head three-host CI and artifacts.",
+      "evidenceStatus": "LOCAL_HOSTS_AND_WASI_PASS_CI_PENDING"
+    },
+    {
+      "gate": "F-performance",
+      "status": "OPEN",
+      "remaining": "Wall/thread-CPU phase/control and allocation counts are captured; repeated UTF-8 input scans are isolated deterministically. Implement a supported optimization and measure scientific abstraction overhead, pure loader time, allocated bytes and compiler memory.",
+      "evidenceStatus": "WALL_CPU_PHASE_CAPTURE_PASS"
+    },
+    {
+      "gate": "G-product",
+      "status": "OPEN",
+      "remaining": "Native report/SVG export works on Windows/Linux; verify updated site/browser and installation instructions on the integrated source.",
+      "evidenceStatus": "NATIVE_EXPORT_TUTORIAL_PASS"
+    },
+    {
+      "gate": "I-documentation",
+      "status": "OPEN",
+      "remaining": "Keep source/evidence scopes, clock limitations, counts and current-head CI consistent after integration.",
+      "evidenceStatus": "SOURCE_BOUND_TUTORIAL_AND_METHODS"
     }
-  ]
+  ],
+  "historicalEvidence": "Earlier detailed checkpoint/P2 history remains in git log -- docs/program-state-m1.json; archived receipts and source revisions are retained, including validation/m1-pendulum-allocations-windows.json, validation/m1-pendulum-reuse-windows.json and validation/m1-pendulum-wasi-linux.json."
 }

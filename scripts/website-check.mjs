@@ -101,7 +101,7 @@ check(audit.includes("**" + facts.examples + "** `.ostrin` source files")
   && audit.includes(`Compiler suite: **${facts.integrationTests} integration**, **${facts.differentialTests} differential** and **${facts.unitTests} unit** tests.`),
   "docs/website-audit.md: inventory counts drifted from source");
 const projectStatus = read("ESTADO_Y_PLAN.md");
-check(projectStatus.includes(`· ${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
+check(projectStatus.includes(`${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
   && projectStatus.includes(`# ${facts.differentialTests} diferenciales + ${facts.integrationTests} de integración + ${facts.unitTests} unitarias`),
   "ESTADO_Y_PLAN.md: compiler test counts drifted from source");
 const changelog = read("CHANGELOG.md");
@@ -389,6 +389,7 @@ const benchmarks = read("website/benchmarks.html");
 check(benchmarks.includes('<script src="benchmark-data.js" defer></script>'), "benchmarks.html: missing generated benchmark data");
 check(benchmarks.includes('<script src="benchmarks.js" defer></script>'), "benchmarks.html: missing benchmark renderer");
 check(benchmarks.includes("data-benchmark-rows"), "benchmarks.html: missing benchmark table");
+check(benchmarks.includes("data-benchmark-source-hash"), "benchmarks.html: missing normalized source identity");
 const benchmarkData = read("website/benchmark-data.js");
 check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.includes('"schema": 1'),
   "website/benchmark-data.js: missing generated benchmark record");

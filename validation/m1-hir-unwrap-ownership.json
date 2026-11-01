@@ -1,0 +1,116 @@
+{
+  "schema": "ostrin.hir-unwrap-ownership/v1",
+  "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+  "scope": "HIR borrowed Option/Result unwrap payloads and owned temporary-list loop cleanup; no general memory-safety claim",
+  "regressionTest": "native_hir_unwrap_retains_borrowed_payloads_and_releases_iterables",
+  "before": {
+    "compilerSourceRevision": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
+    "reproducerSourceUtf8": "import std.json\n\nfn option_twice(values: Option<List<Value>>) -> Result<Float, String> {\n    mut total = 0.0\n    for item in values.unwrap() {\n        match json.as_number(item) {\n            Some(number) => { total = total + number },\n            _ => { return Err(\"non-number\") },\n        }\n    }\n    for item in values.unwrap() {\n        match json.as_number(item) {\n            Some(number) => { total = total + number },\n            _ => { return Err(\"non-number\") },\n        }\n    }\n    Ok(total)\n}\n\nfn result_twice(values: Result<List<Value>, String>) -> Result<Float, String> {\n    mut total = 0.0\n    for item in values.unwrap() {\n        match json.as_number(item) {\n            Some(number) => { total = total + number },\n            _ => { return Err(\"non-number\") },\n        }\n    }\n    for item in values.unwrap() {\n        match json.as_number(item) {\n            Some(number) => { total = total + number },\n            _ => { return Err(\"non-number\") },\n        }\n    }\n    Ok(total)\n}\n\nfn main() -> Void {\n    mut values: List<Value> = [json.number_value(1.0), json.number_value(2.0)]\n    option: Option<List<Value>> = Some(values)\n    result: Result<List<Value>, String> = Ok(values)\n    print(option_twice(option).unwrap())\n    print(result_twice(result).unwrap())\n    print(values.length())\n}\n",
+    "reproducerSourceSha256": "7d7b2910fa31b0de0572362fd3d365291333645ca8328b5cbaa858191ec42873",
+    "asanExecutableSha256": "72c43f33dd3a9b8725ae8af6027e61c25c8875899eeef7b23fc772989a3de797",
+    "diagnostic": "AddressSanitizer: heap-use-after-free in ostrin_fn_result_twice; same test without sanitizer may appear to pass",
+    "stderrSha256": "d4a0504bbd2f1792d09a811f9ac128a9cbcb883bf48074766020da0ced2585f7",
+    "macos": {
+      "runId": 41261253404,
+      "pullRequestHead": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
+      "testedMergeRevision": "7d214715148196d0002376313c26243c20fae72f",
+      "artifactId": 13065955064,
+      "artifactName": "native-failure-macos-7d214715148196d0002376313c26243c20fae72f",
+      "crashReportSha256": "96736b09cb28573fab98f9871e2f78225d9346c1e175848031c4322b33fa08de",
+      "nativeBinarySha256": "7d42c664021d94ccb1b478ff72b585ddbb4046ed7fcb53f38855713717f94d28",
+      "emittedCSha256": "d42c9d2442bad6f5b46b9c97d4d021ee84becda7c0b7ea285ebb9259788af111",
+      "exception": "EXC_BREAKPOINT",
+      "signal": "SIGTRAP",
+      "mallocDiagnostic": "BUG IN CLIENT OF LIBMALLOC: not an allocated block",
+      "frames": [
+        "mfm_free.cold.4",
+        "mfm_free",
+        "ostrin_release",
+        "ostrin_fn_load_analysis",
+        "ostrin_main",
+        "main",
+        "start"
+      ],
+      "codeSignature": "valid on disk; satisfies Designated Requirement",
+      "lldbRerun": "same binary exited 0 with live_allocations=0; intermittent success does not invalidate original failure"
+    },
+    "windows": {
+      "runId": 41261253404,
+      "jobId": 124714926012,
+      "head": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
+      "failure": "pendulum workflow native run 1: exit 1; ostrin: index out of bounds: 2",
+      "testSummary": "383 passed; 1 failed"
+    }
+  },
+  "after": {
+    "asanExecutableSha256": "18c309493057bd2db45c93b3579d843777cb9ed560df234835ebcaff5031eb00",
+    "stdout": "6\n6\n2\n",
+    "allocationReport": "ostrin memory: live_allocations=0 peak_allocations=12 total_allocations=12",
+    "focusedChecks": [
+      {
+        "host": "Windows x64",
+        "tests": [
+          "regression",
+          "pendulum workflow"
+        ],
+        "status": "pass"
+      },
+      {
+        "host": "Linux x86_64 GCC",
+        "instrumentation": "-fsanitize=address -fno-omit-frame-pointer -g; ASAN_OPTIONS=detect_leaks=1:halt_on_error=1",
+        "tests": [
+          "regression",
+          "pendulum workflow"
+        ],
+        "status": "pass"
+      },
+      {
+        "host": "Linux x86_64 GCC",
+        "instrumentation": "-fsanitize=undefined -fno-sanitize-recover=all -g",
+        "tests": [
+          "regression",
+          "pendulum workflow"
+        ],
+        "status": "pass"
+      }
+    ],
+    "wasiReceipt": "validation/m1-pendulum-hir-ownership-wasi-linux.json",
+    "wasiCases": 10,
+    "phaseReceipt": "validation/m1-pendulum-hir-ownership-phases-linux.json",
+    "phaseCaptureContext": "Seven paired wall/thread-CPU captures ran alongside the broader GCC compiler suite; timings are not a controlled comparison with prior receipts.",
+    "fullSuite": {
+      "host": "Linux x86_64 GCC",
+      "command": "cargo test --manifest-path compiler/Cargo.toml",
+      "unit": 33,
+      "differential": 6,
+      "integration": 385,
+      "total": 424,
+      "status": "pass",
+      "backendRatchet": {
+        "ir": 8788,
+        "hir": 46,
+        "ast": 0,
+        "divergences": 0
+      }
+    },
+    "remoteCorrectedHead": "pending",
+    "wasiReceiptSha256": "67a438737d018494aea378dda32f8ba2869f408f6fe2dc9d35b6d37b8e28cadf",
+    "phaseReceiptSha256": "b384f956eed39b9b36de3116108217f719881c0a0ef41937a25d1236c741661c",
+    "numericValidation": {
+      "host": "Windows x64",
+      "comparedValues": 80,
+      "emittedValuesCompared": 136,
+      "maximumAbsoluteDifference": 0,
+      "leakCheck": "live_allocations=0",
+      "path": "validation/numeric/windows-local.json",
+      "sha256": "126a881c74de79d4265151bf7138fa9964231f4047674e7fb8118d86ef3c766b"
+    }
+  },
+  "reproduction": [
+    "Extract before.reproducerSourceUtf8 as probe.ostrin; build ostrinc from the desired compilerSourceRevision/sourceRevision.",
+    "OSTRIN_CC=gcc OSTRIN_CFLAGS=\"-fsanitize=address -fno-omit-frame-pointer -g\" ostrinc --compile --leak-check --out probe probe.ostrin",
+    "ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./probe",
+    "cargo test --manifest-path compiler/Cargo.toml --test examples native_hir_unwrap_retains_borrowed_payloads_and_releases_iterables",
+    "cargo test --manifest-path compiler/Cargo.toml --test examples pendulum_calibration_workflow"
+  ]
+}

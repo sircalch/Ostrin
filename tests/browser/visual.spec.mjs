@@ -68,18 +68,25 @@ test("scientific plot visual fixtures match their published gallery cards", asyn
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   await stabilizePage(page);
 
+  const visualMismatches = [];
   for (const id of ["lines", "scatter-fit", "histogram", "heatmap", "bars", "dashboard", "surface"]) {
     const card = page.locator(`#viz-${id}`);
     await expect(card, `missing visual fixture ${id}`).toBeVisible();
     await card.scrollIntoViewIfNeeded();
-    await card.locator("img.viz-image").evaluate((image) => {
+    const image = card.locator("img.viz-image");
+    await image.evaluate((image) => {
       image.loading = "eager";
       image.src = image.currentSrc || image.src;
     });
-    await expect.poll(() => card.locator("img.viz-image").evaluate((image) => image.naturalWidth), {
+    await expect.poll(() => image.evaluate((image) => image.naturalWidth), {
       message: `plot image ${id} did not load`,
       timeout: 15_000,
     }).toBeGreaterThan(0);
-    await expect(card).toHaveScreenshot(`plot-${id}.png`, screenshotOptions);
+    try {
+      await expect(image).toHaveScreenshot(`plot-${id}.png`, screenshotOptions);
+    } catch (error) {
+      visualMismatches.push({ id, message: error.message });
+    }
   }
+  expect(visualMismatches, "published scientific plot images differ from their baselines").toEqual([]);
 });

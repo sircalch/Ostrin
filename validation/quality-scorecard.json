@@ -17,13 +17,13 @@
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 389
+    "rustMarkedTests": 391
   },
   "nativeBackend": {
-    "ir": 7220,
-    "hir": 41,
+    "ir": 8788,
+    "hir": 46,
     "ast": 0,
-    "total": 7261
+    "total": 8834
   },
   "ownership": {
     "tested": 205,
@@ -45,56 +45,56 @@
     "ciRunUrl": null
   },
   "effectCoverage": {
-    "knownCalls": 21063,
-    "symbolicCalls": 83,
+    "knownCalls": 22345,
+    "symbolicCalls": 93,
     "unresolvedCalls": 0,
     "countUnit": "distinct_function_operation_edges",
     "aggregation": "sum_of_per_bundle_distinct_function_operation_edges",
-    "bundleCount": 29,
-    "scope": "registered experiment bundles (29)",
+    "bundleCount": 30,
+    "scope": "registered experiment bundles (30)",
     "complete": true
   },
   "reproducibility": {
     "R0": 18,
     "R1": 0,
-    "R2": 11,
+    "R2": 12,
     "R3": 0
   },
   "r3": {
     "status": "OPEN",
-    "bundleCount": 29,
-    "baseReadyCount": 29,
+    "bundleCount": 30,
+    "baseReadyCount": 30,
     "extensionReadyCount": 0,
     "readyCount": 0,
-    "openCount": 29,
+    "openCount": 30,
     "captureReadyCount": 0,
-    "captureOpenCount": 29,
+    "captureOpenCount": 30,
     "incompleteEffectBundleCount": 0,
-    "closedEntryEffectBundleCount": 29,
-    "symbolicEffectCallCount": 83,
+    "closedEntryEffectBundleCount": 30,
+    "symbolicEffectCallCount": 93,
     "unresolvedEffectCallCount": 0,
     "callResolutionEvidence": {
       "status": "available",
-      "bundleCount": 29,
-      "availableBundleCount": 29,
+      "bundleCount": 30,
+      "availableBundleCount": 30,
       "invalidBundleCount": 0,
-      "edgeCount": 21146,
-      "categorizedEdgeCount": 21146,
+      "edgeCount": 22438,
+      "categorizedEdgeCount": 22438,
       "uncategorizedEdgeCount": 0,
-      "staticLocalFunctionEdgeCount": 9347,
+      "staticLocalFunctionEdgeCount": 9796,
       "genericTraitCandidateEdgeCount": 0,
-      "localTargetCandidateCount": 9347,
+      "localTargetCandidateCount": 9796,
       "multiTargetEdgeCount": 0,
-      "resolvedCallSiteCount": 245,
-      "locatedCallSiteCount": 245,
+      "resolvedCallSiteCount": 290,
+      "locatedCallSiteCount": 290,
       "unlocatedCallSiteCount": 0,
       "sourceSiteAssociationsValid": true
     },
     "sourceReadAudit": {
-      "sourceBundleCount": 29,
-      "bundlesWithDirectReadFileCalls": 11,
-      "directReadFileCallCount": 21,
-      "literalReadPathCallCount": 21,
+      "sourceBundleCount": 30,
+      "bundlesWithDirectReadFileCalls": 12,
+      "directReadFileCallCount": 22,
+      "literalReadPathCallCount": 22,
       "dynamicReadCallCount": 0,
       "readFileReferenceCount": 0,
       "shadowedReadFileCallCount": 0,

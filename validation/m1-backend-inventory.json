@@ -1,0 +1,26 @@
+{
+  "schema": "ostrin.m1-backend-inventory/v1",
+  "sourceRevision": "e612d73baf2307296e562502e342ce074794fb74",
+  "command": "cargo test --manifest-path compiler/Cargo.toml --test differential native_backend_types_agree_with_the_checker -- --exact --nocapture",
+  "ratchetMinimum": 8835,
+  "counts": {
+    "ir": 8789,
+    "hir": 46,
+    "ast": 0,
+    "total": 8835,
+    "nativeSourceModules": 245
+  },
+  "scope": "Correlated source modules are counted per importing example; counts are not unique repository functions or a new-feature count. Both current ratchet executions passed.",
+  "runs": [
+    {
+      "host": "windows",
+      "sha256": "c3cb4c169fc7333c67ac64c09f5b0e58f8c44c870ad7cc0b5b27606d486d3811",
+      "logUtf8": "   Compiling ostrinc v0.2.0 (C:\\Users\\Andre\\.codex\\worktrees\\ostrin-m1-pendulum-profile\\compiler)\r\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.73s\r\n     Running tests\\differential.rs (compiler\\target\\debug\\deps\\differential-20234093d1f296d8.exe)\r\n\r\nrunning 1 test\r\nchecker AST comparisons: 0 expressions, 0 nodes\r\nfunctions generated from HIR/IR: 8835 (HIR 46, IR 8789)\r\nfunctions still using AST fallback: 0\r\nnative source modules measured: 245\r\nAST fallback function identifiers: 0\r\ntest native_backend_types_agree_with_the_checker ... ok\r\n\r\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 56.44s\r\n\r\n"
+    },
+    {
+      "host": "linux-wsl",
+      "sha256": "6ad1c443ca0e036a7dd3c5ed747d841ff47f7c33d2be57dc72092b433e233d6c",
+      "logUtf8": "   Compiling ostrinc v0.2.0 (/mnt/c/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile/compiler)\r\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s\r\n     Running tests/differential.rs (/home/andres/.cache/ostrin-m1-pendulum-target/debug/deps/differential-6880187b1369f62d)\r\n\r\nrunning 1 test\r\nchecker AST comparisons: 0 expressions, 0 nodes\r\nfunctions generated from HIR/IR: 8835 (HIR 46, IR 8789)\r\nfunctions still using AST fallback: 0\r\nnative source modules measured: 245\r\nAST fallback function identifiers: 0\r\ntest native_backend_types_agree_with_the_checker ... ok\r\n\r\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 47.57s\r\n\r\n"
+    }
+  ]
+}

@@ -17,9 +17,9 @@ para observar el coste semántico de las unidades; no es una comparación con
 otros lenguajes. El runner comprueba además que sus valores numéricos coincidan
 dentro de una tolerancia declarada. Cada ejecución comprueba que ambos caminos impriman
 exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
-schema 3 incluye el hash exacto de cada fuente, commit y estado del checkout,
-sistema operativo, CPU, compilador C, defaults administrados por el compilador e
-inputs de flags, además de cada muestra y
+schema 3 incluye el hash exacto de cada fuente, compilador Ostrin y ejecutable
+nativo, commit y estado del checkout, sistema operativo, CPU, compilador C,
+defaults administrados por el compilador e inputs de flags, además de cada muestra y
 estadísticas de dispersión (mínimo, máximo, media, mediana, p95 y desviación
 estándar). El gate [`benchmark-contract-check.mjs`](../scripts/benchmark-contract-check.mjs)
 rechaza informes incompletos o inconsistentes. La memoria pico del proceso hijo y
@@ -32,11 +32,35 @@ una referencia gruesa del costo en la misma máquina; incluye arranque de proces
 envoltorios `Result`, ownership y gestión de mediciones, por lo que no aísla el
 costo del campo de identidad.
 
-El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
-manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
-mediciones son evidencia de una carga concreta; no representan por sí solas el
-rendimiento de todo el lenguaje. La ampliación prevista cubre arrays, cantidades,
-métodos numéricos y cargas científicas antes de establecer umbrales.
+La batería también incluye `viz_pendulum_calibration.ostrin`, el flujo científico
+M1. El runner copia su snapshot versionado a un directorio aislado dentro de
+`target/benchmarks/runtime-inputs`, registra ruta, tamaño y SHA-256 del snapshot,
+y comprueba que el hash copiado sea idéntico antes de medir. El intérprete y el
+binario nativo se ejecutan desde ese mismo directorio y sus salidas deben coincidir
+exactamente. Las duraciones interpretadas y nativas son de extremo a extremo:
+incluyen arranque del proceso, lectura del JSON, análisis, propagación de
+incertidumbre y renderizado SVG; no aíslan el tiempo del núcleo numérico. La
+compilación se mide aparte. `--compile-iterations N` repite esa medición y el
+informe conserva muestras, mediana y dispersión; por defecto se hace una sola
+compilación para limitar el costo de la batería completa.
+
+Para repetir la medición enfocada del flujo M1 con siete muestras de ejecución y
+cinco muestras de compilación:
+
+```text
+cargo build --release --manifest-path compiler/Cargo.toml
+node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5
+node scripts/benchmark-contract-check.mjs
+```
+
+El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) ejecuta el
+flujo file-backed del péndulo en Ubuntu, macOS y Windows cuando se solicita
+manualmente, cada lunes o cuando cambia el compilador, el runner o sus datos en
+un PR o en `main`. Cada plataforma conserva un artefacto separado por commit
+durante 30 días, con siete ejecuciones del intérprete, siete nativas y cinco
+compilaciones. Los runners compartidos varían entre ejecuciones: estos informes
+son mediciones con procedencia por host, no umbrales de regresión ni evidencia
+de velocidad general o equivalencia temporal entre sistemas.
 
 El historial local [`validation/benchmark-history.json`](../validation/benchmark-history.json)
 conserva ejecuciones reales de snapshots versionados. Cada entrada mantiene el
@@ -74,3 +98,52 @@ node scripts/benchmark-contract-check.mjs
 
 Puedes seleccionar una fuente concreta o una lista separada por comas con
 `--workloads examples/arrays.ostrin,examples/numeric_methods.ostrin`.
+
+## Contadores de asignaciones gestionadas
+
+`--allocation-profile` añade una compilación independiente con `--leak-check` después
+de las muestras de tiempo. Cada ejecución usa el mismo staging de entradas y debe
+producir el mismo hash de stdout que el intérprete y el binario cronometrado. El
+reporte conserva el SHA-256 de ese segundo ejecutable y los contadores originales
+`live`, `peak` y `total` de cada muestra. Se rechazan reportes ausentes, duplicados,
+malformados, con asignaciones vivas o inconsistentes con el resultado esperado.
+
+```text
+node scripts/benchmark.mjs --workloads examples/viz_pendulum_calibration.ostrin --iterations 7 --warmups 1 --compile-iterations 5 --allocation-profile
+node scripts/benchmark-contract-check.mjs
+```
+
+Los tiempos de este segundo ejecutable no se incorporan a las estadísticas. Los
+contadores describen registros del asignador gestionado de Ostrin; no cuentan bytes,
+asignaciones internas de libc, memoria del compilador ni RSS. No aíslan por sí solos
+el kernel numérico o el coste de las abstracciones científicas. Los informes
+históricos sin este campo siguen indicando que no capturaron esos contadores.
+
+## Fases del flujo científico M1 (Linux y GCC)
+
+`node scripts/benchmark-phases.mjs --iterations 7` emite una sola unidad C del
+péndulo y construye un control y un ejecutable con instrumentación selectiva.
+Los dos usan ese mismo C y las opciones nativas `-O2 -pthread -lm -ffp-contract=off`.
+El profiler cuenta únicamente las fronteras de entrada C, aplicación, carga de
+entrada, análisis numérico, renderizado y reporte textual. Si GCC instrumenta
+funciones adicionales, la pila queda incompleta o los tiempos no cuadran, falla.
+Cada muestra conserva tiempos de reloj inclusivos/exclusivos con `CLOCK_MONOTONIC`
+y de CPU del hilo con `CLOCK_THREAD_CPUTIME_ID`;
+los exclusivos particionan exactamente el intervalo raíz de esa muestra. Las
+medianas de componentes distintos no necesariamente suman la mediana del total.
+
+Se alterna el orden control/perfilado, con un calentamiento validado por binario
+y entradas nuevas por ejecución. Todos deben mantener la salida completa del
+intérprete y cero asignaciones vivas. El informe guarda hashes de fuente, entrada,
+compilador, C emitido, C instrumentado, helper, scripts y ambos ejecutables. CI
+archiva el informe, los dos binarios, el C, la entrada y la salida esperada; este
+experimento no se incluye en las estadísticas normales de `benchmark.mjs`.
+
+La observación de inicio mide hasta la recepción del marcador de entrada C;
+incluye planificación, loader, pipe y event loop. El residuo del tiempo de proceso
+incluye inicio, salida y transporte, por lo que no se presenta como tiempo puro
+del loader. Los tiempos internos son observaciones instrumentadas: no se resta
+un supuesto overhead ni se los presenta como tiempos del kernel sin instrumentar.
+La abstracción `Measurement` forma parte de la fase de análisis; este informe no
+aísla todavía su overhead frente a una implementación de la misma matemática.
+No demuestra equivalencia temporal entre sistemas ni R3 global.

@@ -4,6 +4,10 @@
 
 ### Correctness
 
+- HIR now preserves borrowed managed payloads when unwrapping `Option`/`Result`,
+  including list iteration and string concatenation. Owned loop temporaries are
+  released on early return as well as normal loop exit; regression coverage
+  includes repeated access, error returns, break and continue.
 - Mutable assignments now reuse the binding's existing type as an expected type,
   refining `Option`, `Result` and generic record constructors without allowing a
   reassignment to silently change the slot's type. Incompatible values report
@@ -20,12 +24,6 @@
 
 ### Scientific measurement
 
-- Added a development-only structural `Measurement<TemperaturePoint>` profile with
-  empty sources. Constructor, alias, argument/return, field replacement and branch/loop
-  Phi tests use typed IR, native leak-check and shared WASI execution fixtures.
-  Dynamic unknown-state reasons exercise managed payload destruction. Absolute-point
-  uncertainty propagation, covariance, point arrays and measurement conversion remain
-  unsupported; this does not change the published v0.2.0 binaries.
 - Added experimental dense `SourceCovariance` propagation for at most 64
   dimensionless scalar sources using `J·Σ·Jᵀ`. The implementation checks shape,
   finite values, bounded symmetry/PSD tolerance and source variances. A diagonal
@@ -44,6 +42,30 @@
   `sqrt(3)` covariance and a 16-unit residual after cancellation, with analytical
   oracle, interpreter/native parity, leak-check and optimized WASI execution;
   covariance for `Quantity` and measurement arrays remains unsupported.
+
+### Scientific workflow profiling
+
+- Pendulum loading now consumes the same JSON arrays as its independent oracle,
+  replacing mirrored scalar keys and the fixed six-row loader. It accepts 3–31
+  pairs within the 64-source covariance profile, with an analytical three-row
+  case and explicit array/type/shape/limit diagnostics checked natively and in
+  the compiled-WASI checker.
+- The pendulum workflow now returns a managed `PendulumAnalysis` with typed
+  acceleration quantities through `Result`, separating numeric analysis from
+  JSON loading, report text and SVG rendering. Existing outputs and negative
+  diagnostics remain stable. A bounded Linux/GCC phase experiment records
+  inclusive/exclusive timings, observed entry latency, paired controls and
+  verifiable output/allocation receipts; these are instrumented observations.
+- Re-measured the development corpus on Windows/Linux and tightened its ratchet
+  to 8788 IR + 46 HIR / 0 AST after removing one obsolete loader body. Shared library bodies are counted per importing
+  example; this is a corpus inventory, not a count of new features.
+- The experimental pendulum calibration example reuses each period measurement
+  when squaring it, preserving source correlation and the complete output. Seven
+  Windows captures reduce managed allocation records from 12405 to 12291, with
+  unchanged peak 347 and zero live records; no timing improvement is claimed.
+- `scripts/benchmark.mjs --allocation-profile` captures managed counters using a
+  separate leak-check executable after uninstrumented timing, with matching
+  output identity. These counters measure neither allocated bytes nor RSS.
 
 ## 0.2.0 (2026-10-15)
 
@@ -110,7 +132,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 305-example, 385-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 306-example, 387-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 

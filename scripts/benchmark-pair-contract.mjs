@@ -36,6 +36,14 @@ export function validateCheckedInQuantityFloatPair(root = repositoryRoot) {
   return validateQuantityFloatPairSources(floatSource, quantitySource);
 }
 
+export function selectQuantityFloatPair(measuredWorkloads) {
+  const selectedFloatWorkload = measuredWorkloads.find((workload) => workload.workload === floatArrayWorkload);
+  const selectedQuantityWorkload = measuredWorkloads.find((workload) => workload.workload === quantityArrayWorkload);
+  return selectedFloatWorkload && selectedQuantityWorkload
+    ? { float: selectedFloatWorkload, quantity: selectedQuantityWorkload }
+    : null;
+}
+
 function numericValues(output, label) {
   const lines = output.replaceAll("\r\n", "\n").split("\n").map((line) => line.trim()).filter(Boolean);
   if (lines.length === 0) throw new Error(`${label}: output contains no numeric values`);

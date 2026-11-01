@@ -47,6 +47,39 @@ jobs:
         run: cargo clippy --all-targets --all-features --manifest-path compiler/Cargo.toml -- -A clippy::all -D clippy::suspicious
       - name: Run tests
         run: cargo test --manifest-path compiler/Cargo.toml
+      - name: Capture macOS pendulum failure diagnostics
+        if: ${{ failure() && runner.os == 'macOS' }}
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          diagnostics="$GITHUB_WORKSPACE/target/native-failure"
+          mkdir -p "$diagnostics"
+          for input in "$TMPDIR"/ostrin_pendulum_workflow_*; do
+            [ -d "$input" ] || continue
+            snapshot="$diagnostics/$(basename "$input")"
+            cp -R "$input" "$snapshot"
+            "$GITHUB_WORKSPACE/compiler/target/debug/ostrinc" --emit-c --leak-check \
+              --out "$snapshot/pendulum-native.c" "$snapshot/viz_pendulum_calibration.ostrin" \
+              > "$snapshot/emission.log" 2>&1 || true
+            file "$snapshot/pendulum-native" > "$snapshot/binary.log" 2>&1 || true
+            codesign --verify --verbose=4 "$snapshot/pendulum-native" \
+              > "$snapshot/codesign.log" 2>&1 || true
+            (cd "$snapshot" && xcrun lldb --batch \
+              -o 'settings set target.disable-aslr false' -o run -o 'thread backtrace all' \
+              -- ./pendulum-native) > "$snapshot/lldb.log" 2>&1 || true
+          done
+          if [ -d "$HOME/Library/Logs/DiagnosticReports" ]; then
+            find "$HOME/Library/Logs/DiagnosticReports" -type f -name 'pendulum-native*' \
+              -exec cp {} "$diagnostics/" \;
+          fi
+      - name: Upload macOS native failure diagnostics
+        if: ${{ failure() && runner.os == 'macOS' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-failure-macos-${{ github.sha }}
+          path: target/native-failure
+          if-no-files-found: warn
       - name: Run generated differential corpus
         env:
           # Exercise both deterministic generators with a wider corpus than

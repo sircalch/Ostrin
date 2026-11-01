@@ -9680,6 +9680,143 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
 }
 
 #[test]
+fn native_hir_unwrap_retains_borrowed_payloads_and_releases_iterables() {
+    let file = temp_source(
+        "native-hir-unwrap-managed.ostrin",
+        r#"import std.json
+
+fn option_twice(values: Option<List<Value>>) -> Result<Float, String> {
+    label: Option<String> = Some("borrowed" + " option")
+    copy = label.unwrap()
+    joined = label.unwrap() + " payload"
+    if copy != "borrowed option" or joined != "borrowed option payload" {
+        return Err("option string alias changed")
+    }
+    mut total = 0.0
+    for item in values.unwrap() {
+        unwrapped = Some(item).unwrap()
+        match json.as_number(unwrapped) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    for item in values.unwrap() {
+        match json.as_number(item) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    Ok(total)
+}
+
+fn result_twice(values: Result<List<Value>, String>) -> Result<Float, String> {
+    label: Result<String, String> = Ok("borrowed" + " result")
+    copy = label.unwrap()
+    joined = label.unwrap() + " payload"
+    if copy != "borrowed result" or joined != "borrowed result payload" {
+        return Err("result string alias changed")
+    }
+    mut total = 0.0
+    for item in values.unwrap() {
+        wrapped: Result<Value, String> = Ok(item)
+        match json.as_number(wrapped.unwrap()) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    for item in values.unwrap() {
+        match json.as_number(item) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    Ok(total)
+}
+
+fn fresh_values() -> Option<List<Value>> {
+    Some([json.number_value(1.0), json.number_value(2.0)])
+}
+
+fn controlled(mode: Int) -> Result<Float, String> {
+    mut total = 0.0
+    for item in fresh_values().unwrap() {
+        match json.as_number(item) {
+            Some(number) => {
+                if mode == 1 { return Ok(number) }
+                if mode == 2 { break }
+                if mode == 3 { continue }
+                if mode == 4 { return Err("stopped") }
+                total = total + number
+            },
+            _ => { return Err("non-number") },
+        }
+    }
+    Ok(total)
+}
+
+fn main() -> Void {
+    mut values: List<Value> = [json.number_value(1.0), json.number_value(2.0)]
+    option: Option<List<Value>> = Some(values)
+    result: Result<List<Value>, String> = Ok(values)
+    for i in 0 until 5 {
+        print(option_twice(option).unwrap())
+        print(result_twice(result).unwrap())
+        print(values.length())
+    }
+    print(controlled(0).unwrap())
+    print(controlled(1).unwrap())
+    print(controlled(2).unwrap())
+    print(controlled(3).unwrap())
+    print(controlled(4).is_err())
+    invalid: Option<List<Value>> = Some([json.text_value("text")])
+    print(option_twice(invalid).is_err())
+    invalid_result: Result<List<Value>, String> = Ok([json.text_value("text")])
+    print(result_twice(invalid_result).is_err())
+}
+"#,
+    );
+    let expected = "6\n6\n2\n".repeat(5) + "3\n1\n0\n0\ntrue\ntrue\ntrue\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "{}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "{}", stderr(&report));
+    assert!(
+        stdout(&report).contains("hir-generated: 6")
+            && stdout(&report).contains("ast-fallback: 0")
+            && stdout(&report).contains("divergences: 0"),
+        "regression must exercise HIR without AST fallback: {}",
+        stdout(&report)
+    );
+    let exe = temp_artifact("native-hir-unwrap-managed.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "{}", stderr(&compile));
+    let native = Command::new(&exe)
+        .output()
+        .expect("run HIR unwrap regression");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "HIR unwrap failed ({}): {}",
+        native.status,
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "HIR unwrap or iterable cleanup leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_nested_record_option_payload_ownership() {
     let file = temp_source(
         "native-ir-nested-record-option.ostrin",
@@ -12593,6 +12730,270 @@ fn dimensional_measurement_lab_matches_interpreter_and_native() {
         "dimensional Measurement Lab leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
+}
+
+#[test]
+fn pendulum_calibration_workflow_matches_interpreter_native_and_wasi_emission() {
+    let work =
+        std::env::temp_dir().join(format!("ostrin_pendulum_workflow_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&work);
+    fs::create_dir_all(&work).expect("failed to create pendulum workflow input directory");
+    let source = example_path("viz_pendulum_calibration.ostrin");
+    let staged_source = work.join("viz_pendulum_calibration.ostrin");
+    fs::copy(&source, &staged_source).expect("failed to stage pendulum source");
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../experiments/pendulum-calibration.inputs.json");
+    fs::copy(&data, work.join("data.json")).expect("failed to stage pendulum input snapshot");
+    let backend = run(&["--native-type-report", &source]);
+    assert!(backend.status.success(), "{}", stderr(&backend));
+    assert!(
+        stdout(&backend).contains("examples/viz_pendulum_calibration.ostrin ir=9 hir=2 ast=0")
+            && stdout(&backend).contains("ast-fallback: 0")
+            && stdout(&backend).contains("divergences: 0"),
+        "the dimensional workflow must preserve its typed backend profile: {}",
+        stdout(&backend)
+    );
+    let expected = "workflow = dimensional pendulum calibration; synthetic data\n\
+observations = 6, repeatability sources = 12, shared sources = 2\n\
+fit: T² = 4.025 L + 0.0006 s²; R² = 0.999979\n\
+g = 9.8084 m/s²; linearized standard uncertainty = 0.0485 m/s²\n\
+shared-source correlation (ruler zero, clock zero) = 0.2\n\
+independent variance contribution = 0.04826689993418455 m/s²\n";
+
+    let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .arg("--run")
+        .arg(&staged_source)
+        .output()
+        .expect("failed to run pendulum workflow in the interpreter");
+    assert!(
+        interpreted.status.success(),
+        "pendulum workflow interpreter failed: {}",
+        String::from_utf8_lossy(&interpreted.stderr)
+    );
+    let interpreted_stdout = String::from_utf8_lossy(&interpreted.stdout).replace("\r\n", "\n");
+    let (interpreted_report, interpreted_svg) = interpreted_stdout
+        .split_once("<svg")
+        .expect("pendulum workflow should render the fit and input table as SVG");
+    assert_eq!(interpreted_report, expected);
+    assert!(interpreted_svg.contains("Pendulum calibration · linearized model"));
+    assert!(interpreted_svg.contains("Synthetic pendulum calibration inputs"));
+    assert!(
+        interpreted_svg.contains("0.0021"),
+        "the input table must include both repeatability and shared clock-offset uncertainty in u(T)"
+    );
+    assert!(interpreted_svg.contains("data-table-row=\"5\""));
+
+    let wasi_c = work.join("pendulum-wasi.c");
+    let wasi_emit = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .args(["--emit-c", "--target", "wasm32-wasi", "--out"])
+        .arg(&wasi_c)
+        .arg(&staged_source)
+        .output()
+        .expect("failed to emit pendulum workflow for WASI");
+    assert!(
+        wasi_emit.status.success(),
+        "pendulum workflow WASI emission failed: {}",
+        String::from_utf8_lossy(&wasi_emit.stderr)
+    );
+    let wasi_source = fs::read_to_string(&wasi_c).expect("missing emitted WASI C source");
+    assert!(wasi_source.contains("data.json"));
+
+    let exe = work.join(if cfg!(windows) {
+        "pendulum-native.exe"
+    } else {
+        "pendulum-native"
+    });
+    let exe_text = exe.to_string_lossy().to_string();
+    let native_compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .args(["--compile", "--leak-check", "--out", &exe_text])
+        .arg(&staged_source)
+        .output()
+        .expect("failed to compile pendulum workflow natively");
+    if skip_if_no_c_compiler(&native_compile) {
+        let _ = fs::remove_dir_all(&work);
+        return;
+    }
+    assert!(
+        native_compile.status.success(),
+        "pendulum workflow native compile failed: {}",
+        String::from_utf8_lossy(&native_compile.stderr)
+    );
+    for repeat in 0..8 {
+        let native = Command::new(&exe)
+            .current_dir(&work)
+            .output()
+            .expect("failed to run native pendulum workflow");
+        assert!(
+            native.status.success(),
+            "pendulum workflow native run {repeat} failed with status {}:\nstdout:\n{}\nstderr:\n{}",
+            native.status,
+            String::from_utf8_lossy(&native.stdout),
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            interpreted_stdout,
+            "interpreter and native figure/report should match byte-for-byte on run {repeat}"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "pendulum workflow run {repeat} leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&data).expect("read pendulum fixture"))
+            .expect("parse pendulum fixture");
+    assert!(fixture["parameters"].get("length_m_1").is_none());
+    assert!(fixture["parameters"].get("period_s_1").is_none());
+    let mut shortened = fixture.clone();
+    // Independent analytical case: T^2 = 4 L, so g = pi^2.
+    shortened["parameters"]["length_m"] = serde_json::json!([1.0, 4.0, 9.0]);
+    shortened["parameters"]["period_s"] = serde_json::json!([2.0, 4.0, 6.0]);
+    fs::write(work.join("data.json"), shortened.to_string()).expect("stage three-row arrays");
+    let short_interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .arg("--run")
+        .arg(&staged_source)
+        .output()
+        .expect("interpret three-row arrays");
+    let short_native = Command::new(&exe)
+        .current_dir(&work)
+        .output()
+        .expect("run three-row arrays");
+    assert!(short_interpreted.status.success() && short_native.status.success());
+    let short_stdout = String::from_utf8_lossy(&short_native.stdout).replace("\r\n", "\n");
+    assert_eq!(
+        short_stdout,
+        String::from_utf8_lossy(&short_interpreted.stdout).replace("\r\n", "\n")
+    );
+    assert!(
+        short_stdout.contains("observations = 3, repeatability sources = 6, shared sources = 2\n")
+    );
+    assert!(
+        short_stdout.contains("g = 9.8696 m/s²;"),
+        "array values must determine the analytical result: {short_stdout}"
+    );
+    assert!(short_stdout.contains("<svg") && short_stdout.contains("data-table-row=\"2\""));
+    assert!(!short_stdout.contains("data-table-row=\"5\""));
+    assert!(String::from_utf8_lossy(&short_native.stderr).contains("live_allocations=0"));
+
+    let mut oversized = fixture.clone();
+    oversized["parameters"]["length_m"] = serde_json::json!(vec![0.5; 32]);
+    oversized["parameters"]["period_s"] = serde_json::json!(vec![1.4; 32]);
+    fs::write(work.join("data.json"), oversized.to_string()).expect("stage too many source pairs");
+
+    for (field, invalid, expected) in [
+        (
+            "/parameters",
+            oversized["parameters"].clone(),
+            "input error: covariance profile supports at most 31 paired readings\n",
+        ),
+        (
+            "/parameters/length_repeat_sigma_m",
+            serde_json::json!(-0.1),
+            "input error: standard uncertainties must be non-negative\n",
+        ),
+        (
+            "/parameters/ruler_clock_zero_correlation",
+            serde_json::json!(1.1),
+            "input error: shared-source correlation must be between -1 and 1\n",
+        ),
+        (
+            "/parameters/length_m/2",
+            serde_json::json!(-0.45),
+            "input error: all lengths and periods must be finite and positive\n",
+        ),
+        (
+            "/parameters/length_m",
+            serde_json::json!("not an array"),
+            "input error: length_m must be a numeric array\n",
+        ),
+        (
+            "/parameters/length_m/2",
+            serde_json::json!("not a number"),
+            "input error: length_m must be a numeric array\n",
+        ),
+        (
+            "/parameters/period_s",
+            serde_json::json!([1.0, 2.0]),
+            "input error: provide at least three paired length and period readings\n",
+        ),
+    ] {
+        let mut changed = fixture.clone();
+        *changed
+            .pointer_mut(field)
+            .expect("invalid-case path exists") = invalid;
+        fs::write(work.join("data.json"), changed.to_string()).expect("stage invalid fixture");
+        for (mut command, native) in [
+            (
+                {
+                    let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+                    command.arg("--run").arg(&staged_source);
+                    command
+                },
+                false,
+            ),
+            (Command::new(&exe), true),
+        ] {
+            let result = command
+                .current_dir(&work)
+                .output()
+                .expect("run invalid pendulum input");
+            assert!(
+                result.status.success(),
+                "{field}: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&result.stdout).replace("\r\n", "\n"),
+                expected
+            );
+            if native {
+                assert!(
+                    String::from_utf8_lossy(&result.stderr).contains("live_allocations=0"),
+                    "{field}: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                );
+            }
+        }
+    }
+
+    fs::remove_file(work.join("data.json")).expect("failed to remove pendulum input snapshot");
+    let missing_interpreter = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .arg("--run")
+        .arg(&staged_source)
+        .output()
+        .expect("failed to check missing pendulum input in the interpreter");
+    assert!(missing_interpreter.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_interpreter.stdout).trim_end()
+            == "input error: could not read data.json",
+        "interpreter should report a stable missing-input error: {}",
+        String::from_utf8_lossy(&missing_interpreter.stdout)
+    );
+    let missing_native = Command::new(&exe)
+        .current_dir(&work)
+        .output()
+        .expect("failed to check missing pendulum input in the native binary");
+    assert!(missing_native.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_native.stdout).trim_end()
+            == "input error: could not read data.json",
+        "native binary should report a stable missing-input error: {}",
+        String::from_utf8_lossy(&missing_native.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&missing_native.stderr).contains("live_allocations=0"),
+        "missing-input native path leaked: {}",
+        String::from_utf8_lossy(&missing_native.stderr)
+    );
+    let _ = fs::remove_dir_all(&work);
 }
 
 #[test]

@@ -6,9 +6,11 @@ import {
   compareQuantityFloatOutputs,
   floatArrayWorkload,
   quantityArrayWorkload,
+  selectQuantityFloatPair,
   validateCheckedInQuantityFloatPair,
   validateQuantityFloatPairSources,
 } from "./benchmark-pair-contract.mjs";
+import { repositoryRelativeWorkloadPath } from "./benchmark-runtime-inputs.mjs";
 
 test("checked-in Float and Quantity array workloads use aligned operations", () => {
   const pair = validateCheckedInQuantityFloatPair();
@@ -50,5 +52,18 @@ test("cross-workload output comparison rejects mismatched values and shapes", ()
     () => compareQuantityFloatOutputs("1\n2\n", "1 m^2\n"),
     /output lengths differ/,
   );
+});
+
+test("quantity and Float pairing uses normalized workload names", () => {
+  const float = { workload: floatArrayWorkload, normalizedOutput: "1\n" };
+  const quantity = { workload: quantityArrayWorkload, normalizedOutput: "1 m^2\n" };
+  const normalizedFloat = {
+    ...float,
+    workload: repositoryRelativeWorkloadPath(process.cwd(), `./${floatArrayWorkload}`),
+  };
+  assert.deepEqual(selectQuantityFloatPair([normalizedFloat, quantity]), {
+    float: normalizedFloat,
+    quantity,
+  });
 });
 
