@@ -10,107 +10,54 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
-    "evidenceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
+    "sourceRevision": "e612d73baf2307296e562502e342ce074794fb74",
+    "evidenceRevision": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "1352bf45ad0428221c207cc9bc23a5fa12618d4e",
-    "lastObservedRemotePullRequestHead": "1352bf45ad0428221c207cc9bc23a5fa12618d4e",
+    "lastValidatedRemotePullRequestHead": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
+    "lastObservedRemotePullRequestHead": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
     "releaseTag": "v0.2.0",
-    "revisionSemantics": "sourceRevision is the latest tested workflow tree; evidenceRevision is the committed ancestor recording allocation reports. Resolve the newly added WASI receipt recording commit with git log -1 --format=%H -- validation/m1-pendulum-wasi-linux.json; the checkpoint does not reference its own containing commit."
+    "revisionSemantics": "sourceRevision identifies the latest tested profiler tree; evidenceRevision is the preceding committed evidence checkpoint. Current receipts bind their own tested trees and content hashes; their recording commits resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
   },
   "completed": [
-    "integrated-authorized-prs-225-230-231-227-226-229",
-    "measurement-array-structural-profile-merged-pr-233",
-    "main-pr-233-post-merge-ci-eight-checks-green",
-    "measurement-scalar-covariance-analytical-native-parity-leak-and-wasi-emission",
-    "measurement-covariance-added-to-32-program-wasi-execution-matrix",
-    "main-r3-host-evidence-29-bundles-and-116-manifest-file-records-verified-against-main-0a3a824",
-    "scalar-covariance-underflow-guard-and-regression-example",
-    "full-cargo-suite-rerun-after-p2-fix-6-differential-383-integration-33-unit-green",
-    "full-cargo-test-6-differential-383-integration-33-unit-green",
-    "measurement-contract-gate-and-18-tests-green",
-    "project-plan-linguist-distribution-and-website-checks-green",
-    "scientific-lab-covariance-demo-and-generated-website-metadata-synchronized",
-    "measurement-covariance-large-matrix-psd-normalization-and-subnormal-midpoint-regressions-fixed",
-    "measurement-covariance-local-full-suite-wasi-chromium-webkit-and-numeric-validation-green",
-    "local-numeric-validation",
-    "local-benchmark-contract-check",
-    "measurement-covariance-propagation-preserves-correlations-across-matrix-scales",
-    "measurement-covariance-quadratic-form-compensated-sums-preserve-small-residuals",
-    "measurement-covariance-rounded-factor-projection-p2-rejected-as-unresolved-9d41693",
-    "measurement-covariance-lossy-subnormal-normalization-p2-rejected-9d41693",
-    "measurement-covariance-full-cargo-422-tests-green-on-source-9d41693",
-    "measurement-covariance-wasi-32-programs-green-on-source-9d41693",
-    "measurement-covariance-15-workload-benchmark-recorded-on-source-9d41693",
-    "covariance-generated-website-and-bars-effect-bundle-synchronized",
-    "pr-234-source-evidence-checkpoint-prepared-locally",
-    "measurement-covariance-near-perfect-correlation-p2-rejected-as-unresolved-5998717",
-    "full-cargo-422-tests-wasi-32-and-contract-18-green-source-5998717",
-    "measurement-covariance-benchmark-15-workloads-7-samples-source-5998717",
-    "website-lab-provenance-benchmark-status-data-regenerated-and-verified-source-5998717",
-    "chromium-and-webkit-36-browser-tests-green-firefox-launch-unavailable-source-5998717",
-    "numeric-validation-80-report-and-136-emitted-values-exact-live-allocations-zero-source-5998717",
-    "v0.2-readiness-12-of-12-ready-r3-open-0-of-29-host-captures-source-5998717",
-    "measurement-covariance-subnormal-variance-ratio-p2-fixed-source-140a53d",
-    "source-140a53d-full-validation-and-evidence-recorded-19f599b",
-    "measurement-covariance-unequal-subnormal-geometric-scale-rejected-source-6c4d1c8",
-    "full-source-6c4d1c8-cargo422-wasi32-contract18-web-lab-numeric-and-readiness-validation-green",
-    "measurement-covariance-adjustment-residual-p2-4371782448-fixed-source-06849b5",
-    "measurement-covariance-source-06849b5-focused-interpreter-native-leak-test-green",
-    "measurement-covariance-source-06849b5-full-cargo-422-tests-green-exact-tested-tree",
-    "measurement-covariance-source-06849b5-wasi-32-programs-green",
-    "measurement-covariance-source-06849b5-website-lab-replays-numeric-linguist-distribution-and-readiness-green",
-    "measurement-covariance-evidence-493edec-and-dashboard-9bbbf09-recorded-source-and-evidence-provenance",
-    "pr-234-rounded-root-square-and-rounded-adjustment-ratio-p2s-fixed-source-469b11a",
-    "source-469b11a-focused-interpreter-native-wasi-leak-contract-and-format-validation-passed",
-    "source-469b11a-full-cargo-suite-422-passed-before-final-conservative-root-bound-tightening",
-    "source-469b11a-wasi-32-programs-passed-after-final-root-bound-tightening",
-    "source-469b11a-web-lab-29-figures-11-r1-r2-bundles-and-provenance-regenerated",
-    "source-469b11a-numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero",
-    "source-469b11a-linguist-distribution-readiness-12-of-12-and-quality-dashboard-synchronized",
-    "pr-234-rounded-subnormal-square-root-adjustment-p2-fixed-source-ae9aaaa",
-    "source-ae9aaaa-focused-interpreter-native-wasi-leak-test-contract-18-and-format-pass",
-    "source-ae9aaaa-release-build-and-32-program-wasi-matrix-pass",
-    "source-ae9aaaa-web-lab-29-figures-r1-r2-replays-provenance-and-website-check-pass",
-    "source-ae9aaaa-numeric-validation-80-and-136-values-exact-live-allocation-zero",
-    "source-ae9aaaa-linguist-distribution-and-v0.2-readiness-12-of-12-pass",
-    "measurement-covariance-unequal-subnormal-midpoint-p2-4372155934-reproduced-192824a",
-    "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
-    "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
-    "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
-    "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
-    "website-test-count-384-metadata-synchronized-pr239-29f8339",
-    "measurement-temperaturepoint-273e01e-five-workflows-green",
-    "temperaturepoint-shared-fixtures-34-programs-actual-wasi-7f7a3ba",
-    "pendulum-managed-allocation-profile-seven-runs-local-114e9c6",
-    "pr237-1352bf4-all-fourteen-checks-green",
-    "pr239-7f7a3ba-all-ten-checks-green-and-wasi34",
-    "pendulum-reused-period-seven-samples-114-fewer-records-49374d7",
-    "pendulum-full-compiled-wasi-three-executions-clean-b8016ee"
+    "authorized-prs-225-230-231-227-226-229-integrated",
+    "measurement-array-structural-profile-merged-pr233",
+    "scalar-covariance-analytical-native-numeric-and-wasi-evidence-preserved",
+    "pr239-7f7a3ba-ten-checks-green-and-wasi34",
+    "pr237-c80d26e-fourteen-checks-green-and-standalone-wasi-run41253542664",
+    "period-reuse-seven-allocation-samples-114-fewer-records-source49374d7",
+    "typed-analysis-result-and-render-boundary-source5960371",
+    "separated-workflow-windows-linux-asan-ubsan-and-compiled-wasi-three-runs",
+    "linux-gcc-seven-paired-wall-and-thread-cpu-phase-samples-sourcee612d73",
+    "current-windows-linux-backend-ratchets8789ir46hir0ast-sourcee612d73",
+    "native-report-svg-export-procedure-tested-windows-and-linux",
+    "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source"
   ],
   "currentPackage": {
-    "name": "pendulum-allocation-optimization-and-compiled-wasi",
+    "name": "typed-pendulum-result-and-native-phase-profile",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
-    "status": "Source 49374d7 and clean compiled-WASI tree b8016ee validated locally. This substantive extension will be pushed to existing PR #237 and requires fresh exact-head CI/review. Earlier green checks do not approve the forthcoming head.",
-    "sourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
-    "evidenceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
+    "status": "Prepared for existing PR #237 with source-bound local receipts. Re-evaluate the actual remote HEAD and its CI/WASI run; historical c80d26e results do not approve this child package.",
+    "sourceRevision": "e612d73baf2307296e562502e342ce074794fb74",
+    "evidenceRevision": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
     "scope": [
-      "separate managed allocation capture and validation",
-      "reuse the period measurement while preserving self-correlation and exact report/SVG output",
-      "source-bound website/demo/bundle synchronization",
-      "actual compiled-WASI execution with isolated input, interpreter parity, leak counters and compiler/toolchain hashes"
+      "Result<PendulumAnalysis,String> with managed arrays/lists and acceleration quantities",
+      "separate JSON loading, scientific analysis, text report and SVG rendering",
+      "bounded Linux/GCC wall/thread-CPU profiling with paired controls, stack/counter/output validation and CI artifact",
+      "tighten and synchronize measured native corpus inventory; retain frozen release inventory",
+      "tested native export tutorial and regenerated source-backed website/bundles"
     ],
     "evidence": [
-      "32 benchmark/oracle JavaScript tests and 33 experiment bundle/replay tests passed.",
-      "Clean Windows source 49374d7: seven samples live=0, peak=347, total=12291 versus baseline total=12405 (114 fewer records, approximately 0.92%). Same compiler hash, host, Node, flags, inputs and normalized report/SVG identity; no peak reduction.",
-      "Slower raw timing samples are preserved. Overlapping host build/sanitizer load prevents a causal timing conclusion; startup/kernel/rendering/abstraction isolation remains open.",
-      "Focused workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan. Its 7 IR / 2 HIR / 0 AST source-body profile is now asserted.",
-      "Clean b8016ee tree compiled/executed the full input-backed workflow under Node WASI three times with exact interpreter report/SVG parity and zero live allocations. validation/m1-pendulum-wasi-linux.json binds source, input, compiler, C compiler and WASM hashes.",
-      "A negative missing-toolchain run failed and removed the earlier success receipt, preventing stale success archival.",
-      "30 experiment replays / 12 demos passed; website 17 pages / 306 examples / 384 integration tests; project-plan 7220 IR + 41 HIR / 0 AST; distribution, Linguist, benchmark contract, format and diff checks passed.",
-      "Historical PR #237 head 1352bf4 passed all 14 checks including native benchmarks on three hosts and cross-platform provenance. Original report texts/IDs/hashes are archived in validation/m1-pendulum-allocation-ci-baseline.json; this does not validate the forthcoming head.",
-      "PR #239 exact head 7f7a3ba passed all 10 checks plus the 34-program WASI workflow 41251579139. Fresh automated review remains unavailable due Code Review quota. No merges performed."
+      "35 benchmark/oracle JavaScript tests and seven project-plan consistency tests passed.",
+      "Focused typed-result workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan; 10 IR / 2 HIR / 0 AST source bodies, eight repeated native outputs and three invalid-input paths.",
+      "Three compiled-WASI executions at clean 5960371 matched the interpreted full report/SVG and zero live allocations: validation/m1-pendulum-phases-wasi-linux.json.",
+      "Seven paired phase samples at clean e612d73: all control/profiled outputs matched, live=0, no unexpected instrumented calls, and each wall/CPU interval partitions its root exactly. Raw report: validation/m1-pendulum-phases-linux.json.",
+      "Independent median exclusive CPU times on this WSL host: input loading/decoding/validation 7.530924 ms, scientific analysis 0.290347 ms, rendering 2.025366 ms. The phase does not isolate one input operation or Measurement overhead.",
+      "Control/profiled process medians 31.425554/28.405775 ms and launch-to-entry observation 6.652421 ms. No negative-overhead or speedup conclusion; clocks, medians and filesystem/scheduling effects remain explicit.",
+      "Current tightened backend ratchet passed on Windows and Linux: 8789 IR + 46 HIR, 0 AST, 245 source modules, zero type divergences; original logs in validation/m1-backend-inventory.json.",
+      "Native tutorial executed on Windows and Linux with live=0; extracted figure.svg is well-formed and stdout identity matches the phase experiment.",
+      "Historical exact head c80d26e has all 14 checks green and standalone WASI success 41253542664; pendulum artifact 13062641070. These results remain historical for the source extension.",
+      "PR #239 exact head 7f7a3ba remains ten-check/WASI34 green. Fresh automated review was blocked by Code Review quota; unchanged requests are not repeated.",
+      "Regenerated website/bundles passed 30 replays / 12 demos and 33 bundle/replay tests; distribution, Linguist and project-plan gates passed."
     ],
     "activePullRequests": [
       235,
@@ -121,59 +68,73 @@
     ],
     "lastBenchmarkSourceRevision": "49374d7a47539d77c03b319c720c41bee6947ede",
     "compilerCodeUnchangedSinceRevision": "fcbe5284efffbb30d4acd10309aa04b31d8bdc45",
-    "latestReceipt": {
-      "path": "validation/m1-pendulum-wasi-linux.json",
-      "testedSourceRevision": "b8016ee49b89f0d13852957ae2334f99ff5625c6",
-      "sha256": "fe612b7963a3d236cfa1a3ea528d4f6d964e2bf1fa456ea9bfd9acfaa8076bec",
-      "recordingRevision": "resolve with git log -1 --format=%H -- validation/m1-pendulum-wasi-linux.json"
-    }
+    "programSourceRevision": "59603712aacce52ddd4c1b0fc558377bb8b67972",
+    "receipts": [
+      {
+        "path": "validation/m1-pendulum-phases-linux.json",
+        "testedSourceRevision": "e612d73baf2307296e562502e342ce074794fb74"
+      },
+      {
+        "path": "validation/m1-pendulum-phases-wasi-linux.json",
+        "testedSourceRevision": "59603712aacce52ddd4c1b0fc558377bb8b67972"
+      },
+      {
+        "path": "validation/m1-backend-inventory.json",
+        "testedSourceRevision": "e612d73baf2307296e562502e342ce074794fb74"
+      }
+    ]
   },
   "pending": [
-    "Push through existing PR #237, then validate its actual new HEAD and standalone WASI workflow. Do not reuse green 1352bf4 checks.",
-    "New exact-head reviews remain pending; PR #239 automated review was rejected by Code Review quota. Do not repeat unchanged quota requests.",
-    "PRs #235-#239 remain unmerged and need explicit merge authorization.",
-    "M1 performance remains open for controlled startup/kernel/rendering/abstraction timing assessment; managed counts were reduced, allocated bytes and compiler memory are unmeasured.",
-    "Integrate and validate all M1 acceptance criteria on a combined reference-workflow source before closing the Goal."
+    "Ensure PR #237 contains the prepared package; validate its actual current HEAD, new Linux phase artifact and standalone WASI workflow, without reusing green c80d26e checks.",
+    "New exact-head reviews and explicit merge authorizations for PRs #235-#239 remain pending. Do not repeat unchanged Code Review quota requests.",
+    "Controlled scientific abstraction overhead, pure loader isolation, allocated bytes and compiler memory remain open. Phase observations include instrumentation and input-stage waiting/scheduling.",
+    "Complete the combined reference workflow and R3 restricted artifact integration/replay; global R3 remains open.",
+    "Validate all M1 acceptance criteria on the integrated source before closing the Goal."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41252031294,
+    "runId": 41253498446,
     "status": "success",
-    "head": "1352bf45ad0428221c207cc9bc23a5fa12618d4e",
+    "head": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
     "relatedRuns": [
       {
         "workflow": "Compiler benchmarks",
-        "runId": 41252031304,
+        "runId": 41253498451,
         "status": "success"
       },
       {
         "workflow": "Browser audit",
-        "runId": 41252031324,
+        "runId": 41253498466,
         "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 41252031293,
+        "runId": 41253498536,
         "status": "success"
       },
       {
         "workflow": "CodeQL",
-        "runId": 41252031335,
+        "runId": 41253498512,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 41252031326,
+        "runId": 41253498463,
+        "status": "success"
+      },
+      {
+        "workflow": "Standalone WASI",
+        "runId": 41253542664,
         "status": "success"
       }
     ],
-    "note": "Historical full fourteen-check result for 1352bf4. Benchmark artifacts execute synthetic merge tree 295c4cdef3c1406904c3f738ae7e5bde3f7eb1b5. This checkpoint does not claim its containing commit already passed."
+    "note": "Historical c80d26e result: fourteen checks plus standalone WASI; the new source/profiler extension requires its own exact-head checks."
   },
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Validate the next PR #237 HEAD and dispatched WASI run after a state change; continue controlled numerical-kernel/startup/rendering profiling while integration is unavailable. No release or unauthorized merge.",
+  "next": "Detect the next PR #237 HEAD and validate changed CI/artifacts once available. Investigate input-stage CPU versus waiting or scientific abstraction costs with controlled experiments; no release, tag or unauthorized merge.",
   "latestPullRequestValidation": {
     "number": 239,
     "url": "https://github.com/sircalch/Ostrin/pull/239",
@@ -231,22 +192,26 @@
     {
       "gate": "A-compiler",
       "status": "OPEN",
-      "remaining": "Validate the integrated dimensional reference workflow and nested managed paths at its actual source revision."
+      "remaining": "Typed managed result and acceleration fields passed native/WASI checks; require updated integrated-source CI.",
+      "evidenceStatus": "LOCAL_PASS_CI_PENDING"
     },
     {
       "gate": "B-science",
       "status": "OPEN",
-      "remaining": "Retain independent analytical/finite-difference oracle results for dimensional uncertainty and shared-source correlation."
+      "remaining": "Keep independent finite-difference/source-correlation evidence and unit scope tied to the integrated source; first-order synthetic model only.",
+      "evidenceStatus": "REFERENCE_CASE_PASS"
     },
     {
       "gate": "C-memory",
       "status": "OPEN",
-      "remaining": "Reused-period native/ASan/UBSan and compiled-WASI leak checks passed locally; require updated integrated-workflow checks before closing."
+      "remaining": "Positive/negative typed-result native paths passed ASan/UBSan/leak-check and actual WASI; require new exact-head full suites.",
+      "evidenceStatus": "FOCUSED_PASS"
     },
     {
       "gate": "D-execution",
       "status": "OPEN",
-      "remaining": "Actual full compiled-WASI workflow ran three times at b8016ee; updated native multiplatform and exact-head WASI CI remain pending."
+      "remaining": "Separated workflow ran on Windows/Linux and compiled WASI; updated macOS/Windows/Linux CI and artifact checks remain pending.",
+      "evidenceStatus": "LOCAL_HOSTS_AND_WASI_PASS"
     },
     {
       "gate": "E-reproducibility",
@@ -256,12 +221,14 @@
     {
       "gate": "F-performance",
       "status": "OPEN",
-      "remaining": "Managed counts reduced by 114 in seven captures; controlled timing, startup/kernel/rendering/abstraction isolation, allocated bytes and compiler memory remain open."
+      "remaining": "Repeatable raw phase/control and managed-count evidence is recorded; scientific abstraction overhead, pure loader time, allocated bytes and compiler memory remain open.",
+      "evidenceStatus": "WALL_CPU_PHASE_CAPTURE_PASS"
     },
     {
       "gate": "G-product",
       "status": "OPEN",
-      "remaining": "Validate installation, tutorial, figure export and rendered reference workflow."
+      "remaining": "Native report/SVG export works on Windows/Linux; verify updated site/browser and installation instructions on the integrated source.",
+      "evidenceStatus": "NATIVE_EXPORT_TUTORIAL_PASS"
     },
     {
       "gate": "H-integration",
@@ -271,7 +238,9 @@
     {
       "gate": "I-documentation",
       "status": "OPEN",
-      "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site."
+      "remaining": "Keep source/evidence scopes, clock limitations, counts and current-head CI consistent after integration.",
+      "evidenceStatus": "SOURCE_BOUND_TUTORIAL_AND_METHODS"
     }
-  ]
+  ],
+  "historicalEvidence": "Earlier detailed checkpoint/P2 history remains in git log -- docs/program-state-m1.json; archived receipts and source revisions are retained, including validation/m1-pendulum-allocations-windows.json, validation/m1-pendulum-reuse-windows.json and validation/m1-pendulum-wasi-linux.json."
 }

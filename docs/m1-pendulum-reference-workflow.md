@@ -225,3 +225,89 @@ measurement scope: launch/exit/transport residuals are not pure loader time,
 component medians need not sum, and no instrumentation overhead is subtracted.
 Scientific abstraction overhead still requires a controlled comparison using the
 same model/algorithm; the current phase timings do not establish that cost.
+
+## Phase measurements and current inventory
+
+`validation/m1-pendulum-phases-linux.json` records seven clean Linux/WSL samples
+at `e612d73baf2307296e562502e342ce074794fb74`. SHA-256 of the UTF-8 LF snapshot (Git blob):
+`0cfd0baea4fba0c6f200e6a0a5230414f7dd803eacb8d566e8eb71edb49bdfbf`. Every control/profiled run retained identical interpreted
+report/SVG output and zero live allocations. Both wall and thread-CPU intervals
+partition their respective root interval exactly for each sample; the profiler
+observed no unexpected instrumented calls.
+
+On this one host, independent median exclusive wall / thread-CPU times were:
+
+| Phase | Wall ms | Thread CPU ms |
+| --- | ---: | ---: |
+| Input loading/decoding/validation | 17.130883 | 7.530924 |
+| Scientific analysis | 0.548730 | 0.290347 |
+| Figure/table rendering | 2.504237 | 2.025366 |
+| Text report | 0.032023 | 0.032480 |
+
+The launch-to-entry observation median was 6.652421 ms. Uninstrumented control
+and profiled process medians were 31.425554 and 28.405775 ms. These samples do
+not establish negative instrumentation overhead or an optimization speedup.
+The workspace/input directories are on a Windows-mounted WSL filesystem;
+loading includes file access, JSON construction and argument validation. The
+wall/CPU observations do not isolate any one of those operations. Clock windows
+and individual component medians differ, so tiny CPU/wall differences are not
+interpreted as waiting time. Scientific abstraction overhead, allocated bytes,
+compiler memory and pure loader time remain unmeasured.
+
+`validation/m1-pendulum-phases-wasi-linux.json` records three clean compiled-WASI
+runs of the separated workflow at `59603712aacce52ddd4c1b0fc558377bb8b67972` (UTF-8 LF snapshot
+SHA-256 `5f26868efef2c97d3efb735abf656e68467519b3f2c760186883e66d8eed88bf`). All matched the interpreter's complete report/SVG and
+reported zero live allocations. This precedes the CPU-profiler-only change;
+workflow/standard-library source is unchanged between those two revisions.
+
+`validation/m1-backend-inventory.json` retains both current Windows/Linux
+ratchet logs: 8789 IR + 46 HIR, zero AST, 245 measured source modules. The corpus
+sums standard-library bodies per importing example and does not count unique
+functions. All these receipts describe their exact source trees; the next
+pushed head still requires its own CI and review.
+
+## Run the native application and export its figure
+
+This workflow uses development sources; published v0.2.0 binaries do not supply
+this full dimensional API. Check out the tested source revision recorded in the
+receipts and build with `cargo build --release --manifest-path compiler/Cargo.toml`.
+The commands below keep the copied input and generated files under ignored
+`target/pendulum-demo/` and leave the checked-in dataset unchanged.
+
+PowerShell 7 on Windows (tested):
+
+```powershell
+$pendulumRoot = (Get-Location).Path
+$pendulumOutput = Join-Path $pendulumRoot 'target/pendulum-demo'
+New-Item -ItemType Directory -Force -Path $pendulumOutput | Out-Null
+Copy-Item -LiteralPath experiments/pendulum-calibration.inputs.json -Destination (Join-Path $pendulumOutput 'data.json')
+& ./compiler/target/release/ostrinc.exe --compile --leak-check --out (Join-Path $pendulumOutput 'pendulum.exe') examples/viz_pendulum_calibration.ostrin
+Push-Location $pendulumOutput
+try { & ./pendulum.exe > stdout.txt } finally { Pop-Location }
+```
+
+Bash on Linux/macOS (the Linux path is tested):
+
+```bash
+pendulumCompiler="${OSTRIN_COMPILER:-$PWD/compiler/target/release/ostrinc}"
+pendulumSource="$PWD/examples/viz_pendulum_calibration.ostrin"
+pendulumOutput="$PWD/target/pendulum-demo"
+mkdir -p "$pendulumOutput"
+cp experiments/pendulum-calibration.inputs.json "$pendulumOutput/data.json"
+"$pendulumCompiler" --compile --leak-check --out "$pendulumOutput/pendulum" "$pendulumSource"
+(cd "$pendulumOutput" && ./pendulum > stdout.txt)
+```
+
+From the repository root, this common Node command extracts `figure.svg` and
+`report.txt` from the actual program output. Open the SVG in a browser or vector
+editor; it contains the fit, uncertainty bars and six-row input table.
+
+```text
+node --input-type=module -e 'import {readFileSync,writeFileSync} from "node:fs"; import {extractSvg} from "./scripts/experiment-replay.mjs"; const p="target/pendulum-demo/", s=readFileSync(p+"stdout.txt","utf8").replaceAll("\r\n","\n"); writeFileSync(p+"figure.svg",extractSvg(s.split("\n"),"pendulum-calibration")); writeFileSync(p+"report.txt",s.slice(0,s.indexOf("<svg")));'
+```
+
+The native figure is a direct export. The source-backed R2 bundle in
+`website/assets/experiments/pendulum-calibration.ostrin-experiment.json` supplies
+its normalized figure/source/input manifest and replay contract. Runtime and
+compiler hashes for the measured native and WASI paths are in the separate
+receipts above; these are scoped observations, not signed build attestations.

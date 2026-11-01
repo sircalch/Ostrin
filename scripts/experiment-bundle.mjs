@@ -181,7 +181,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/pendulum-calibration.inputs.json",
     figurePath: "website/assets/viz/pendulum-calibration.svg",
     outputPath: "website/assets/experiments/pendulum-calibration.ostrin-experiment.json",
-    sourceRevision: "49374d7a47539d77c03b319c720c41bee6947ede",
+    sourceRevision: "59603712aacce52ddd4c1b0fc558377bb8b67972",
   }),
   units: Object.freeze({
     id: "units",
