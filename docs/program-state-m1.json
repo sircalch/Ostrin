@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-31",
+  "updatedAt": "2026-11-01",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "checkpoint": {
-    "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+    "mainRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
     "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
     "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
@@ -129,101 +129,36 @@
     "hir-unwrap-uaf-reproduced-then-corrected-source434f3a2",
     "source434f3a2-full-linux424-tests-pass-and-focused-windows-asan-ubsan-pass",
     "source434f3a2-ten-compiled-wasi-cases-and-seven-native-phase-pairs-pass",
-    "input-stage-repeated-utf8-work-isolated-by-three-whitespace-only-counter-probes"
+    "input-stage-repeated-utf8-work-isolated-by-three-whitespace-only-counter-probes",
+    "pr-235-dimensional-source-correlation-merged-5df0254",
+    "pr-236-bounded-wasi-replay-profile-merged-406fad7",
+    "pr-237-pendulum-calibration-workflow-merged-42a7b1a",
+    "pr-238-r3-artifact-inventory-merged-f410ac5",
+    "pr-239-measurement-temperaturepoint-merged-06ce10d"
   ],
   "currentPackage": {
-    "name": "hir-unwrap-ownership-and-owned-iterator-cleanup",
-    "branch": "codex/m1-reference-workflow",
-    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
-    "status": "Compiler source 434f3a2 passes all 424 local Linux tests, focused Windows/ASan/UBSan, ten compiled-WASI cases and numerical validation. Historical 13e53ce fails Windows and macOS; require fresh corrected-head CI before integration.",
-    "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
-    "evidenceRevision": "f22840f81b7e4a535f9f2e6f619c8fddda659ffb",
+    "name": "pendulum-calibration-end-to-end-validation",
+    "branch": "main",
+    "baseRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
+    "status": "PR #237 merged; Phase 1 validation on main in progress (compile, run, oracle, benchmark)",
     "scope": [
-      "HIR borrowed Option/Result unwrap payload classification, including strings",
-      "owned temporary iterable cleanup on return, with break/continue lifetime preserved",
-      "deterministic regression for aliases, loop exits and error paths",
-      "preserve reproducible before/after ASan evidence and macOS crash/signature artifact",
-      "ten-case WASI, current phase capture and unchanged scientific output",
-      "record input-stage UTF-8 scan counts; no runtime optimization shipped"
+      "validate examples/viz_pendulum_calibration.ostrin end-to-end on main",
+      "compare results with the independent JavaScript oracle",
+      "confirm ownership regressions from PR 237 remain covered",
+      "measure runtime phases and record reproducible benchmark evidence"
     ],
-    "evidence": [
-      "Focused workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan: canonical six-row parity, analytical three-row result g=pi^2, seven rejected-input paths and zero live allocations.",
-      "Current source profile 9 IR / 2 HIR / 0 AST. Removing the obsolete scalar-loader function removes one IR body; no AST fallback was introduced.",
-      "Current aggregate ratchet passed on Windows and Linux: 8788 IR + 46 HIR / 0 AST, 245 measured source modules, zero type divergences. Original logs: validation/m1-array-input-backend-inventory.json.",
-      "Clean 3b60f21 compiled-WASI run passed all ten cases: three baseline report/SVG repeats, one independent analytical three-row case and six exact rejected-input cases. Each input text hashes to its recorded bytes and every run reports live=0. Receipt: validation/m1-pendulum-array-input-wasi-linux.json.",
-      "Clean 3b60f21 seven paired native phase captures retained exact interpreted baseline output and zero-live counters. Old output identity is unchanged; input/source bytes changed, so timing differences are not a controlled speed comparison. Receipt: validation/m1-pendulum-array-input-phases-linux.json.",
-      "42 benchmark/oracle/plan tests and 33 bundle/replay tests passed; all 30 experiment replays and 12 demos matched the regenerated source-backed figures. Distribution, Linguist and project-plan gates passed.",
-      "Historical 728d224 passed fourteen checks, the three-host benchmark/provenance matrix and standalone WASI run 41257538742. Its Linux phase artifact was downloaded and inspected; input-stage CPU exceeded analysis/rendering there as well, without a cross-host timing equivalence claim.",
-      "PR #239 remains exact-head 7f7a3ba ten-check/WASI34 green; automated fresh review remains unavailable due the earlier quota rejection. No PR merge, tag or release performed.",
-      "Actual head 0b011dd: macOS CI run 41260414100 job 124712327766 failed (383 passed, 1 failed) on first native pendulum execution with SIGTRAP and empty output. Compiler/runtime remain unchanged. The separate macOS benchmark passed, so the failure requires diagnosis rather than an assumed platform-wide rejection.",
-      "Source 434f3a2: complete Linux GCC suite passed 33 unit + 6 differential + 385 integration = 424 tests. Ratchet stays 8788 IR + 46 HIR / 0 AST and zero divergences.",
-      "Focused regression and scientific workflow pass on Windows and Linux GCC ASan with leak detection plus UBSan. Same small program fails before the fix with an ASan heap-use-after-free and passes afterward with output 6/6/2 and live=0.",
-      "Clean source 434f3a2: ten actual compiled-WASI cases and seven native phase pairs passed with report/SVG parity and zero live allocations. Phase timings were captured alongside the full compiler suite and are not a controlled speed comparison.",
-      "Windows numerical validation retained 80 report and 136 emitted-value comparisons, absolute difference zero and live_allocations=0. Thirty focused JavaScript tests passed.",
-      "Observed exact head 13e53ce CI: Linux and site passed; Windows failed the second pendulum replay with index out of bounds, and macOS failed with libmalloc invalid free. ASan/UBSan workflow passed that historical head; these results do not override the reproduced bug.",
-      "Deterministic input-stage probe: 1668/3336/5004 bytes of otherwise identical JSON produce 6171620/23472116/51901508 String.length byte visits and 1662188/6595298/14310632 indexed code-point steps. All output and zero-live checks pass; no timing or optimization claim."
-    ],
-    "activePullRequests": [
-      235,
-      236,
-      237,
-      238,
-      239
-    ],
-    "lastBenchmarkSourceRevision": "49374d7a47539d77c03b319c720c41bee6947ede",
-    "programSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
-    "receipts": [
-      {
-        "path": "validation/m1-pendulum-array-input-wasi-linux.json",
-        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
-      },
-      {
-        "path": "validation/m1-pendulum-array-input-phases-linux.json",
-        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
-      },
-      {
-        "path": "validation/m1-array-input-backend-inventory.json",
-        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
-      },
-      {
-        "path": "validation/m1-hir-unwrap-ownership.json",
-        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
-      },
-      {
-        "path": "validation/m1-pendulum-hir-ownership-wasi-linux.json",
-        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
-      },
-      {
-        "path": "validation/m1-pendulum-hir-ownership-phases-linux.json",
-        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
-      },
-      {
-        "path": "validation/m1-input-string-scan-counts.json",
-        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
-      }
-    ],
-    "lastPhaseProfileSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
-    "compilerSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+    "evidence": []
   },
   "pending": [
-    "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
-    "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
+    "PRs #235 to #239 are merged into main (42a7b1a7); PR #240 is the open checkpoint record for that state.",
     "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
-    "Push the PR verification-job correction in PR #236 and require all relevant workflows, including Deploy Ostrin website verify, to pass on the latest exact head; inspect the downloaded R3 profile receipt and verified artifact before treating the package as validated.",
-    "PR #235 has 10/10 checks green on a4a17eef19ee89ad059d6821c772e124ca6971c5; both review P2 threads are resolved with a passing targeted interpreter/native leak/WASI test. A fresh @codex review was requested and is pending; merge authorization is not recorded.",
     "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
     "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0.",
-    "Push the locally validated source and evidence commits to PR #235; run all required checks on its exact new head.",
-    "Obtain fresh review on the new PR head and verify both P2 findings are no longer substantive before considering integration; no merge has been authorized for PR #235.",
     "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
     "Keep unit-carrying covariance matrices, Measurement arrays, and array reductions outside the supported profile until separately typed and validated.",
     "Keep published v0.2.0 unchanged; do not create or publish a new release.",
-    "Push the shared-fixture/actual-WASI/documentation package in PR #239 and require checks plus review for the resulting HEAD.",
-    "PRs #235-#239 remain unmerged; no PR-specific merge authorization exists for this set.",
     "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
     "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS.",
-    "Push corrected source/evidence in PR #237 and validate the actual new HEAD CI, especially Windows/macOS, native sanitizers, standalone WASI and phase artifacts. Historical failures and green checks remain source-scoped.",
-    "New exact-head review and explicit merge authorization remain pending for PRs #235-#239; do not repeat unchanged Code Review quota requests.",
     "Repeated UTF-8 scans are isolated by deterministic input-stage counts; implement and benchmark a bounded correction after current-head ownership validation. Measurement overhead, pure loader time, allocated bytes and compiler memory remain open.",
     "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
   ],
@@ -324,93 +259,15 @@
   ],
   "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
-    "number": 238,
-    "url": "https://github.com/sircalch/Ostrin/pull/238",
-    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
-    "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "open-mergeable-exact-metadata-head-green",
-    "checks": {
-      "ostrinCi": {
-        "status": "success",
-        "runId": 41167597498
-      },
-      "browserAudit": {
-        "status": "success",
-        "runId": 41167597511
-      },
-      "nativeSanitizers": {
-        "status": "success",
-        "runId": 41167597496,
-        "asan": "success",
-        "ubsan": "success"
-      },
-      "codeql": {
-        "status": "success",
-        "runId": 41167597546
-      },
-      "securityAudit": {
-        "status": "success",
-        "runId": 41167597514
-      },
-      "wasi": {
-        "status": "success",
-        "runId": 41251579139,
-        "artifactId": 13060939257
-      },
-      "successful": 10,
-      "failing": 0,
-      "pending": 0,
-      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
-    },
-    "review": {
-      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
-      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
-      "currentHeadReviewed": true,
-      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
-      "unresolvedOutdatedThreads": 0
-    },
-    "openReviewThreads": [],
-    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
-    "observedAt": "2026-10-31",
-    "head": "d1974b052528eec47975297d094031c4081f0681",
-    "integration": "not merged; no PR #238 merge authorization",
-    "mergeCommit": null,
-    "reviewThreads": {
-      "total": 2,
-      "unresolved": 2,
-      "comments": [
-        {
-          "id": 4372396523,
-          "priority": "P2",
-          "status": "fixed-locally-not-revalidated"
-        },
-        {
-          "id": 4372490005,
-          "priority": "P2",
-          "status": "fixed-locally-not-revalidated"
-        }
-      ]
-    },
-    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
-    "runs": {
-      "ostrinCi": "success",
-      "browserAudit": "success",
-      "nativeSanitizersAsan": "success",
-      "nativeSanitizersUbsan": "success",
-      "codeql": "success",
-      "securityAudit": "success"
-    },
-    "resolvedReviewThreads": [
-      4372396523,
-      4372490005
-    ]
+    "number": 240,
+    "url": "https://github.com/sircalch/Ostrin/pull/240",
+    "remoteHead": "51f536189b0330da975effb23d0dd3a53928be47",
+    "base": "main",
+    "state": "open-checkpoint-review-in-progress",
+    "note": "Checkpoint-only PR after merging PRs 235 to 239; Codex review on 51f5361 reported no findings in its summary; CI running."
   },
   "activePullRequests": [
-    237,
-    238,
-    235,
-    236,
-    239
+    240
   ],
   "acceptanceCriteria": [
     {
@@ -501,5 +358,87 @@
       "evidenceStatus": "SOURCE_BOUND_TUTORIAL_AND_METHODS"
     }
   ],
-  "historicalEvidence": "Earlier detailed checkpoint/P2 history remains in git log -- docs/program-state-m1.json; archived receipts and source revisions are retained, including validation/m1-pendulum-allocations-windows.json, validation/m1-pendulum-reuse-windows.json and validation/m1-pendulum-wasi-linux.json."
+  "historicalEvidence": "Earlier detailed checkpoint/P2 history remains in git log -- docs/program-state-m1.json; archived receipts and source revisions are retained, including validation/m1-pendulum-allocations-windows.json, validation/m1-pendulum-reuse-windows.json and validation/m1-pendulum-wasi-linux.json.",
+  "previousPullRequestValidation": {
+    "number": 238,
+    "url": "https://github.com/sircalch/Ostrin/pull/238",
+    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
+    "base": "69c962dee40a4b12606d131df0e8655b90924516",
+    "state": "open-mergeable-exact-metadata-head-green",
+    "checks": {
+      "ostrinCi": {
+        "status": "success",
+        "runId": 41167597498
+      },
+      "browserAudit": {
+        "status": "success",
+        "runId": 41167597511
+      },
+      "nativeSanitizers": {
+        "status": "success",
+        "runId": 41167597496,
+        "asan": "success",
+        "ubsan": "success"
+      },
+      "codeql": {
+        "status": "success",
+        "runId": 41167597546
+      },
+      "securityAudit": {
+        "status": "success",
+        "runId": 41167597514
+      },
+      "wasi": {
+        "status": "success",
+        "runId": 41251579139,
+        "artifactId": 13060939257
+      },
+      "successful": 10,
+      "failing": 0,
+      "pending": 0,
+      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
+    },
+    "review": {
+      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "currentHeadReviewed": true,
+      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
+      "unresolvedOutdatedThreads": 0
+    },
+    "openReviewThreads": [],
+    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
+    "observedAt": "2026-10-31",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
+    "integration": "not merged; no PR #238 merge authorization",
+    "mergeCommit": null,
+    "reviewThreads": {
+      "total": 2,
+      "unresolved": 2,
+      "comments": [
+        {
+          "id": 4372396523,
+          "priority": "P2",
+          "status": "fixed-locally-not-revalidated"
+        },
+        {
+          "id": 4372490005,
+          "priority": "P2",
+          "status": "fixed-locally-not-revalidated"
+        }
+      ]
+    },
+    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
+    "runs": {
+      "ostrinCi": "success",
+      "browserAudit": "success",
+      "nativeSanitizersAsan": "success",
+      "nativeSanitizersUbsan": "success",
+      "codeql": "success",
+      "securityAudit": "success"
+    },
+    "resolvedReviewThreads": [
+      4372396523,
+      4372490005
+    ]
+  }
 }
