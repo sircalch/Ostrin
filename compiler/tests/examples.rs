@@ -20468,3 +20468,173 @@ fn native_string_cursor_cache_preserves_utf8_semantics_without_leaks() {
         expected
     );
 }
+
+#[test]
+fn pendulum_calibration_rejects_invalid_inputs_with_typed_messages_and_backend_parity() {
+    let work = std::env::temp_dir().join(format!("ostrin_pendulum_inputs_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&work);
+    fs::create_dir_all(&work).expect("failed to create pendulum input directory");
+    let source = example_path("viz_pendulum_calibration.ostrin");
+    let staged_source = work.join("viz_pendulum_calibration.ostrin");
+    fs::copy(&source, &staged_source).expect("failed to stage pendulum source");
+    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../experiments/pendulum-calibration.inputs.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&fixture_path).expect("read pendulum fixture"))
+            .expect("parse pendulum fixture");
+
+    let exe = work.join(if cfg!(windows) {
+        "pendulum-inputs.exe"
+    } else {
+        "pendulum-inputs"
+    });
+    let exe_text = exe.to_string_lossy().to_string();
+    let native_compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .args(["--compile", "--leak-check", "--out", &exe_text])
+        .arg(&staged_source)
+        .output()
+        .expect("failed to compile pendulum workflow natively");
+    if skip_if_no_c_compiler(&native_compile) {
+        let _ = fs::remove_dir_all(&work);
+        return;
+    }
+    assert!(
+        native_compile.status.success(),
+        "pendulum native compile failed: {}",
+        String::from_utf8_lossy(&native_compile.stderr)
+    );
+
+    type Mutate = fn(&mut serde_json::Value);
+    let cases: Vec<(&str, Option<&str>, Mutate, &str)> = vec![
+        (
+            "one_point",
+            None,
+            |j| {
+                j["parameters"]["length_m"] = serde_json::json!([0.25]);
+                j["parameters"]["period_s"] = serde_json::json!([1.0037]);
+            },
+            "input error: provide at least three paired length and period readings",
+        ),
+        (
+            "two_points",
+            None,
+            |j| {
+                j["parameters"]["length_m"] = serde_json::json!([0.25, 0.35]);
+                j["parameters"]["period_s"] = serde_json::json!([1.0037, 1.186]);
+            },
+            "input error: provide at least three paired length and period readings",
+        ),
+        (
+            "mismatched_lengths",
+            None,
+            |j| j["parameters"]["period_s"] = serde_json::json!([1.0037, 1.186, 1.3473, 1.4869]),
+            "input error: provide at least three paired length and period readings",
+        ),
+        (
+            "zero_length",
+            None,
+            |j| j["parameters"]["length_m"][2] = serde_json::json!(0.0),
+            "input error: all lengths and periods must be finite and positive",
+        ),
+        (
+            "negative_period",
+            None,
+            |j| j["parameters"]["period_s"][1] = serde_json::json!(-1.2),
+            "input error: all lengths and periods must be finite and positive",
+        ),
+        (
+            "identical_lengths",
+            None,
+            |j| j["parameters"]["length_m"] = serde_json::json!([0.5, 0.5, 0.5, 0.5, 0.5, 0.5]),
+            "input error: at least two distinct lengths are required to fit the period-length relation",
+        ),
+        (
+            "negative_uncertainty",
+            None,
+            |j| j["parameters"]["length_repeat_sigma_m"] = serde_json::json!(-0.1),
+            "input error: standard uncertainties must be non-negative",
+        ),
+        (
+            "correlation_out_of_range",
+            None,
+            |j| j["parameters"]["ruler_clock_zero_correlation"] = serde_json::json!(1.5),
+            "input error: shared-source correlation must be between -1 and 1",
+        ),
+        (
+            "missing_period_array",
+            None,
+            |j| {
+                j["parameters"].as_object_mut().unwrap().remove("period_s");
+            },
+            "input error: period_s must be a numeric array",
+        ),
+        (
+            "not_json",
+            Some("{ not json"),
+            |_| {},
+            "input error: data.json is not valid JSON",
+        ),
+        (
+            "empty_file",
+            Some(""),
+            |_| {},
+            "input error: data.json is not valid JSON",
+        ),
+    ];
+
+    for (name, raw, mutate, expected) in cases {
+        let text = match raw {
+            Some(raw) => raw.to_string(),
+            None => {
+                let mut input = fixture.clone();
+                mutate(&mut input);
+                serde_json::to_string_pretty(&input).expect("serialize pendulum variant")
+            }
+        };
+        fs::write(work.join("data.json"), text).expect("write pendulum variant");
+        let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+            .current_dir(&work)
+            .arg("--run")
+            .arg(&staged_source)
+            .output()
+            .expect("failed to run pendulum variant in the interpreter");
+        let native = Command::new(&exe)
+            .current_dir(&work)
+            .output()
+            .expect("failed to run pendulum variant natively");
+        let interpreted_out = String::from_utf8_lossy(&interpreted.stdout).replace("\r\n", "\n");
+        let native_out = String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n");
+        assert_eq!(
+            interpreted_out,
+            format!("{expected}\n"),
+            "{name}: interpreter"
+        );
+        assert_eq!(native_out, interpreted_out, "{name}: native differs");
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "{name} leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+
+    // Zero standard uncertainty is a valid exact input, not an input error.
+    let mut exact = fixture.clone();
+    exact["parameters"]["length_repeat_sigma_m"] = serde_json::json!(0.0);
+    fs::write(
+        work.join("data.json"),
+        serde_json::to_string_pretty(&exact).expect("serialize exact variant"),
+    )
+    .expect("write exact variant");
+    let accepted = Command::new(&exe)
+        .current_dir(&work)
+        .output()
+        .expect("failed to run exact-uncertainty variant natively");
+    let accepted_out = String::from_utf8_lossy(&accepted.stdout).replace("\r\n", "\n");
+    assert!(
+        accepted_out.starts_with("workflow = dimensional pendulum calibration; synthetic data\n")
+            && accepted_out.contains("\ng = "),
+        "zero repeatability sigma should still produce a report: {accepted_out}"
+    );
+    let _ = fs::remove_dir_all(&work);
+}

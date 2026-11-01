@@ -351,6 +351,12 @@ its normalized figure/source/input manifest and replay contract. Runtime and
 compiler hashes for the measured native and WASI paths are in the separate
 receipts above; these are scoped observations, not signed build attestations.
 
+## Input validation
+
+`pendulum_calibration_rejects_invalid_inputs_with_typed_messages_and_backend_parity` runs the workflow on eleven invalid `data.json` variants (one and two readings, mismatched lengths, a zero length, a negative period, identical lengths, a negative uncertainty, a correlation outside [-1, 1], a missing `period_s`, malformed JSON and an empty file). Each prints one fixed `input error:` line, the interpreter and the native binary agree byte for byte, and the native run reports `live_allocations=0`. A fit with identical lengths used to reach `linfit` and stop with a runtime error; it is now rejected up front with `at least two distinct lengths are required`. A zero repeatability uncertainty is accepted as an exact input.
+
+Limit: `main` returns `Void`, so an input error is printed on stdout and the process exits with status 0. Scripts must check the output rather than the exit status until the language offers a way to set it.
+
 ## Authoritative array input
 
 The current loader reads `parameters.length_m` and `parameters.period_s` directly

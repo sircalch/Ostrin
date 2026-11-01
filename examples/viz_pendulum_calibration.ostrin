@@ -122,6 +122,16 @@ fn analyze(
     {
         return Err("input error: shared-source correlation must be between -1 and 1")
     }
+    // The linear fit of T^2 against L needs at least two distinct lengths.
+    mut has_distinct_lengths = false
+    for i in 1 until n {
+        if length_inputs[i] != length_inputs[0] {
+            has_distinct_lengths = true
+        }
+    }
+    if not has_distinct_lengths {
+        return Err("input error: at least two distinct lengths are required to fit the period-length relation")
+    }
 
     mut lengths_m: List<Float> = []
     mut periods_s: List<Float> = []
