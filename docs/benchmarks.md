@@ -88,6 +88,20 @@ intérprete y 8.272 ms en nativo (10.252× en esta carga concreta). El informe
 registra hashes de fuente y salida; no mide RSS/memoria pico y no permite afirmar
 rendimiento entre plataformas o frente a otros lenguajes.
 
+### Caché de cursor UTF-8 (M2-B)
+
+`String.length`, `char_at` y `slice` recorrían la cadena completa o desde el inicio en cada
+llamada, lo que daba costo cuadrático en el parser JSON del péndulo. El runtime nativo ahora
+guarda, para cadenas del heap de al menos 256 bytes, la longitud en puntos de código y el último
+cursor índice→offset (4 ranuras). La entrada se descarta al liberar, soltar o realocar la cadena.
+[`validation/m2b-utf8-string-cursor-cache-windows.json`](../validation/m2b-utf8-string-cursor-cache-windows.json)
+compara el mismo binario con y sin caché (`-DOSTRIN_NO_STR_CACHE`) y registra contadores
+deterministas (`-DOSTRIN_SCAN_COUNTERS`): con 5004 bytes de entrada los bytes escaneados por
+`length` bajan de 77 478 720 a 6 670 y los pasos de offset de 17 821 161 a 94 657; la salida es
+idéntica. Con 200 000 bytes de espacio JSON, la mediana pasa de 55 879.7 ms a 33.6 ms. Son
+mediciones de un único host Windows; no cubren el intérprete Rust ni WASI, y un índice anterior
+al cursor vuelve a escanear desde el inicio.
+
 Para reproducirlo localmente:
 
 ```text
