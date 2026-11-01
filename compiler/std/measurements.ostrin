@@ -605,6 +605,44 @@ pub fn quantity_uncertainty<D: Dimension>(
     })
 }
 
+// An absolute temperature reading kept as a reference point plus a measured interval.
+// The nominal point is `reference + offset.value`. All uncertainty lives in `offset`, a
+// `Measurement<Quantity<Temperature>>`, so it is always a temperature interval: converting the
+// reading to another scale changes only the reference, never the uncertainty, and the scale
+// offsets (273.15 for degC, 32 for degF) are never treated as uncertainty. Readings that share a
+// source id keep their correlation, so a difference of two readings from one probe cancels it.
+pub record TemperatureReading {
+    reference: TemperaturePoint
+    offset: Measurement<Quantity<Temperature>>
+}
+
+pub fn temperature_reading(reference: TemperaturePoint, offset: Measurement<Quantity<Temperature>>) -> TemperatureReading {
+    TemperatureReading { reference: reference, offset: offset }
+}
+
+pub fn temperature_reading_point(reading: TemperatureReading) -> TemperaturePoint {
+    reading.reference + reading.offset.value
+}
+
+pub fn temperature_reading_to(reading: TemperatureReading, scale: String) -> TemperatureReading {
+    TemperatureReading { reference: temperature_point_to(reading.reference, scale), offset: reading.offset }
+}
+
+pub fn temperature_reading_uncertainty(reading: TemperatureReading) -> Result<CoherentUncertainty<Quantity<Temperature>>, String> {
+    quantity_uncertainty(reading.offset)
+}
+
+pub fn temperature_reading_difference(a: TemperatureReading, b: TemperatureReading) -> Result<Measurement<Quantity<Temperature>>, String> {
+    reference_gap = a.reference - b.reference
+    match exact_quantity(reference_gap) {
+        Ok(gap) => match sub_quantity(a.offset, b.offset) {
+            Ok(offsets) => add_quantity(gap, offsets),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
 pub fn unknown(value: Float, reason: String) -> Measurement<Float> {
     Measurement<Float> {
         value: value,

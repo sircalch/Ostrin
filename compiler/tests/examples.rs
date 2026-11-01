@@ -20731,3 +20731,118 @@ fn pendulum_calibration_rejects_invalid_inputs_with_typed_messages_and_backend_p
     );
     let _ = fs::remove_dir_all(&work);
 }
+
+#[test]
+fn temperature_readings_propagate_interval_uncertainty_with_backend_parity() {
+    // a = 20 degC + (0.3 +- 0.1) K. Converting to degF changes only the reference, so the
+    // uncertainty stays the 0.1 K interval. Two readings from the same probe cancel their shared
+    // source (u = 0); independent sources add in quadrature: sqrt(0.2^2 + 0.1^2).
+    let expected = "20.3 degC (absolute)\n0.1\n68.54 degF (absolute)\n0.1\n0.8 K\n0\n0.8 K\n0.223606797749979\n";
+    let path = example_path("temperature_readings.ostrin");
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &path]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(stdout(&wasi).contains("TemperatureReading"));
+
+    let exe = temp_artifact("temperature_readings.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn temperature_readings_with_unknown_offsets_stay_unknown() {
+    // An unknown offset keeps its nominal point but never reports a numeric uncertainty, and a
+    // difference involving it is unknown rather than silently exact.
+    let source = temp_source(
+        "temperature_reading_unknown",
+        "import std.measurements\n\
+         fn main() -> Void {\n\
+         ref = temperature_point(25.0, \"degC\")\n\
+         known = measurements.from_quantity_source(0.5 K, 0.1 K, \"probe\", \"probe\").unwrap()\n\
+         unknown = measurements.unknown_quantity(0.5 K, \"probe offline\").unwrap()\n\
+         a = measurements.temperature_reading(ref, known)\n\
+         b = measurements.temperature_reading(ref, unknown)\n\
+         print(measurements.temperature_reading_point(b))\n\
+         match measurements.temperature_reading_uncertainty(b) {\n\
+         Ok(u) => print(u.value),\n\
+         Err(message) => print(message),\n\
+         }\n\
+         diff = measurements.temperature_reading_difference(a, b).unwrap()\n\
+         print(diff.known)\n\
+         match measurements.quantity_uncertainty(diff) {\n\
+         Ok(u) => print(u.value),\n\
+         Err(message) => print(message),\n\
+         }\n\
+         }\n",
+    );
+    let expected = "25.5 degC (absolute)\nprobe offline\nfalse\nadd received a measurement with unknown uncertainty\n";
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("temperature_reading_unknown.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    let _ = fs::remove_file(&source);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
