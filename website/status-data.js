@@ -21,10 +21,10 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "rustMarkedTests": 390
   },
   "nativeBackend": {
-    "ir": 7220,
-    "hir": 41,
+    "ir": 8789,
+    "hir": 46,
     "ast": 0,
-    "total": 7261
+    "total": 8835
   },
   "ownership": {
     "tested": 205,
@@ -46,7 +46,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "ciRunUrl": null
   },
   "effectCoverage": {
-    "knownCalls": 22331,
+    "knownCalls": 22349,
     "symbolicCalls": 93,
     "unresolvedCalls": 0,
     "countUnit": "distinct_function_operation_edges",
@@ -79,15 +79,15 @@ globalThis.OSTRIN_STATUS = Object.freeze({
       "bundleCount": 30,
       "availableBundleCount": 30,
       "invalidBundleCount": 0,
-      "edgeCount": 22424,
-      "categorizedEdgeCount": 22424,
+      "edgeCount": 22442,
+      "categorizedEdgeCount": 22442,
       "uncategorizedEdgeCount": 0,
-      "staticLocalFunctionEdgeCount": 9792,
+      "staticLocalFunctionEdgeCount": 9797,
       "genericTraitCandidateEdgeCount": 0,
-      "localTargetCandidateCount": 9792,
+      "localTargetCandidateCount": 9797,
       "multiTargetEdgeCount": 0,
-      "resolvedCallSiteCount": 288,
-      "locatedCallSiteCount": 288,
+      "resolvedCallSiteCount": 296,
+      "locatedCallSiteCount": 296,
       "unlocatedCallSiteCount": 0,
       "sourceSiteAssociationsValid": true
     },

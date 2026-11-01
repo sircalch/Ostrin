@@ -30,7 +30,7 @@
   "captureOpenCount": 30,
   "incompleteEffectBundleCount": 0,
   "closedEntryEffectBundleCount": 30,
-  "knownEffectCallCount": 22331,
+  "knownEffectCallCount": 22349,
   "symbolicEffectCallCount": 93,
   "unresolvedEffectCallCount": 0,
   "gapDiagnostics": {
@@ -186,21 +186,21 @@
       "availableBundleCount": 30,
       "unavailableBundleCount": 0,
       "invalidBundleCount": 0,
-      "edgeCount": 22424,
-      "categorizedEdgeCount": 22424,
+      "edgeCount": 22442,
+      "categorizedEdgeCount": 22442,
       "uncategorizedEdgeCount": 0,
-      "localFunctionEdgeCount": 9792,
-      "staticLocalFunctionEdgeCount": 9792,
+      "localFunctionEdgeCount": 9797,
+      "staticLocalFunctionEdgeCount": 9797,
       "genericTraitCandidateEdgeCount": 0,
-      "localTargetCandidateCount": 9792,
+      "localTargetCandidateCount": 9797,
       "multiTargetEdgeCount": 0,
-      "resolvedCallSiteCount": 288,
-      "locatedCallSiteCount": 288,
+      "resolvedCallSiteCount": 296,
+      "locatedCallSiteCount": 296,
       "unlocatedCallSiteCount": 0,
       "categoryCounts": {
-        "resolvedLocalOperations": 9792,
-        "effectClassifiedOperations": 12657,
-        "effectFreeIntrinsics": 9557,
+        "resolvedLocalOperations": 9797,
+        "effectClassifiedOperations": 12670,
+        "effectFreeIntrinsics": 9569,
         "compilerBuiltinCallbacks": 0,
         "indirectOperations": 93,
         "unresolvedOperations": 0,
@@ -620,7 +620,7 @@
               {
                 "kind": "literal",
                 "path": "data.json",
-                "line": 320
+                "line": 384
               }
             ],
             "declaredSnapshotPaths": [
@@ -1405,7 +1405,7 @@
       "effectCoverage": {
         "complete": true,
         "count_unit": "distinct_function_operation_edges",
-        "known_calls": 1299,
+        "known_calls": 1317,
         "symbolic_calls": 10,
         "unresolved_calls": 0
       },
