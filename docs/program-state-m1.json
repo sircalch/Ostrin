@@ -256,13 +256,14 @@
   "latestPullRequestValidation": {
     "number": 240,
     "url": "https://github.com/sircalch/Ostrin/pull/240",
-    "remoteHead": "51f536189b0330da975effb23d0dd3a53928be47",
+    "mergeCommit": "dc6682cbf92185cac650f4716833ba0646fadc43",
+    "remoteHead": "215e03a235226d158675e010b03cb4a5311153ba",
     "base": "main",
-    "state": "open-checkpoint-review-in-progress",
-    "note": "Checkpoint-only PR after merging PRs 235 to 239; Codex review on 51f5361 reported no findings in its summary; CI running."
+    "state": "merged",
+    "note": "Checkpoint PR after merging PRs 235 to 239; Codex reported no findings on 51f5361 and the latest head 215e03a2 passed all checks before merge."
   },
   "activePullRequests": [
-    240
+    241
   ],
   "acceptanceCriteria": [
     {
