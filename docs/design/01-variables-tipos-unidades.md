@@ -373,7 +373,7 @@ para reducir el redondeo al normalizar puntos, y calcula el offset Fahrenheit de
 exacto `32 °F = 273.15 K`; una prueba verifica que referencias Celsius/Fahrenheit equivalentes comparen
 iguales en ambas direcciones. La conversión pública `temperature_point_to` emplea
 transformaciones directas por par de escalas (con FMA donde aporta estabilidad) equivalentes a
-la fórmula general. Por tanto, una implementación no debe inferir si una
+la fórmula general. Dos puntos en la misma escala se comparan y se restan directamente en esa escala (`(a - b) * scale`), y un punto desplazado por un intervalo suma `intervalo / scale` a su valor: el offset se cancela, de modo que `20 °C + 0.3 K` es `20.3 °C` y no el resultado de un viaje por kelvin. Solo puntos de escalas distintas se encuentran en kelvin. El FMA nativo es correctamente redondeado en todas las plataformas: en Windows se emula (el `fma` de mingw-w64 no es fusionado) y se validó contra aritmética racional exacta en 260 000 casos sin discrepancias; `temperature_point_scale_arithmetic_is_exact_and_matches_across_backends` exige que intérprete y nativo coincidan bit a bit. Por tanto, una implementación no debe inferir si una
 cantidad es absoluta únicamente a partir de la dimensión `Quantity<Temperature>`: requiere una
 distinción representable por el sistema de tipos y preservada por HIR/IR, intérprete, backend
 nativo, arrays, formatters y serialización.
