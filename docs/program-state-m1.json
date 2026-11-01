@@ -78,38 +78,68 @@
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
     "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
-    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b"
+    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
+    "pr-234-merged-main-69c962d-all-five-main-workflows-green",
+    "bounded-r3-wasi-preview1-host-replay-profile-local-70-tests-website-and-plan-gates-green",
+    "pr-235-two-p2-covariance-findings-fixed-and-current-review-threads-resolved-targeted-native-wasi-leak-test-passed"
   ],
   "currentPackage": {
-    "name": "r3-restricted-artifact-inventory",
-    "branch": "codex/m1-r3-restricted-receipt",
-    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-reference-workflow",
-    "status": "PR #238 is open and mergeable at d1974b052528eec47975297d094031c4081f0681; the metadata checkpoint head has all five required workflows green, fresh review found no major issues, and the prior P1 thread is resolved. Do not merge without explicit authorization.",
+    "name": "bounded-r3-wasi-preview1-host-replay-profile",
+    "branch": "codex/r3-profile-contract",
+    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-source-lineage",
+    "baseRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+    "status": "pr-236-open-pull-request-verification-added-pending-exact-head-ci-and-artifact-replay",
     "scope": [
-      "bind downloaded R3 artifact verification to every archived ostrin.experiment/v0 bundle",
-      "reject omitted, extra, malformed, duplicate, path-escaping, filename/ID-mismatched, maturity-mismatched and hash-mismatched bundles",
-      "preserve the restricted R3 boundary without promoting the global R3 score or v0.2.0"
+      "adds a bounded single-runner Node WASI Preview 1 replay receipt for the full registered visualization fixture inventory",
+      "binds source, inputs, outputs, manifests, effect signatures, compiler WASM digest, run identity, tested SHA and evidence files",
+      "verifies the receipt by replaying the downloaded artifact and comparing canonical receipt bytes before publishing verified evidence",
+      "keeps static reproducibility maturity unchanged at R0/R1/R2 with R3=0 and documents single-host, unsigned and scientific-validity limitations",
+      "regenerates only the stale registered bars bundle after its effect inventory changed from 1253 to 1247 known calls",
+      "runs the same website verification composite action on relevant pull requests with read-only repository permission, isolates concurrency per PR and skips Pages deployment"
     ],
     "evidence": [
-      "Source/evidence package commit 1841d180 adds complete archived inventory validation and documentation.",
-      "Follow-up source fix 0480bfd binds each bundle filename to its declared fixture ID and adds a regression for renamed animation evidence.",
-      "Local scripts/r3-surface-receipt.test.mjs: 17 tests passed; related readiness/replay/action tests: 44 passed.",
-      "Exact metadata HEAD CI for d1974b052528eec47975297d094031c4081f0681: Ostrin CI 41167597498, Browser audit 41167597511, Native sanitizers 41167597496 with ASan and UBSan success, CodeQL 41167597546 and Security audit 41167597514.",
-      "Fresh Codex review of d1974b052528eec47975297d094031c4081f0681 found no major issues; the P1 filename/ID thread is resolved.",
-      "R3 remains OPEN globally; this package improves evidence integrity and does not claim cross-platform equivalence or production readiness."
+      "70/70 focused replay, R3 readiness, quality-scorecard, surface-receipt, profile and workflow tests passed",
+      "website-check passed: 17 public pages, 305 examples, 383 integration tests",
+      "project-plan-check passed: 7,261 HIR/IR bodies (7,220 IR + 41 HIR), 0 AST fallback",
+      "main 69c962dee40a4b12606d131df0e8655b90924516 has all five main workflows successful: Deploy website, CodeQL, Security audit, Browser audit, Ostrin CI",
+      "PR #235 head a4a17eef19ee89ad059d6821c772e124ca6971c5 has 10/10 checks green and is mergeable, but two current-head P2 covariance review threads remain unresolved; no merge authorization recorded",
+      "implementation source commit 0b1ce988b6010430d933abb73c31024ec94162d8 contains the profile implementation, tests, workflow, documentation and synchronized bars bundle; local test results are recorded in this checkpoint, GitHub artifact evidence is pending",
+      "PR #236 opened from the two local commits; initial head 6206839034d9e383ca4e2e86c3f2e2b1bea7b110 is awaiting GitHub Actions and real artifact replay",
+      "the original PR #236 runs on head 6206839034d9e383ca4e2e86c3f2e2b1bea7b110 were cancelled after the workflow gap was found; current code adds a pull_request verify job and a regression guard, and the focused workflow test passed 2/2"
     ],
+    "staticReproducibility": {
+      "R0": 18,
+      "R1": 0,
+      "R2": 11,
+      "R3": 0
+    },
+    "sourceRevision": "7fde953f4c78f43feeacaa38a461050b8b92c1d2",
+    "evidenceRevision": null,
     "activePullRequests": [
-      237,
-      238
+      235,
+      236
     ],
-    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
-    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
+    "pullRequest": {
+      "number": 236,
+      "url": "https://github.com/sircalch/Ostrin/pull/236",
+      "base": "main",
+      "baseSha": "69c962dee40a4b12606d131df0e8655b90924516",
+      "headTracking": "Use the live GitHub PR head as source of truth; each checkpoint commit changes the head and starts a new exact-head validation run.",
+      "state": "open-exact-head-checks-pending"
+    },
+    "sourceCommits": [
+      "0b1ce988b6010430d933abb73c31024ec94162d8",
+      "7fde953f4c78f43feeacaa38a461050b8b92c1d2"
+    ]
   },
   "pending": [
     "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
     "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
-    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization."
+    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
+    "Push the PR verification-job correction in PR #236 and require all relevant workflows, including Deploy Ostrin website verify, to pass on the latest exact head; inspect the downloaded R3 profile receipt and verified artifact before treating the package as validated.",
+    "PR #235 has 10/10 checks green on a4a17eef19ee89ad059d6821c772e124ca6971c5; both review P2 threads are resolved with a passing targeted interpreter/native leak/WASI test. A fresh @codex review was requested and is pending; merge authorization is not recorded.",
+    "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
+    "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
@@ -138,13 +168,36 @@
         "workflow": "Security audit",
         "runId": 41167597514,
         "status": "success"
+      },
+      {
+        "workflow": "Deploy Ostrin website",
+        "runId": 40230630648,
+        "status": "success"
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 40230630661,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 40230630640,
+        "status": "success"
+      },
+      {
+        "workflow": "Browser audit",
+        "runId": 40230630645,
+        "status": "success"
       }
     ],
     "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
   },
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
-    "Published v0.2.0 remains frozen; no new tag or release is authorized."
+    "Published v0.2.0 remains frozen; no new tag or release is authorized.",
+    "PR #235 still needs fresh Codex review of head a4a17eef19ee89ad059d6821c772e124ca6971c5 after the two P2 fixes; prior findings are resolved, 10 checks remain green, and no merge authorization is recorded.",
+    "PR #236 needs fresh exact-head GitHub Actions after its PR verification job was added; the first runs were cancelled before producing a real candidate artifact, so no GitHub replay receipt is yet claimed.",
+    "Published v0.2.0 remains frozen; do not create a new release or tag."
   ],
   "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
@@ -152,7 +205,22 @@
     "url": "https://github.com/sircalch/Ostrin/pull/238",
     "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
+    "mergeCommit": null,
     "state": "open-mergeable-exact-metadata-head-green",
+    "runs": {
+      "ostrinCi": "success",
+      "browserAudit": "success",
+      "nativeSanitizersAsan": "success",
+      "nativeSanitizersUbsan": "success",
+      "codeql": "success",
+      "securityAudit": "success"
+    },
+    "openReviewThreads": [],
+    "resolvedReviewThreads": [
+      4372396523,
+      4372490005
+    ],
+    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
     "checks": {
       "ostrinCi": {
         "status": "success",
@@ -184,7 +252,6 @@
       "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
       "unresolvedOutdatedThreads": 0
     },
-    "openReviewThreads": [],
     "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
     "observedAt": "2026-10-31",
     "head": "d1974b052528eec47975297d094031c4081f0681",
