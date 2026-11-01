@@ -41,6 +41,15 @@
 
 ### Scientific workflow profiling
 
+- The pendulum workflow now returns a managed `PendulumAnalysis` with typed
+  acceleration quantities through `Result`, separating numeric analysis from
+  JSON loading, report text and SVG rendering. Existing outputs and negative
+  diagnostics remain stable. A bounded Linux/GCC phase experiment records
+  inclusive/exclusive timings, observed entry latency, paired controls and
+  verifiable output/allocation receipts; these are instrumented observations.
+- Re-measured the development corpus on Windows/Linux and tightened its ratchet
+  to 8789 IR + 46 HIR / 0 AST. Shared library bodies are counted per importing
+  example; this is a corpus inventory, not a count of new features.
 - The experimental pendulum calibration example reuses each period measurement
   when squaring it, preserving source correlation and the complete output. Seven
   Windows captures reduce managed allocation records from 12405 to 12291, with

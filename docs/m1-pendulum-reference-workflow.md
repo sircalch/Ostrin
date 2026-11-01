@@ -198,3 +198,30 @@ identified by actual file hashes, not a signed build attestation. The Windows
 worktree was checked from WSL using its Git metadata directory and the same
 `core.autocrlf=true` policy used by Git for Windows; raw source/input hashes bind
 the bytes actually compiled. The next pushed head still needs its own CI.
+
+## Analysis/rendering boundary
+
+`analyze` now returns `Result<PendulumAnalysis, String>` without rendering or
+printing. Its managed arrays/lists cross that boundary together with acceleration
+quantities for gravity and both reported uncertainties. The fit still operates
+on coherent SI Float arrays; it is not a general unit-aware OLS API.
+`load_analysis` owns JSON loading and validation, `render` owns figure/table
+formatting, and `print_report` preserves the textual scientific output. The
+bounded native source profile is now 10 IR / 2 HIR / 0 AST bodies. Tests preserve
+full output parity and also exercise invalid uncertainty, correlation and a
+non-positive reading through the returned error path with leak-check enabled.
+
+On Linux with GCC, run the independent phase experiment after building the host
+compiler:
+
+```text
+node scripts/benchmark-phases.mjs --iterations 7
+```
+
+It records instrumented analysis/rendering times, an observed launch-to-entry
+latency and a paired uninstrumented process control. It also verifies the phase
+call graph and all output/allocation receipts. See `docs/benchmarks.md` for the
+measurement scope: launch/exit/transport residuals are not pure loader time,
+component medians need not sum, and no instrumentation overhead is subtracted.
+Scientific abstraction overhead still requires a controlled comparison using the
+same model/algorithm; the current phase timings do not establish that cost.

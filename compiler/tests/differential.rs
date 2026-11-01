@@ -500,8 +500,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 7261,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 7261)"
+        native_generated >= 8835,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 8835)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -580,7 +580,9 @@ fn native_backend_types_agree_with_the_checker() {
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. Typed dyn lists and
     // indirect fold/dispatch and persistent dyn fields now use HIR/C. The verified baseline is
-    // 0 AST fallbacks (7,261 HIR/IR-generated: 7,220 IR and 41 HIR functions).
+    // 0 AST fallbacks (8,835 HIR/IR-generated: 8,789 IR and 46 HIR functions).
+    // Re-measured on Windows and Linux after the dimensional workflow split;
+    // shared modules count once per importing example, not once per repository.
     // Function values stored in signature-specific lists and record fields now
     // use the IR ownership path. Remaining AST bodies include managed enum
     // payload, generic dispatch and concurrency boundaries.

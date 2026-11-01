@@ -118,3 +118,31 @@ contadores describen registros del asignador gestionado de Ostrin; no cuentan by
 asignaciones internas de libc, memoria del compilador ni RSS. No aíslan por sí solos
 el kernel numérico o el coste de las abstracciones científicas. Los informes
 históricos sin este campo siguen indicando que no capturaron esos contadores.
+
+## Fases del flujo científico M1 (Linux y GCC)
+
+`node scripts/benchmark-phases.mjs --iterations 7` emite una sola unidad C del
+péndulo y construye un control y un ejecutable con instrumentación selectiva.
+Los dos usan ese mismo C y las opciones nativas `-O2 -pthread -lm -ffp-contract=off`.
+El profiler cuenta únicamente las fronteras de entrada C, aplicación, carga de
+entrada, análisis numérico, renderizado y reporte textual. Si GCC instrumenta
+funciones adicionales, la pila queda incompleta o los tiempos no cuadran, falla.
+Cada muestra conserva tiempos inclusivos y exclusivos con `CLOCK_MONOTONIC`;
+los exclusivos particionan exactamente el intervalo raíz de esa muestra. Las
+medianas de componentes distintos no necesariamente suman la mediana del total.
+
+Se alterna el orden control/perfilado, con un calentamiento validado por binario
+y entradas nuevas por ejecución. Todos deben mantener la salida completa del
+intérprete y cero asignaciones vivas. El informe guarda hashes de fuente, entrada,
+compilador, C emitido, C instrumentado, helper, scripts y ambos ejecutables. CI
+archiva el informe, los dos binarios, el C, la entrada y la salida esperada; este
+experimento no se incluye en las estadísticas normales de `benchmark.mjs`.
+
+La observación de inicio mide hasta la recepción del marcador de entrada C;
+incluye planificación, loader, pipe y event loop. El residuo del tiempo de proceso
+incluye inicio, salida y transporte, por lo que no se presenta como tiempo puro
+del loader. Los tiempos internos son observaciones instrumentadas: no se resta
+un supuesto overhead ni se los presenta como tiempos del kernel sin instrumentar.
+La abstracción `Measurement` forma parte de la fase de análisis; este informe no
+aísla todavía su overhead frente a una implementación de la misma matemática.
+No demuestra equivalencia temporal entre sistemas ni R3 global.

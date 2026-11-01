@@ -4,6 +4,24 @@ import std.json
 import std.measurements
 import std.viz
 
+// The fit uses coherent SI arrays; the reported acceleration and uncertainties
+// retain their physical dimension across the analysis/rendering boundary.
+record PendulumAnalysis {
+    lengths_m: Array<Float>
+    periods_s: List<Float>
+    period_squares_s2: Array<Float>
+    period_square_uncertainties_s2: List<Float>
+    period_marginal_uncertainty_s: Float
+    slope: Float
+    intercept: Float
+    r_squared: Float
+    gravity: Quantity<Length / Time / Time>
+    gravity_uncertainty: Quantity<Length / Time / Time>
+    independent_uncertainty: Quantity<Length / Time / Time>
+    shared_source_correlation: Float
+    residual_sd: Float
+}
+
 fn input_number(object: Value, key: String) -> Result<Float, String> {
     value = json.object_get(object, key)
     if value.is_none() {
@@ -115,28 +133,24 @@ fn analyze(
     ruler_zero_sigma: Float,
     clock_zero_sigma: Float,
     shared_source_correlation: Float
-) -> Void {
+) -> Result<PendulumAnalysis, String> {
     n = length_inputs.length()
     if n < 3 or period_inputs.length() != n {
-        print("input error: provide at least three paired length and period readings")
-        return
+        return Err("input error: provide at least three paired length and period readings")
     }
     if length_repeat_sigma < 0.0 or period_repeat_sigma < 0.0
     or ruler_zero_sigma < 0.0 or clock_zero_sigma < 0.0
     {
-        print("input error: standard uncertainties must be non-negative")
-        return
+        return Err("input error: standard uncertainties must be non-negative")
     }
     period_marginal_uncertainty = sqrt(period_repeat_sigma * period_repeat_sigma + clock_zero_sigma * clock_zero_sigma)
     if not is_finite(period_marginal_uncertainty) {
-        print("input error: combined period uncertainty is outside the finite range")
-        return
+        return Err("input error: combined period uncertainty is outside the finite range")
     }
     if not is_finite(shared_source_correlation)
     or shared_source_correlation < -1.0 or shared_source_correlation > 1.0
     {
-        print("input error: shared-source correlation must be between -1 and 1")
-        return
+        return Err("input error: shared-source correlation must be between -1 and 1")
     }
 
     mut lengths_m: List<Float> = []
@@ -147,18 +161,15 @@ fn analyze(
     mut period_square_reading_contributions: List<Float> = []
     mut clock_zero_contributions: List<Float> = []
     mut period_square_marginal_uncertainties: List<Float> = []
-    mut table_rows: List<List<String>> = []
 
     for i in 0 until n {
         if not is_finite(length_inputs[i]) or length_inputs[i] <= 0.0
         or not is_finite(period_inputs[i]) or period_inputs[i] <= 0.0
         {
-            print("input error: all lengths and periods must be finite and positive")
-            return
+            return Err("input error: all lengths and periods must be finite and positive")
         }
         if not is_finite(period_inputs[i] * period_inputs[i]) {
-            print("input error: a period square is outside the finite Float range")
-            return
+            return Err("input error: a period square is outside the finite Float range")
         }
         repeat_effect = 2.0 * period_inputs[i] * period_repeat_sigma
         clock_effect = 2.0 * period_inputs[i] * clock_zero_sigma
@@ -166,8 +177,7 @@ fn analyze(
         or not is_finite(repeat_effect * repeat_effect)
         or not is_finite(clock_effect * clock_effect)
         {
-            print("input error: a period uncertainty is outside the finite variance range")
-            return
+            return Err("input error: a period uncertainty is outside the finite variance range")
         }
 
         length = measured_length(length_inputs[i], length_repeat_sigma, ruler_zero_sigma, "length-" + i.to_string())
@@ -193,23 +203,14 @@ fn analyze(
                     period_square_reading_contributions.push(period_contribution)
                     clock_zero_contributions.push(clock_zero_contribution)
                     period_square_marginal_uncertainties.push(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution))
-                    table_rows.push([
-                            (i + 1).to_string(),
-                            four(length_value),
-                            four(period_inputs[i]),
-                            four(period_marginal_uncertainty),
-                            four(period_value),
-                            four(sqrt(period_contribution * period_contribution + clock_zero_contribution * clock_zero_contribution)),
-                    ])
+
                 },
                 Err(message) => {
-                    print("measurement error: " + message)
-                    return
+                    return Err("measurement error: " + message)
                 },
             },
             Err(message) => {
-                print("measurement error: " + message)
-                return
+                return Err("measurement error: " + message)
             },
         }
     }
@@ -221,19 +222,16 @@ fn analyze(
     intercept = fit[1]
     r_squared = fit[2]
     if not is_finite(slope) or slope <= 0.0 {
-        print("fit error: slope must be finite and positive")
-        return
+        return Err("fit error: slope must be finite and positive")
     }
     if not is_finite(intercept) or not is_finite(r_squared) {
-        print("fit error: coefficients and fit statistic must be finite")
-        return
+        return Err("fit error: coefficients and fit statistic must be finite")
     }
     x_mean = x.mean()
     y_mean = y.mean()
     sxx = ((x - x_mean) * (x - x_mean)).sum()
     if not is_finite(sxx) or sxx <= 0.0 {
-        print("fit error: length readings must span a nonzero range")
-        return
+        return Err("fit error: length readings must span a nonzero range")
     }
 
     // OLS slope derivatives. The measurement library supplies the typed
@@ -255,8 +253,7 @@ fn analyze(
         length_effect = d_gravity_d_length[i] * length_reading_contributions[i]
         period_effect = d_gravity_d_period_squared[i] * period_square_reading_contributions[i]
         if not is_finite(length_effect) or not is_finite(period_effect) {
-            print("uncertainty error: a source sensitivity is outside the finite Float range")
-            return
+            return Err("uncertainty error: a source sensitivity is outside the finite Float range")
         }
         length_id = "length-" + i.to_string()
         period_id = "period-" + i.to_string()
@@ -283,8 +280,7 @@ fn analyze(
     if not is_finite(ruler_zero_sensitivity) or not is_finite(clock_zero_sensitivity)
     or not is_finite(variance_independent)
     {
-        print("uncertainty error: accumulated source sensitivities are outside the finite Float range")
-        return
+        return Err("uncertainty error: accumulated source sensitivities are outside the finite Float range")
     }
     output_sources.push(Sensitivity<Float> {
             source_id: "ruler-zero",
@@ -322,13 +318,47 @@ fn analyze(
 
     residuals = y - (x * slope + intercept)
     residual_sd = sqrt((residuals * residuals).sum() / ((n - 2) as Float))
+    Ok(PendulumAnalysis {
+        lengths_m: x,
+        periods_s: periods_s,
+        period_squares_s2: y,
+        period_square_uncertainties_s2: period_square_marginal_uncertainties,
+        period_marginal_uncertainty_s: period_marginal_uncertainty,
+        slope: slope,
+        intercept: intercept,
+        r_squared: r_squared,
+        gravity: gravity * (1 m/s^2),
+        gravity_uncertainty: gravity_uncertainty * (1 m/s^2),
+        independent_uncertainty: sqrt(variance_independent) * (1 m/s^2),
+        shared_source_correlation: shared_source_correlation,
+        residual_sd: residual_sd,
+    })
+}
+
+fn render(analysis: PendulumAnalysis) -> String {
+    x = analysis.lengths_m
+    y = analysis.period_squares_s2
+    slope = analysis.slope
+    intercept = analysis.intercept
+    residual_sd = analysis.residual_sd
     fitted = x * slope + intercept
+    mut table_rows: List<List<String>> = []
+    for i in 0 until analysis.periods_s.length() {
+        table_rows.push([
+            (i + 1).to_string(),
+            four(x[i]),
+            four(analysis.periods_s[i]),
+            four(analysis.period_marginal_uncertainty_s),
+            four(y[i]),
+            four(analysis.period_square_uncertainties_s2[i]),
+        ])
+    }
     fit_figure = viz.figure("Pendulum calibration · linearized model")
     .describe("Synthetic input snapshot · OLS fit of T² against L · first-order source propagation")
     .labels("Length L [m]", "Period squared T² [s²]")
     .size(680, 420)
     .band(x, fitted - 2.0 * residual_sd, fitted + 2.0 * residual_sd, label: "±2 residual SD", color: "#dbeafe")
-    .errorbars(x, y, array(period_square_marginal_uncertainties), label: "standard uncertainty in T²", color: "#1e3a8a")
+    .errorbars(x, y, array(analysis.period_square_uncertainties_s2), label: "standard uncertainty in T²", color: "#1e3a8a")
     .scatter(x, y, label: "measured periods", color: "#2563eb", size: 5.0)
     .line(x, fitted, label: "OLS fit", color: "#dc2626", width: 2.0)
     input_table = viz.table(
@@ -337,33 +367,34 @@ fn analyze(
         title: "Synthetic pendulum calibration inputs"
     ).size(900).row_height(28)
 
-    print("workflow = dimensional pendulum calibration; synthetic data")
-    print("observations = " + n.to_string() + ", repeatability sources = " + (2 * n).to_string() + ", shared sources = 2")
-    print("fit: T² = " + four(slope) + " L + " + four(intercept) + " s²; R² = " + six(r_squared))
-    print("g = " + four(gravity) + " m/s²; linearized standard uncertainty = " + four(gravity_uncertainty) + " m/s²")
-    print("shared-source correlation (ruler zero, clock zero) = " + four(shared_source_correlation))
-    print("independent variance contribution = " + (sqrt(variance_independent)).to_string() + " m/s²")
-    print(viz.grid([fit_figure.svg(), input_table.svg()], 1, 680, 420, title: "Reproducible pendulum calibration"))
+    viz.grid([fit_figure.svg(), input_table.svg()], 1, 680, 420, title: "Reproducible pendulum calibration")
 }
 
-fn main() -> Void {
+fn print_report(analysis: PendulumAnalysis) -> Void {
+    n = analysis.periods_s.length()
+    print("workflow = dimensional pendulum calibration; synthetic data")
+    print("observations = " + n.to_string() + ", repeatability sources = " + (2 * n).to_string() + ", shared sources = 2")
+    print("fit: T² = " + four(analysis.slope) + " L + " + four(analysis.intercept) + " s²; R² = " + six(analysis.r_squared))
+    print("g = " + four(analysis.gravity.value() * analysis.gravity.unit_scale()) + " m/s²; linearized standard uncertainty = " + four(analysis.gravity_uncertainty.value() * analysis.gravity_uncertainty.unit_scale()) + " m/s²")
+    print("shared-source correlation (ruler zero, clock zero) = " + four(analysis.shared_source_correlation))
+    print("independent variance contribution = " + (analysis.independent_uncertainty.value() * analysis.independent_uncertainty.unit_scale()).to_string() + " m/s²")
+}
+
+fn load_analysis() -> Result<PendulumAnalysis, String> {
     loaded = match read_file("data.json") {
         Ok(contents) => contents,
         Err(_message) => {
-            print("input error: could not read data.json")
-            return
+            return Err("input error: could not read data.json")
         },
     }
     parsed = json.parse(loaded)
     if parsed.is_err() {
-        print("input error: data.json is not valid JSON")
-        return
+        return Err("input error: data.json is not valid JSON")
     }
     document = parsed.unwrap()
     parameters = json.object_get(document, "parameters")
     if parameters.is_none() {
-        print("input error: missing parameters object")
-        return
+        return Err("input error: missing parameters object")
     }
     config = parameters.unwrap()
     lengths = input_scalar_series(config, "length_m")
@@ -374,32 +405,25 @@ fn main() -> Void {
     clock_zero_sigma = input_number(config, "clock_zero_sigma_s")
     correlation = input_number(config, "ruler_clock_zero_correlation")
     if lengths.is_err() {
-        print("input error: length_m must be a numeric array")
-        return
+        return Err("input error: length_m must be a numeric array")
     }
     if periods.is_err() {
-        print("input error: period_s must be a numeric array")
-        return
+        return Err("input error: period_s must be a numeric array")
     }
     if length_sigma.is_err() {
-        print("input error: length_repeat_sigma_m must be numeric")
-        return
+        return Err("input error: length_repeat_sigma_m must be numeric")
     }
     if period_sigma.is_err() {
-        print("input error: period_repeat_sigma_s must be numeric")
-        return
+        return Err("input error: period_repeat_sigma_s must be numeric")
     }
     if ruler_zero_sigma.is_err() {
-        print("input error: ruler_zero_sigma_m must be numeric")
-        return
+        return Err("input error: ruler_zero_sigma_m must be numeric")
     }
     if clock_zero_sigma.is_err() {
-        print("input error: clock_zero_sigma_s must be numeric")
-        return
+        return Err("input error: clock_zero_sigma_s must be numeric")
     }
     if correlation.is_err() {
-        print("input error: ruler_clock_zero_correlation must be numeric")
-        return
+        return Err("input error: ruler_clock_zero_correlation must be numeric")
     }
     analyze(
         lengths.unwrap(),
@@ -410,4 +434,14 @@ fn main() -> Void {
         clock_zero_sigma.unwrap(),
         correlation.unwrap()
     )
+}
+
+fn main() -> Void {
+    match load_analysis() {
+        Ok(analysis) => {
+            print_report(analysis)
+            print(render(analysis))
+        },
+        Err(message) => print(message),
+    }
 }

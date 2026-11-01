@@ -12575,7 +12575,7 @@ fn pendulum_calibration_workflow_matches_interpreter_native_and_wasi_emission() 
     let backend = run(&["--native-type-report", &source]);
     assert!(backend.status.success(), "{}", stderr(&backend));
     assert!(
-        stdout(&backend).contains("examples/viz_pendulum_calibration.ostrin ir=7 hir=2 ast=0")
+        stdout(&backend).contains("examples/viz_pendulum_calibration.ostrin ir=10 hir=2 ast=0")
             && stdout(&backend).contains("ast-fallback: 0")
             && stdout(&backend).contains("divergences: 0"),
         "the dimensional workflow must preserve its typed backend profile: {}",
@@ -12671,6 +12671,63 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
             "pendulum workflow run {repeat} leaked: {}",
             String::from_utf8_lossy(&native.stderr)
         );
+    }
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&data).expect("read pendulum fixture"))
+            .expect("parse pendulum fixture");
+    for (field, invalid, expected) in [
+        (
+            "length_repeat_sigma_m",
+            -0.1,
+            "input error: standard uncertainties must be non-negative\n",
+        ),
+        (
+            "ruler_clock_zero_correlation",
+            1.1,
+            "input error: shared-source correlation must be between -1 and 1\n",
+        ),
+        (
+            "length_m_3",
+            -0.45,
+            "input error: all lengths and periods must be finite and positive\n",
+        ),
+    ] {
+        let mut changed = fixture.clone();
+        changed["parameters"][field] = serde_json::json!(invalid);
+        fs::write(work.join("data.json"), changed.to_string()).expect("stage invalid fixture");
+        for (mut command, native) in [
+            (
+                {
+                    let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+                    command.arg("--run").arg(&staged_source);
+                    command
+                },
+                false,
+            ),
+            (Command::new(&exe), true),
+        ] {
+            let result = command
+                .current_dir(&work)
+                .output()
+                .expect("run invalid pendulum input");
+            assert!(
+                result.status.success(),
+                "{field}: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&result.stdout).replace("\r\n", "\n"),
+                expected
+            );
+            if native {
+                assert!(
+                    String::from_utf8_lossy(&result.stderr).contains("live_allocations=0"),
+                    "{field}: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                );
+            }
+        }
     }
 
     fs::remove_file(work.join("data.json")).expect("failed to remove pendulum input snapshot");
