@@ -14,7 +14,7 @@
     "evidenceRevision": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
     "lastValidatedRemotePullRequestHead": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
-    "lastObservedRemotePullRequestHead": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
+    "lastObservedRemotePullRequestHead": "0b011dd707126e487034b431fb7afc9480f54069",
     "releaseTag": "v0.2.0",
     "revisionSemantics": "sourceRevision identifies the latest tested profiler tree; evidenceRevision is the preceding committed evidence checkpoint. Current receipts bind their own tested trees and content hashes; their recording commits resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
   },
@@ -39,7 +39,7 @@
     "name": "authoritative-array-input-and-variable-row-validation",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
-    "status": "Prepared for existing PR #237. Source 3b60f21 is validated locally; require the actual updated HEAD CI and WASI artifact. Historical 728d224 green checks do not validate this extension.",
+    "status": "Current head 0b011dd fails the macOS native pendulum test with SIGTRAP before stdout/stderr. Linux, UBSan, website/browser, three-host benchmarks and standalone ten-case WASI passed; Windows and ASan were still running when observed. Add bounded macOS diagnostics; do not treat this head as integration-ready.",
     "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
     "evidenceRevision": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "scope": [
@@ -57,7 +57,8 @@
       "Clean 3b60f21 seven paired native phase captures retained exact interpreted baseline output and zero-live counters. Old output identity is unchanged; input/source bytes changed, so timing differences are not a controlled speed comparison. Receipt: validation/m1-pendulum-array-input-phases-linux.json.",
       "42 benchmark/oracle/plan tests and 33 bundle/replay tests passed; all 30 experiment replays and 12 demos matched the regenerated source-backed figures. Distribution, Linguist and project-plan gates passed.",
       "Historical 728d224 passed fourteen checks, the three-host benchmark/provenance matrix and standalone WASI run 41257538742. Its Linux phase artifact was downloaded and inspected; input-stage CPU exceeded analysis/rendering there as well, without a cross-host timing equivalence claim.",
-      "PR #239 remains exact-head 7f7a3ba ten-check/WASI34 green; automated fresh review remains unavailable due the earlier quota rejection. No PR merge, tag or release performed."
+      "PR #239 remains exact-head 7f7a3ba ten-check/WASI34 green; automated fresh review remains unavailable due the earlier quota rejection. No PR merge, tag or release performed.",
+      "Actual head 0b011dd: macOS CI run 41260414100 job 124712327766 failed (383 passed, 1 failed) on first native pendulum execution with SIGTRAP and empty output. Compiler/runtime remain unchanged. The separate macOS benchmark passed, so the failure requires diagnosis rather than an assumed platform-wide rejection."
     ],
     "activePullRequests": [
       235,
@@ -86,55 +87,56 @@
     "lastPhaseProfileSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
   },
   "pending": [
-    "Ensure PR #237 contains this package and validate its actual updated HEAD, native phase artifact and standalone ten-case WASI workflow; do not inherit 728d224 results.",
+    "Diagnose the macOS SIGTRAP on head 0b011dd using retained native C/binary, codesign verification and LLDB backtrace; rerun the actual corrected HEAD before any integration.",
     "New exact-head review and explicit merge authorization remain pending for PRs #235-#239; do not repeat unchanged Code Review quota requests.",
     "Input decoding remains the dominant CPU stage in the observed captures; isolate its costs before optimizing. Measurement overhead, pure loader time, allocated bytes and compiler memory remain unmeasured.",
     "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41257377871,
-    "status": "success",
-    "head": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
+    "runId": 41260414100,
+    "status": "failure-observed-other-jobs-pending",
+    "head": "0b011dd707126e487034b431fb7afc9480f54069",
     "relatedRuns": [
       {
         "workflow": "Compiler benchmarks",
-        "runId": 41257377971,
+        "runId": 41260413888,
         "status": "success"
       },
       {
         "workflow": "Browser audit",
-        "runId": 41257377894,
+        "runId": 41260413913,
         "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 41257377903,
-        "status": "success"
+        "runId": 41260413886,
+        "status": "ubsan-success-asan-in-progress"
       },
       {
         "workflow": "CodeQL",
-        "runId": 41257377870,
+        "runId": 41260413885,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 41257377867,
+        "runId": 41260413974,
         "status": "success"
       },
       {
         "workflow": "Standalone WASI",
-        "runId": 41257538742,
+        "runId": 41260486364,
         "status": "success"
       }
     ],
-    "note": "Historical source 728d224 only: fourteen checks and standalone WASI passed. Current authoritative-array code requires fresh exact-head results."
+    "note": "The current-head macOS native SIGTRAP is unresolved. Green historical results are retained in git history and do not override this failure."
   },
   "blockers": [
+    "PR #237 actual head 0b011dd fails its macOS native pendulum test with SIGTRAP; no silent retry or green-head substitution.",
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Validate changed PR #237 CI/artifacts once available; independently investigate input-decoder CPU or remaining type/ownership/R3 boundaries using controlled evidence. Preserve v0.2.0; no unauthorized integration.",
+  "next": "Collect bounded macOS native failure diagnostics in CI; independently measure the repeated UTF-8 scan cost in ignored emitted-C prototypes. Keep compiler changes separate from diagnosis until evidence supports a correction.",
   "latestPullRequestValidation": {
     "number": 239,
     "url": "https://github.com/sircalch/Ostrin/pull/239",
@@ -192,8 +194,8 @@
     {
       "gate": "A-compiler",
       "status": "OPEN",
-      "remaining": "Direct List<Value>-to-Float array decoding and typed managed result pass locally; require updated integrated-source CI.",
-      "evidenceStatus": "LOCAL_PASS_CI_PENDING"
+      "remaining": "Direct List<Value>-to-Float array decoding and typed managed result pass locally; require updated integrated-source CI. Actual head 0b011dd has an unresolved macOS native SIGTRAP.",
+      "evidenceStatus": "MACOS_NATIVE_FAILURE_UNDER_DIAGNOSIS"
     },
     {
       "gate": "B-science",
@@ -204,14 +206,14 @@
     {
       "gate": "C-memory",
       "status": "OPEN",
-      "remaining": "Array/typed-result positive and rejected paths passed native sanitizers/leak checks and ten compiled-WASI cases; require full new-head suites.",
-      "evidenceStatus": "FOCUSED_PASS"
+      "remaining": "Array/typed-result positive and rejected paths passed native sanitizers/leak checks and ten compiled-WASI cases; require full new-head suites. Actual head 0b011dd has an unresolved macOS native SIGTRAP.",
+      "evidenceStatus": "MACOS_NATIVE_FAILURE_UNDER_DIAGNOSIS"
     },
     {
       "gate": "D-execution",
       "status": "OPEN",
-      "remaining": "New array schema passed Windows/Linux and ten compiled-WASI cases; updated three-platform CI and artifacts remain pending.",
-      "evidenceStatus": "LOCAL_HOSTS_AND_WASI_PASS"
+      "remaining": "New array schema passed Windows/Linux and ten compiled-WASI cases; updated three-platform CI and artifacts remain pending. Actual head 0b011dd has an unresolved macOS native SIGTRAP.",
+      "evidenceStatus": "MACOS_NATIVE_FAILURE_UNDER_DIAGNOSIS"
     },
     {
       "gate": "E-reproducibility",
