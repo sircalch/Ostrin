@@ -1,0 +1,732 @@
+{
+  "schema": "ostrin.native-phase-profile/v1",
+  "revision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+  "gitClean": true,
+  "iterations": 7,
+  "warmups": 1,
+  "source": {
+    "path": "examples/viz_pendulum_calibration.ostrin",
+    "sha256": "932ddd18ac3dda5326fa3e0fe541e973996b3fd32575da0f35af80aed6f3d1ab"
+  },
+  "input": {
+    "path": "experiments/pendulum-calibration.inputs.json",
+    "sha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf"
+  },
+  "compilerSha256": "0dbd980053c42f8464bf3b97447744d554bafa6d46dd6783316d1ba4331e7b54",
+  "compilerVersion": "ostrinc 0.2.0",
+  "cc": {
+    "command": "gcc",
+    "version": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+  },
+  "host": {
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.21.0",
+    "cpu": "AMD Ryzen 7 5700X 8-Core Processor",
+    "osRelease": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "emittedCSha256": "9b036bba41e3b669c71ef1edb05103ff6f841a7d4466750f0712fb4ed76ef91b",
+  "instrumentedCSha256": "e9ce9d28d30b5cb1022ded5770fd5447c9b8db33d06ee95be6e269ebc69af225",
+  "profilerSourceSha256": "10e6bfda9cc6efd39dd2e44efba45455feec30b76d5d5d861143bd11f98ccc96",
+  "controlSha256": "929291a8380ad145e3320a7618dae998a51207e8725b1f5ef3e98e439e640129",
+  "profiledSha256": "358714b557b641752cda81057bbfac9cbc922a7e0c58cc6ac19d35b29e90fef5",
+  "flags": [
+    "-O2",
+    "-pthread",
+    "-lm",
+    "-ffp-contract=off"
+  ],
+  "instrumentationFlags": [
+    "-finstrument-functions",
+    "-finstrument-functions-exclude-function-list=ostrin_mutex_init,ostrin_mutex_destroy,ostrin_mutex_lock,ostrin_mutex_unlock,ostrin_cond_init,ostrin_cond_destroy,ostrin_cond_wait,ostrin_cond_wait_timeout,ostrin_cond_signal,ostrin_cond_broadcast,ostrin_select_wait,ostrin_thread_boot,ostrin_thread_start,ostrin_thread_join,ostrin_thread_start_detached,ostrin_task_enter,ostrin_task_leave,ostrin_cancellation_requested,ostrin_task_checkpoint,ostrin_hash_ptr,ostrin_table_insert,ostrin_table_grow,ostrin_table_link,ostrin_runtime_init,ostrin_heap_lock,ostrin_heap_unlock,ostrin_register_task,ostrin_unregister_task,ostrin_poll_tasks_from,ostrin_poll_all,ostrin_poll_one,ostrin_cancel_group,ostrin_poll_group,ostrin_drain_group,ostrin_current_group,ostrin_scope_begin,ostrin_scope_end,ostrin_scope_cancel_all,ostrin_cancel_active_scopes,ostrin_task_mark,ostrin_drain_tasks,ostrin_track_task_handle,ostrin_mark_task_handle_released,ostrin_clear_task_handles,ostrin_register_allocation_with_drop,ostrin_register_allocation,ostrin_alloc,ostrin_alloc_with_drop,ostrin_calloc_with_drop,ostrin_calloc,ostrin_realloc,ostrin_free,ostrin_retain,ostrin_release,ostrin_release_owned,ostrin_mem_report,ostrin_mem_cleanup,ostrin_abs_i64,ostrin_idiv,ostrin_irem,ostrin_hash_u64,ostrin_hash_combine,ostrin_hash_string,ostrin_hash_float,ostrin_hash_float32,ostrin_cwd,ostrin_file_exists,ostrin_expand_exp,ostrin_fmt_double,ostrin_fmt_single,ostrin_single_to_string,ostrin_print_single,ostrin_int_to_string,ostrin_uint_to_string,ostrin_float_to_string,ostrin_float_format,ostrin_print_float,ostrin_str_concat,ostrin_show_cat,ostrin_show_catf,ostrin_s_dup,ostrin_s_space,ostrin_s_length,ostrin_s_utf8_width,ostrin_s_byte_offset,ostrin_s_char_at,ostrin_s_slice,ostrin_s_codepoint,ostrin_s_from_codepoint,ostrin_s_trim,ostrin_s_upper,ostrin_s_lower,ostrin_s_starts_with,ostrin_s_ends_with,ostrin_s_replace,ostrin_s_format,ostrin_s_path_join,ostrin_s_split,ostrin_s_lines,ostrin_s_join,ostrin_s_ieq,ostrin_s_float_check,ostrin_sbuf_push,ostrin_sbuf_take,ostrin_srow_push,ostrin_s_csv,ostrin_dm_pow2,ostrin_dm_exp,ostrin_dm_ln,ostrin_dm_log10,ostrin_dm_sin_kernel,ostrin_dm_cos_kernel,ostrin_dm_reduce,ostrin_dm_sin,ostrin_dm_cos,ostrin_dm_tan,ostrin_dm_atan_series,ostrin_dm_atan_core,ostrin_dm_atan,ostrin_dm_atan2,ostrin_dm_asin,ostrin_dm_acos,ostrin_dm_sinh,ostrin_dm_cosh,ostrin_dm_tanh,ostrin_dm_pow,ostrin_dm_powf,ostrin_dm_atan2f,ostrin_dm_erf,ostrin_dm_norm_pdf,ostrin_dm_norm_cdf,ostrin_splitmix64,ostrin_rng_new,ostrin_rotl,ostrin_rng_u64,ostrin_rng_float,ostrin_rng_int,ostrin_rng_normal,ostrin_qty_retain,ostrin_qty_release,ostrin_qty_copy,ostrin_qty_from_borrowed,ostrin_qty_from_owned,ostrin_unit_lookup,ostrin_unit_pow,ostrin_unit_push,ostrin_unit_drop_zero,ostrin_unit_parse,ostrin_unit_expr_factor,ostrin_convert,ostrin_unit_cat,ostrin_unit_combine,ostrin_temperature_point_to_kelvin,ostrin_temperature_point_from_kelvin,ostrin_temperature_point_new,ostrin_temperature_point_to,ostrin_temperature_point_cmp,ostrin_temperature_point_difference,ostrin_temperature_point_shift,ostrin_print_temperature_point,ostrin_qty_add,ostrin_qty_sub,ostrin_qty_mul,ostrin_qty_div,ostrin_qty_mul_pure,ostrin_qty_ratio,ostrin_qty_scale_mul,ostrin_qty_scale_div,ostrin_scalar_div_qty,ostrin_qty_cmp,ostrin_print_qty,ostrin_qty_to_string,ostrin_file_plain_dup,ostrin_file_error_dup,ostrin_file_outcome_dispose,ostrin_file_read_blocking,ostrin_file_write_blocking,ostrin_file_request_release,ostrin_file_request_start,ostrin_file_request_worker,ostrin_file_request_wait,ostrin_file_read_cancelable,ostrin_file_write_cancelable,Array_Bool_drop,Array_Bool_alloc,Array_Bool_check_shape,Array_Bool_full,Array_Bool_from1,Array_Bool_from2,Array_Bool_from3,Array_Bool_apply,Array_Bool_binop,Array_Bool_cmp_apply,Array_Bool_cmp,Array_Bool_cmp_scalar,Array_Bool_mask,Array_Bool_slice,Array_Bool_any,Array_Bool_all,Array_Bool_count_true,Array_Bool_row,Array_Bool_col,Array_Bool_from_scalar,Array_Bool_not,Array_Bool_where,Array_Bool_scalar,Array_Bool_neg,Array_Bool_map,Array_Bool_msort,Array_Bool_sorted_flat,Array_Bool_sort,Array_Bool_cumsum,Array_Bool_sum,Array_Bool_min,Array_Bool_max,Array_Bool_rank,Array_Bool_size,Array_Bool_shape,Array_Bool_to_list,Array_Bool_offset,Array_Bool_get,Array_Bool_set,Array_Bool_index1,Array_Bool_reshape,Array_Bool_transpose,Array_Bool_sum_axis,Array_Bool_dot,Array_Bool_matmul,Array_Bool_show_rec,Array_Int_drop,Array_Int_alloc,Array_Int_check_shape,Array_Int_full,Array_Int_from1,Array_Int_from2,Array_Int_from3,Array_Int_apply,Array_Int_binop,Array_Int_cmp_apply,Array_Int_cmp,Array_Int_cmp_scalar,Array_Int_mask,Array_Int_slice,Array_Int_any,Array_Int_all,Array_Int_count_true,Array_Int_row,Array_Int_col,Array_Int_from_scalar,Array_Int_not,Array_Int_where,Array_Int_scalar,Array_Int_neg,Array_Int_map,Array_Int_randint,Array_Int_permutation,Array_Int_msort,Array_Int_sorted_flat,Array_Int_sort,Array_Int_cumsum,Array_Int_sum,Array_Int_min,Array_Int_max,Array_Int_rank,Array_Int_size,Array_Int_shape,Array_Int_to_list,Array_Int_offset,Array_Int_get,Array_Int_set,Array_Int_index1,Array_Int_reshape,Array_Int_transpose,Array_Int_sum_axis,Array_Int_dot,Array_Int_matmul,Array_Int_show_rec,Array_Int_mean,Array_Int_arange,Array_Float_drop,Array_Float_alloc,Array_Float_check_shape,Array_Float_full,Array_Float_from1,Array_Float_from2,Array_Float_from3,Array_Float_apply,Array_Float_binop,Array_Float_cmp_apply,Array_Float_cmp,Array_Float_cmp_scalar,Array_Float_mask,Array_Float_slice,Array_Float_any,Array_Float_all,Array_Float_count_true,Array_Float_row,Array_Float_col,Array_Float_from_scalar,Array_Float_not,Array_Float_where,Array_Float_scalar,Array_Float_neg,Array_Float_map,Array_Float_rand,Array_Float_randn,Array_Float_msort,Array_Float_sorted_flat,Array_Float_sort,Array_Float_cumsum,Array_Float_sum,Array_Float_min,Array_Float_max,Array_Float_rank,Array_Float_size,Array_Float_shape,Array_Float_to_list,Array_Float_offset,Array_Float_get,Array_Float_set,Array_Float_index1,Array_Float_reshape,Array_Float_transpose,Array_Float_sum_axis,Array_Float_dot,Array_Float_matmul,Array_Float_show_rec,Array_Float_vector,Array_Float_solve_raw,Array_Float_norm,Array_Float_eigvals,Array_Float_det_raw,Array_Float_square_check,Array_Float_det,Array_Float_trace,Array_Float_inv,Array_Float_eye,Array_Float_solve,Array_Float_linfit,Array_Float_polyfit,Array_Float_horner,Array_Float_polyval,Array_Float_polyval_array,Array_Float_histogram,Array_Float_norm_map,Array_Float_mean_value,Array_Float_var_ddof,Array_Float_var,Array_Float_std,Array_Float_sample_var,Array_Float_sample_std,Array_Float_median,Array_Float_percentile,Array_Float_cov,Array_Float_corr,Array_Float_mean,Array_Float_linspace,Array_Int_to_float,ostrin_fn_std_numeric__trapz,ostrin_fn_std_numeric__simpson,ostrin_fn_std_numeric__bisect,ostrin_fn_std_numeric__secant,ostrin_fn_std_numeric__newton,ostrin_fn_std_numeric__derivative,ostrin_fn_std_numeric__golden_min,ostrin_fn_std_numeric__segment,ostrin_fn_std_numeric__interp,ostrin_fn_std_numeric__interp_all,ostrin_fn_std_numeric__spline,ostrin_fn_std_numeric__solution,ostrin_fn_std_numeric__qr,ostrin_fn_std_numeric__cholesky,ostrin_fn_std_numeric__mark_used,ostrin_fn_std_numeric__symmetric_eigen,ostrin_fn_std_numeric__eigen_order,ostrin_fn_std_numeric__eigen_order_ascending,ostrin_fn_std_numeric__eigen,ostrin_fn_std_numeric__svd,ostrin_fn_std_numeric__lu,ostrin_fn_std_numeric__rk4,ostrin_fn_std_numeric__rk45,ostrin_fn_std_numeric__complex,ostrin_fn_std_numeric__polar,ostrin_fn_std_numeric__cis,ostrin_fn_std_numeric__powi,ostrin_fn_std_numeric__complex_vector,ostrin_fn_std_numeric__complex_matrix,ostrin_fn_std_numeric__power_of_two,ostrin_fn_std_numeric__transform,ostrin_fn_std_numeric__pow2,ostrin_fn_std_numeric__fft,ostrin_fn_std_numeric__ifft,ostrin_fn_std_numeric__frequencies,ostrin_fn_std_numeric__amplitude,ostrin_fn_std_viz__light,ostrin_fn_std_viz__dark,ostrin_fn_std_viz__table,ostrin_fn_std_viz__empty,ostrin_fn_std_viz__has_range,ostrin_fn_std_viz__series,ostrin_fn_std_viz__num,ostrin_fn_std_viz__px,ostrin_fn_std_viz__escape,ostrin_fn_std_viz__attr,ostrin_fn_std_viz__escape_attr,ostrin_fn_std_viz__binding_attr,ostrin_fn_std_viz__binding_name,ostrin_fn_std_viz__provenance_metadata,ostrin_fn_std_viz__text_at,ostrin_fn_std_viz__seg,ostrin_fn_std_viz__header,ostrin_fn_std_viz__tip,ostrin_fn_std_viz__short,ostrin_fn_std_viz__named,ostrin_fn_std_viz__pow10,ostrin_fn_std_viz__nice_step,ostrin_fn_std_viz__decimals,ostrin_fn_std_viz__ticks,ostrin_fn_std_viz__tick_label,ostrin_fn_std_viz__stops,ostrin_fn_std_viz__clamp01,ostrin_fn_std_viz__rgb_part,ostrin_fn_std_viz__colormap,ostrin_fn_std_viz__pick,ostrin_fn_std_viz__gradient,ostrin_fn_std_viz__colorbar,ostrin_fn_std_viz__uid,ostrin_fn_std_viz__figure,ostrin_fn_std_viz__axis_title,ostrin_fn_std_viz__is_grid,ostrin_fn_std_viz__render,ostrin_fn_std_viz__min_gap,ostrin_fn_std_viz__center_gap,ostrin_fn_std_viz__path_of,ostrin_fn_std_viz__stream_value,ostrin_fn_std_viz__sample_stream,ostrin_fn_std_viz__stream_inside,ostrin_fn_std_viz__integrate_stream,ostrin_fn_std_viz__draw_series,ostrin_fn_std_viz__draw_quiver,ostrin_fn_std_viz__draw_heatmap,ostrin_fn_std_viz__draw_contour,ostrin_fn_std_viz__draw_contourf,ostrin_fn_std_viz__draw_hexbin,ostrin_fn_std_viz__legend,ostrin_fn_std_viz__min_of,ostrin_fn_std_viz__max_of,ostrin_fn_std_viz__is_motion,ostrin_fn_std_viz__animate_attr,ostrin_fn_std_viz__screen_xs,ostrin_fn_std_viz__screen_ys,ostrin_fn_std_viz__draw_motion,ostrin_fn_std_viz__motion_series,ostrin_fn_std_viz__table_column_widths,ostrin_fn_std_viz__render_table,ostrin_fn_std_viz__scene3d,ostrin_fn_std_viz__grid_of,ostrin_fn_std_viz__clamp_index,ostrin_fn_std_viz__slice_xy,ostrin_fn_std_viz__slice_xz,ostrin_fn_std_viz__slice_yz,ostrin_fn_std_viz__iso_intersection,ostrin_fn_std_viz__tetra_isoline,ostrin_fn_std_viz__norm,ostrin_fn_std_viz__project_x,ostrin_fn_std_viz__project_y,ostrin_fn_std_viz__depth,ostrin_fn_std_viz__pt,ostrin_fn_std_viz__argsort,ostrin_fn_std_viz__render3d,ostrin_fn_std_viz__edge,ostrin_fn_std_viz__axes3d,ostrin_fn_std_viz__shade,ostrin_fn_std_viz__draw_slice,ostrin_fn_std_viz__draw_mesh3,ostrin_fn_std_viz__draw_surface,ostrin_fn_std_viz__grid,ostrin_fn_std_viz__svg_size,ostrin_fn_std_viz__animate,ostrin_fn_std_measurements__exact,ostrin_fn_std_measurements__standard,ostrin_fn_std_measurements__from_source,ostrin_fn_std_measurements__unknown,ostrin_fn_std_measurements__value,ostrin_fn_std_measurements__is_known,ostrin_fn_std_measurements__is_exact,ostrin_fn_std_measurements__source_count,ostrin_fn_std_measurements__values,ostrin_fn_std_measurements__uncertainties,ostrin_fn_std_measurements__sum,ostrin_fn_std_measurements__mean,ostrin_fn_std_measurements__uncertainty,ostrin_fn_std_measurements__summary,ostrin_fn_std_measurements__variance,ostrin_fn_std_measurements__merge_scaled,ostrin_fn_std_measurements__unknown_from,ostrin_fn_std_measurements__scale,ostrin_fn_std_measurements__add,ostrin_fn_std_measurements__sub,ostrin_fn_std_measurements__mul,ostrin_fn_std_measurements__div,ostrin_fn_std_measurements__covariance_midpoint,ostrin_fn_std_measurements__covariance_validation_error,ostrin_fn_std_measurements__covariance,ostrin_fn_std_measurements__covariance_source_index,ostrin_fn_std_measurements__covariance_symmetric_entry,ostrin_fn_std_measurements__covariance_correlation_matrix,ostrin_fn_std_measurements__covariance_semidefinite_factor,ostrin_fn_std_measurements__variance_with_covariance,ostrin_fn_std_measurements__uncertainty_with_covariance,ostrin_fn_input_number,ostrin_fn_input_numbers,ostrin_fn_measured_length,ostrin_fn_measured_period,ostrin_fn_four,ostrin_fn_six,ostrin_fn_std_json__empty_values,ostrin_fn_std_json__empty_keys,ostrin_fn_std_json__is_digit,ostrin_fn_std_json__char_is,ostrin_fn_std_json__append_text,ostrin_fn_std_json__append_value,ostrin_fn_std_json__null_value,ostrin_fn_std_json__bool_value,ostrin_fn_std_json__number_value,ostrin_fn_std_json__text_value,ostrin_fn_std_json__array_value,ostrin_fn_std_json__object_value,ostrin_fn_std_json__kind,ostrin_fn_std_json__as_bool,ostrin_fn_std_json__as_number,ostrin_fn_std_json__as_text,ostrin_fn_std_json__array_items,ostrin_fn_std_json__object_keys,ostrin_fn_std_json__object_get,ostrin_fn_std_json__parse,ostrin_fn_std_json__quote_string,ostrin_fn_std_json__render,ostrin_fn_std_json__stringify,std_numeric__Spline__sample,std_numeric__Spline__at,std_numeric__Cholesky__reconstruct,std_numeric__Cholesky__solve,std_numeric__Spectrum__length,std_numeric__Spectrum__magnitude,std_viz__Scene3D__slice_xz,std_viz__Scene3D__line,std_viz__Scene3D__isosurface,std_viz__Scene3D__bind,std_viz__Scene3D__slice_yz,std_viz__Scene3D__wireframe,std_viz__Scene3D__svg,std_viz__Scene3D__save,std_viz__Scene3D__view,std_viz__Scene3D__provenance,std_viz__Scene3D__dark,std_viz__Scene3D__vector_field,std_viz__Scene3D__labels,std_viz__Scene3D__scatter,std_viz__Scene3D__surface,std_viz__Scene3D__describe,std_viz__Scene3D__slice_xy,std_viz__Scene3D__size,std_numeric__Solution__length,std_numeric__Solution__component,std_numeric__Solution__final_state,std_numeric__Svd__rank,std_numeric__Svd__solve,std_numeric__Svd__condition_number,std_numeric__Svd__reconstruct,std_numeric__Complex__div,std_numeric__Complex__neg,std_numeric__Complex__equals,std_numeric__Complex__conjugate,std_numeric__Complex__magnitude,std_numeric__Complex__rsub,std_numeric__Complex__rmul,std_numeric__Complex__add,std_numeric__Complex__real,std_numeric__Complex__imag,std_numeric__Complex__radd,std_numeric__Complex__sub,std_numeric__Complex__rdiv,std_numeric__Complex__mul,std_numeric__Lu__determinant,std_numeric__Lu__reconstruct,std_numeric__Lu__solve,std_viz__Figure__no_legend,std_viz__Figure__svg,std_viz__Figure__vline,std_viz__Figure__xlim,std_viz__Figure__animate,std_viz__Figure__errorbars,std_viz__Figure__dark,std_viz__Figure__violin,std_viz__Figure__contour,std_viz__Figure__scatter,std_viz__Figure__add,std_viz__Figure__boxplot,std_viz__Figure__band,std_viz__Figure__text,std_viz__Figure__hexbin,std_viz__Figure__labels,std_viz__Figure__heatmap,std_viz__Figure__provenance,std_viz__Figure__quiver,std_viz__Figure__hline,std_viz__Figure__save,std_viz__Figure__rod,std_viz__Figure__moving_segment,std_viz__Figure__size,std_viz__Figure__bars,std_viz__Figure__morph,std_viz__Figure__moving_point,std_viz__Figure__line,std_viz__Figure__stairs,std_viz__Figure__contourf,std_viz__Figure__describe,std_viz__Figure__ylim,std_viz__Figure__bind,std_viz__Figure__streamplot,std_viz__Figure__no_axes,std_viz__Figure__histogram,std_viz__Figure__area,std_viz__Table__provenance,std_viz__Table__size,std_viz__Table__bind,std_viz__Table__svg,std_viz__Table__save,std_viz__Table__row_height,std_viz__Table__dark,std_numeric__ComplexVector__at,std_numeric__ComplexVector__magnitude,std_numeric__ComplexVector__length,std_numeric__Qr__reconstruct,std_numeric__Qr__orthogonality,std_numeric__Eigen__reconstruct,std_numeric__ComplexMatrix__matmul,std_numeric__ComplexMatrix__mul_vector,std_numeric__ComplexMatrix__at,std_numeric__ComplexMatrix__conjugate_transpose,std_numeric__ComplexMatrix__solve,std_json__Parser__literal,std_json__Parser__parse_string,std_json__Parser__parse_object,std_json__Parser__parse_value,std_json__Parser__parse_array,std_json__Parser__peek_is,std_json__Parser__peek,std_json__Parser__consume_is,std_json__Parser__peek_digit,std_json__Parser__parse_hex4,std_json__Parser__parse_number,std_json__Parser__consume,std_json__Parser__skip_ws,List_Int_drop,List_Int_new_from_array,List_Int_push,List_Int_length,List_Int_get,List_Int_remove_at,List_Bool_drop,List_Bool_new_from_array,List_Bool_push,List_Bool_length,List_Bool_get,List_Bool_remove_at,List_List_Bool_drop,List_List_Bool_new_from_array,List_List_Bool_push,List_List_Bool_length,List_List_Bool_get,List_List_Bool_remove_at,List_List_List_Bool_drop,List_List_List_Bool_new_from_array,List_List_List_Bool_push,List_List_List_Bool_length,List_List_List_Bool_get,List_List_List_Bool_remove_at,List_List_Int_drop,List_List_Int_new_from_array,List_List_Int_push,List_List_Int_length,List_List_Int_get,List_List_Int_remove_at,List_List_List_Int_drop,List_List_List_Int_new_from_array,List_List_List_Int_push,List_List_List_Int_length,List_List_List_Int_get,List_List_List_Int_remove_at,List_Float_drop,List_Float_new_from_array,List_Float_push,List_Float_length,List_Float_get,List_Float_remove_at,List_List_Float_drop,List_List_Float_new_from_array,List_List_Float_push,List_List_Float_length,List_List_Float_get,List_List_Float_remove_at,List_List_List_Float_drop,List_List_List_Float_new_from_array,List_List_List_Float_push,List_List_List_Float_length,List_List_List_Float_get,List_List_List_Float_remove_at,List_String_drop,List_String_new_from_array,List_String_push,List_String_length,List_String_get,List_String_remove_at,List_List_String_drop,List_List_String_new_from_array,List_List_String_push,List_List_String_length,List_List_String_get,List_List_String_remove_at,List_std_viz__Series_drop,List_std_viz__Series_new_from_array,List_std_viz__Series_push,List_std_viz__Series_length,List_std_viz__Series_get,List_std_viz__Series_remove_at,List_std_viz__Note_drop,List_std_viz__Note_new_from_array,List_std_viz__Note_push,List_std_viz__Note_length,List_std_viz__Note_get,List_std_viz__Note_remove_at,List_std_json__Value_drop,List_std_json__Value_new_from_array,List_std_json__Value_push,List_std_json__Value_length,List_std_json__Value_get,List_std_json__Value_remove_at,List_std_viz__Point3_drop,List_std_viz__Point3_new_from_array,List_std_viz__Point3_push,List_std_viz__Point3_length,List_std_viz__Point3_get,List_std_viz__Point3_remove_at,List_std_measurements__Measurement__Float_drop,List_std_measurements__Measurement__Float_new_from_array,List_std_measurements__Measurement__Float_push,List_std_measurements__Measurement__Float_length,List_std_measurements__Measurement__Float_get,List_std_measurements__Measurement__Float_remove_at,List_std_measurements__Sensitivity__Float_drop,List_std_measurements__Sensitivity__Float_new_from_array,List_std_measurements__Sensitivity__Float_push,List_std_measurements__Sensitivity__Float_length,List_std_measurements__Sensitivity__Float_get,List_std_measurements__Sensitivity__Float_remove_at,List_std_measurements__Sensitivity__Q_Length_drop,List_std_measurements__Sensitivity__Q_Length_new_from_array,List_std_measurements__Sensitivity__Q_Length_push,List_std_measurements__Sensitivity__Q_Length_length,List_std_measurements__Sensitivity__Q_Length_get,List_std_measurements__Sensitivity__Q_Length_remove_at,List_std_measurements__Sensitivity__Q_Time_drop,List_std_measurements__Sensitivity__Q_Time_new_from_array,List_std_measurements__Sensitivity__Q_Time_push,List_std_measurements__Sensitivity__Q_Time_length,List_std_measurements__Sensitivity__Q_Time_get,List_std_measurements__Sensitivity__Q_Time_remove_at,List_std_measurements__Sensitivity__Q_Time_2_drop,List_std_measurements__Sensitivity__Q_Time_2_new_from_array,List_std_measurements__Sensitivity__Q_Time_2_push,List_std_measurements__Sensitivity__Q_Time_2_length,List_std_measurements__Sensitivity__Q_Time_2_get,List_std_measurements__Sensitivity__Q_Time_2_remove_at,List_Q_X_Y_drop,List_Q_X_Y_new_from_array,List_Q_X_Y_push,List_Q_X_Y_length,List_Q_X_Y_get,List_Q_X_Y_remove_at,List_Q_X__1_Y_drop,List_Q_X__1_Y_new_from_array,List_Q_X__1_Y_push,List_Q_X__1_Y_length,List_Q_X__1_Y_get,List_Q_X__1_Y_remove_at,List_Q_D_drop,List_Q_D_new_from_array,List_Q_D_push,List_Q_D_length,List_Q_D_get,List_Q_D_remove_at,List_Q_X_drop,List_Q_X_new_from_array,List_Q_X_push,List_Q_X_length,List_Q_X_get,List_Q_X_remove_at,List_Q_Y_drop,List_Q_Y_new_from_array,List_Q_Y_push,List_Q_Y_length,List_Q_Y_get,List_Q_Y_remove_at,List_List_std_viz__Point3_drop,List_List_std_viz__Point3_new_from_array,List_List_std_viz__Point3_push,List_List_std_viz__Point3_length,List_List_std_viz__Point3_get,List_List_std_viz__Point3_remove_at,List_std_measurements__Sensitivity__Q_D_drop,List_std_measurements__Sensitivity__Q_D_new_from_array,List_std_measurements__Sensitivity__Q_D_push,List_std_measurements__Sensitivity__Q_D_length,List_std_measurements__Sensitivity__Q_D_get,List_std_measurements__Sensitivity__Q_D_remove_at,List_std_measurements__Sensitivity__Q_A_drop,List_std_measurements__Sensitivity__Q_A_new_from_array,List_std_measurements__Sensitivity__Q_A_push,List_std_measurements__Sensitivity__Q_A_length,List_std_measurements__Sensitivity__Q_A_get,List_std_measurements__Sensitivity__Q_A_remove_at,List_std_measurements__Sensitivity__Q_A_B_drop,List_std_measurements__Sensitivity__Q_A_B_new_from_array,List_std_measurements__Sensitivity__Q_A_B_push,List_std_measurements__Sensitivity__Q_A_B_length,List_std_measurements__Sensitivity__Q_A_B_get,List_std_measurements__Sensitivity__Q_A_B_remove_at,List_std_measurements__Sensitivity__Q_B_drop,List_std_measurements__Sensitivity__Q_B_new_from_array,List_std_measurements__Sensitivity__Q_B_push,List_std_measurements__Sensitivity__Q_B_length,List_std_measurements__Sensitivity__Q_B_get,List_std_measurements__Sensitivity__Q_B_remove_at,List_std_measurements__Sensitivity__Q_A_B__1_drop,List_std_measurements__Sensitivity__Q_A_B__1_new_from_array,List_std_measurements__Sensitivity__Q_A_B__1_push,List_std_measurements__Sensitivity__Q_A_B__1_length,List_std_measurements__Sensitivity__Q_A_B__1_get,List_std_measurements__Sensitivity__Q_A_B__1_remove_at,std_measurements__from_quantity_source__Q_Length,std_measurements__add_quantity__Q_Length,std_measurements__from_quantity_source__Q_Time,std_measurements__add_quantity__Q_Time,std_measurements__mul_quantity__Q_Time_Q_Time,std_measurements__unknown_quantity_from__Q_Length,std_measurements__merge_quantity_sources__Q_Length,std_measurements__unknown_quantity_from__Q_Time,std_measurements__merge_quantity_sources__Q_Time,std_measurements__unknown_quantity_from__Q_Time_2,std_measurements__scale_quantity_sources_by_right__Q_Time_Q_Time,std_measurements__scale_quantity_sources_by_left__Q_Time_Q_Time,std_measurements__merge_quantity_sources__Q_Time_2,std_measurements__validate_quantity_source__Q_Length,std_measurements__validate_quantity_source__Q_Time,std_measurements__validate_quantity_source__Q_Time_2,ostrin_retain_enum_Ordering,ostrin_drop_enum_Ordering,ostrin_retain_enum_std_json__Kind,ostrin_drop_enum_std_json__Kind,ostrin_drop_PendulumAnalysis,ostrin_drop_std_json__Parser,ostrin_drop_std_json__Value,ostrin_drop_std_measurements__Measurement__Float,ostrin_drop_std_measurements__Measurement__Q_A,ostrin_drop_std_measurements__Measurement__Q_A_B,ostrin_drop_std_measurements__Measurement__Q_A_B__1,ostrin_drop_std_measurements__Measurement__Q_B,ostrin_drop_std_measurements__Measurement__Q_D,ostrin_drop_std_measurements__Measurement__Q_Length,ostrin_drop_std_measurements__Measurement__Q_Time,ostrin_drop_std_measurements__Measurement__Q_Time_2,ostrin_drop_std_measurements__Sensitivity__Float,ostrin_drop_std_measurements__Sensitivity__Q_A,ostrin_drop_std_measurements__Sensitivity__Q_A_B,ostrin_drop_std_measurements__Sensitivity__Q_A_B__1,ostrin_drop_std_measurements__Sensitivity__Q_B,ostrin_drop_std_measurements__Sensitivity__Q_D,ostrin_drop_std_measurements__Sensitivity__Q_Length,ostrin_drop_std_measurements__Sensitivity__Q_Time,ostrin_drop_std_measurements__Sensitivity__Q_Time_2,ostrin_drop_std_measurements__SourceCovariance,ostrin_drop_std_numeric__Cholesky,ostrin_drop_std_numeric__Complex,ostrin_drop_std_numeric__ComplexMatrix,ostrin_drop_std_numeric__ComplexVector,ostrin_drop_std_numeric__Eigen,ostrin_drop_std_numeric__Lu,ostrin_drop_std_numeric__Qr,ostrin_drop_std_numeric__Solution,ostrin_drop_std_numeric__Spectrum,ostrin_drop_std_numeric__Spline,ostrin_drop_std_numeric__Svd,ostrin_drop_std_numeric__SymmetricEigen,ostrin_drop_std_viz__Camera,ostrin_drop_std_viz__Figure,ostrin_drop_std_viz__Note,ostrin_drop_std_viz__Point3,ostrin_drop_std_viz__Scene3D,ostrin_drop_std_viz__Series,ostrin_drop_std_viz__StreamPath,ostrin_drop_std_viz__Table,ostrin_drop_std_viz__Theme"
+  ],
+  "selectedPhases": [
+    {
+      "name": "process_entry",
+      "parent": null,
+      "function": "main"
+    },
+    {
+      "name": "application",
+      "parent": "process_entry",
+      "function": "ostrin_main"
+    },
+    {
+      "name": "input_and_analysis",
+      "parent": "application",
+      "function": "ostrin_fn_load_analysis"
+    },
+    {
+      "name": "analysis",
+      "parent": "input_and_analysis",
+      "function": "ostrin_fn_analyze"
+    },
+    {
+      "name": "render",
+      "parent": "application",
+      "function": "ostrin_fn_render"
+    },
+    {
+      "name": "text_report",
+      "parent": "application",
+      "function": "ostrin_fn_print_report"
+    }
+  ],
+  "discoveredCFunctions": 932,
+  "runnerScriptSha256": "c72f8d60ee7fdb381f5dbb9bb84188b1e010630ebfe6cdce9c01169b46b670db",
+  "planScriptSha256": "af6ac1b37273b7263baf3f5c2bf6c7b1a49367b3f55bc17f50c95c7c095c9732",
+  "methodology": {
+    "clock": "CLOCK_MONOTONIC and CLOCK_THREAD_CPUTIME_ID nanoseconds inside selected emitted C functions; Node performance.now process observations",
+    "scope": "Single-thread Linux/GCC pendulum workflow; profiling changes optimization/instrumentation overhead. Control uses the same emitted C without instrumentation.",
+    "entryObservation": "Launch-to-entry-marker delivery upper observation, including loader/scheduling/pipe/event-loop delay; not pure loader time.",
+    "residual": "Process elapsed minus C-main inclusive time; includes launch, exit, stream transport, receipt and profiler teardown. Not pure startup time.",
+    "durations": "Inclusive/exclusive phase samples are instrumented observations, never overhead-corrected or claimed as uninstrumented kernel time. Individual medians need not add up; each raw sample partitions its root interval exactly.",
+    "output": "All control/profiled runs must match normalized interpreted report and SVG; zero live managed allocations required."
+  },
+  "medians": {
+    "controlProcessMs": 49.435051000000385,
+    "profiledProcessMs": 45.73731399999815,
+    "entryObservationMs": 17.324932000003173,
+    "phases": [
+      {
+        "name": "process_entry",
+        "inclusiveMs": 26.396985,
+        "exclusiveMs": 0.019627,
+        "inclusiveCpuMs": 11.411881,
+        "exclusiveCpuMs": 0.014677
+      },
+      {
+        "name": "application",
+        "inclusiveMs": 26.386916,
+        "exclusiveMs": 0.087041,
+        "inclusiveCpuMs": 11.394088,
+        "exclusiveCpuMs": 0.065622
+      },
+      {
+        "name": "input_and_analysis",
+        "inclusiveMs": 23.610046,
+        "exclusiveMs": 18.524707,
+        "inclusiveCpuMs": 8.651497,
+        "exclusiveCpuMs": 8.25655
+      },
+      {
+        "name": "analysis",
+        "inclusiveMs": 1.254368,
+        "exclusiveMs": 1.254368,
+        "inclusiveCpuMs": 0.3662,
+        "exclusiveCpuMs": 0.3662
+      },
+      {
+        "name": "render",
+        "inclusiveMs": 3.307951,
+        "exclusiveMs": 3.307951,
+        "inclusiveCpuMs": 2.583123,
+        "exclusiveCpuMs": 2.583123
+      },
+      {
+        "name": "text_report",
+        "inclusiveMs": 0.061214,
+        "exclusiveMs": 0.061214,
+        "inclusiveCpuMs": 0.059921,
+        "exclusiveCpuMs": 0.059921
+      }
+    ]
+  },
+  "samples": [
+    {
+      "order": [
+        "control",
+        "profiled"
+      ],
+      "control": {
+        "elapsedMs": 61.72270800000115,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      },
+      "profiled": {
+        "elapsedMs": 68.2001969999983,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 21.377559000000474,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 39537671,
+              "exclusiveNs": 24295,
+              "inclusiveCpuNs": 18947617,
+              "exclusiveCpuNs": 21420
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 39513376,
+              "exclusiveNs": 92931,
+              "inclusiveCpuNs": 18926197,
+              "exclusiveCpuNs": 96149
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 36061439,
+              "exclusiveNs": 35255924,
+              "inclusiveCpuNs": 16142951,
+              "exclusiveCpuNs": 15785685
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 805515,
+              "exclusiveNs": 805515,
+              "inclusiveCpuNs": 357266,
+              "exclusiveCpuNs": 357266
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 3307951,
+              "exclusiveNs": 3307951,
+              "inclusiveCpuNs": 2637244,
+              "exclusiveCpuNs": 2637244
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 51055,
+              "exclusiveNs": 51055,
+              "inclusiveCpuNs": 49853,
+              "exclusiveCpuNs": 49853
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":39537671,\"exclusiveNs\":24295,\"inclusiveCpuNs\":18947617,\"exclusiveCpuNs\":21420},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":39513376,\"exclusiveNs\":92931,\"inclusiveCpuNs\":18926197,\"exclusiveCpuNs\":96149},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":36061439,\"exclusiveNs\":35255924,\"inclusiveCpuNs\":16142951,\"exclusiveCpuNs\":15785685},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":805515,\"exclusiveNs\":805515,\"inclusiveCpuNs\":357266,\"exclusiveCpuNs\":357266},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":3307951,\"exclusiveNs\":3307951,\"inclusiveCpuNs\":2637244,\"exclusiveCpuNs\":2637244},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":51055,\"exclusiveNs\":51055,\"inclusiveCpuNs\":49853,\"exclusiveCpuNs\":49853}]}"
+        },
+        "launchExitTransportResidualMs": 28.662525999998294
+      }
+    },
+    {
+      "order": [
+        "profiled",
+        "control"
+      ],
+      "profiled": {
+        "elapsedMs": 96.72428599999694,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 21.85566999999719,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 59610782,
+              "exclusiveNs": 18725,
+              "inclusiveCpuNs": 13774098,
+              "exclusiveCpuNs": 13515
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 59592057,
+              "exclusiveNs": 62025,
+              "inclusiveCpuNs": 13760583,
+              "exclusiveCpuNs": 65622
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 55055797,
+              "exclusiveNs": 39807212,
+              "inclusiveCpuNs": 10585995,
+              "exclusiveCpuNs": 10015262
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 15248585,
+              "exclusiveNs": 15248585,
+              "inclusiveCpuNs": 570733,
+              "exclusiveCpuNs": 570733
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 4294582,
+              "exclusiveNs": 4294582,
+              "inclusiveCpuNs": 2931175,
+              "exclusiveCpuNs": 2931175
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 179653,
+              "exclusiveNs": 179653,
+              "inclusiveCpuNs": 177791,
+              "exclusiveCpuNs": 177791
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":59610782,\"exclusiveNs\":18725,\"inclusiveCpuNs\":13774098,\"exclusiveCpuNs\":13515},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":59592057,\"exclusiveNs\":62025,\"inclusiveCpuNs\":13760583,\"exclusiveCpuNs\":65622},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":55055797,\"exclusiveNs\":39807212,\"inclusiveCpuNs\":10585995,\"exclusiveCpuNs\":10015262},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":15248585,\"exclusiveNs\":15248585,\"inclusiveCpuNs\":570733,\"exclusiveCpuNs\":570733},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":4294582,\"exclusiveNs\":4294582,\"inclusiveCpuNs\":2931175,\"exclusiveCpuNs\":2931175},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":179653,\"exclusiveNs\":179653,\"inclusiveCpuNs\":177791,\"exclusiveCpuNs\":177791}]}"
+        },
+        "launchExitTransportResidualMs": 37.11350399999694
+      },
+      "control": {
+        "elapsedMs": 39.425894999993034,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      }
+    },
+    {
+      "order": [
+        "control",
+        "profiled"
+      ],
+      "control": {
+        "elapsedMs": 74.09323099999892,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      },
+      "profiled": {
+        "elapsedMs": 43.892822000001615,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 12.77241900000081,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 26396985,
+              "exclusiveNs": 10069,
+              "inclusiveCpuNs": 10830939,
+              "exclusiveCpuNs": 10781
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 26386916,
+              "exclusiveNs": 57747,
+              "inclusiveCpuNs": 10820158,
+              "exclusiveCpuNs": 57036
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 23610046,
+              "exclusiveNs": 18401457,
+              "inclusiveCpuNs": 8580893,
+              "exclusiveCpuNs": 8219959
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 5208589,
+              "exclusiveNs": 5208589,
+              "inclusiveCpuNs": 360934,
+              "exclusiveCpuNs": 360934
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 2683406,
+              "exclusiveNs": 2683406,
+              "inclusiveCpuNs": 2147264,
+              "exclusiveCpuNs": 2147264
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 35717,
+              "exclusiveNs": 35717,
+              "inclusiveCpuNs": 34965,
+              "exclusiveCpuNs": 34965
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":26396985,\"exclusiveNs\":10069,\"inclusiveCpuNs\":10830939,\"exclusiveCpuNs\":10781},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":26386916,\"exclusiveNs\":57747,\"inclusiveCpuNs\":10820158,\"exclusiveCpuNs\":57036},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":23610046,\"exclusiveNs\":18401457,\"inclusiveCpuNs\":8580893,\"exclusiveCpuNs\":8219959},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":5208589,\"exclusiveNs\":5208589,\"inclusiveCpuNs\":360934,\"exclusiveCpuNs\":360934},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":2683406,\"exclusiveNs\":2683406,\"inclusiveCpuNs\":2147264,\"exclusiveCpuNs\":2147264},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":35717,\"exclusiveNs\":35717,\"inclusiveCpuNs\":34965,\"exclusiveCpuNs\":34965}]}"
+        },
+        "launchExitTransportResidualMs": 17.495837000001615
+      }
+    },
+    {
+      "order": [
+        "profiled",
+        "control"
+      ],
+      "profiled": {
+        "elapsedMs": 45.73731399999815,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 18.998074000002816,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 22087029,
+              "exclusiveNs": 61865,
+              "inclusiveCpuNs": 10389407,
+              "exclusiveCpuNs": 14677
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 22025164,
+              "exclusiveNs": 916211,
+              "inclusiveCpuNs": 10374730,
+              "exclusiveCpuNs": 50316
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 15774551,
+              "exclusiveNs": 10799115,
+              "inclusiveCpuNs": 8001399,
+              "exclusiveCpuNs": 7634567
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 4975436,
+              "exclusiveNs": 4975436,
+              "inclusiveCpuNs": 366832,
+              "exclusiveCpuNs": 366832
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 5273188,
+              "exclusiveNs": 5273188,
+              "inclusiveCpuNs": 2263094,
+              "exclusiveCpuNs": 2263094
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 61214,
+              "exclusiveNs": 61214,
+              "inclusiveCpuNs": 59921,
+              "exclusiveCpuNs": 59921
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":22087029,\"exclusiveNs\":61865,\"inclusiveCpuNs\":10389407,\"exclusiveCpuNs\":14677},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":22025164,\"exclusiveNs\":916211,\"inclusiveCpuNs\":10374730,\"exclusiveCpuNs\":50316},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":15774551,\"exclusiveNs\":10799115,\"inclusiveCpuNs\":8001399,\"exclusiveCpuNs\":7634567},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":4975436,\"exclusiveNs\":4975436,\"inclusiveCpuNs\":366832,\"exclusiveCpuNs\":366832},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":5273188,\"exclusiveNs\":5273188,\"inclusiveCpuNs\":2263094,\"exclusiveCpuNs\":2263094},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":61214,\"exclusiveNs\":61214,\"inclusiveCpuNs\":59921,\"exclusiveCpuNs\":59921}]}"
+        },
+        "launchExitTransportResidualMs": 23.65028499999815
+      },
+      "control": {
+        "elapsedMs": 48.26962900000217,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      }
+    },
+    {
+      "order": [
+        "control",
+        "profiled"
+      ],
+      "control": {
+        "elapsedMs": 45.19332100000611,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      },
+      "profiled": {
+        "elapsedMs": 44.588174000004074,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 13.938774000002013,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 23874266,
+              "exclusiveNs": 19627,
+              "inclusiveCpuNs": 11411881,
+              "exclusiveCpuNs": 17793
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 23854639,
+              "exclusiveNs": 87041,
+              "inclusiveCpuNs": 11394088,
+              "exclusiveCpuNs": 92683
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 19779075,
+              "exclusiveNs": 18524707,
+              "inclusiveCpuNs": 8651497,
+              "exclusiveCpuNs": 8256550
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 1254368,
+              "exclusiveNs": 1254368,
+              "inclusiveCpuNs": 394947,
+              "exclusiveCpuNs": 394947
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 3920527,
+              "exclusiveNs": 3920527,
+              "inclusiveCpuNs": 2583123,
+              "exclusiveCpuNs": 2583123
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 67996,
+              "exclusiveNs": 67996,
+              "inclusiveCpuNs": 66785,
+              "exclusiveCpuNs": 66785
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":23874266,\"exclusiveNs\":19627,\"inclusiveCpuNs\":11411881,\"exclusiveCpuNs\":17793},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":23854639,\"exclusiveNs\":87041,\"inclusiveCpuNs\":11394088,\"exclusiveCpuNs\":92683},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":19779075,\"exclusiveNs\":18524707,\"inclusiveCpuNs\":8651497,\"exclusiveCpuNs\":8256550},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":1254368,\"exclusiveNs\":1254368,\"inclusiveCpuNs\":394947,\"exclusiveCpuNs\":394947},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":3920527,\"exclusiveNs\":3920527,\"inclusiveCpuNs\":2583123,\"exclusiveCpuNs\":2583123},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":67996,\"exclusiveNs\":67996,\"inclusiveCpuNs\":66785,\"exclusiveCpuNs\":66785}]}"
+        },
+        "launchExitTransportResidualMs": 20.713908000004075
+      }
+    },
+    {
+      "order": [
+        "profiled",
+        "control"
+      ],
+      "profiled": {
+        "elapsedMs": 44.32372600000235,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 17.324932000003173,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 22388438,
+              "exclusiveNs": 86941,
+              "inclusiveCpuNs": 10660250,
+              "exclusiveCpuNs": 17001
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 22301497,
+              "exclusiveNs": 620833,
+              "inclusiveCpuNs": 10643249,
+              "exclusiveCpuNs": 80722
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 18332511,
+              "exclusiveNs": 17637091,
+              "inclusiveCpuNs": 7819684,
+              "exclusiveCpuNs": 7477587
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 695420,
+              "exclusiveNs": 695420,
+              "inclusiveCpuNs": 342097,
+              "exclusiveCpuNs": 342097
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 3283132,
+              "exclusiveNs": 3283132,
+              "inclusiveCpuNs": 2678784,
+              "exclusiveCpuNs": 2678784
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 65021,
+              "exclusiveNs": 65021,
+              "inclusiveCpuNs": 64059,
+              "exclusiveCpuNs": 64059
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":22388438,\"exclusiveNs\":86941,\"inclusiveCpuNs\":10660250,\"exclusiveCpuNs\":17001},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":22301497,\"exclusiveNs\":620833,\"inclusiveCpuNs\":10643249,\"exclusiveCpuNs\":80722},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":18332511,\"exclusiveNs\":17637091,\"inclusiveCpuNs\":7819684,\"exclusiveCpuNs\":7477587},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":695420,\"exclusiveNs\":695420,\"inclusiveCpuNs\":342097,\"exclusiveCpuNs\":342097},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":3283132,\"exclusiveNs\":3283132,\"inclusiveCpuNs\":2678784,\"exclusiveCpuNs\":2678784},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":65021,\"exclusiveNs\":65021,\"inclusiveCpuNs\":64059,\"exclusiveCpuNs\":64059}]}"
+        },
+        "launchExitTransportResidualMs": 21.935288000002352
+      },
+      "control": {
+        "elapsedMs": 49.435051000000385,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      }
+    },
+    {
+      "order": [
+        "control",
+        "profiled"
+      ],
+      "control": {
+        "elapsedMs": 60.57653199999913,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        }
+      },
+      "profiled": {
+        "elapsedMs": 52.024365000004764,
+        "outputSha256": "16853e67b49f29988cc86deb517f417af8c897eb0b4c524e101f74cf3583f9e3",
+        "allocations": {
+          "live": 0,
+          "peak": 311,
+          "total": 12199,
+          "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+        },
+        "entryObservationMs": 14.484119000000646,
+        "phaseReport": {
+          "schema": 1,
+          "unknownCalls": 0,
+          "error": 0,
+          "depth": 0,
+          "phases": [
+            {
+              "name": "process_entry",
+              "calls": 1,
+              "inclusiveNs": 29620639,
+              "exclusiveNs": 10430,
+              "inclusiveCpuNs": 11470202,
+              "exclusiveCpuNs": 8907
+            },
+            {
+              "name": "application",
+              "calls": 1,
+              "inclusiveNs": 29610209,
+              "exclusiveNs": 46246,
+              "inclusiveCpuNs": 11461295,
+              "exclusiveCpuNs": 48661
+            },
+            {
+              "name": "input_and_analysis",
+              "calls": 1,
+              "inclusiveNs": 26397147,
+              "exclusiveNs": 25607331,
+              "inclusiveCpuNs": 8818174,
+              "exclusiveCpuNs": 8451974
+            },
+            {
+              "name": "analysis",
+              "calls": 1,
+              "inclusiveNs": 789816,
+              "exclusiveNs": 789816,
+              "inclusiveCpuNs": 366200,
+              "exclusiveCpuNs": 366200
+            },
+            {
+              "name": "render",
+              "calls": 1,
+              "inclusiveNs": 3116433,
+              "exclusiveNs": 3116433,
+              "inclusiveCpuNs": 2545309,
+              "exclusiveCpuNs": 2545309
+            },
+            {
+              "name": "text_report",
+              "calls": 1,
+              "inclusiveNs": 50383,
+              "exclusiveNs": 50383,
+              "inclusiveCpuNs": 49151,
+              "exclusiveCpuNs": 49151
+            }
+          ],
+          "raw": "ostrin phases: {\"schema\":1,\"unknownCalls\":0,\"error\":0,\"depth\":0,\"phases\":[{\"name\":\"process_entry\",\"calls\":1,\"inclusiveNs\":29620639,\"exclusiveNs\":10430,\"inclusiveCpuNs\":11470202,\"exclusiveCpuNs\":8907},{\"name\":\"application\",\"calls\":1,\"inclusiveNs\":29610209,\"exclusiveNs\":46246,\"inclusiveCpuNs\":11461295,\"exclusiveCpuNs\":48661},{\"name\":\"input_and_analysis\",\"calls\":1,\"inclusiveNs\":26397147,\"exclusiveNs\":25607331,\"inclusiveCpuNs\":8818174,\"exclusiveCpuNs\":8451974},{\"name\":\"analysis\",\"calls\":1,\"inclusiveNs\":789816,\"exclusiveNs\":789816,\"inclusiveCpuNs\":366200,\"exclusiveCpuNs\":366200},{\"name\":\"render\",\"calls\":1,\"inclusiveNs\":3116433,\"exclusiveNs\":3116433,\"inclusiveCpuNs\":2545309,\"exclusiveCpuNs\":2545309},{\"name\":\"text_report\",\"calls\":1,\"inclusiveNs\":50383,\"exclusiveNs\":50383,\"inclusiveCpuNs\":49151,\"exclusiveCpuNs\":49151}]}"
+        },
+        "launchExitTransportResidualMs": 22.403726000004763
+      }
+    }
+  ]
+}

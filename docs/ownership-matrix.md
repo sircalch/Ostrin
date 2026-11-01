@@ -2,6 +2,16 @@
 
 *Corte: 2026-10-13 · inventario conservador; no es una promesa de soporte estable.*
 
+Extensión M1 (`434f3a2`): `native_hir_unwrap_retains_borrowed_payloads_and_releases_iterables`
+cubre alias de `Option`/`Result` con listas de records y strings en HIR. El payload de
+un wrapper prestado permanece prestado al hacer `unwrap`; copiarlo o retornarlo
+retiene su referencia. Los iterables temporales se liberan también en retornos
+anticipados, sin liberarlos en cada `continue`. La regresión y el workflow del
+péndulo pasan localmente con ASan, UBSan y leak-check; diez casos compilados WASI
+del workflow conservan paridad y cero registros vivos. Esta evidencia está
+acotada a los casos descritos en [la guía M1](m1-pendulum-reference-workflow.md#hir-ownership-regression);
+no convierte otras combinaciones HIR en soporte general ni reemplaza el CI del HEAD.
+
 Esta matriz registra el contrato de valores gestionados en IR/C. El intérprete puede
 aceptar combinaciones que todavía usan el fallback HIR/AST en el backend nativo.
 Las celdas describen el cruce **tipo × contexto**; el estado de un contexto no

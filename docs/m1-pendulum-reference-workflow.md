@@ -59,6 +59,43 @@ native support for all dimensional measurements, cross-platform numeric
 reproducibility, R3 maturity, or production readiness. The CI replay result is
 specific to the archived compiler and input bundle recorded for the run.
 
+## HIR ownership regression
+
+Compiler source `434f3a258315a0ab8a4d2e37d4b3a9b7329befd2` corrects borrowing
+through `Option.unwrap()` and `Result.unwrap()` in HIR. Iterating an unwrapped
+borrowed list must not release the wrapper's payload reference. Binding or
+returning that borrowed payload retains it; concatenating an unwrapped borrowed
+string must also preserve its owner. Owned temporary iterables now participate
+in return cleanup while remaining live across `continue` and until `break`
+leaves the loop.
+
+This was exposed by a macOS `SIGTRAP` on heads `0b011dd` and `13e53ce`.
+The archived crash report identifies an invalid free in `ostrin_release` from
+`load_analysis`; code-signature verification passed. A later LLDB execution of
+the same binary succeeded, so that rerun does not invalidate the original
+failure. A smaller repeated-unwrapping program independently reproduced a
+heap-use-after-free under Linux ASan before the correction.
+
+The regression test exercises borrowed Option/Result list and string payloads,
+repeated access, and temporary-loop completion, return, error, break and continue.
+Focused Windows, Linux ASan/leak-check and UBSan checks pass after the correction,
+as do ten actual compiled-WASI workflow cases. The source-bound receipts are
+`validation/m1-pendulum-hir-ownership-wasi-linux.json` and
+`validation/m1-pendulum-hir-ownership-phases-linux.json`. The phase capture ran
+alongside the broader compiler suite; its timings are raw observations, not a
+controlled speed comparison with previous receipts. The authoritative checkpoint
+records fresh-HEAD CI and remaining integration/review requirements. This fix
+does not establish general HIR ownership safety for untested methods or contexts.
+
+The input-stage work-count probe in
+`validation/m1-input-string-scan-counts.json` embeds its reproduction script.
+With identical scientific output, 1668 input bytes required 6,171,620 byte visits
+in `String.length` and 1,662,188 code-point steps in indexed access. Adding only
+legal leading JSON whitespace to reach 5004 bytes raised those counts to
+51,901,508 and 14,310,632 respectively. The distinct units must not be added.
+This supports investigating repeated UTF-8 scans in the input stage; it measures
+work rather than timing and does not implement or establish a runtime speedup.
+
 ## Process-memory evidence
 
 The report associates the measured native binary with compiler source revision `b2143dac1ee5573d2da662d1b607f21cc5c9f98f` and tested tree revision `a9e1f3099fe1219cf7f4cac33b9e79548433969d`. It records the compiler version/hash, workflow source hash, fixture and runtime-input hashes, executable hash, exact stdout hash, and seven per-run captures in `validation/m1-pendulum-process-memory.json`.

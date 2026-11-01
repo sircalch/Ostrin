@@ -9,7 +9,7 @@ globalThis.OSTRIN_SITE_FACTS = Object.freeze({
   "designDocs": "28",
   "examples": "306",
   "experimentBundles": "30",
-  "integrationTests": "384",
+  "integrationTests": "385",
   "differentialTests": "6",
   "unitTests": "33"
 });

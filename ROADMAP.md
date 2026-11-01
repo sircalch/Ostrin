@@ -3,6 +3,13 @@
 La fuente de verdad del roadmap activo es [ESTADO_Y_PLAN.md](ESTADO_Y_PLAN.md), sección 8 y sus
 listas de pendientes. Este índice separa el futuro del estado comprobado.
 
+El hito M1 incluye ahora una corrección de ownership HIR para payloads prestados
+de `Option`/`Result` e iterables temporales, motivada por el workflow científico.
+La evidencia por revisión y los gates pendientes se mantienen en
+[`docs/program-state-m1.json`](docs/program-state-m1.json) y en
+[la guía del péndulo](docs/m1-pendulum-reference-workflow.md#hir-ownership-regression).
+La validación local no sustituye los checks del HEAD integrado.
+
 ## Orden de prioridades
 
 El RC documentado en [`validation/release-candidate-v0.2.0.json`](validation/release-candidate-v0.2.0.json)

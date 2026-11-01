@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
-    "evidenceRevision": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
+    "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+    "evidenceRevision": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
     "lastValidatedRemotePullRequestHead": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
-    "lastObservedRemotePullRequestHead": "0b011dd707126e487034b431fb7afc9480f54069",
+    "lastObservedRemotePullRequestHead": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
     "releaseTag": "v0.2.0",
     "revisionSemantics": "sourceRevision identifies the latest tested profiler tree; evidenceRevision is the preceding committed evidence checkpoint. Current receipts bind their own tested trees and content hashes; their recording commits resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
   },
@@ -33,21 +33,26 @@
     "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source",
     "pr237-728d224-fourteen-checks-green-and-wasi-run41257538742",
     "authoritative-json-arrays-analytical-three-row-case-and-covariance-limit-source3b60f21",
-    "ten-compiled-wasi-input-cases-and-seven-paired-phase-captures-clean3b60f21"
+    "ten-compiled-wasi-input-cases-and-seven-paired-phase-captures-clean3b60f21",
+    "hir-unwrap-uaf-reproduced-then-corrected-source434f3a2",
+    "source434f3a2-full-linux424-tests-pass-and-focused-windows-asan-ubsan-pass",
+    "source434f3a2-ten-compiled-wasi-cases-and-seven-native-phase-pairs-pass",
+    "input-stage-repeated-utf8-work-isolated-by-three-whitespace-only-counter-probes"
   ],
   "currentPackage": {
-    "name": "authoritative-array-input-and-variable-row-validation",
+    "name": "hir-unwrap-ownership-and-owned-iterator-cleanup",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
-    "status": "Current head 0b011dd fails the macOS native pendulum test with SIGTRAP before stdout/stderr. Linux, UBSan, website/browser, three-host benchmarks and standalone ten-case WASI passed; Windows and ASan were still running when observed. Add bounded macOS diagnostics; do not treat this head as integration-ready.",
-    "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
-    "evidenceRevision": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
+    "status": "Compiler source 434f3a2 passes all 424 local Linux tests, focused Windows/ASan/UBSan, ten compiled-WASI cases and numerical validation. Historical 13e53ce fails Windows and macOS; require fresh corrected-head CI before integration.",
+    "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+    "evidenceRevision": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
     "scope": [
-      "same JSON arrays drive application and independent oracle",
-      "remove twelve duplicated scalar keys and obsolete six-row loader",
-      "3–31 paired readings within the 64-source covariance profile",
-      "analytical three-row g=pi^2 case and explicit type/shape/source-limit diagnostics",
-      "ten compiled-WASI cases with input text/hash and zero-live evidence; preserve older source-bound captures"
+      "HIR borrowed Option/Result unwrap payload classification, including strings",
+      "owned temporary iterable cleanup on return, with break/continue lifetime preserved",
+      "deterministic regression for aliases, loop exits and error paths",
+      "preserve reproducible before/after ASan evidence and macOS crash/signature artifact",
+      "ten-case WASI, current phase capture and unchanged scientific output",
+      "record input-stage UTF-8 scan counts; no runtime optimization shipped"
     ],
     "evidence": [
       "Focused workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan: canonical six-row parity, analytical three-row result g=pi^2, seven rejected-input paths and zero live allocations.",
@@ -58,7 +63,13 @@
       "42 benchmark/oracle/plan tests and 33 bundle/replay tests passed; all 30 experiment replays and 12 demos matched the regenerated source-backed figures. Distribution, Linguist and project-plan gates passed.",
       "Historical 728d224 passed fourteen checks, the three-host benchmark/provenance matrix and standalone WASI run 41257538742. Its Linux phase artifact was downloaded and inspected; input-stage CPU exceeded analysis/rendering there as well, without a cross-host timing equivalence claim.",
       "PR #239 remains exact-head 7f7a3ba ten-check/WASI34 green; automated fresh review remains unavailable due the earlier quota rejection. No PR merge, tag or release performed.",
-      "Actual head 0b011dd: macOS CI run 41260414100 job 124712327766 failed (383 passed, 1 failed) on first native pendulum execution with SIGTRAP and empty output. Compiler/runtime remain unchanged. The separate macOS benchmark passed, so the failure requires diagnosis rather than an assumed platform-wide rejection."
+      "Actual head 0b011dd: macOS CI run 41260414100 job 124712327766 failed (383 passed, 1 failed) on first native pendulum execution with SIGTRAP and empty output. Compiler/runtime remain unchanged. The separate macOS benchmark passed, so the failure requires diagnosis rather than an assumed platform-wide rejection.",
+      "Source 434f3a2: complete Linux GCC suite passed 33 unit + 6 differential + 385 integration = 424 tests. Ratchet stays 8788 IR + 46 HIR / 0 AST and zero divergences.",
+      "Focused regression and scientific workflow pass on Windows and Linux GCC ASan with leak detection plus UBSan. Same small program fails before the fix with an ASan heap-use-after-free and passes afterward with output 6/6/2 and live=0.",
+      "Clean source 434f3a2: ten actual compiled-WASI cases and seven native phase pairs passed with report/SVG parity and zero live allocations. Phase timings were captured alongside the full compiler suite and are not a controlled speed comparison.",
+      "Windows numerical validation retained 80 report and 136 emitted-value comparisons, absolute difference zero and live_allocations=0. Thirty focused JavaScript tests passed.",
+      "Observed exact head 13e53ce CI: Linux and site passed; Windows failed the second pendulum replay with index out of bounds, and macOS failed with libmalloc invalid free. ASan/UBSan workflow passed that historical head; these results do not override the reproduced bug.",
+      "Deterministic input-stage probe: 1668/3336/5004 bytes of otherwise identical JSON produce 6171620/23472116/51901508 String.length byte visits and 1662188/6595298/14310632 indexed code-point steps. All output and zero-live checks pass; no timing or optimization claim."
     ],
     "activePullRequests": [
       235,
@@ -68,7 +79,6 @@
       239
     ],
     "lastBenchmarkSourceRevision": "49374d7a47539d77c03b319c720c41bee6947ede",
-    "compilerCodeUnchangedSinceRevision": "fcbe5284efffbb30d4acd10309aa04b31d8bdc45",
     "programSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
     "receipts": [
       {
@@ -82,61 +92,53 @@
       {
         "path": "validation/m1-array-input-backend-inventory.json",
         "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
+      },
+      {
+        "path": "validation/m1-hir-unwrap-ownership.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      },
+      {
+        "path": "validation/m1-pendulum-hir-ownership-wasi-linux.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      },
+      {
+        "path": "validation/m1-pendulum-hir-ownership-phases-linux.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
+      },
+      {
+        "path": "validation/m1-input-string-scan-counts.json",
+        "testedSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
       }
     ],
-    "lastPhaseProfileSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
+    "lastPhaseProfileSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
+    "compilerSourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2"
   },
   "pending": [
-    "Diagnose the macOS SIGTRAP on head 0b011dd using retained native C/binary, codesign verification and LLDB backtrace; rerun the actual corrected HEAD before any integration.",
+    "Push corrected source/evidence in PR #237 and validate the actual new HEAD CI, especially Windows/macOS, native sanitizers, standalone WASI and phase artifacts. Historical failures and green checks remain source-scoped.",
     "New exact-head review and explicit merge authorization remain pending for PRs #235-#239; do not repeat unchanged Code Review quota requests.",
-    "Input decoding remains the dominant CPU stage in the observed captures; isolate its costs before optimizing. Measurement overhead, pure loader time, allocated bytes and compiler memory remain unmeasured.",
+    "Repeated UTF-8 scans are isolated by deterministic input-stage counts; implement and benchmark a bounded correction after current-head ownership validation. Measurement overhead, pure loader time, allocated bytes and compiler memory remain open.",
     "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41260414100,
-    "status": "failure-observed-other-jobs-pending",
-    "head": "0b011dd707126e487034b431fb7afc9480f54069",
+    "runId": 41261253404,
+    "status": "failure",
+    "head": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
     "relatedRuns": [
       {
-        "workflow": "Compiler benchmarks",
-        "runId": 41260413888,
-        "status": "success"
-      },
-      {
-        "workflow": "Browser audit",
-        "runId": 41260413913,
-        "status": "success"
-      },
-      {
         "workflow": "Native sanitizers",
-        "runId": 41260413886,
-        "status": "ubsan-success-asan-in-progress"
-      },
-      {
-        "workflow": "CodeQL",
-        "runId": 41260413885,
-        "status": "success"
-      },
-      {
-        "workflow": "Security audit",
-        "runId": 41260413974,
-        "status": "success"
-      },
-      {
-        "workflow": "Standalone WASI",
-        "runId": 41260486364,
+        "runId": 41261253440,
         "status": "success"
       }
     ],
-    "note": "The current-head macOS native SIGTRAP is unresolved. Green historical results are retained in git history and do not override this failure."
+    "note": "Historical head 13e53ce only: Linux/site passed; Windows pendulum replay and macOS invalid free failed. Source 434f3a2 is corrected locally and awaits new-head remote checks."
   },
   "blockers": [
-    "PR #237 actual head 0b011dd fails its macOS native pendulum test with SIGTRAP; no silent retry or green-head substitution.",
+    "PR #237 integration remains blocked pending exact corrected-head Windows/macOS CI; prior 13e53ce failed those jobs. Local source434f3a2 correction is validated but not a substitute for remote integration evidence.",
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Collect bounded macOS native failure diagnostics in CI; independently measure the repeated UTF-8 scan cost in ignored emitted-C prototypes. Keep compiler changes separate from diagnosis until evidence supports a correction.",
+  "next": "Validate the corrected PR #237 HEAD without repeating unchanged review-quota requests; while CI runs, investigate a measured UTF-8 scanning correction or scientific abstraction-overhead baseline. Preserve v0.2.0 and do not merge unauthorized PRs.",
   "latestPullRequestValidation": {
     "number": 239,
     "url": "https://github.com/sircalch/Ostrin/pull/239",
@@ -194,8 +196,8 @@
     {
       "gate": "A-compiler",
       "status": "OPEN",
-      "remaining": "Direct List<Value>-to-Float array decoding and typed managed result pass locally; require updated integrated-source CI. Actual head 0b011dd has an unresolved macOS native SIGTRAP.",
-      "evidenceStatus": "MACOS_NATIVE_FAILURE_UNDER_DIAGNOSIS"
+      "remaining": "HIR unwrap and iterable lifetime correction passes complete local Linux suite and focused Windows checks; require the corrected remote HEAD and integration.",
+      "evidenceStatus": "LOCAL_FULL_SUITE_PASS_NEW_HEAD_CI_PENDING"
     },
     {
       "gate": "B-science",
@@ -206,14 +208,14 @@
     {
       "gate": "C-memory",
       "status": "OPEN",
-      "remaining": "Array/typed-result positive and rejected paths passed native sanitizers/leak checks and ten compiled-WASI cases; require full new-head suites. Actual head 0b011dd has an unresolved macOS native SIGTRAP.",
-      "evidenceStatus": "MACOS_NATIVE_FAILURE_UNDER_DIAGNOSIS"
+      "remaining": "Before/after ASan UAF reproduction and bounded corrected workflow pass focused ASan/leaks, UBSan and ten compiled-WASI cases. Require fresh remote Windows/macOS and sanitizer suites; general ownership remains open.",
+      "evidenceStatus": "LOCAL_ASAN_UBSAN_LEAK_AND_WASI_PASS"
     },
     {
       "gate": "D-execution",
       "status": "OPEN",
-      "remaining": "New array schema passed Windows/Linux and ten compiled-WASI cases; updated three-platform CI and artifacts remain pending. Actual head 0b011dd has an unresolved macOS native SIGTRAP.",
-      "evidenceStatus": "MACOS_NATIVE_FAILURE_UNDER_DIAGNOSIS"
+      "remaining": "Corrected source runs locally on Windows/Linux and passes ten compiled-WASI cases; require actual new-head three-host CI and artifacts.",
+      "evidenceStatus": "LOCAL_HOSTS_AND_WASI_PASS_CI_PENDING"
     },
     {
       "gate": "E-reproducibility",
@@ -223,7 +225,7 @@
     {
       "gate": "F-performance",
       "status": "OPEN",
-      "remaining": "Repeatable raw phase/control and managed-count evidence is recorded; scientific abstraction overhead, pure loader time, allocated bytes and compiler memory remain open.",
+      "remaining": "Wall/thread-CPU phase/control and allocation counts are captured; repeated UTF-8 input scans are isolated deterministically. Implement a supported optimization and measure scientific abstraction overhead, pure loader time, allocated bytes and compiler memory.",
       "evidenceStatus": "WALL_CPU_PHASE_CAPTURE_PASS"
     },
     {
