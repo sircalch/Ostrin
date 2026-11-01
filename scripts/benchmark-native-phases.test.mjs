@@ -9,7 +9,7 @@ const valid = () => ({ schema: 1, unknownCalls: 0, error: 0, depth: 0, phases: [
   { name: "analysis", calls: 1, inclusiveNs: 35, exclusiveNs: 35 },
   { name: "render", calls: 1, inclusiveNs: 15, exclusiveNs: 15 },
   { name: "text_report", calls: 1, inclusiveNs: 5, exclusiveNs: 5 },
-] });
+].map((p) => ({ ...p, inclusiveCpuNs: p.inclusiveNs * 0.8, exclusiveCpuNs: p.exclusiveNs * 0.8 })) });
 const line = (value) => `ostrin phases: ${JSON.stringify(value)}\n`;
 
 test("GCC plan instruments all declared boundaries and excludes unrelated definitions", () => {
@@ -38,6 +38,8 @@ test("missing, duplicated, incomplete and inconsistent phase evidence is rejecte
     (r) => { r.phases[2].inclusiveNs = 2 ** 54; },
     (r) => { r.phases[0].inclusiveNs += 1; },
     (r) => { r.phases[2].inclusiveNs += 1; },
+    (r) => { r.phases[2].inclusiveCpuNs = -1; },
+    (r) => { r.phases[3].exclusiveCpuNs -= 1; },
   ]) {
     const report = valid(); mutate(report);
     assert.throws(() => parsePhaseReport(line(report)));

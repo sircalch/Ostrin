@@ -126,7 +126,7 @@ async function main() {
     runnerScriptSha256: sha256(readFileSync(fileURLToPath(import.meta.url))),
     planScriptSha256: sha256(readFileSync(path.join(root, "scripts", "benchmark-native-phases.mjs"))),
     methodology: {
-      clock: "CLOCK_MONOTONIC nanoseconds inside selected emitted C functions; Node performance.now process observations",
+      clock: "CLOCK_MONOTONIC and CLOCK_THREAD_CPUTIME_ID nanoseconds inside selected emitted C functions; Node performance.now process observations",
       scope: "Single-thread Linux/GCC pendulum workflow; profiling changes optimization/instrumentation overhead. Control uses the same emitted C without instrumentation.",
       entryObservation: "Launch-to-entry-marker delivery upper observation, including loader/scheduling/pipe/event-loop delay; not pure loader time.",
       residual: "Process elapsed minus C-main inclusive time; includes launch, exit, stream transport, receipt and profiler teardown. Not pure startup time.",
@@ -140,6 +140,8 @@ async function main() {
       phases: pendulumPhases.map((phase, index) => ({ name: phase.name,
         inclusiveMs: median(samples.map((s) => s.profiled.phaseReport.phases[index].inclusiveNs / 1e6)),
         exclusiveMs: median(samples.map((s) => s.profiled.phaseReport.phases[index].exclusiveNs / 1e6)),
+        inclusiveCpuMs: median(samples.map((s) => s.profiled.phaseReport.phases[index].inclusiveCpuNs / 1e6)),
+        exclusiveCpuMs: median(samples.map((s) => s.profiled.phaseReport.phases[index].exclusiveCpuNs / 1e6)),
       })),
     }, samples,
   };

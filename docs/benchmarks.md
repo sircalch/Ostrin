@@ -127,7 +127,8 @@ Los dos usan ese mismo C y las opciones nativas `-O2 -pthread -lm -ffp-contract=
 El profiler cuenta únicamente las fronteras de entrada C, aplicación, carga de
 entrada, análisis numérico, renderizado y reporte textual. Si GCC instrumenta
 funciones adicionales, la pila queda incompleta o los tiempos no cuadran, falla.
-Cada muestra conserva tiempos inclusivos y exclusivos con `CLOCK_MONOTONIC`;
+Cada muestra conserva tiempos de reloj inclusivos/exclusivos con `CLOCK_MONOTONIC`
+y de CPU del hilo con `CLOCK_THREAD_CPUTIME_ID`;
 los exclusivos particionan exactamente el intervalo raíz de esa muestra. Las
 medianas de componentes distintos no necesariamente suman la mediana del total.
 
