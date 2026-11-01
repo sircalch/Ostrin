@@ -130,3 +130,9 @@ es tiempo puro del loader y sus tiempos instrumentados no aíslan todavía el
 overhead de Measurement. Las revisiones fuente de los recibos identifican árboles
 probados; usa un checkpoint que también contenga los bundles/evidencias actuales
 para el replay completo, conservando las referencias históricas de cada reporte.
+
+La entrada del péndulo usa únicamente `parameters.length_m` y `parameters.period_s`
+como pares de observaciones, además de los parámetros escalares de incertidumbre.
+La misma representación alimenta el oráculo. El ejemplo admite 3–31 pares dentro
+del perfil de 64 fuentes; el checker WASI valida tres repeticiones, un caso
+analítico de tres filas y seis rechazos de entrada con cero asignaciones vivas.

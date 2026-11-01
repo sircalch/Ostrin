@@ -178,9 +178,11 @@ node scripts/pendulum-wasi-check.mjs
 ```
 
 This compiles the actual file-backed workflow to WASI with leak-check enabled,
-then executes it three times under Node 24 WASI Preview 1. Every run stages the
-checked-in input in an isolated directory and must match the interpreter's full
-report and SVG, with zero live managed allocations. The receipt records source,
+then executes three baseline replays, one analytical three-row case and six
+expected-input-error cases under Node 24 WASI Preview 1. Every case stages its
+recorded input in an isolated directory. Successful cases must match the full
+interpreted report/SVG; rejected cases must match their exact diagnostic. Every
+case requires zero live managed allocations. The receipt records source,
 input, compiler and WASM hashes, the tested revision and runner/toolchain inputs
 in `target/pendulum-wasi-check/report.json`. The standalone WASI workflow archives
 this receipt with the compiled program. This supports this one workflow; it does
@@ -334,3 +336,18 @@ Removing the obsolete helper removes one IR body. The current workflow profile
 is 9 IR / 2 HIR / 0 AST; earlier source-bound inventory/timing receipts above are
 preserved and do not describe the new loader or its changed input bytes. No
 performance change is inferred without a new scoped measurement.
+
+The array-input implementation was validated at clean source `3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4`.
+`validation/m1-pendulum-array-input-wasi-linux.json` contains all ten actual WASI
+cases, including each input text/hash, expected-error mode, output hash and
+zero-live counters. The seven paired wall/CPU captures are preserved separately
+in `validation/m1-pendulum-array-input-phases-linux.json`. Baseline report/SVG
+identity is unchanged from the earlier scalar-loader capture. Input/source bytes
+changed, so the two timing snapshots are not a controlled speed comparison.
+The new WSL medians were 43.238786 ms control and 42.628076 ms profiled; exclusive
+thread-CPU medians were 7.464024 ms input, 0.285300 ms analysis and 2.232129 ms
+rendering. They remain host-specific instrumented observations.
+
+`validation/m1-array-input-backend-inventory.json` retains the current Windows
+and Linux ratchet logs: 8788 IR + 46 HIR / 0 AST across 245 source modules.
+The earlier inventory at `e612d73` remains archived in its original file.

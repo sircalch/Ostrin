@@ -1,0 +1,26 @@
+{
+  "schema": "ostrin.m1-backend-inventory/v1",
+  "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
+  "command": "cargo test --manifest-path compiler/Cargo.toml --test differential native_backend_types_agree_with_the_checker -- --exact --nocapture",
+  "ratchetMinimum": 8834,
+  "counts": {
+    "ir": 8788,
+    "hir": 46,
+    "ast": 0,
+    "total": 8834,
+    "nativeSourceModules": 245
+  },
+  "scope": "One obsolete scalar-loader IR body was removed; no AST fallback was added. Standard modules count per importing example, not as unique repository functions.",
+  "runs": [
+    {
+      "host": "windows",
+      "sha256": "ec23488c0ee1610bd66cc509fc4bb9e91632eee64a1000f2a225cbcc90bebcba",
+      "logUtf8": "   Compiling ostrinc v0.2.0 (C:\\Users\\Andre\\.codex\\worktrees\\ostrin-m1-pendulum-profile\\compiler)\r\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.18s\r\n     Running tests\\differential.rs (compiler\\target\\debug\\deps\\differential-20234093d1f296d8.exe)\r\n\r\nrunning 1 test\r\ntest native_backend_types_agree_with_the_checker has been running for over 60 seconds\r\nchecker AST comparisons: 0 expressions, 0 nodes\r\nfunctions generated from HIR/IR: 8834 (HIR 46, IR 8788)\r\nfunctions still using AST fallback: 0\r\nnative source modules measured: 245\r\nAST fallback function identifiers: 0\r\ntest native_backend_types_agree_with_the_checker ... ok\r\n\r\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 75.97s\r\n\r\n"
+    },
+    {
+      "host": "linux-wsl",
+      "sha256": "389881987c30deac13753459f31da313ba9e9d081448caaaacce029163f25dbd",
+      "logUtf8": "   Compiling ostrinc v0.2.0 (/mnt/c/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile/compiler)\r\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.34s\r\n     Running tests/differential.rs (/home/andres/.cache/ostrin-m1-pendulum-target/debug/deps/differential-6880187b1369f62d)\r\n\r\nrunning 1 test\r\ntest native_backend_types_agree_with_the_checker has been running for over 60 seconds\r\nchecker AST comparisons: 0 expressions, 0 nodes\r\nfunctions generated from HIR/IR: 8834 (HIR 46, IR 8788)\r\nfunctions still using AST fallback: 0\r\nnative source modules measured: 245\r\nAST fallback function identifiers: 0\r\ntest native_backend_types_agree_with_the_checker ... ok\r\n\r\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 90.87s\r\n\r\n"
+    }
+  ]
+}

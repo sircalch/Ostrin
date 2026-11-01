@@ -1,0 +1,181 @@
+{
+  "schema": "ostrin.pendulum-wasi/v1",
+  "status": "pass",
+  "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
+  "gitClean": true,
+  "compilerSha256": "c654e1c66d835ec99dca235de82dea329a01a3b696f16e7351504fb6dbf4d4af",
+  "compilerVersion": "ostrinc 0.2.0",
+  "source": {
+    "path": "examples/viz_pendulum_calibration.ostrin",
+    "sha256": "932ddd18ac3dda5326fa3e0fe541e973996b3fd32575da0f35af80aed6f3d1ab"
+  },
+  "input": {
+    "path": "experiments/pendulum-calibration.inputs.json",
+    "stagedAs": "data.json",
+    "sha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf"
+  },
+  "wasmSha256": "7c20536c06014ff7967540220b05cc0359c8330bd9279ff782ae817c16a398a5",
+  "compilerArguments": [
+    "--compile",
+    "--target",
+    "wasm32-wasi",
+    "--leak-check"
+  ],
+  "toolchain": {
+    "cc": "/home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/bin/clang",
+    "ccSha256": "061f88b9f4c48f3742434c2513d5038ab7fa4dc27abff5cb13b5eaedcb51d6ea",
+    "ccVersion": "clang version 23.1.0-wasi-sdk (https://github.com/llvm/llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)\nTarget: wasm32-unknown-wasip1\nThread model: posix\nInstalledDir: /home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/bin\nConfiguration file: /home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/bin/clang.cfg",
+    "sysroot": "/home/andres/.cache/ostrin-toolchains/wasi-sdk-34.0-x86_64-linux/share/wasi-sysroot",
+    "sdkArchiveSha256": "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4",
+    "cflags": null
+  },
+  "runner": {
+    "node": "v24.21.0",
+    "wasi": "preview1",
+    "host": "linux/x64"
+  },
+  "outputCheck": "exact UTF-8 report and SVG parity with interpreter after CRLF normalization",
+  "scope": "One synthetic workflow with three repeated baseline runs, one independent analytical array case and six rejected-input cases; no general WASI coverage, timing equivalence or global R3 claim.",
+  "samples": [
+    {
+      "case": "baseline-1",
+      "expectedError": null,
+      "inputSha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf",
+      "inputUtf8": "{\r\n  \"seed\": \"deterministic\",\r\n  \"parameters\": {\r\n    \"length_m\": [\r\n      0.25,\r\n      0.35,\r\n      0.45,\r\n      0.55,\r\n      0.65,\r\n      0.75\r\n    ],\r\n    \"period_s\": [\r\n      1.0037,\r\n      1.186,\r\n      1.3473,\r\n      1.4869,\r\n      1.6191,\r\n      1.7369\r\n    ],\r\n    \"length_repeat_sigma_m\": 0.0015,\r\n    \"period_repeat_sigma_s\": 0.002,\r\n    \"ruler_zero_sigma_m\": 0.0008,\r\n    \"clock_zero_sigma_s\": 0.0006,\r\n    \"ruler_clock_zero_correlation\": 0.2\r\n  },\r\n  \"description\": \"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\r\n  \"reproducibility\": {\r\n    \"level\": \"R2\",\r\n    \"label\": \"R2 · embedded input snapshot replay verified\",\r\n    \"next\": \"R3 · host-bound auditable artifact (not claimed by this fixture)\"\r\n  },\r\n  \"execution\": {\r\n    \"mode\": \"input-file\",\r\n    \"input_file\": \"data.json\",\r\n    \"consumes\": [\r\n      \"parameters.length_m\",\r\n      \"parameters.period_s\",\r\n      \"parameters.length_repeat_sigma_m\",\r\n      \"parameters.period_repeat_sigma_s\",\r\n      \"parameters.ruler_zero_sigma_m\",\r\n      \"parameters.clock_zero_sigma_s\",\r\n      \"parameters.ruler_clock_zero_correlation\"\r\n    ],\r\n    \"capabilities\": [\r\n      \"filesystem.read:data.json\"\r\n    ],\r\n    \"snapshot\": {\r\n      \"path\": \"data.json\",\r\n      \"kind\": \"json\",\r\n      \"embedded\": true\r\n    },\r\n    \"sensitivity\": {\r\n      \"path\": \"parameters.clock_zero_sigma_s\",\r\n      \"alternate\": 0.0011\r\n    },\r\n    \"command\": \"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\r\n    \"target\": \"wasm32-wasip1\",\r\n    \"wasi\": \"preview1\",\r\n    \"status\": \"verified-in-ci\"\r\n  }\r\n}\r\n",
+      "outputSha256": "cb0c2065869d599c63ee2be8b79e73d5bd48798b43ce12a6748f1e199c209c71",
+      "outputBytes": 25631,
+      "allocations": {
+        "live": 0,
+        "peak": 311,
+        "total": 12199,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+      }
+    },
+    {
+      "case": "baseline-2",
+      "expectedError": null,
+      "inputSha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf",
+      "inputUtf8": "{\r\n  \"seed\": \"deterministic\",\r\n  \"parameters\": {\r\n    \"length_m\": [\r\n      0.25,\r\n      0.35,\r\n      0.45,\r\n      0.55,\r\n      0.65,\r\n      0.75\r\n    ],\r\n    \"period_s\": [\r\n      1.0037,\r\n      1.186,\r\n      1.3473,\r\n      1.4869,\r\n      1.6191,\r\n      1.7369\r\n    ],\r\n    \"length_repeat_sigma_m\": 0.0015,\r\n    \"period_repeat_sigma_s\": 0.002,\r\n    \"ruler_zero_sigma_m\": 0.0008,\r\n    \"clock_zero_sigma_s\": 0.0006,\r\n    \"ruler_clock_zero_correlation\": 0.2\r\n  },\r\n  \"description\": \"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\r\n  \"reproducibility\": {\r\n    \"level\": \"R2\",\r\n    \"label\": \"R2 · embedded input snapshot replay verified\",\r\n    \"next\": \"R3 · host-bound auditable artifact (not claimed by this fixture)\"\r\n  },\r\n  \"execution\": {\r\n    \"mode\": \"input-file\",\r\n    \"input_file\": \"data.json\",\r\n    \"consumes\": [\r\n      \"parameters.length_m\",\r\n      \"parameters.period_s\",\r\n      \"parameters.length_repeat_sigma_m\",\r\n      \"parameters.period_repeat_sigma_s\",\r\n      \"parameters.ruler_zero_sigma_m\",\r\n      \"parameters.clock_zero_sigma_s\",\r\n      \"parameters.ruler_clock_zero_correlation\"\r\n    ],\r\n    \"capabilities\": [\r\n      \"filesystem.read:data.json\"\r\n    ],\r\n    \"snapshot\": {\r\n      \"path\": \"data.json\",\r\n      \"kind\": \"json\",\r\n      \"embedded\": true\r\n    },\r\n    \"sensitivity\": {\r\n      \"path\": \"parameters.clock_zero_sigma_s\",\r\n      \"alternate\": 0.0011\r\n    },\r\n    \"command\": \"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\r\n    \"target\": \"wasm32-wasip1\",\r\n    \"wasi\": \"preview1\",\r\n    \"status\": \"verified-in-ci\"\r\n  }\r\n}\r\n",
+      "outputSha256": "cb0c2065869d599c63ee2be8b79e73d5bd48798b43ce12a6748f1e199c209c71",
+      "outputBytes": 25631,
+      "allocations": {
+        "live": 0,
+        "peak": 311,
+        "total": 12199,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+      }
+    },
+    {
+      "case": "baseline-3",
+      "expectedError": null,
+      "inputSha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf",
+      "inputUtf8": "{\r\n  \"seed\": \"deterministic\",\r\n  \"parameters\": {\r\n    \"length_m\": [\r\n      0.25,\r\n      0.35,\r\n      0.45,\r\n      0.55,\r\n      0.65,\r\n      0.75\r\n    ],\r\n    \"period_s\": [\r\n      1.0037,\r\n      1.186,\r\n      1.3473,\r\n      1.4869,\r\n      1.6191,\r\n      1.7369\r\n    ],\r\n    \"length_repeat_sigma_m\": 0.0015,\r\n    \"period_repeat_sigma_s\": 0.002,\r\n    \"ruler_zero_sigma_m\": 0.0008,\r\n    \"clock_zero_sigma_s\": 0.0006,\r\n    \"ruler_clock_zero_correlation\": 0.2\r\n  },\r\n  \"description\": \"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\r\n  \"reproducibility\": {\r\n    \"level\": \"R2\",\r\n    \"label\": \"R2 · embedded input snapshot replay verified\",\r\n    \"next\": \"R3 · host-bound auditable artifact (not claimed by this fixture)\"\r\n  },\r\n  \"execution\": {\r\n    \"mode\": \"input-file\",\r\n    \"input_file\": \"data.json\",\r\n    \"consumes\": [\r\n      \"parameters.length_m\",\r\n      \"parameters.period_s\",\r\n      \"parameters.length_repeat_sigma_m\",\r\n      \"parameters.period_repeat_sigma_s\",\r\n      \"parameters.ruler_zero_sigma_m\",\r\n      \"parameters.clock_zero_sigma_s\",\r\n      \"parameters.ruler_clock_zero_correlation\"\r\n    ],\r\n    \"capabilities\": [\r\n      \"filesystem.read:data.json\"\r\n    ],\r\n    \"snapshot\": {\r\n      \"path\": \"data.json\",\r\n      \"kind\": \"json\",\r\n      \"embedded\": true\r\n    },\r\n    \"sensitivity\": {\r\n      \"path\": \"parameters.clock_zero_sigma_s\",\r\n      \"alternate\": 0.0011\r\n    },\r\n    \"command\": \"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\r\n    \"target\": \"wasm32-wasip1\",\r\n    \"wasi\": \"preview1\",\r\n    \"status\": \"verified-in-ci\"\r\n  }\r\n}\r\n",
+      "outputSha256": "cb0c2065869d599c63ee2be8b79e73d5bd48798b43ce12a6748f1e199c209c71",
+      "outputBytes": 25631,
+      "allocations": {
+        "live": 0,
+        "peak": 311,
+        "total": 12199,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=12199"
+      }
+    },
+    {
+      "case": "analytical-three-row-arrays",
+      "expectedError": null,
+      "inputSha256": "a1542de0ef30d68e8714fb81bf7cf6b890d9e176b71d6545609145deedd8e86f",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":[1,4,9],\"period_s\":[2,4,6],\"length_repeat_sigma_m\":0.0015,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "c3240cd6ca4a53218a1e7b6354fb943899b6d465e970c1b2cac08f7241b5313d",
+      "outputBytes": 17964,
+      "allocations": {
+        "live": 0,
+        "peak": 281,
+        "total": 9036,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=281 total_allocations=9036"
+      }
+    },
+    {
+      "case": "negative-sigma",
+      "expectedError": "input error: standard uncertainties must be non-negative\n",
+      "inputSha256": "ab1fc93c5fe0945c102e6b8d891f6a328df7f836764d3f03aa1f91fd4ecbedb4",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":[0.25,0.35,0.45,0.55,0.65,0.75],\"period_s\":[1.0037,1.186,1.3473,1.4869,1.6191,1.7369],\"length_repeat_sigma_m\":-0.1,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "e1b0a8626635be2420ef772f38b9f6eae31b9132511d47e031a30a53956e7660",
+      "outputBytes": 57,
+      "allocations": {
+        "live": 0,
+        "peak": 311,
+        "total": 2901,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=2901"
+      }
+    },
+    {
+      "case": "non-positive-reading",
+      "expectedError": "input error: all lengths and periods must be finite and positive\n",
+      "inputSha256": "bf24318e837152046a416cf7db122838690ca270ca3fdc3c44067df1dcc2ae67",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":[0.25,0.35,-0.45,0.55,0.65,0.75],\"period_s\":[1.0037,1.186,1.3473,1.4869,1.6191,1.7369],\"length_repeat_sigma_m\":0.0015,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "c74d7a82ffc15aac8ab8a457d1910feb3a29a74bb28d552d0ca2043cca7fe92e",
+      "outputBytes": 65,
+      "allocations": {
+        "live": 0,
+        "peak": 311,
+        "total": 3036,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=311 total_allocations=3036"
+      }
+    },
+    {
+      "case": "non-numeric-array-element",
+      "expectedError": "input error: length_m must be a numeric array\n",
+      "inputSha256": "093523871cbaec152634a0aa483d25ce6b68d6e0627b234f4b35a878a2dccb37",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":[0.25,\"invalid\",0.45],\"period_s\":[1.0037,1.186,1.3473,1.4869,1.6191,1.7369],\"length_repeat_sigma_m\":0.0015,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "95252b46380ae8315b0935e8e5ba287d70cc8295788334c55116c29e3a2adca1",
+      "outputBytes": 46,
+      "allocations": {
+        "live": 0,
+        "peak": 297,
+        "total": 2845,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=297 total_allocations=2845"
+      }
+    },
+    {
+      "case": "non-array-input",
+      "expectedError": "input error: length_m must be a numeric array\n",
+      "inputSha256": "75c3aecc3a5c57281d17e6af461022f19affa960a795b2b8ce823fe395c8b9c2",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":\"invalid\",\"period_s\":[1.0037,1.186,1.3473,1.4869,1.6191,1.7369],\"length_repeat_sigma_m\":0.0015,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "95252b46380ae8315b0935e8e5ba287d70cc8295788334c55116c29e3a2adca1",
+      "outputBytes": 46,
+      "allocations": {
+        "live": 0,
+        "peak": 282,
+        "total": 2788,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=282 total_allocations=2788"
+      }
+    },
+    {
+      "case": "mismatched-array-lengths",
+      "expectedError": "input error: provide at least three paired length and period readings\n",
+      "inputSha256": "404df04c1a062fdbc30846e195479b2dcb8c5f469e7cacbfd56e7ede7c42364b",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":[0.25,0.35,0.45,0.55,0.65,0.75],\"period_s\":[1,2],\"length_repeat_sigma_m\":0.0015,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "47f837eb7ccfd693c7658a22c8c02cb4140b04349f8d760f79e7ce893fc27f26",
+      "outputBytes": 70,
+      "allocations": {
+        "live": 0,
+        "peak": 291,
+        "total": 2789,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=291 total_allocations=2789"
+      }
+    },
+    {
+      "case": "source-profile-limit",
+      "expectedError": "input error: covariance profile supports at most 31 paired readings\n",
+      "inputSha256": "75bf8a23c2ee36dff5df091e5e61b29af796e4c74aa549654c8191ad6c6e0195",
+      "inputUtf8": "{\"seed\":\"deterministic\",\"parameters\":{\"length_m\":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],\"period_s\":[1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4],\"length_repeat_sigma_m\":0.0015,\"period_repeat_sigma_s\":0.002,\"ruler_zero_sigma_m\":0.0008,\"clock_zero_sigma_s\":0.0006,\"ruler_clock_zero_correlation\":0.2},\"description\":\"Synthetic six-point pendulum calibration fixture. The shared zero-offset correlation is declared as an input assumption, not inferred from experimental data.\",\"reproducibility\":{\"level\":\"R2\",\"label\":\"R2 · embedded input snapshot replay verified\",\"next\":\"R3 · host-bound auditable artifact (not claimed by this fixture)\"},\"execution\":{\"mode\":\"input-file\",\"input_file\":\"data.json\",\"consumes\":[\"parameters.length_m\",\"parameters.period_s\",\"parameters.length_repeat_sigma_m\",\"parameters.period_repeat_sigma_s\",\"parameters.ruler_zero_sigma_m\",\"parameters.clock_zero_sigma_s\",\"parameters.ruler_clock_zero_correlation\"],\"capabilities\":[\"filesystem.read:data.json\"],\"snapshot\":{\"path\":\"data.json\",\"kind\":\"json\",\"embedded\":true},\"sensitivity\":{\"path\":\"parameters.clock_zero_sigma_s\",\"alternate\":0.0011},\"command\":\"node scripts/experiment-replay.mjs --fixture pendulum-calibration\",\"target\":\"wasm32-wasip1\",\"wasi\":\"preview1\",\"status\":\"verified-in-ci\"}}",
+      "outputSha256": "d15f84f190e6c838db54e9536e34d8bf842dbff668a635e86cf808a2f4736c31",
+      "outputBytes": 68,
+      "allocations": {
+        "live": 0,
+        "peak": 571,
+        "total": 4025,
+        "raw": "ostrin memory: live_allocations=0 peak_allocations=571 total_allocations=4025"
+      }
+    }
+  ]
+}

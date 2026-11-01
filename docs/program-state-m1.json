@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "e612d73baf2307296e562502e342ce074794fb74",
-    "evidenceRevision": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
+    "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
+    "evidenceRevision": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
-    "lastObservedRemotePullRequestHead": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
+    "lastValidatedRemotePullRequestHead": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
+    "lastObservedRemotePullRequestHead": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "releaseTag": "v0.2.0",
     "revisionSemantics": "sourceRevision identifies the latest tested profiler tree; evidenceRevision is the preceding committed evidence checkpoint. Current receipts bind their own tested trees and content hashes; their recording commits resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
   },
@@ -30,34 +30,34 @@
     "linux-gcc-seven-paired-wall-and-thread-cpu-phase-samples-sourcee612d73",
     "current-windows-linux-backend-ratchets8789ir46hir0ast-sourcee612d73",
     "native-report-svg-export-procedure-tested-windows-and-linux",
-    "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source"
+    "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source",
+    "pr237-728d224-fourteen-checks-green-and-wasi-run41257538742",
+    "authoritative-json-arrays-analytical-three-row-case-and-covariance-limit-source3b60f21",
+    "ten-compiled-wasi-input-cases-and-seven-paired-phase-captures-clean3b60f21"
   ],
   "currentPackage": {
-    "name": "typed-pendulum-result-and-native-phase-profile",
+    "name": "authoritative-array-input-and-variable-row-validation",
     "branch": "codex/m1-reference-workflow",
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
-    "status": "Prepared for existing PR #237 with source-bound local receipts. Re-evaluate the actual remote HEAD and its CI/WASI run; historical c80d26e results do not approve this child package.",
-    "sourceRevision": "e612d73baf2307296e562502e342ce074794fb74",
-    "evidenceRevision": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
+    "status": "Prepared for existing PR #237. Source 3b60f21 is validated locally; require the actual updated HEAD CI and WASI artifact. Historical 728d224 green checks do not validate this extension.",
+    "sourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
+    "evidenceRevision": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "scope": [
-      "Result<PendulumAnalysis,String> with managed arrays/lists and acceleration quantities",
-      "separate JSON loading, scientific analysis, text report and SVG rendering",
-      "bounded Linux/GCC wall/thread-CPU profiling with paired controls, stack/counter/output validation and CI artifact",
-      "tighten and synchronize measured native corpus inventory; retain frozen release inventory",
-      "tested native export tutorial and regenerated source-backed website/bundles"
+      "same JSON arrays drive application and independent oracle",
+      "remove twelve duplicated scalar keys and obsolete six-row loader",
+      "3–31 paired readings within the 64-source covariance profile",
+      "analytical three-row g=pi^2 case and explicit type/shape/source-limit diagnostics",
+      "ten compiled-WASI cases with input text/hash and zero-live evidence; preserve older source-bound captures"
     ],
     "evidence": [
-      "35 benchmark/oracle JavaScript tests and seven project-plan consistency tests passed.",
-      "Focused typed-result workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan; 10 IR / 2 HIR / 0 AST source bodies, eight repeated native outputs and three invalid-input paths.",
-      "Three compiled-WASI executions at clean 5960371 matched the interpreted full report/SVG and zero live allocations: validation/m1-pendulum-phases-wasi-linux.json.",
-      "Seven paired phase samples at clean e612d73: all control/profiled outputs matched, live=0, no unexpected instrumented calls, and each wall/CPU interval partitions its root exactly. Raw report: validation/m1-pendulum-phases-linux.json.",
-      "Independent median exclusive CPU times on this WSL host: input loading/decoding/validation 7.530924 ms, scientific analysis 0.290347 ms, rendering 2.025366 ms. The phase does not isolate one input operation or Measurement overhead.",
-      "Control/profiled process medians 31.425554/28.405775 ms and launch-to-entry observation 6.652421 ms. No negative-overhead or speedup conclusion; clocks, medians and filesystem/scheduling effects remain explicit.",
-      "Current tightened backend ratchet passed on Windows and Linux: 8789 IR + 46 HIR, 0 AST, 245 source modules, zero type divergences; original logs in validation/m1-backend-inventory.json.",
-      "Native tutorial executed on Windows and Linux with live=0; extracted figure.svg is well-formed and stdout identity matches the phase experiment.",
-      "Historical exact head c80d26e has all 14 checks green and standalone WASI success 41253542664; pendulum artifact 13062641070. These results remain historical for the source extension.",
-      "PR #239 exact head 7f7a3ba remains ten-check/WASI34 green. Fresh automated review was blocked by Code Review quota; unchanged requests are not repeated.",
-      "Regenerated website/bundles passed 30 replays / 12 demos and 33 bundle/replay tests; distribution, Linguist and project-plan gates passed."
+      "Focused workflow test passed on Windows and Linux GCC ASan+leak detection / UBSan: canonical six-row parity, analytical three-row result g=pi^2, seven rejected-input paths and zero live allocations.",
+      "Current source profile 9 IR / 2 HIR / 0 AST. Removing the obsolete scalar-loader function removes one IR body; no AST fallback was introduced.",
+      "Current aggregate ratchet passed on Windows and Linux: 8788 IR + 46 HIR / 0 AST, 245 measured source modules, zero type divergences. Original logs: validation/m1-array-input-backend-inventory.json.",
+      "Clean 3b60f21 compiled-WASI run passed all ten cases: three baseline report/SVG repeats, one independent analytical three-row case and six exact rejected-input cases. Each input text hashes to its recorded bytes and every run reports live=0. Receipt: validation/m1-pendulum-array-input-wasi-linux.json.",
+      "Clean 3b60f21 seven paired native phase captures retained exact interpreted baseline output and zero-live counters. Old output identity is unchanged; input/source bytes changed, so timing differences are not a controlled speed comparison. Receipt: validation/m1-pendulum-array-input-phases-linux.json.",
+      "42 benchmark/oracle/plan tests and 33 bundle/replay tests passed; all 30 experiment replays and 12 demos matched the regenerated source-backed figures. Distribution, Linguist and project-plan gates passed.",
+      "Historical 728d224 passed fourteen checks, the three-host benchmark/provenance matrix and standalone WASI run 41257538742. Its Linux phase artifact was downloaded and inspected; input-stage CPU exceeded analysis/rendering there as well, without a cross-host timing equivalence claim.",
+      "PR #239 remains exact-head 7f7a3ba ten-check/WASI34 green; automated fresh review remains unavailable due the earlier quota rejection. No PR merge, tag or release performed."
     ],
     "activePullRequests": [
       235,
@@ -68,73 +68,73 @@
     ],
     "lastBenchmarkSourceRevision": "49374d7a47539d77c03b319c720c41bee6947ede",
     "compilerCodeUnchangedSinceRevision": "fcbe5284efffbb30d4acd10309aa04b31d8bdc45",
-    "programSourceRevision": "59603712aacce52ddd4c1b0fc558377bb8b67972",
+    "programSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4",
     "receipts": [
       {
-        "path": "validation/m1-pendulum-phases-linux.json",
-        "testedSourceRevision": "e612d73baf2307296e562502e342ce074794fb74"
+        "path": "validation/m1-pendulum-array-input-wasi-linux.json",
+        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
       },
       {
-        "path": "validation/m1-pendulum-phases-wasi-linux.json",
-        "testedSourceRevision": "59603712aacce52ddd4c1b0fc558377bb8b67972"
+        "path": "validation/m1-pendulum-array-input-phases-linux.json",
+        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
       },
       {
-        "path": "validation/m1-backend-inventory.json",
-        "testedSourceRevision": "e612d73baf2307296e562502e342ce074794fb74"
+        "path": "validation/m1-array-input-backend-inventory.json",
+        "testedSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
       }
-    ]
+    ],
+    "lastPhaseProfileSourceRevision": "3b60f21a5f5c4c1d557472d8ba1c2d918805e1a4"
   },
   "pending": [
-    "Ensure PR #237 contains the prepared package; validate its actual current HEAD, new Linux phase artifact and standalone WASI workflow, without reusing green c80d26e checks.",
-    "New exact-head reviews and explicit merge authorizations for PRs #235-#239 remain pending. Do not repeat unchanged Code Review quota requests.",
-    "Controlled scientific abstraction overhead, pure loader isolation, allocated bytes and compiler memory remain open. Phase observations include instrumentation and input-stage waiting/scheduling.",
-    "Complete the combined reference workflow and R3 restricted artifact integration/replay; global R3 remains open.",
-    "Validate all M1 acceptance criteria on the integrated source before closing the Goal."
+    "Ensure PR #237 contains this package and validate its actual updated HEAD, native phase artifact and standalone ten-case WASI workflow; do not inherit 728d224 results.",
+    "New exact-head review and explicit merge authorization remain pending for PRs #235-#239; do not repeat unchanged Code Review quota requests.",
+    "Input decoding remains the dominant CPU stage in the observed captures; isolate its costs before optimizing. Measurement overhead, pure loader time, allocated bytes and compiler memory remain unmeasured.",
+    "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41253498446,
+    "runId": 41257377871,
     "status": "success",
-    "head": "c80d26e08acfc90d82609a7d6cd89abb0128903e",
+    "head": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "relatedRuns": [
       {
         "workflow": "Compiler benchmarks",
-        "runId": 41253498451,
+        "runId": 41257377971,
         "status": "success"
       },
       {
         "workflow": "Browser audit",
-        "runId": 41253498466,
+        "runId": 41257377894,
         "status": "success"
       },
       {
         "workflow": "Native sanitizers",
-        "runId": 41253498536,
+        "runId": 41257377903,
         "status": "success"
       },
       {
         "workflow": "CodeQL",
-        "runId": 41253498512,
+        "runId": 41257377870,
         "status": "success"
       },
       {
         "workflow": "Security audit",
-        "runId": 41253498463,
+        "runId": 41257377867,
         "status": "success"
       },
       {
         "workflow": "Standalone WASI",
-        "runId": 41253542664,
+        "runId": 41257538742,
         "status": "success"
       }
     ],
-    "note": "Historical c80d26e result: fourteen checks plus standalone WASI; the new source/profiler extension requires its own exact-head checks."
+    "note": "Historical source 728d224 only: fourteen checks and standalone WASI passed. Current authoritative-array code requires fresh exact-head results."
   },
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Detect the next PR #237 HEAD and validate changed CI/artifacts once available. Investigate input-stage CPU versus waiting or scientific abstraction costs with controlled experiments; no release, tag or unauthorized merge.",
+  "next": "Validate changed PR #237 CI/artifacts once available; independently investigate input-decoder CPU or remaining type/ownership/R3 boundaries using controlled evidence. Preserve v0.2.0; no unauthorized integration.",
   "latestPullRequestValidation": {
     "number": 239,
     "url": "https://github.com/sircalch/Ostrin/pull/239",
@@ -192,25 +192,25 @@
     {
       "gate": "A-compiler",
       "status": "OPEN",
-      "remaining": "Typed managed result and acceleration fields passed native/WASI checks; require updated integrated-source CI.",
+      "remaining": "Direct List<Value>-to-Float array decoding and typed managed result pass locally; require updated integrated-source CI.",
       "evidenceStatus": "LOCAL_PASS_CI_PENDING"
     },
     {
       "gate": "B-science",
       "status": "OPEN",
-      "remaining": "Keep independent finite-difference/source-correlation evidence and unit scope tied to the integrated source; first-order synthetic model only.",
+      "remaining": "Same authoritative arrays now feed application/oracle; retain six-row finite-difference and three-row analytical evidence on the integrated source.",
       "evidenceStatus": "REFERENCE_CASE_PASS"
     },
     {
       "gate": "C-memory",
       "status": "OPEN",
-      "remaining": "Positive/negative typed-result native paths passed ASan/UBSan/leak-check and actual WASI; require new exact-head full suites.",
+      "remaining": "Array/typed-result positive and rejected paths passed native sanitizers/leak checks and ten compiled-WASI cases; require full new-head suites.",
       "evidenceStatus": "FOCUSED_PASS"
     },
     {
       "gate": "D-execution",
       "status": "OPEN",
-      "remaining": "Separated workflow ran on Windows/Linux and compiled WASI; updated macOS/Windows/Linux CI and artifact checks remain pending.",
+      "remaining": "New array schema passed Windows/Linux and ten compiled-WASI cases; updated three-platform CI and artifacts remain pending.",
       "evidenceStatus": "LOCAL_HOSTS_AND_WASI_PASS"
     },
     {
