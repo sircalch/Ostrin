@@ -718,6 +718,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
 fn list_element_supported(ty: &Ty, records: &RecordFields) -> bool {
     (scalar(ty) && *ty != Ty::Void)
         || quantity(ty)
+        || record_name(ty, records).is_some()
         // Enum values are stored inline in the generated list.  The C
         // list helpers already retain/drop managed enum payloads by active
         // variant, so this is safe for both scalar and managed enums.

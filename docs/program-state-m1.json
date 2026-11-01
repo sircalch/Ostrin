@@ -106,44 +106,45 @@
     "measurement-correlation-wasi-33-programs-green-after-release-compiler-rebuild",
     "measurement-correlation-contract-18-website-383-lab-replays-29-and-provenance-green",
     "measurement-correlation-numeric-80-and-136-values-exact-live-allocations-zero",
-    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green"
+    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green",
+    "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
+    "website-test-count-384-metadata-synchronized-pr239-29f8339",
+    "measurement-temperaturepoint-273e01e-five-workflows-green"
   ],
   "currentPackage": {
-    "name": "dimensional-source-correlation",
-    "branch": "codex/dimensional-measurement-correlation",
-    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-r3-host-provenance",
-    "status": "local-source-and-evidence-validated-awaiting-push-and-exact-head-ci-review",
+    "name": "measurement-temperaturepoint-hir-ir-and-website-metadata",
+    "branch": "codex/m1-temperature-measurement",
+    "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-temperature-measurement",
+    "status": "Shared native/WASI fixtures and affine-profile documentation validated locally on an extension of 273e01e; the next pushed HEAD requires its own CI and review. The preceding 273e01e HEAD has all five workflows green. PR #239 remains unmerged.",
     "scope": [
-      "experimental dense dimensionless SourceCorrelation matrices for one to 64 source identities",
-      "scalar quantity_uncertainty_with_correlation for Measurement<Quantity<D>> with sources of different input dimensions",
-      "coherent-unit source contributions and statically dimensioned CoherentUncertainty<D> result",
-      "finite, shape, unique-ID, symmetry, unit-diagonal, coefficient-bound and PSD validation",
-      "analytical Length*Time product oracle: contribution terms 0.09 + 0.16 + 0.12 = variance 0.37",
-      "reject symmetry-tolerant asymmetric coefficients when Float midpoint rounding would erase residual uncertainty at +/-1",
-      "reject zero propagated variance when lossy coherent-unit conversion affected nonzero original contributions",
-      "unit-conversion regression: 128 cm exact residual equals 32/25 m, but unresolved Float conversion/cancellation is reported explicitly",
-      "unit-carrying covariance matrices, measurement arrays and array reductions remain unsupported"
+      "lower Measurement<TemperaturePoint> through HIR and IR with typed list ownership",
+      "publish methods discovered while flushing generic HIR instances",
+      "synchronize generated website and documentation test counts after the new regression",
+      "run the same field and Phi fixtures natively and in WASI with dynamic reason strings and repeated fresh replacements",
+      "require successful WASI leak-check output; document the empty-source structural boundary"
     ],
     "evidence": [
-      "Source fix commit c20b087dd727992c40a7871887dff9b9cb5624d1 adds a conservative error for conversion-induced cancellation; documentation and regression oracle are in commit 6741a4c.",
-      "The regression uses distinct sources with sigmas 1000000000000000128 cm and 1000000000000000256 cm; the independent exact residual is 128/100 m = 32/25 m, while rounded coherent contributions would cancel. The API returns correlated measurement uncertainty is numerically unresolved after unit conversion.",
-      "Focused dimensional_measurement_lab_matches_interpreter_and_native test passed; interpreter/native output agrees and native leak-check reports live_allocations=0.",
-      "Full cargo suite passed on the exact source/evidence tree: 33 unit, 6 differential, and 383 integration tests (422 total).",
-      "After rebuilding compiler/target/release/ostrinc.exe from the current source, Node WASI Preview 1 passed all 33 programs, including the new unresolved-conversion error.",
-      "Measurement contract gate and 18/18 mutation tests passed, including enforcement of the WASI expected output. cargo fmt check passed.",
-      "Lab generated 4 static outputs and replayed 29 figures; website-check passed 17 pages, 305 examples, and 383 integration checks. Provenance and status page checks passed.",
-      "Numeric validation matched 80 report values and 136 emitted values exactly; maximum absolute difference was 0 and live_allocations=0.",
-      "Project plan reports 7,261 HIR/IR bodies (7,220 IR + 41 HIR) and 0 AST fallbacks. Linguist, distribution, ownership, and v0.2 readiness checks passed.",
-      "PR #235 old remote head f58ed2e is CLEAN/MERGEABLE with 10/10 checks green, including Linux/macOS/Windows, browser audit, ASan, UBSan, CodeQL, and dependency checks. This head predates the new source/evidence commits and does not validate them.",
-      "Two P2 review findings remain unresolved on GitHub, both addressed in the local source change; fresh review and exact new-head CI are pending.",
-      "v0.2.0 remains published and frozen; main is still 69c962dee40a4b12606d131df0e8655b90924516."
+      "Local focused Measurement<TemperaturePoint> constructor and field replacement tests pass with interpreter/native/WASI parity, ast-fallback: 0 and live_allocations=0.",
+      "Local generic-method regression passes after publishing flushed methods into hir_world.",
+      "website-check: ok (17 public pages, 305 examples, 384 integration tests); project-plan-check and linguist-check pass; cargo fmt --check and git diff --check pass.",
+      "Exact HEAD 29f8339ad27865627d1021534bda7881f315c177 remote workflows: Ostrin CI 41246123265, Browser audit 41246123145, Native sanitizers 41246123164 with ASan and UBSan success, CodeQL 41246123123 and Security audit 41246123213.",
+      "Fresh Codex review of 29f8339ad2 found no major issues; PR #239 has one resolved P2 thread and remains unmerged.",
+      "R3 remains OPEN globally; this package does not claim production readiness, cross-platform equivalence or v0.2.0 changes.",
+      "273e01e exact CI: Ostrin CI 41248858683, Browser audit 41248858643, Native sanitizers 41248858644 (ASan/UBSan), CodeQL 41248858648 and Security audit 41248858645 all passed; 385 integration + 6 differential + 33 unit tests in the source inventory.",
+      "Local extension: Windows GCC focused profile 3/3 passed; Linux/WSL GCC ASan with leak detection 3/3 and UBSan 3/3 passed on the shared fixtures.",
+      "Local extension: all 34 programs compiled and executed using wasi-sdk 34.0 (pinned Linux archive SHA-256 b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4) and Node WASI; both TemperaturePoint measurement fixtures required live_allocations=0.",
+      "Local extension: website-check (17 pages, 305 examples, 385 integration tests), Measurement contract plus 18 tests, project-plan-check, distribution-check, cargo fmt and git diff --check passed. No performance claim or affine uncertainty API was added."
     ],
     "activePullRequests": [
-      235
+      235,
+      236,
+      237,
+      238,
+      239
     ],
-    "sourceRevision": "c20b087dd727992c40a7871887dff9b9cb5624d1",
-    "evidenceRevision": "537e58f0ff402de764b81605d57c645ccbf160cd",
-    "dashboardRevision": "537e58f0ff402de764b81605d57c645ccbf160cd"
+    "sourceRevision": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "evidenceRevision": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
+    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
   },
   "pending": [
     "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
@@ -157,7 +158,11 @@
     "Obtain fresh review on the new PR head and verify both P2 findings are no longer substantive before considering integration; no merge has been authorized for PR #235.",
     "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
     "Keep unit-carrying covariance matrices, Measurement arrays, and array reductions outside the supported profile until separately typed and validated.",
-    "Keep published v0.2.0 unchanged; do not create or publish a new release."
+    "Keep published v0.2.0 unchanged; do not create or publish a new release.",
+    "Push the shared-fixture/actual-WASI/documentation package in PR #239 and require checks plus review for the resulting HEAD.",
+    "PRs #235-#239 remain unmerged; no PR-specific merge authorization exists for this set.",
+    "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
+    "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS."
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
@@ -211,6 +216,28 @@
         "workflow": "Rust dependency advisories",
         "runId": 40230630640,
         "status": "success"
+      },
+      {
+        "workflow": "Browser audit",
+        "runId": 41248858643,
+        "status": "success"
+      },
+      {
+        "workflow": "Native sanitizers",
+        "runId": 41248858644,
+        "status": "success",
+        "asan": "success",
+        "ubsan": "success"
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 41248858648,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 41248858645,
+        "status": "success"
       }
     ],
     "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
@@ -232,13 +259,8 @@
     "url": "https://github.com/sircalch/Ostrin/pull/238",
     "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "mergeCommit": null,
     "state": "open-mergeable-exact-metadata-head-green",
     "checks": {
-      "successful": 10,
-      "failing": 0,
-      "pending": 0,
-      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
       "ostrinCi": {
         "status": "success",
         "runId": 41167597498
@@ -260,8 +282,25 @@
       "securityAudit": {
         "status": "success",
         "runId": 41167597514
-      }
+      },
+      "successful": 10,
+      "failing": 0,
+      "pending": 0,
+      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
     },
+    "review": {
+      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "currentHeadReviewed": true,
+      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
+      "unresolvedOutdatedThreads": 0
+    },
+    "openReviewThreads": [],
+    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
+    "observedAt": "2026-10-31",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
+    "integration": "not merged; no PR #238 merge authorization",
+    "mergeCommit": null,
     "reviewThreads": {
       "total": 2,
       "unresolved": 2,
@@ -279,18 +318,6 @@
       ]
     },
     "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
-    "review": {
-      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
-      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
-      "currentHeadReviewed": true,
-      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
-      "unresolvedOutdatedThreads": 0
-    },
-    "openReviewThreads": [],
-    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
-    "observedAt": "2026-10-31",
-    "head": "d1974b052528eec47975297d094031c4081f0681",
-    "integration": "not merged; no PR #238 merge authorization",
     "runs": {
       "ostrinCi": "success",
       "browserAudit": "success",
@@ -306,6 +333,56 @@
   },
   "activePullRequests": [
     237,
-    238
+    238,
+    235,
+    236,
+    239
+  ],
+  "acceptanceCriteria": [
+    {
+      "gate": "A-compiler",
+      "status": "OPEN",
+      "remaining": "Validate the integrated dimensional reference workflow and nested managed paths at its actual source revision."
+    },
+    {
+      "gate": "B-science",
+      "status": "OPEN",
+      "remaining": "Retain independent analytical/finite-difference oracle results for dimensional uncertainty and shared-source correlation."
+    },
+    {
+      "gate": "C-memory",
+      "status": "OPEN",
+      "remaining": "Require leak-check/sanitizers for the integrated workflow; the TemperaturePoint profile proves only its tested structural paths."
+    },
+    {
+      "gate": "D-execution",
+      "status": "OPEN",
+      "remaining": "Record native multiplatform and actual WASI execution of the reference workflow; 34-program matrix is supporting evidence."
+    },
+    {
+      "gate": "E-reproducibility",
+      "status": "OPEN",
+      "remaining": "Integrate bounded R3 inspect/verify/replay/compare evidence without promoting host-specific replay to cross-platform equivalence."
+    },
+    {
+      "gate": "F-performance",
+      "status": "OPEN",
+      "remaining": "Isolate startup, numerical kernel, managed allocations and abstraction overhead; assess measured bottlenecks."
+    },
+    {
+      "gate": "G-product",
+      "status": "OPEN",
+      "remaining": "Validate installation, tutorial, figure export and rendered reference workflow."
+    },
+    {
+      "gate": "H-integration",
+      "status": "OPEN",
+      "remaining": "Integrate authorized packages only, then validate their combined source and CI; PRs #235-#239 remain open."
+    },
+    {
+      "gate": "I-documentation",
+      "status": "OPEN",
+      "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site."
+    }
   ]
 }

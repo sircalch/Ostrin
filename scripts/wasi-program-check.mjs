@@ -37,6 +37,20 @@ const programs = [
     expectedError: "absolute temperature arithmetic overflowed",
   },
   {
+    name: "temperature_point_measurement_field",
+    source: "compiler/tests/fixtures/temperature_point_measurement_field.ostrin.txt",
+    args: ["temperature_point_measurement_field.wasm"],
+    expected: "30 degC (absolute)\n30 degC (absolute)\nreplacement offline\n",
+    leakCheck: true,
+  },
+  {
+    name: "temperature_point_measurement_phis",
+    source: "compiler/tests/fixtures/temperature_point_measurement_phis.ostrin.txt",
+    args: ["temperature_point_measurement_phis.wasm"],
+    expected: "20 degC (absolute)\n30 degC (absolute)\n42 degC (absolute)\nsensor 42\n20 degC (absolute)\nsensor 20\n",
+    leakCheck: true,
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],
@@ -275,6 +289,9 @@ async function runWasi(program) {
     if (output !== program.expected) {
       fail(`${program.name} output mismatch\nexpected:\n${program.expected}\nactual:\n${output}\nstderr:\n${error}`);
     }
+    if (program.leakCheck && !/\blive_allocations=0\b/.test(error)) {
+      fail(`${program.name} omitted a successful WASI leak-check: ${error}`);
+    }
   } finally {
     if (stdoutFd !== undefined) closeSync(stdoutFd);
     if (stderrFd !== undefined) closeSync(stderrFd);
@@ -292,6 +309,7 @@ async function main() {
     const output = path.join(dist, `${program.name}.wasm`);
     rmSync(output, { force: true });
     const args = ["--compile", "--target", "wasm32-wasi", "--out", output];
+    if (program.leakCheck) args.push("--leak-check");
     if (program.project) {
       args.push("--project", path.join(root, program.project));
     } else {

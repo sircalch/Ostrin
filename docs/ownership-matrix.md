@@ -55,6 +55,23 @@ fallback, emisión C para WASI y `live_allocations=0`; `wasi-program-check.mjs` 
 en Node WASI Preview 1. Esta cobertura no habilita covarianza para
 `Measurement<Quantity<D>>`, arrays ni reducciones.
 
+### Perfil estructural de `Measurement<TemperaturePoint>`
+
+Las pruebas `native_temperature_point_measurement_matches_interpreter_and_wasi`,
+`temperature_point_measurement_field_replacement_preserves_alias_ownership` y
+`temperature_point_measurement_arguments_returns_and_phis_preserve_ownership` cubren construcción,
+alias, argumento/retorno, campo y reemplazo, ambas selecciones de `Phi`, reemplazos en loop-Phi y
+destrucción. Los dos fixtures compartidos usan listas de fuentes vacías y cadenas `reason`
+dinámicas. Se exige paridad intérprete/nativo, IR sin fallback ni divergencias y
+`live_allocations=0`. La matriz `scripts/wasi-program-check.mjs` también compila y ejecuta los
+fixtures `temperature_point_measurement_field` y `temperature_point_measurement_phis` y exige
+cero asignaciones vivas. Las suites nativas ASan/UBSan ejecutan estas mismas regresiones.
+
+La evidencia sólo cubre almacenamiento estructural: no convierte `TemperaturePoint` en una
+cantidad lineal ni acredita propagación de incertidumbre, covarianza, fuentes no vacías, arrays,
+wrappers de error o capturas por closure/tarea para este payload. Véase el contrato afín en
+[`design/25-mediciones-e-incertidumbre.md`](design/25-mediciones-e-incertidumbre.md).
+
 ### Evidencia de operaciones `dyn Trait`
 
 Esta submatriz desglosa las transiciones específicas exigidas por el ABI

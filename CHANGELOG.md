@@ -20,6 +20,12 @@
 
 ### Scientific measurement
 
+- Added a development-only structural `Measurement<TemperaturePoint>` profile with
+  empty sources. Constructor, alias, argument/return, field replacement and branch/loop
+  Phi tests use typed IR, native leak-check and shared WASI execution fixtures.
+  Dynamic unknown-state reasons exercise managed payload destruction. Absolute-point
+  uncertainty propagation, covariance, point arrays and measurement conversion remain
+  unsupported; this does not change the published v0.2.0 binaries.
 - Added experimental dense `SourceCovariance` propagation for at most 64
   dimensionless scalar sources using `J·Σ·Jᵀ`. The implementation checks shape,
   finite values, bounded symmetry/PSD tolerance and source variances. A diagonal
@@ -104,7 +110,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 305-example, 383-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 305-example, 385-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 
