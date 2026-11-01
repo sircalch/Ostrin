@@ -1,0 +1,115 @@
+{
+  "schema": "ostrin.m2b-utf8-string-cursor-cache/v1",
+  "scope": "Native string length/index/slice scan cost on the M1 pendulum calibration input with extra leading JSON whitespace. Counters are deterministic work units, not timings; timings are single-host wall-clock process durations.",
+  "baseRevision": "d4ba7fd57524b62b0aa3edcf6b44887bc592adf2",
+  "change": "Cursor cache (4 slots, heap strings >= 256 bytes) for code-point length and last index->byte-offset, invalidated on free/release/realloc under the heap lock. Baseline is the same binary built with -DOSTRIN_NO_STR_CACHE; counters use -DOSTRIN_SCAN_COUNTERS.",
+  "host": {
+    "os": "Windows 11 x64",
+    "cpu": "AMD Ryzen 7 5700X",
+    "cc": "gcc (MinGW-W64 x86_64-ucrt-posix-seh) 13.2.0 -O2 -ffp-contract=off"
+  },
+  "counters": [
+    {
+      "leadingWhitespaceBytes": 0,
+      "inputBytes": 1668,
+      "base": {
+        "lengthCalls": 1608,
+        "lengthBytes": 2678928,
+        "offsetCalls": 996,
+        "offsetSteps": 319671
+      },
+      "cache": {
+        "lengthCalls": 1608,
+        "lengthBytes": 1666,
+        "offsetCalls": 996,
+        "offsetSteps": 4585
+      }
+    },
+    {
+      "leadingWhitespaceBytes": 1668,
+      "inputBytes": 3336,
+      "base": {
+        "lengthCalls": 4944,
+        "lengthBytes": 16483296,
+        "offsetCalls": 2664,
+        "offsetSteps": 3371277
+      },
+      "cache": {
+        "lengthCalls": 4944,
+        "lengthBytes": 3334,
+        "offsetCalls": 2664,
+        "offsetSteps": 34609
+      }
+    },
+    {
+      "leadingWhitespaceBytes": 3336,
+      "inputBytes": 5004,
+      "base": {
+        "lengthCalls": 8280,
+        "lengthBytes": 41416560,
+        "offsetCalls": 4332,
+        "offsetSteps": 9205107
+      },
+      "cache": {
+        "lengthCalls": 8280,
+        "lengthBytes": 5002,
+        "offsetCalls": 4332,
+        "offsetSteps": 64633
+      }
+    },
+    {
+      "leadingWhitespaceBytes": 5004,
+      "inputBytes": 6672,
+      "base": {
+        "lengthCalls": 11616,
+        "lengthBytes": 77478720,
+        "offsetCalls": 6000,
+        "offsetSteps": 17821161
+      },
+      "cache": {
+        "lengthCalls": 11616,
+        "lengthBytes": 6670,
+        "offsetCalls": 6000,
+        "offsetSteps": 94657
+      }
+    }
+  ],
+  "timingMedianMs": {
+    "samples": 7,
+    "warmups": 1,
+    "rows": [
+      {
+        "leadingWhitespaceBytes": 0,
+        "base": 19.9,
+        "cache": 15.5
+      },
+      {
+        "leadingWhitespaceBytes": 1668,
+        "base": 31.7,
+        "cache": 15.4
+      },
+      {
+        "leadingWhitespaceBytes": 5004,
+        "base": 78.6,
+        "cache": 15.4
+      },
+      {
+        "leadingWhitespaceBytes": 50000,
+        "base": 3411.1,
+        "cache": 20.2
+      },
+      {
+        "leadingWhitespaceBytes": 200000,
+        "base": 55879.7,
+        "cache": 33.6
+      }
+    ]
+  },
+  "outputs": "Process stdout was byte-identical between baseline and cache at every input size.",
+  "limits": [
+    "Single Windows host, one compiler, wall-clock process time, no RSS or allocation-count comparison.",
+    "The Rust interpreter and WASI string paths were not changed or measured here.",
+    "A cursor moves forward only; an index before the cursor rescans from the start.",
+    "Cache entries cost 32 bytes each (4 slots) and are only created for heap strings >= 256 bytes."
+  ]
+}

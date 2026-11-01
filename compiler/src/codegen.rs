@@ -1221,6 +1221,22 @@ static void ostrin_register_allocation(void* ptr) {\n\
     ostrin_register_allocation_with_drop(ptr, NULL);\n\
 }\n\
 \n\
+/* Cursor cache for long heap strings (see strings_runtime.c). Entries are dropped whenever the\n\
+ * backing allocation is freed, released or reallocated; all access holds the heap lock. */\n\
+#define OSTRIN_STR_CACHE_SLOTS 4\n\
+#define OSTRIN_STR_CACHE_MIN_BYTES 256\n\
+typedef struct { const char* ptr; int64_t cps; int64_t idx; size_t off; } OstrinStrCache;\n\
+static OstrinStrCache ostrin_str_cache[OSTRIN_STR_CACHE_SLOTS];\n\
+static unsigned ostrin_str_cache_next = 0;\n\
+static void ostrin_str_cache_forget(const void* ptr) {\n\
+    for (unsigned i = 0; i < OSTRIN_STR_CACHE_SLOTS; i++) {\n\
+        if (ostrin_str_cache[i].ptr == (const char*)ptr) ostrin_str_cache[i].ptr = NULL;\n\
+    }\n\
+}\n\
+static void ostrin_str_cache_clear(void) {\n\
+    for (unsigned i = 0; i < OSTRIN_STR_CACHE_SLOTS; i++) ostrin_str_cache[i].ptr = NULL;\n\
+}\n\
+\n\
 static void* ostrin_alloc(size_t size) {\n\
     void* ptr = malloc(size == 0 ? 1 : size);\n\
     if (!ptr) OSTRIN_OOM();\n\
@@ -1256,6 +1272,7 @@ static void* ostrin_calloc(size_t count, size_t size) {\n\
 static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
     if (!old_ptr) return ostrin_alloc(size);\n\
     ostrin_heap_lock();\n\
+    ostrin_str_cache_forget(old_ptr);\n\
     void* ptr = realloc(old_ptr, size == 0 ? 1 : size);\n\
     if (!ptr) { ostrin_heap_unlock(); OSTRIN_OOM(); }\n\
     OstrinAllocation** old_link = ostrin_table_link(old_ptr);\n\
@@ -1280,6 +1297,7 @@ static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
 static void ostrin_free(void* ptr) {\n\
     if (!ptr) return;\n\
     ostrin_heap_lock();\n\
+    ostrin_str_cache_forget(ptr);\n\
     OstrinAllocation** link = ostrin_table_link(ptr);\n\
     if (link) {\n\
         OstrinAllocation* entry = *link;\n\
@@ -1314,6 +1332,7 @@ static void ostrin_release(void* ptr) {\n\
         if (entry->refs > 1) {\n\
             entry->refs--;\n\
         } else {\n\
+            ostrin_str_cache_forget(ptr);\n\
             *link = entry->next;\n\
             ostrin_allocation_count--;\n\
             void (*drop)(void*) = entry->drop;\n\
@@ -1352,6 +1371,7 @@ static void ostrin_mem_cleanup(void) {\n\
         free(node);\n\
     }\n\
     ostrin_heap_lock();\n\
+    ostrin_str_cache_clear();\n\
     for (size_t i = 0; i < ostrin_bucket_count; i++) {\n\
         OstrinAllocation* entry = ostrin_buckets[i];\n\
         while (entry) {\n\
