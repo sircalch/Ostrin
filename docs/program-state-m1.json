@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
-    "evidenceRevision": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
+    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
-    "lastObservedRemotePullRequestHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
+    "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -77,6 +77,36 @@
     "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
+    "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
+    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
+    "pr-234-merged-main-69c962d-all-five-main-workflows-green",
+    "bounded-r3-wasi-preview1-host-replay-profile-local-70-tests-website-and-plan-gates-green",
+    "pr-235-two-p2-covariance-findings-fixed-and-current-review-threads-resolved-targeted-native-wasi-leak-test-passed",
+    "pr-234-merged-into-main-69c962-and-all-eight-post-merge-checks-green",
+    "measurement-dimensional-source-correlation-implemented-at-source-c1a4281",
+    "measurement-correlation-analytic-oracle-variance-0.37-uncertainty-0.6082762530298219-interpreter-native-parity-live-allocations-zero",
+    "measurement-correlation-wasi-preview1-matrix-33-programs-green",
+    "measurement-correlation-lab-12-demos-29-figure-replays-generated-and-verified",
+    "measurement-correlation-website-17-pages-305-examples-383-integration-tests-green",
+    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-fallbacks",
+    "measurement-correlation-contract-gate-and-18-mutation-tests-green",
+    "measurement-correlation-numeric-validation-80-reports-136-emitted-values-exact",
+    "measurement-correlation-linguist-distribution-and-v0.2-readiness-12-of-12-green",
+    "measurement-correlation-evidence-9ac3446-and-dashboard-84b6c04-recorded",
+    "measurement-correlation-rounded-endpoint-p2-fixed-source-6c6c3aa-with-exact-rational-regression",
+    "measurement-correlation-p2-focused-interpreter-native-test-wasi33-and-contract18-green",
+    "measurement-scalar-native-lowering-ratchet-updated-31-to-34-after-three-sourcecorrelation-ir-bodies",
+    "stale-remote-pr235-failures-diagnosed-and-fixed-provenance-page-regenerated-website383-green",
+    "numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero-after-p2",
+    "project-plan-linguist-distribution-ownership-v0.2-readiness-and-scorecard-tests-green-after-p2",
+    "r3-bars-bundle-regenerated-effect-coverage-21063-r3-open-zero-host-captures",
+    "measurement-correlation-lossy-unit-conversion-cancellation-rejected-source-c20b087",
+    "unit-conversion-cancellation-exact-rational-residual-32-over-25-meters",
+    "measurement-correlation-full-cargo-422-tests-green-current-source-tree",
+    "measurement-correlation-wasi-33-programs-green-after-release-compiler-rebuild",
+    "measurement-correlation-contract-18-website-383-lab-replays-29-and-provenance-green",
+    "measurement-correlation-numeric-80-and-136-values-exact-live-allocations-zero",
+    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green",
     "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
     "website-test-count-384-metadata-synchronized-pr239-29f8339",
     "measurement-temperaturepoint-273e01e-five-workflows-green"
@@ -117,6 +147,18 @@
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849"
   },
   "pending": [
+    "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
+    "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
+    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
+    "Push the PR verification-job correction in PR #236 and require all relevant workflows, including Deploy Ostrin website verify, to pass on the latest exact head; inspect the downloaded R3 profile receipt and verified artifact before treating the package as validated.",
+    "PR #235 has 10/10 checks green on a4a17eef19ee89ad059d6821c772e124ca6971c5; both review P2 threads are resolved with a passing targeted interpreter/native leak/WASI test. A fresh @codex review was requested and is pending; merge authorization is not recorded.",
+    "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
+    "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0.",
+    "Push the locally validated source and evidence commits to PR #235; run all required checks on its exact new head.",
+    "Obtain fresh review on the new PR head and verify both P2 findings are no longer substantive before considering integration; no merge has been authorized for PR #235.",
+    "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
+    "Keep unit-carrying covariance matrices, Measurement arrays, and array reductions outside the supported profile until separately typed and validated.",
+    "Keep published v0.2.0 unchanged; do not create or publish a new release.",
     "Push the shared-fixture/actual-WASI/documentation package in PR #239 and require checks plus review for the resulting HEAD.",
     "PRs #235-#239 remain unmerged; no PR-specific merge authorization exists for this set.",
     "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
@@ -124,10 +166,57 @@
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 41248858683,
+    "runId": 41167597498,
     "status": "success",
-    "head": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
     "relatedRuns": [
+      {
+        "workflow": "Browser audit",
+        "runId": 41167597511,
+        "status": "success"
+      },
+      {
+        "workflow": "Native sanitizers",
+        "runId": 41167597496,
+        "status": "success",
+        "asan": "success",
+        "ubsan": "success"
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 41167597546,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 41167597514,
+        "status": "success"
+      },
+      {
+        "workflow": "Deploy Ostrin website",
+        "runId": 40230630648,
+        "status": "success"
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 40230630661,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 40230630640,
+        "status": "success"
+      },
+      {
+        "workflow": "Browser audit",
+        "runId": 40230630645,
+        "status": "success"
+      },
+      {
+        "workflow": "Rust dependency advisories",
+        "runId": 40230630640,
+        "status": "success"
+      },
       {
         "workflow": "Browser audit",
         "runId": 41248858643,
@@ -151,61 +240,102 @@
         "status": "success"
       }
     ],
-    "note": "Historical exact-head result for 273e01e; the shared-fixture/documentation extension requires fresh CI. Source and evidence references identify earlier commits intentionally; this checkpoint never claims its containing commit has already passed."
+    "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
   },
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
-    "Published v0.2.0 remains frozen; no new tag or release is authorized."
+    "Published v0.2.0 remains frozen; no new tag or release is authorized.",
+    "PR #235 still needs fresh Codex review of head a4a17eef19ee89ad059d6821c772e124ca6971c5 after the two P2 fixes; prior findings are resolved, 10 checks remain green, and no merge authorization is recorded.",
+    "PR #236 needs fresh exact-head GitHub Actions after its PR verification job was added; the first runs were cancelled before producing a real candidate artifact, so no GitHub replay receipt is yet claimed.",
+    "Published v0.2.0 remains frozen; do not create a new release or tag.",
+    "PR #235 has two P2 review threads on old head f58ed2e. Their fixes are locally validated, but the branch has not yet been updated and no exact-head CI or fresh review exists for the fixes.",
+    "R3 remains OPEN: host capture is missing from 29/29 bundles; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
+    "The broader M1 acceptance gates for performance, end-to-end reproducibility, visual quality, and multi-platform execution remain incomplete.",
+    "Published v0.2.0 remains frozen."
   ],
-  "next": "Confirm PR #239 checks/review on the new pushed HEAD once; while they run, inspect the pendulum workflow performance gaps and prepare an independent local package without merging other PRs.",
+  "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
-    "number": 239,
-    "url": "https://github.com/sircalch/Ostrin/pull/239",
-    "remoteHead": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
+    "number": 238,
+    "url": "https://github.com/sircalch/Ostrin/pull/238",
+    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "preceding-head-green-local-extension-pending-push-ci-review",
+    "state": "open-mergeable-exact-metadata-head-green",
     "checks": {
       "ostrinCi": {
         "status": "success",
-        "runId": 41248858683
+        "runId": 41167597498
       },
       "browserAudit": {
         "status": "success",
-        "runId": 41248858643
+        "runId": 41167597511
       },
       "nativeSanitizers": {
         "status": "success",
-        "runId": 41248858644,
+        "runId": 41167597496,
         "asan": "success",
         "ubsan": "success"
       },
       "codeql": {
         "status": "success",
-        "runId": 41248858648
+        "runId": 41167597546
       },
       "securityAudit": {
         "status": "success",
-        "runId": 41248858645
-      }
+        "runId": 41167597514
+      },
+      "successful": 10,
+      "failing": 0,
+      "pending": 0,
+      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
     },
     "review": {
-      "latestSubmittedReviewHead": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
-      "latestGitHubReviewHead": "830ec3dc5238257a4792b5d2fc43be2f652335f0",
-      "currentHeadReviewed": false,
-      "status": "Clean receipt exists on 830ec3d; the updated shared-fixture profile requires fresh review.",
+      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "currentHeadReviewed": true,
+      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
       "unresolvedOutdatedThreads": 0
     },
     "openReviewThreads": [],
-    "localFollowUp": "Shared dynamic-payload fixtures passed native Windows, local Linux GCC ASan/UBSan and actual 34-program WASI execution; push together with documentation/checkpoint and validate the resulting head.",
+    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
     "observedAt": "2026-10-31",
-    "head": "273e01e5376b3c4a2dd2aa81f03b779a9c48f8b9",
-    "integration": "not merged; no PR #239 merge authorization"
+    "head": "d1974b052528eec47975297d094031c4081f0681",
+    "integration": "not merged; no PR #238 merge authorization",
+    "mergeCommit": null,
+    "reviewThreads": {
+      "total": 2,
+      "unresolved": 2,
+      "comments": [
+        {
+          "id": 4372396523,
+          "priority": "P2",
+          "status": "fixed-locally-not-revalidated"
+        },
+        {
+          "id": 4372490005,
+          "priority": "P2",
+          "status": "fixed-locally-not-revalidated"
+        }
+      ]
+    },
+    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
+    "runs": {
+      "ostrinCi": "success",
+      "browserAudit": "success",
+      "nativeSanitizersAsan": "success",
+      "nativeSanitizersUbsan": "success",
+      "codeql": "success",
+      "securityAudit": "success"
+    },
+    "resolvedReviewThreads": [
+      4372396523,
+      4372490005
+    ]
   },
   "activePullRequests": [
-    235,
-    236,
     237,
     238,
+    235,
+    236,
     239
   ],
   "acceptanceCriteria": [
