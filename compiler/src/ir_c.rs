@@ -718,6 +718,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
 fn list_element_supported(ty: &Ty, records: &RecordFields) -> bool {
     (scalar(ty) && *ty != Ty::Void)
         || quantity(ty)
+        || *ty == Ty::TemperaturePoint
         || record_name(ty, records).is_some()
         // Enum values are stored inline in the generated list.  The C
         // list helpers already retain/drop managed enum payloads by active
@@ -867,6 +868,7 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         // field type remains the explicit `Trait_Dyn` pair.
         Ty::Dyn(name) => name.clone(),
         Ty::Fn(_, _) => mangle_record_type(ty, records),
+        Ty::TemperaturePoint => "TemperaturePoint".to_string(),
         Ty::Quantity(dimension) => format!(
             "Q_{}",
             crate::types::dim_to_string(dimension)
