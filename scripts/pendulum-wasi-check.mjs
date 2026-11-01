@@ -47,17 +47,36 @@ async function main() {
   run(compileArgs);
   const module = await WebAssembly.compile(readFileSync(wasmPath));
   const samples = [];
-  for (let index = 0; index < 3; index += 1) {
+  const parsedInput = JSON.parse(inputBytes.toString("utf8"));
+  const changed = (changes) => {
+    const document = structuredClone(parsedInput);
+    Object.assign(document.parameters, changes);
+    return Buffer.from(JSON.stringify(document));
+  };
+  const scenarios = [
+    ...[0, 1, 2].map((index) => ({ name: `baseline-${index + 1}`, input: inputBytes })),
+    { name: "analytical-three-row-arrays", input: changed({ length_m: [1, 4, 9], period_s: [2, 4, 6] }), expectedIncludes: "g = 9.8696 m/s²;" },
+    { name: "negative-sigma", input: changed({ length_repeat_sigma_m: -0.1 }), expectedError: "input error: standard uncertainties must be non-negative\n" },
+    { name: "non-positive-reading", input: changed({ length_m: [0.25, 0.35, -0.45, 0.55, 0.65, 0.75] }), expectedError: "input error: all lengths and periods must be finite and positive\n" },
+    { name: "non-numeric-array-element", input: changed({ length_m: [0.25, "invalid", 0.45] }), expectedError: "input error: length_m must be a numeric array\n" },
+    { name: "non-array-input", input: changed({ length_m: "invalid" }), expectedError: "input error: length_m must be a numeric array\n" },
+    { name: "mismatched-array-lengths", input: changed({ period_s: [1, 2] }), expectedError: "input error: provide at least three paired length and period readings\n" },
+    { name: "source-profile-limit", input: changed({ length_m: Array(32).fill(0.5), period_s: Array(32).fill(1.4) }), expectedError: "input error: covariance profile supports at most 31 paired readings\n" },
+  ];
+  for (const scenario of scenarios) {
     const cwd = mkdtempSync(path.join(output, "input-"));
     let stdoutFd;
     let stderrFd;
     try {
       const stagedInput = path.join(cwd, "data.json");
-      writeFileSync(stagedInput, inputBytes);
+      writeFileSync(stagedInput, scenario.input);
       const expected = normalize(run(["--run", path.join(root, sourcePath)], cwd));
-      assertBenchmarkWorkloadSucceeded(expected, "", "pendulum interpreter");
-      if (!expected.includes("<svg") || !expected.includes("linearized standard uncertainty")) {
-        throw new Error("pendulum interpreter did not produce the full scientific report and SVG");
+      if (scenario.expectedError) {
+        if (expected !== scenario.expectedError) throw new Error(`${scenario.name}: interpreter rejection differs`);
+      } else {
+        assertBenchmarkWorkloadSucceeded(expected, "", "pendulum interpreter");
+        if (!expected.includes("<svg") || !expected.includes("linearized standard uncertainty")) throw new Error("pendulum interpreter did not produce the full scientific report and SVG");
+        if (scenario.expectedIncludes && !expected.includes(scenario.expectedIncludes)) throw new Error(`${scenario.name}: independent analytical result differs`);
       }
       const stdoutPath = path.join(cwd, "stdout");
       const stderrPath = path.join(cwd, "stderr");
@@ -74,11 +93,11 @@ async function main() {
       const actual = normalize(readFileSync(stdoutPath, "utf8"));
       const stderr = normalize(readFileSync(stderrPath, "utf8"));
       if (exitCode !== 0) throw new Error(`pendulum WASI exited with ${exitCode}: ${stderr}`);
-      assertBenchmarkWorkloadSucceeded(actual, stderr, "pendulum WASI");
+      if (!scenario.expectedError) assertBenchmarkWorkloadSucceeded(actual, stderr, "pendulum WASI");
       if (actual !== expected) throw new Error("compiled WASI report/SVG differs from interpreter output");
-      if (sha256(readFileSync(stagedInput)) !== sha256(inputBytes)) throw new Error("pendulum input bytes changed during execution");
-      if (samples.length && sha256(actual) !== samples[0].outputSha256) throw new Error("pendulum output changed across repeated runs");
-      samples.push({ outputSha256: sha256(actual), outputBytes: Buffer.byteLength(actual), allocations: parseAllocationCounters(stderr) });
+      if (sha256(readFileSync(stagedInput)) !== sha256(scenario.input)) throw new Error("pendulum input bytes changed during execution");
+      if (scenario.name.startsWith("baseline-") && samples.length && sha256(actual) !== samples[0].outputSha256) throw new Error("pendulum output changed across repeated runs");
+      samples.push({ case: scenario.name, expectedError: scenario.expectedError || null, inputSha256: sha256(scenario.input), inputUtf8: scenario.input.toString("utf8"), outputSha256: sha256(actual), outputBytes: Buffer.byteLength(actual), allocations: parseAllocationCounters(stderr) });
     } finally {
       if (stdoutFd !== undefined) closeSync(stdoutFd);
       if (stderrFd !== undefined) closeSync(stderrFd);
@@ -105,11 +124,11 @@ async function main() {
     },
     runner: { node: process.version, wasi: "preview1", host: `${process.platform}/${process.arch}` },
     outputCheck: "exact UTF-8 report and SVG parity with interpreter after CRLF normalization",
-    scope: "One synthetic workflow; no general WASI coverage, timing equivalence or global R3 claim.",
+    scope: "One synthetic workflow with three repeated baseline runs, one independent analytical array case and six rejected-input cases; no general WASI coverage, timing equivalence or global R3 claim.",
     samples,
   };
   writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
-  console.log(`pendulum-wasi-check: ok (${samples.length} compiled WASI runs, full report/SVG parity, zero live managed allocations)`);
+  console.log(`pendulum-wasi-check: ok (${samples.length} compiled WASI cases, report/SVG and expected-error parity, zero live managed allocations)`);
 }
 
 main().catch((error) => { console.error(`pendulum-wasi-check: ${error.message}`); process.exitCode = 1; });

@@ -12575,7 +12575,7 @@ fn pendulum_calibration_workflow_matches_interpreter_native_and_wasi_emission() 
     let backend = run(&["--native-type-report", &source]);
     assert!(backend.status.success(), "{}", stderr(&backend));
     assert!(
-        stdout(&backend).contains("examples/viz_pendulum_calibration.ostrin ir=10 hir=2 ast=0")
+        stdout(&backend).contains("examples/viz_pendulum_calibration.ostrin ir=9 hir=2 ast=0")
             && stdout(&backend).contains("ast-fallback: 0")
             && stdout(&backend).contains("divergences: 0"),
         "the dimensional workflow must preserve its typed backend profile: {}",
@@ -12676,25 +12676,86 @@ independent variance contribution = 0.04826689993418455 m/s²\n";
     let fixture: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&data).expect("read pendulum fixture"))
             .expect("parse pendulum fixture");
+    assert!(fixture["parameters"].get("length_m_1").is_none());
+    assert!(fixture["parameters"].get("period_s_1").is_none());
+    let mut shortened = fixture.clone();
+    // Independent analytical case: T^2 = 4 L, so g = pi^2.
+    shortened["parameters"]["length_m"] = serde_json::json!([1.0, 4.0, 9.0]);
+    shortened["parameters"]["period_s"] = serde_json::json!([2.0, 4.0, 6.0]);
+    fs::write(work.join("data.json"), shortened.to_string()).expect("stage three-row arrays");
+    let short_interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(&work)
+        .arg("--run")
+        .arg(&staged_source)
+        .output()
+        .expect("interpret three-row arrays");
+    let short_native = Command::new(&exe)
+        .current_dir(&work)
+        .output()
+        .expect("run three-row arrays");
+    assert!(short_interpreted.status.success() && short_native.status.success());
+    let short_stdout = String::from_utf8_lossy(&short_native.stdout).replace("\r\n", "\n");
+    assert_eq!(
+        short_stdout,
+        String::from_utf8_lossy(&short_interpreted.stdout).replace("\r\n", "\n")
+    );
+    assert!(
+        short_stdout.contains("observations = 3, repeatability sources = 6, shared sources = 2\n")
+    );
+    assert!(
+        short_stdout.contains("g = 9.8696 m/s²;"),
+        "array values must determine the analytical result: {short_stdout}"
+    );
+    assert!(short_stdout.contains("<svg") && short_stdout.contains("data-table-row=\"2\""));
+    assert!(!short_stdout.contains("data-table-row=\"5\""));
+    assert!(String::from_utf8_lossy(&short_native.stderr).contains("live_allocations=0"));
+
+    let mut oversized = fixture.clone();
+    oversized["parameters"]["length_m"] = serde_json::json!(vec![0.5; 32]);
+    oversized["parameters"]["period_s"] = serde_json::json!(vec![1.4; 32]);
+    fs::write(work.join("data.json"), oversized.to_string()).expect("stage too many source pairs");
+
     for (field, invalid, expected) in [
         (
-            "length_repeat_sigma_m",
-            -0.1,
+            "/parameters",
+            oversized["parameters"].clone(),
+            "input error: covariance profile supports at most 31 paired readings\n",
+        ),
+        (
+            "/parameters/length_repeat_sigma_m",
+            serde_json::json!(-0.1),
             "input error: standard uncertainties must be non-negative\n",
         ),
         (
-            "ruler_clock_zero_correlation",
-            1.1,
+            "/parameters/ruler_clock_zero_correlation",
+            serde_json::json!(1.1),
             "input error: shared-source correlation must be between -1 and 1\n",
         ),
         (
-            "length_m_3",
-            -0.45,
+            "/parameters/length_m/2",
+            serde_json::json!(-0.45),
             "input error: all lengths and periods must be finite and positive\n",
+        ),
+        (
+            "/parameters/length_m",
+            serde_json::json!("not an array"),
+            "input error: length_m must be a numeric array\n",
+        ),
+        (
+            "/parameters/length_m/2",
+            serde_json::json!("not a number"),
+            "input error: length_m must be a numeric array\n",
+        ),
+        (
+            "/parameters/period_s",
+            serde_json::json!([1.0, 2.0]),
+            "input error: provide at least three paired length and period readings\n",
         ),
     ] {
         let mut changed = fixture.clone();
-        changed["parameters"][field] = serde_json::json!(invalid);
+        *changed
+            .pointer_mut(field)
+            .expect("invalid-case path exists") = invalid;
         fs::write(work.join("data.json"), changed.to_string()).expect("stage invalid fixture");
         for (mut command, native) in [
             (

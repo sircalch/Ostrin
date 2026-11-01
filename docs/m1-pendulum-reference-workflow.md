@@ -206,8 +206,8 @@ printing. Its managed arrays/lists cross that boundary together with acceleratio
 quantities for gravity and both reported uncertainties. The fit still operates
 on coherent SI Float arrays; it is not a general unit-aware OLS API.
 `load_analysis` owns JSON loading and validation, `render` owns figure/table
-formatting, and `print_report` preserves the textual scientific output. The
-bounded native source profile is now 10 IR / 2 HIR / 0 AST bodies. Tests preserve
+formatting, and `print_report` preserves the textual scientific output. At source
+`5960371`, the bounded native profile was 10 IR / 2 HIR / 0 AST bodies. Tests preserve
 full output parity and also exercise invalid uncertainty, correlation and a
 non-positive reading through the returned error path with leak-check enabled.
 
@@ -311,3 +311,26 @@ The native figure is a direct export. The source-backed R2 bundle in
 its normalized figure/source/input manifest and replay contract. Runtime and
 compiler hashes for the measured native and WASI paths are in the separate
 receipts above; these are scoped observations, not signed build attestations.
+
+## Authoritative array input
+
+The current loader reads `parameters.length_m` and `parameters.period_s` directly
+through `std.json` arrays. These are the same arrays used by the independent
+oracle. The obsolete six-scalar loader and duplicated `*_1` through `*_6` fields
+are removed. The checked-in fixture still has six synthetic observations, while
+the application supports 3–31 paired readings. Two independent sources per row
+plus the ruler/clock offsets must fit the current 64-source covariance profile;
+32 pairs are rejected before model construction.
+
+The regression suite includes a three-row analytical dataset with L=[1,4,9] m
+and T=[2,4,6] s: T²=4 L and the derived g=π² m/s². It checks interpreter/native
+output, a three-row exported table and leak cleanup, plus malformed arrays,
+non-numeric elements, mismatched lengths, invalid sigma/correlation and the
+source-profile limit. The compiled-WASI checker now runs three baseline replays,
+that analytical case and six expected-input-error cases, retaining the actual
+input text/hash and allocation counters for every case.
+
+Removing the obsolete helper removes one IR body. The current workflow profile
+is 9 IR / 2 HIR / 0 AST; earlier source-bound inventory/timing receipts above are
+preserved and do not describe the new loader or its changed input bytes. No
+performance change is inferred without a new scoped measurement.

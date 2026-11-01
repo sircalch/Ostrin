@@ -41,6 +41,11 @@
 
 ### Scientific workflow profiling
 
+- Pendulum loading now consumes the same JSON arrays as its independent oracle,
+  replacing mirrored scalar keys and the fixed six-row loader. It accepts 3–31
+  pairs within the 64-source covariance profile, with an analytical three-row
+  case and explicit array/type/shape/limit diagnostics checked natively and in
+  the compiled-WASI checker.
 - The pendulum workflow now returns a managed `PendulumAnalysis` with typed
   acceleration quantities through `Result`, separating numeric analysis from
   JSON loading, report text and SVG rendering. Existing outputs and negative
@@ -48,7 +53,7 @@
   inclusive/exclusive timings, observed entry latency, paired controls and
   verifiable output/allocation receipts; these are instrumented observations.
 - Re-measured the development corpus on Windows/Linux and tightened its ratchet
-  to 8789 IR + 46 HIR / 0 AST. Shared library bodies are counted per importing
+  to 8788 IR + 46 HIR / 0 AST after removing one obsolete loader body. Shared library bodies are counted per importing
   example; this is a corpus inventory, not a count of new features.
 - The experimental pendulum calibration example reuses each period measurement
   when squaring it, preserving source correlation and the complete output. Seven
