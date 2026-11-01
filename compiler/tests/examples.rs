@@ -9680,6 +9680,143 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
 }
 
 #[test]
+fn native_hir_unwrap_retains_borrowed_payloads_and_releases_iterables() {
+    let file = temp_source(
+        "native-hir-unwrap-managed.ostrin",
+        r#"import std.json
+
+fn option_twice(values: Option<List<Value>>) -> Result<Float, String> {
+    label: Option<String> = Some("borrowed" + " option")
+    copy = label.unwrap()
+    joined = label.unwrap() + " payload"
+    if copy != "borrowed option" or joined != "borrowed option payload" {
+        return Err("option string alias changed")
+    }
+    mut total = 0.0
+    for item in values.unwrap() {
+        unwrapped = Some(item).unwrap()
+        match json.as_number(unwrapped) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    for item in values.unwrap() {
+        match json.as_number(item) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    Ok(total)
+}
+
+fn result_twice(values: Result<List<Value>, String>) -> Result<Float, String> {
+    label: Result<String, String> = Ok("borrowed" + " result")
+    copy = label.unwrap()
+    joined = label.unwrap() + " payload"
+    if copy != "borrowed result" or joined != "borrowed result payload" {
+        return Err("result string alias changed")
+    }
+    mut total = 0.0
+    for item in values.unwrap() {
+        wrapped: Result<Value, String> = Ok(item)
+        match json.as_number(wrapped.unwrap()) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    for item in values.unwrap() {
+        match json.as_number(item) {
+            Some(number) => { total = total + number },
+            _ => { return Err("non-number") },
+        }
+    }
+    Ok(total)
+}
+
+fn fresh_values() -> Option<List<Value>> {
+    Some([json.number_value(1.0), json.number_value(2.0)])
+}
+
+fn controlled(mode: Int) -> Result<Float, String> {
+    mut total = 0.0
+    for item in fresh_values().unwrap() {
+        match json.as_number(item) {
+            Some(number) => {
+                if mode == 1 { return Ok(number) }
+                if mode == 2 { break }
+                if mode == 3 { continue }
+                if mode == 4 { return Err("stopped") }
+                total = total + number
+            },
+            _ => { return Err("non-number") },
+        }
+    }
+    Ok(total)
+}
+
+fn main() -> Void {
+    mut values: List<Value> = [json.number_value(1.0), json.number_value(2.0)]
+    option: Option<List<Value>> = Some(values)
+    result: Result<List<Value>, String> = Ok(values)
+    for i in 0 until 5 {
+        print(option_twice(option).unwrap())
+        print(result_twice(result).unwrap())
+        print(values.length())
+    }
+    print(controlled(0).unwrap())
+    print(controlled(1).unwrap())
+    print(controlled(2).unwrap())
+    print(controlled(3).unwrap())
+    print(controlled(4).is_err())
+    invalid: Option<List<Value>> = Some([json.text_value("text")])
+    print(option_twice(invalid).is_err())
+    invalid_result: Result<List<Value>, String> = Ok([json.text_value("text")])
+    print(result_twice(invalid_result).is_err())
+}
+"#,
+    );
+    let expected = "6\n6\n2\n".repeat(5) + "3\n1\n0\n0\ntrue\ntrue\ntrue\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "{}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "{}", stderr(&report));
+    assert!(
+        stdout(&report).contains("hir-generated: 6")
+            && stdout(&report).contains("ast-fallback: 0")
+            && stdout(&report).contains("divergences: 0"),
+        "regression must exercise HIR without AST fallback: {}",
+        stdout(&report)
+    );
+    let exe = temp_artifact("native-hir-unwrap-managed.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "{}", stderr(&compile));
+    let native = Command::new(&exe)
+        .output()
+        .expect("run HIR unwrap regression");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "HIR unwrap failed ({}): {}",
+        native.status,
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "HIR unwrap or iterable cleanup leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_nested_record_option_payload_ownership() {
     let file = temp_source(
         "native-ir-nested-record-option.ostrin",

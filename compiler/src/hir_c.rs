@@ -488,10 +488,22 @@ impl Emitter<'_> {
     }
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
-        matches!(
-            expr.kind,
-            HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..)
-        )
+        match &expr.kind {
+            HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..) => true,
+            // A by-value wrapper does not create another payload reference.
+            // Unwrapping a borrowed wrapper borrows its payload; binding or
+            // returning that payload must retain it, and iteration must not
+            // release the wrapper's existing reference.
+            HirKind::MethodCall {
+                recv, method, args, ..
+            } if method == "unwrap"
+                && args.is_empty()
+                && (is_option(&recv.ty) || is_result(&recv.ty)) =>
+            {
+                Self::borrowed_expr(recv)
+            }
+            _ => false,
+        }
     }
 
     fn contains_enum(&self, ty: &Ty) -> bool {
@@ -873,6 +885,15 @@ impl Emitter<'_> {
                 let list_temp = self.next_temp();
                 let index_temp = self.next_temp();
                 let iter_code = self.expr(iter)?;
+                let owns_iter = !Self::borrowed_expr(iter);
+                // Keep an owned iterable outside the per-iteration control
+                // frame: return must release it, while break/continue must
+                // leave its final release to the enclosing loop scope.
+                self.owned_block_locals.push(if owns_iter {
+                    vec![(list_temp.clone(), iter.ty.clone())]
+                } else {
+                    Vec::new()
+                });
                 out.push_str(&format!(
                     "    {{ {list_c} {list_temp} = {iter_code}; for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ {elem_c} {var} = {list_temp}->items[{index_temp}];\n"
                 ));
@@ -884,9 +905,12 @@ impl Emitter<'_> {
                 self.end_loop(frame, out);
                 out.push_str("    }\n");
                 // A temporary list (literal or call result) is owned by the loop.
-                if !Self::borrowed_expr(iter) {
+                if owns_iter {
                     out.push_str(&format!("    ostrin_release((void*){list_temp});\n"));
                 }
+                self.owned_block_locals
+                    .pop()
+                    .expect("iterable ownership frame must exist");
                 out.push_str("    }\n");
             }
             HirStmt::Expr(e) => self.expr_stmt(e, out)?,
@@ -2765,6 +2789,7 @@ fn result_types(ty: &Ty) -> Bail<(Ty, Ty)> {
 /// result of a call (functions and string methods return a new reference).
 fn fresh_string(e: &HirExpr) -> bool {
     e.ty == Ty::String
+        && !Emitter::borrowed_expr(e)
         && matches!(
             &e.kind,
             HirKind::Binary(BinOp::Add, ..) | HirKind::Call { .. } | HirKind::MethodCall { .. }
