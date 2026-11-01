@@ -1,0 +1,49 @@
+// Long mixed-width UTF-8 string accessed forward, backward and after reallocation.
+// Exercises the native cursor cache for strings of at least 256 bytes.
+fn checksum(text: String, count: Int) -> Int {
+    mut sum = 0
+    mut i = 0
+    while i < count {
+        sum = sum + text.char_at(i).codepoint().unwrap() * (i % 7 + 1)
+        i = i + 1
+    }
+    sum
+}
+
+fn checksum_reverse(text: String, count: Int) -> Int {
+    mut sum = 0
+    mut i = count - 1
+    while i >= 0 {
+        sum = sum + text.char_at(i).codepoint().unwrap() * (i % 7 + 1)
+        i = i - 1
+    }
+    sum
+}
+
+fn main() -> Void {
+    mut text = ""
+    mut n = 0
+    while n < 120 {
+        text = text + "ab" + "é" + "漢" + "😀" + "z"
+        n = n + 1
+    }
+    print(text.length())
+    print(checksum(text, text.length()) == checksum_reverse(text, text.length()))
+    print(checksum(text, text.length()))
+    print(text.slice(3, 8))
+    print(text.slice(0, 3))
+    print(text.slice(599, 606))
+    print(text.slice(715, 720))
+    print(text.char_at(717))
+    print(text.slice(10, 10).length())
+
+    longer = text + "!"
+    print(longer.length())
+    print(longer.char_at(720))
+    print(longer.slice(718, 721))
+    print(text.length())
+
+    short = "abc" + "é"
+    print(short.length())
+    print(short.char_at(3))
+}

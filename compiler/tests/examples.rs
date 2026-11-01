@@ -20425,3 +20425,41 @@ fn main() -> Void {
         String::from_utf8_lossy(&native.stderr)
     );
 }
+
+#[test]
+fn native_string_cursor_cache_preserves_utf8_semantics_without_leaks() {
+    // 720 code points (1440 bytes) mixing 1-, 2-, 3- and 4-byte characters, read forward, backward
+    // and across a reallocation; the expected values were checked by hand against the repeating
+    // 6-code-point pattern "abé漢😀z".
+    let expected = "720\ntrue\n75733796\n漢😀zab\nabé\nzabé漢😀z\nbé漢😀z\n漢\n0\n721\n!\n😀z!\n720\n4\né\n";
+    let file = "native_string_cursor_cache.ostrin";
+    let path = example_path(file);
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("string_cursor_cache.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+}

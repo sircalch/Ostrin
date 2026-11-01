@@ -13,9 +13,78 @@ static bool ostrin_s_space(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\r';
 }
 
+/* Deterministic scan counters (not timing evidence); enabled with -DOSTRIN_SCAN_COUNTERS. */
+#ifdef OSTRIN_SCAN_COUNTERS
+static uint64_t ostrin_scan_length_calls = 0, ostrin_scan_length_bytes = 0;
+static uint64_t ostrin_scan_offset_calls = 0, ostrin_scan_offset_steps = 0;
+__attribute__((destructor)) static void ostrin_scan_report(void) {
+    fprintf(stderr, "ostrin scans: {\"lengthCalls\":%llu,\"lengthBytes\":%llu,\"offsetCalls\":%llu,\"offsetSteps\":%llu}\n",
+            (unsigned long long)ostrin_scan_length_calls, (unsigned long long)ostrin_scan_length_bytes,
+            (unsigned long long)ostrin_scan_offset_calls, (unsigned long long)ostrin_scan_offset_steps);
+}
+#define OSTRIN_SCAN_COUNT(counter, n) ((counter) += (uint64_t)(n))
+#else
+#define OSTRIN_SCAN_COUNT(counter, n) ((void)0)
+#endif
+
+/* Cursor cache for long heap strings. Strings are immutable once created, so a cached code-point
+ * count and (index -> byte offset) cursor stay valid until the allocation is freed, released or
+ * reallocated; those paths call ostrin_str_cache_forget under the heap lock. Only registered heap
+ * allocations of at least OSTRIN_STR_CACHE_MIN_BYTES are cached, so short temporaries never evict
+ * the long input being parsed and literals/stack buffers (which have no lifetime hook) are never
+ * cached. A cursor only moves forward: an index before the cursor rescans from the start. */
+static int ostrin_s_cache_find(const char* s) {
+#ifdef OSTRIN_NO_STR_CACHE /* measurement baseline: behave exactly like the uncached scans */
+    (void)s;
+    return -1;
+#endif
+    for (unsigned i = 0; i < OSTRIN_STR_CACHE_SLOTS; i++) {
+        if (ostrin_str_cache[i].ptr == s) return (int)i;
+    }
+    return -1;
+}
+
+/* Caller holds the heap lock. cps < 0 and idx < 0 leave the stored values unchanged. */
+static void ostrin_s_cache_store(const char* s, int64_t cps, int64_t idx, size_t off) {
+#ifdef OSTRIN_NO_STR_CACHE
+    (void)s; (void)cps; (void)idx; (void)off;
+    return;
+#endif
+    if (!ostrin_table_link(s)) return;
+    int slot = ostrin_s_cache_find(s);
+    if (slot < 0) {
+        slot = (int)(ostrin_str_cache_next++ % OSTRIN_STR_CACHE_SLOTS);
+        ostrin_str_cache[slot].ptr = s;
+        ostrin_str_cache[slot].cps = -1;
+        ostrin_str_cache[slot].idx = 0;
+        ostrin_str_cache[slot].off = 0;
+    }
+    if (cps >= 0) ostrin_str_cache[slot].cps = cps;
+    if (idx >= 0) {
+        ostrin_str_cache[slot].idx = idx;
+        ostrin_str_cache[slot].off = off;
+    }
+}
+
 static int64_t ostrin_s_length(const char* s) {
+    OSTRIN_SCAN_COUNT(ostrin_scan_length_calls, 1);
+    ostrin_heap_lock();
+    int slot = ostrin_s_cache_find(s);
+    if (slot >= 0 && ostrin_str_cache[slot].cps >= 0) {
+        int64_t cached = ostrin_str_cache[slot].cps;
+        ostrin_heap_unlock();
+        return cached;
+    }
+    ostrin_heap_unlock();
     int64_t n = 0;
-    for (; *s; s++) if (((unsigned char)*s & 0xC0) != 0x80) n++;
+    size_t bytes = 0;
+    for (; s[bytes]; bytes++) if (((unsigned char)s[bytes] & 0xC0) != 0x80) n++;
+    OSTRIN_SCAN_COUNT(ostrin_scan_length_bytes, bytes);
+    if (bytes >= OSTRIN_STR_CACHE_MIN_BYTES) {
+        ostrin_heap_lock();
+        ostrin_s_cache_store(s, n, -1, 0);
+        ostrin_heap_unlock();
+    }
     return n;
 }
 
@@ -29,10 +98,25 @@ static size_t ostrin_s_utf8_width(unsigned char c) {
 
 static size_t ostrin_s_byte_offset(const char* s, int64_t index) {
     if (index < 0) OSTRIN_FAIL("string index out of bounds");
+    OSTRIN_SCAN_COUNT(ostrin_scan_offset_calls, 1);
+    int64_t i = 0;
     size_t offset = 0;
-    for (int64_t i = 0; i < index; i++) {
+    ostrin_heap_lock();
+    int slot = ostrin_s_cache_find(s);
+    if (slot >= 0 && ostrin_str_cache[slot].idx <= index) {
+        i = ostrin_str_cache[slot].idx;
+        offset = ostrin_str_cache[slot].off;
+    }
+    ostrin_heap_unlock();
+    for (; i < index; i++) {
         if (!s[offset]) OSTRIN_FAIL("string index out of bounds");
+        OSTRIN_SCAN_COUNT(ostrin_scan_offset_steps, 1);
         offset += ostrin_s_utf8_width((unsigned char)s[offset]);
+    }
+    if (slot >= 0 || offset >= OSTRIN_STR_CACHE_MIN_BYTES) {
+        ostrin_heap_lock();
+        ostrin_s_cache_store(s, -1, index, offset);
+        ostrin_heap_unlock();
     }
     return offset;
 }
