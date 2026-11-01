@@ -6,7 +6,7 @@
 // the WASM bytes loaded by each child process. It is never checked in.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { experimentFixtures, outputPathFor, validateEffectCapture, validateEntryEffectSignature, verifyBundleFile } from "./experiment-bundle.mjs";
@@ -228,6 +228,79 @@ export function readArchivedFile(root, relativePath, maximumBytes) {
   return { path: resolved, bytes: readFileSync(resolved) };
 }
 
+// A receipt is only a complete artifact contract when its declared inventory
+// matches every executable bundle shipped beside it. This check runs before
+// replay so a partial download cannot be mistaken for a complete evidence set.
+export function validateArchivedReplayInventory(directory, replayBundles) {
+  let root;
+  try { root = realpathSync(directory); }
+  catch { return ["archived replay artifact directory is missing"]; }
+  const bundleDirectory = path.join(root, "website/assets/experiments");
+  const errors = [];
+  if (!existsSync(bundleDirectory)) return ["archived replay inventory directory is missing"];
+  if (!replayBundles || typeof replayBundles !== "object" || Array.isArray(replayBundles)) {
+    return ["receipt executable replay inventory is missing or invalid"];
+  }
+
+  const actual = {};
+  for (const file of readdirSync(bundleDirectory).filter((name) => name.endsWith(".ostrin-experiment.json")).sort()) {
+    const relativePath = path.join("website/assets/experiments", file);
+    let archived;
+    try {
+      archived = readArchivedFile(root, relativePath, 16 * 1024 * 1024);
+    } catch (error) {
+      errors.push(error.message);
+      continue;
+    }
+    let bundle;
+    try {
+      bundle = JSON.parse(archived.bytes.toString("utf8"));
+    } catch (error) {
+      errors.push(`archived replay bundle ${file} is not valid JSON (${error.message})`);
+      continue;
+    }
+    const id = bundle?.id;
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(id ?? "")) {
+      errors.push(`archived replay bundle ${file} has an invalid fixture ID`);
+      continue;
+    }
+    if (file !== `${id}.ostrin-experiment.json`) {
+      errors.push(`archived replay bundle filename ${file} does not match fixture ID ${id}`);
+    }
+    if (Object.hasOwn(actual, id)) {
+      errors.push(`archived replay inventory contains duplicate fixture ${id}`);
+      continue;
+    }
+    const level = bundle?.reproducibility?.level;
+    if (!["R0", "R1", "R2"].includes(level)) {
+      errors.push(`archived replay bundle ${id} has an unsupported maturity level`);
+      continue;
+    }
+    actual[id] = {
+      level,
+      bundleSha256: sha256(archived.bytes),
+    };
+  }
+
+  const declaredIds = Object.keys(replayBundles).sort();
+  const actualIds = Object.keys(actual).sort();
+  if (declaredIds.length === 0) errors.push("archived replay inventory is empty");
+  if (JSON.stringify(declaredIds) !== JSON.stringify(actualIds)) {
+    const missing = actualIds.filter((id) => !declaredIds.includes(id));
+    const extra = declaredIds.filter((id) => !actualIds.includes(id));
+    if (missing.length) errors.push(`receipt inventory omits archived bundles: ${missing.join(", ")}`);
+    if (extra.length) errors.push(`receipt inventory names missing archived bundles: ${extra.join(", ")}`);
+  }
+  for (const id of actualIds) {
+    const declared = replayBundles[id];
+    const observed = actual[id];
+    if (declared?.level !== observed.level || declared?.bundleSha256 !== observed.bundleSha256) {
+      errors.push(`archived replay bundle ${id} differs from the receipt inventory`);
+    }
+  }
+  return errors;
+}
+
 // This checks archived bytes without regenerating CI host metadata on the
 // verifier's machine. It proves integrity, not a fresh execution of the program.
 export function verifySurfaceArtifact(directory, expectedRun) {
@@ -238,6 +311,7 @@ export function verifySurfaceArtifact(directory, expectedRun) {
   const bundleText = bundle.bytes.toString("utf8");
   const receipt = JSON.parse(receiptFile.bytes.toString("utf8"));
   const errors = verifySurfaceReceipt(receipt, bundleText, wasm.bytes, expectedRun);
+  errors.push(...validateArchivedReplayInventory(root, receipt.replayBundles));
   if (errors.length) throw new Error(errors.join("; "));
   return { bundleText, receipt, wasmPath: wasm.path };
 }

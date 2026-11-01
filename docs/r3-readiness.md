@@ -198,6 +198,10 @@ recibo de `surface`; `node scripts/experiment-replay.mjs --replay-artifact-all <
 --run-id <id> --tested-sha <sha>` vuelve a ejecutar el inventario R0/R1/R2 registrado en ese run con el
 WASM archivado y compara los reportes de lectura y azar determinista del paquete con la evidencia
 regenerada. Cada ejecución WASI se aísla en un proceso hijo con un límite de 120 segundos.
+Antes de aceptar el recibo, `--verify-artifact` compara su inventario con todos los archivos
+`*.ostrin-experiment.json` presentes en el paquete: rechaza bundles omitidos, nombres extra,
+niveles distintos y hashes que no coincidan. Así, un paquete parcial no puede presentarse como
+evidencia completa aunque su recibo sea internamente autoconsistente.
 Los R0 ejecutan dos veces el `source.ostrin` archivado con sus parámetros registrados y comparan
 la salida SVG completa y su hash de invocación; no se les atribuye sensibilidad de entradas
 externas. Los R1/R2 comparan el SVG completo, prueban el cambio de

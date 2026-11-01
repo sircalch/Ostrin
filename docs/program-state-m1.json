@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-25",
+  "updatedAt": "2026-10-31",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "c20b087dd727992c40a7871887dff9b9cb5624d1",
-    "evidenceRevision": "537e58f0ff402de764b81605d57c645ccbf160cd",
-    "dashboardRevision": "537e58f0ff402de764b81605d57c645ccbf160cd",
-    "lastValidatedRemotePullRequestHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
-    "lastObservedRemotePullRequestHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
+    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
+    "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
+    "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -77,6 +77,8 @@
     "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
+    "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
+    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
     "pr-234-merged-into-main-69c962-and-all-eight-post-merge-checks-green",
     "measurement-dimensional-source-correlation-implemented-at-source-c1a4281",
     "measurement-correlation-analytic-oracle-variance-0.37-uncertainty-0.6082762530298219-interpreter-native-parity-live-allocations-zero",
@@ -141,6 +143,9 @@
     "dashboardRevision": "537e58f0ff402de764b81605d57c645ccbf160cd"
   },
   "pending": [
+    "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
+    "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
+    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
     "Push the locally validated source and evidence commits to PR #235; run all required checks on its exact new head.",
     "Obtain fresh review on the new PR head and verify both P2 findings are no longer substantive before considering integration; no merge has been authorized for PR #235.",
     "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
@@ -149,10 +154,32 @@
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40230630708,
+    "runId": 41167597498,
     "status": "success",
-    "head": "69c962dee40a4b12606d131df0e8655b90924516",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
     "relatedRuns": [
+      {
+        "workflow": "Browser audit",
+        "runId": 41167597511,
+        "status": "success"
+      },
+      {
+        "workflow": "Native sanitizers",
+        "runId": 41167597496,
+        "status": "success",
+        "asan": "success",
+        "ubsan": "success"
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 41167597546,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 41167597514,
+        "status": "success"
+      },
       {
         "workflow": "Deploy Ostrin website",
         "runId": 40230630648,
@@ -174,27 +201,51 @@
         "status": "success"
       }
     ],
-    "note": "All eight post-merge check runs for main SHA 69c962dee40a4b12606d131df0e8655b90924516 completed successfully. GitHub confirms PR #234 is merged and its head is contained in main. These runs validate the merged #234 tree, not the current dimensional SourceCorrelation commits."
+    "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
   },
   "blockers": [
+    "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
+    "Published v0.2.0 remains frozen; no new tag or release is authorized.",
     "PR #235 has two P2 review threads on old head f58ed2e. Their fixes are locally validated, but the branch has not yet been updated and no exact-head CI or fresh review exists for the fixes.",
     "R3 remains OPEN: host capture is missing from 29/29 bundles; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
     "The broader M1 acceptance gates for performance, end-to-end reproducibility, visual quality, and multi-platform execution remain incomplete.",
     "Published v0.2.0 remains frozen."
   ],
-  "next": "Push the validated commits to PR #235, verify all checks and obtain a fresh review on that exact head, then continue the M1 workflow without merging absent specific authorization.",
+  "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
-    "number": 235,
-    "url": "https://github.com/sircalch/Ostrin/pull/235",
-    "remoteHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
+    "number": 238,
+    "url": "https://github.com/sircalch/Ostrin/pull/238",
+    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "mergeCommit": null,
-    "state": "open-f58-clean-10-checks-green-local-fixes-awaiting-new-head-ci-and-review",
+    "state": "open-mergeable-exact-metadata-head-green",
     "checks": {
       "successful": 10,
       "failing": 0,
       "pending": 0,
-      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
+      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827",
+      "ostrinCi": {
+        "status": "success",
+        "runId": 41167597498
+      },
+      "browserAudit": {
+        "status": "success",
+        "runId": 41167597511
+      },
+      "nativeSanitizers": {
+        "status": "success",
+        "runId": 41167597496,
+        "asan": "success",
+        "ubsan": "success"
+      },
+      "codeql": {
+        "status": "success",
+        "runId": 41167597546
+      },
+      "securityAudit": {
+        "status": "success",
+        "runId": 41167597514
+      }
     },
     "reviewThreads": {
       "total": 2,
@@ -212,6 +263,22 @@
         }
       ]
     },
-    "note": "Remote head f58ed2e has all ten checks green and is CLEAN/MERGEABLE. Its two P2 review findings are fixed in local source commit c20b087 and validated locally, but the source/evidence updates remain unpushed. Require exact-new-head CI and fresh review; do not merge without PR-specific authorization."
-  }
+    "note": "Remote head f58ed2e has all ten checks green and is CLEAN/MERGEABLE. Its two P2 review findings are fixed in local source commit c20b087 and validated locally, but the source/evidence updates remain unpushed. Require exact-new-head CI and fresh review; do not merge without PR-specific authorization.",
+    "review": {
+      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "currentHeadReviewed": true,
+      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
+      "unresolvedOutdatedThreads": 0
+    },
+    "openReviewThreads": [],
+    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
+    "observedAt": "2026-10-31",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
+    "integration": "not merged; no PR #238 merge authorization"
+  },
+  "activePullRequests": [
+    237,
+    238
+  ]
 }
