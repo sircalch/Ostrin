@@ -140,7 +140,7 @@
     "name": "pendulum-calibration-end-to-end-validation",
     "branch": "main",
     "baseRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
-    "status": "PR #237 merged; Phase 1 validation on main in progress (compile, run, oracle, benchmark)",
+    "status": "PRs #235 to #240 merged into main; Phase 1 end-to-end validation on synthetic data; blocked on real experimental data for closure",
     "scope": [
       "validate examples/viz_pendulum_calibration.ostrin end-to-end on main",
       "compare results with the independent JavaScript oracle",
@@ -246,28 +246,24 @@
     "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
   },
   "blockers": [
-    "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
-    "Published v0.2.0 remains frozen; no new tag or release is authorized.",
-    "PR #235 still needs fresh Codex review of head a4a17eef19ee89ad059d6821c772e124ca6971c5 after the two P2 fixes; prior findings are resolved, 10 checks remain green, and no merge authorization is recorded.",
-    "PR #236 needs fresh exact-head GitHub Actions after its PR verification job was added; the first runs were cancelled before producing a real candidate artifact, so no GitHub replay receipt is yet claimed.",
-    "Published v0.2.0 remains frozen; do not create a new release or tag.",
-    "PR #235 has two P2 review threads on old head f58ed2e. Their fixes are locally validated, but the branch has not yet been updated and no exact-head CI or fresh review exists for the fixes.",
-    "R3 remains OPEN: host capture is missing from 29/29 bundles; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
-    "The broader M1 acceptance gates for performance, end-to-end reproducibility, visual quality, and multi-platform execution remain incomplete.",
-    "Published v0.2.0 remains frozen.",
-    "PR #237 integration remains blocked pending exact corrected-head Windows/macOS CI; prior 13e53ce failed those jobs. Local source434f3a2 correction is validated but not a substitute for remote integration evidence."
+    "Phase 1 (pendulum end-to-end): blocked on real experimental pendulum data supplied by the owner; the current input is synthetic and labeled as such. Gates A-I cannot be closed on synthetic data.",
+    "R3 remains OPEN globally: host capture is missing from 29/29 bundles; current evidence is R0-R2 and does not establish cross-platform reproducibility.",
+    "Phase 2 remaining work: TemperaturePoint arrays and TemperaturePoint measurements, user-defined affine units, and automatic prefixes (scalar TemperaturePoint and dimensional Measurement correlation are on main).",
+    "Phase 4 open: startup, managed allocation counts, sampled RSS and abstraction overhead are not isolated; the repeated UTF-8 scan correction is not implemented.",
+    "Published v0.2.0 remains frozen; no new tag or release is authorized."
   ],
-  "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
+  "next": "Obtain real pendulum data from the owner to start Phase 1 gates; implement the Phase 2 TemperaturePoint array/measurement work and the Phase 4 UTF-8 scan correction as separate PRs with exact-head CI.",
   "latestPullRequestValidation": {
     "number": 240,
     "url": "https://github.com/sircalch/Ostrin/pull/240",
-    "remoteHead": "51f536189b0330da975effb23d0dd3a53928be47",
+    "mergeCommit": "dc6682cbf92185cac650f4716833ba0646fadc43",
+    "remoteHead": "215e03a235226d158675e010b03cb4a5311153ba",
     "base": "main",
-    "state": "open-checkpoint-review-in-progress",
-    "note": "Checkpoint-only PR after merging PRs 235 to 239; Codex review on 51f5361 reported no findings in its summary; CI running."
+    "state": "merged",
+    "note": "Checkpoint PR after merging PRs 235 to 239; Codex reported no findings on 51f5361 and the latest head 215e03a2 passed all checks before merge."
   },
   "activePullRequests": [
-    240
+    241
   ],
   "acceptanceCriteria": [
     {
