@@ -912,7 +912,7 @@ pub enum Ty {
     Quantity(Dimension),
     /// Absolute temperature reading, distinct from a linear `Quantity<Temperature>`.
     /// The explicit source constructor and scalar operations preserve this role
-    /// through the interpreter and scalar backend lowering; arrays remain unsupported.
+    /// through the interpreter and scalar backend lowering; `List<TemperaturePoint>` lowers to IR; the numeric `Array<T>` type does not accept points.
     TemperaturePoint,
     List(Box<Ty>),
     Map(Box<Ty>, Box<Ty>),
