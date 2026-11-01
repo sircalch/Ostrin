@@ -82,6 +82,17 @@ cantidad lineal ni acredita propagación de incertidumbre, covarianza, fuentes n
 wrappers de error o capturas por closure/tarea para este payload. Véase el contrato afín en
 [`design/25-mediciones-e-incertidumbre.md`](design/25-mediciones-e-incertidumbre.md).
 
+### Listas de `TemperaturePoint`
+
+`temperature_point_lists_lower_to_ir_with_native_parity_and_no_leaks` cubre `List<TemperaturePoint>`
+(construcción, `push`, índice, iteración, conversión por elemento con `temperature_point_to`,
+diferencias contra un punto de referencia, retorno, campo de record y alias con mutación) con IR sin
+fallback AST, paridad intérprete/nativo, emisión C para WASI y `live_allocations=0`.
+`temperature_point_list_elements_keep_affine_type_errors` conserva el rechazo de suma de puntos y de
+intervalos lineales almacenados como puntos. El elemento es un struct sin memoria gestionada, por lo que
+no añade retain/release. No cubre `Array<T>` numérico, `Option<List<TemperaturePoint>>`, `Map` ni
+capturas por closure/tarea con este payload.
+
 ### Evidencia de operaciones `dyn Trait`
 
 Esta submatriz desglosa las transiciones específicas exigidas por el ABI

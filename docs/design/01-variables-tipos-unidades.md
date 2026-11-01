@@ -347,7 +347,7 @@ de las tres permitidas; el constructor también rechaza valores no finitos. El i
 el tipo escalar; WASI también compila y ejecuta el caso en Node WASI Preview 1. Su matriz de
 programas comprueba además desbordamientos de conversión y aritmética de puntos. El backend de
 desarrollo añade almacenamiento estructural de `Measurement<TemperaturePoint>` con fuentes vacías;
-arrays y propagación de incertidumbre afín siguen pendientes. El diseño separa una **temperatura absoluta**
+`List<TemperaturePoint>` ya baja a IR con paridad intérprete/nativo/WASI; los `Array<T>` numéricos de puntos y la propagación de incertidumbre afín siguen pendientes. El diseño separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
 reglas algebraicas distintas. Las sumas y diferencias de puntos también comprueban el resultado:
 si el cálculo o la conversión produce un valor no finito, intérprete, backend nativo y WASI fallan

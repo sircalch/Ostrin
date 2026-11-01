@@ -20470,6 +20470,99 @@ fn native_string_cursor_cache_preserves_utf8_semantics_without_leaks() {
 }
 
 #[test]
+fn temperature_point_lists_lower_to_ir_with_native_parity_and_no_leaks() {
+    // 20 degC = 293.15 K, -5 degC = 268.15 K, 68 degF equals 20 degC (delta 0 K), and the hottest
+    // reading is 300 K. Lists of absolute points must not fall back to the AST backend.
+    let expected = "4\n68 degF (absolute)\n300 K (absolute)\n293.15 K (absolute)\n268.15 K (absolute)\n0 K\n-25 K\n4\nlab\n4\n5\n300 K (absolute)\n";
+    let file = "temperature_point_lists.ostrin";
+    let path = example_path(file);
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &path]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in ["List_TemperaturePoint", "OstrinTemperaturePoint"] {
+        assert!(wasi_source.contains(marker), "WASI C omitted `{marker}`");
+    }
+
+    let exe = temp_artifact("temperature_point_lists.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+}
+
+#[test]
+fn temperature_point_list_elements_keep_affine_type_errors() {
+    // Elements read from a list are still absolute points: points cannot be added together and a
+    // linear interval cannot be stored where a point is expected.
+    for (name, source, expected) in [
+        (
+            "temperature_point_list_add",
+            "fn main() -> Void {\n\
+             r = [temperature_point(20.0, \"degC\"), temperature_point(25.0, \"degC\")]\n\
+             print(r[0] + r[1])\n\
+             }\n",
+            "adding two absolute points is undefined",
+        ),
+        (
+            "temperature_point_list_push_interval",
+            "fn main() -> Void {\n\
+             mut r: List<TemperaturePoint> = []\n\
+             r.push(20 K)\n\
+             print(r.length())\n\
+             }\n",
+            "expects 'TemperaturePoint', got 'Quantity<Temperature>'",
+        ),
+    ] {
+        let path = temp_source(name, source);
+        let checked = run(&["--check", &path]);
+        let _ = fs::remove_file(&path);
+        assert!(!checked.status.success(), "{name} was accepted");
+        assert!(
+            stderr(&checked).contains(expected) || stdout(&checked).contains(expected),
+            "{name}: {}{}",
+            stdout(&checked),
+            stderr(&checked)
+        );
+    }
+}
+
+#[test]
 fn pendulum_calibration_rejects_invalid_inputs_with_typed_messages_and_backend_parity() {
     let work = std::env::temp_dir().join(format!("ostrin_pendulum_inputs_{}", std::process::id()));
     let _ = fs::remove_dir_all(&work);

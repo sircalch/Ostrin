@@ -1,0 +1,62 @@
+// Lists of absolute temperatures: construction, indexing, iteration, elementwise scale
+// conversion, differences against a reference point, and ownership across calls and records.
+// Points are never added to each other; differences are linear Temperature intervals.
+record Series {
+    label: String
+    points: List<TemperaturePoint>
+}
+
+fn to_scale(points: List<TemperaturePoint>, scale: String) -> List<TemperaturePoint> {
+    mut out: List<TemperaturePoint> = []
+    for p in points {
+        out.push(temperature_point_to(p, scale))
+    }
+    out
+}
+
+fn deltas_from(points: List<TemperaturePoint>, reference: TemperaturePoint) -> List<Quantity<Temperature>> {
+    mut out: List<Quantity<Temperature>> = []
+    for p in points {
+        out.push(p - reference)
+    }
+    out
+}
+
+fn hottest(points: List<TemperaturePoint>) -> TemperaturePoint {
+    mut best = points[0]
+    for p in points {
+        if p > best {
+            best = p
+        }
+    }
+    best
+}
+
+fn main() -> Void {
+    readings = [
+        temperature_point(20.0, "degC"),
+        temperature_point(68.0, "degF"),
+        temperature_point(300.0, "K"),
+        temperature_point(-5.0, "degC")
+    ]
+    print(readings.length())
+    print(readings[1])
+    print(hottest(readings))
+
+    kelvin = to_scale(readings, "K")
+    print(kelvin[0])
+    print(kelvin[3])
+
+    steps = deltas_from(readings, readings[0])
+    print(steps[0])
+    print(steps[3])
+    print(steps.length())
+
+    series = Series { label: "lab", points: kelvin }
+    print(series.label)
+    print(series.points.length())
+    mut alias = series.points
+    alias.push(temperature_point(0.0, "degC"))
+    print(series.points.length())
+    print(hottest(series.points))
+}
