@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v1",
   "goal": "M1",
-  "updatedAt": "2026-10-25",
+  "updatedAt": "2026-10-31",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -10,11 +10,11 @@
   },
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "sourceRevision": "354f02cb1a6a4ee57f45310d44e6d7aeacd02de0",
-    "evidenceRevision": "79087bffe3ef8f0706850f3e560ae6dba09c048a",
+    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
     "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "a4a17eef19ee89ad059d6821c772e124ca6971c5",
-    "lastObservedRemotePullRequestHead": "a4a17eef19ee89ad059d6821c772e124ca6971c5",
+    "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
+    "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
     "releaseTag": "v0.2.0"
   },
   "completed": [
@@ -77,6 +77,8 @@
     "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
     "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
+    "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
+    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
     "pr-234-merged-main-69c962d-all-five-main-workflows-green",
     "bounded-r3-wasi-preview1-host-replay-profile-local-70-tests-website-and-plan-gates-green",
     "pr-235-two-p2-covariance-findings-fixed-and-current-review-threads-resolved-targeted-native-wasi-leak-test-passed"
@@ -131,6 +133,9 @@
     ]
   },
   "pending": [
+    "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
+    "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
+    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
     "Push the PR verification-job correction in PR #236 and require all relevant workflows, including Deploy Ostrin website verify, to pass on the latest exact head; inspect the downloaded R3 profile receipt and verified artifact before treating the package as validated.",
     "PR #235 has 10/10 checks green on a4a17eef19ee89ad059d6821c772e124ca6971c5; both review P2 threads are resolved with a passing targeted interpreter/native leak/WASI test. A fresh @codex review was requested and is pending; merge authorization is not recorded.",
     "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
@@ -138,10 +143,32 @@
   ],
   "lastCi": {
     "workflow": "Ostrin CI",
-    "runId": 40230630708,
+    "runId": 41167597498,
     "status": "success",
-    "head": "69c962dee40a4b12606d131df0e8655b90924516",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
     "relatedRuns": [
+      {
+        "workflow": "Browser audit",
+        "runId": 41167597511,
+        "status": "success"
+      },
+      {
+        "workflow": "Native sanitizers",
+        "runId": 41167597496,
+        "status": "success",
+        "asan": "success",
+        "ubsan": "success"
+      },
+      {
+        "workflow": "CodeQL",
+        "runId": 41167597546,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 41167597514,
+        "status": "success"
+      },
       {
         "workflow": "Deploy Ostrin website",
         "runId": 40230630648,
@@ -163,21 +190,23 @@
         "status": "success"
       }
     ],
-    "note": "All five workflows triggered on main SHA 69c962dee40a4b12606d131df0e8655b90924516 completed successfully. PR #234 is MERGED (head e30c1358953cb34d1408a6b62847bef9f2e7baa6); its integration is present in the current main base."
+    "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
   },
   "blockers": [
+    "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
+    "Published v0.2.0 remains frozen; no new tag or release is authorized.",
     "PR #235 still needs fresh Codex review of head a4a17eef19ee89ad059d6821c772e124ca6971c5 after the two P2 fixes; prior findings are resolved, 10 checks remain green, and no merge authorization is recorded.",
     "PR #236 needs fresh exact-head GitHub Actions after its PR verification job was added; the first runs were cancelled before producing a real candidate artifact, so no GitHub replay receipt is yet claimed.",
     "Published v0.2.0 remains frozen; do not create a new release or tag."
   ],
-  "next": "Validate PR #236 exact-head website artifact generation, downloaded candidate replay, receipt and checks; then review fresh Codex feedback on PR #235 and continue the next bounded scientific-workflow task.",
+  "next": "Keep PRs #237 and #238 unmerged without authorization, then continue the next independent M1 package.",
   "latestPullRequestValidation": {
-    "number": 235,
-    "url": "https://github.com/sircalch/Ostrin/pull/235",
-    "remoteHead": "a4a17eef19ee89ad059d6821c772e124ca6971c5",
+    "number": 238,
+    "url": "https://github.com/sircalch/Ostrin/pull/238",
+    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
     "base": "69c962dee40a4b12606d131df0e8655b90924516",
     "mergeCommit": null,
-    "state": "open-mergeable-checks-green-prior-p2-threads-resolved-fresh-review-pending",
+    "state": "open-mergeable-exact-metadata-head-green",
     "runs": {
       "ostrinCi": "success",
       "browserAudit": "success",
@@ -191,6 +220,45 @@
       4372396523,
       4372490005
     ],
-    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded."
-  }
+    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
+    "checks": {
+      "ostrinCi": {
+        "status": "success",
+        "runId": 41167597498
+      },
+      "browserAudit": {
+        "status": "success",
+        "runId": 41167597511
+      },
+      "nativeSanitizers": {
+        "status": "success",
+        "runId": 41167597496,
+        "asan": "success",
+        "ubsan": "success"
+      },
+      "codeql": {
+        "status": "success",
+        "runId": 41167597546
+      },
+      "securityAudit": {
+        "status": "success",
+        "runId": 41167597514
+      }
+    },
+    "review": {
+      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+      "currentHeadReviewed": true,
+      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
+      "unresolvedOutdatedThreads": 0
+    },
+    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
+    "observedAt": "2026-10-31",
+    "head": "d1974b052528eec47975297d094031c4081f0681",
+    "integration": "not merged; no PR #238 merge authorization"
+  },
+  "activePullRequests": [
+    237,
+    238
+  ]
 }
