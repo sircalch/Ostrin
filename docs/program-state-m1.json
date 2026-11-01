@@ -11,12 +11,12 @@
   "checkpoint": {
     "mainRevision": "69c962dee40a4b12606d131df0e8655b90924516",
     "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
-    "evidenceRevision": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
-    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
+    "evidenceRevision": "f22840f81b7e4a535f9f2e6f619c8fddda659ffb",
+    "dashboardRevision": "f22840f81b7e4a535f9f2e6f619c8fddda659ffb",
     "lastValidatedRemotePullRequestHead": "728d224c56e8450edd94d44bb5dd9d0ca6ceb03f",
     "lastObservedRemotePullRequestHead": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
     "releaseTag": "v0.2.0",
-    "revisionSemantics": "sourceRevision identifies the latest tested profiler tree; evidenceRevision is the preceding committed evidence checkpoint. Current receipts bind their own tested trees and content hashes; their recording commits resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
+    "revisionSemantics": "sourceRevision identifies the tested compiler tree; programSourceRevision identifies the application change; evidenceRevision records the source-bound receipts. dashboardRevision identifies the clean tree used to regenerate metrics. Receipt recording commits also resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
   },
   "completed": [
     "authorized-prs-225-230-231-227-226-229-integrated",
@@ -45,7 +45,7 @@
     "worktree": "C:/Users/Andre/.codex/worktrees/ostrin-m1-pendulum-profile",
     "status": "Compiler source 434f3a2 passes all 424 local Linux tests, focused Windows/ASan/UBSan, ten compiled-WASI cases and numerical validation. Historical 13e53ce fails Windows and macOS; require fresh corrected-head CI before integration.",
     "sourceRevision": "434f3a258315a0ab8a4d2e37d4b3a9b7329befd2",
-    "evidenceRevision": "13e53ceac8a65cddfdba74097b026db0a8b2e330",
+    "evidenceRevision": "f22840f81b7e4a535f9f2e6f619c8fddda659ffb",
     "scope": [
       "HIR borrowed Option/Result unwrap payload classification, including strings",
       "owned temporary iterable cleanup on return, with break/continue lifetime preserved",
