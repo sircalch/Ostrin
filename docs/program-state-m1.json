@@ -79,6 +79,9 @@
     "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
     "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
     "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
+    "pr-234-merged-main-69c962d-all-five-main-workflows-green",
+    "bounded-r3-wasi-preview1-host-replay-profile-local-70-tests-website-and-plan-gates-green",
+    "pr-235-two-p2-covariance-findings-fixed-and-current-review-threads-resolved-targeted-native-wasi-leak-test-passed",
     "pr-234-merged-into-main-69c962-and-all-eight-post-merge-checks-green",
     "measurement-dimensional-source-correlation-implemented-at-source-c1a4281",
     "measurement-correlation-analytic-oracle-variance-0.37-uncertainty-0.6082762530298219-interpreter-native-parity-live-allocations-zero",
@@ -146,6 +149,10 @@
     "PR #238 remains open and unmerged; its exact metadata head is validated and no merge authorization exists.",
     "PR #237 remains open and unmerged; do not merge without PR-specific authorization.",
     "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
+    "Push the PR verification-job correction in PR #236 and require all relevant workflows, including Deploy Ostrin website verify, to pass on the latest exact head; inspect the downloaded R3 profile receipt and verified artifact before treating the package as validated.",
+    "PR #235 has 10/10 checks green on a4a17eef19ee89ad059d6821c772e124ca6971c5; both review P2 threads are resolved with a passing targeted interpreter/native leak/WASI test. A fresh @codex review was requested and is pending; merge authorization is not recorded.",
+    "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
+    "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0.",
     "Push the locally validated source and evidence commits to PR #235; run all required checks on its exact new head.",
     "Obtain fresh review on the new PR head and verify both P2 findings are no longer substantive before considering integration; no merge has been authorized for PR #235.",
     "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
@@ -186,6 +193,16 @@
         "status": "success"
       },
       {
+        "workflow": "CodeQL",
+        "runId": 40230630661,
+        "status": "success"
+      },
+      {
+        "workflow": "Security audit",
+        "runId": 40230630640,
+        "status": "success"
+      },
+      {
         "workflow": "Browser audit",
         "runId": 40230630645,
         "status": "success"
@@ -194,11 +211,6 @@
         "workflow": "Rust dependency advisories",
         "runId": 40230630640,
         "status": "success"
-      },
-      {
-        "workflow": "CodeQL",
-        "runId": 40230630661,
-        "status": "success"
       }
     ],
     "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
@@ -206,6 +218,9 @@
   "blockers": [
     "R3 remains OPEN globally; the restricted artifact verifier does not establish cross-platform equivalence or complete host closure.",
     "Published v0.2.0 remains frozen; no new tag or release is authorized.",
+    "PR #235 still needs fresh Codex review of head a4a17eef19ee89ad059d6821c772e124ca6971c5 after the two P2 fixes; prior findings are resolved, 10 checks remain green, and no merge authorization is recorded.",
+    "PR #236 needs fresh exact-head GitHub Actions after its PR verification job was added; the first runs were cancelled before producing a real candidate artifact, so no GitHub replay receipt is yet claimed.",
+    "Published v0.2.0 remains frozen; do not create a new release or tag.",
     "PR #235 has two P2 review threads on old head f58ed2e. Their fixes are locally validated, but the branch has not yet been updated and no exact-head CI or fresh review exists for the fixes.",
     "R3 remains OPEN: host capture is missing from 29/29 bundles; current evidence remains R0-R2 and does not establish cross-platform reproducibility.",
     "The broader M1 acceptance gates for performance, end-to-end reproducibility, visual quality, and multi-platform execution remain incomplete.",
@@ -263,7 +278,7 @@
         }
       ]
     },
-    "note": "Remote head f58ed2e has all ten checks green and is CLEAN/MERGEABLE. Its two P2 review findings are fixed in local source commit c20b087 and validated locally, but the source/evidence updates remain unpushed. Require exact-new-head CI and fresh review; do not merge without PR-specific authorization.",
+    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
     "review": {
       "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
       "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
@@ -275,7 +290,19 @@
     "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
     "observedAt": "2026-10-31",
     "head": "d1974b052528eec47975297d094031c4081f0681",
-    "integration": "not merged; no PR #238 merge authorization"
+    "integration": "not merged; no PR #238 merge authorization",
+    "runs": {
+      "ostrinCi": "success",
+      "browserAudit": "success",
+      "nativeSanitizersAsan": "success",
+      "nativeSanitizersUbsan": "success",
+      "codeql": "success",
+      "securityAudit": "success"
+    },
+    "resolvedReviewThreads": [
+      4372396523,
+      4372490005
+    ]
   },
   "activePullRequests": [
     237,

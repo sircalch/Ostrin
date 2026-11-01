@@ -120,6 +120,35 @@ captura estructural de efectos ni el cierre de la fila de entrada. Ese resultado
 bajo el contrato actual. Las capturas host-bound siguen siendo evidencia útil, pero no sustituyen
 la firma de efectos del entrypoint ni las demás comprobaciones.
 
+## Perfil acotado de replay WASI ligado a una ejecución
+
+El artefacto host-bound de CI ahora incluye `target/r3-ci/r3-replay-profile-receipt.json`, con esquema
+`ostrin.r3-wasi-host-replay-receipt/v1`. Este perfil se limita a los bundles de visualización
+registrados que el workflow puede ejecutar con el compilador WASM archivado bajo Node WASI Preview 1
+en un runner de GitHub Actions.
+
+La acción primero genera el recibo después de que los 29 replays terminan y valida que cada bundle,
+manifiesto de archivos, fila de entrada, compilador WASM y revisión probada estén ligados al mismo
+`run_id` y `tested_sha`. El recibo conserva `head_sha` aparte del SHA probado, los hashes de los reportes
+de readiness, scorecard, página de estado, captura de `surface`, lecturas WASI y entrada aleatoria
+determinista. Cada fixture registra su nivel R0/R1/R2 original, revisión fuente, hashes de source/input/output/provenance,
+hash de la fila de efectos y resultados de replay. R0 exige repetición idéntica; R1/R2 conservan sus
+comprobaciones de sensibilidad y semilla.
+
+Luego la acción descarga exactamente el candidate que acaba de subir, repite los 29 bundles desde esos
+bytes y compara el recibo archivado con el que reconstruyó a partir de la repetición. Solo entonces
+publica el artefacto de evidencia de 90 días. Un fallo o diferencia detiene la subida del artefacto
+verificado. Para inspeccionar un artefacto nuevo:
+
+```text
+node scripts/experiment-replay.mjs --replay-artifact-all <directorio> --run-id <id> --tested-sha <sha> --require-profile-receipt
+```
+
+Este recibo define un perfil acotado de evidencia por ejecución; no cambia los niveles guardados en
+los bundles ni el contador `reproducibility.R3`, que permanece en cero. Acredita replay de esos bytes
+en un único host WASI, no equivalencia numérica entre plataformas, atestación criptográfica, completitud
+del analizador de efectos, enumeración total de entradas externas ni validez científica de cada figura.
+
 ## Diagnósticos de brechas
 
 `gapDiagnostics` desglosa los campos de captura ausentes o incompletos, el inventario de referencias
