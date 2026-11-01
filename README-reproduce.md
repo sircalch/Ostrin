@@ -10,6 +10,29 @@ la validación local.
 cargo build --manifest-path compiler/Cargo.toml --release
 ```
 
+## Verificar almacenamiento de mediciones de puntos de temperatura
+
+El compilador de desarrollo verifica un perfil estructural con `sources: []`; no incluye
+propagación de incertidumbre afín. Las tres regresiones comprueban nominales, campos, aliases,
+argumentos/retornos, ambas ramas de Phi, reemplazos en loop y cadenas dinámicas. Exigen IR sin
+fallback, paridad intérprete/nativo y `live_allocations=0`:
+
+```text
+cargo test --manifest-path compiler/Cargo.toml --test examples temperature_point_measurement_ -- --nocapture
+```
+
+Con Node 24 y wasi-sdk 34 instalado, `OSTRIN_WASI_CC` debe apuntar al `bin/clang` del SDK y
+`OSTRIN_WASI_SYSROOT` a `share/wasi-sysroot`. Después del build de arriba, ejecutar:
+
+```text
+node scripts/wasi-program-check.mjs
+```
+
+La matriz incluye los fixtures `temperature_point_measurement_field` y
+`temperature_point_measurement_phis`; compila sus módulos WASI, compara salidas exactas y exige
+`live_allocations=0` al terminar. La suite nativa de CI ejecuta las mismas regresiones bajo
+ASan/UBSan. Esto corresponde al código de desarrollo, no a los archivos publicados de v0.2.0.
+
 ## Validar el backend numérico
 
 La suite usa casos analíticos independientes para LU, Cholesky, QR, SVD y autovalores

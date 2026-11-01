@@ -12658,7 +12658,14 @@ fn dimensional_measurement_native_smoke_matches_interpreter_and_wasi() {
 #[test]
 fn dimensional_measurement_lab_matches_interpreter_and_native() {
     let file = example_path("measurement_lab.ostrin");
-    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\ndimensionless scalar covariance\nsum variance = 7\nsum uncertainty = 2.6458\n";
+    let expected = "exact zero uncertainty (m) = 0\nunknown reading = sensor offline\nshared readings\n8 m\nstandard uncertainty (m) = 0.2\nproduct dimension = Length^2\nproduct contribution\n8000 cm^2\nproduct standard uncertainty = 0.8\nsame-source ratio = 1 ± 0\ncross-dimension ratio = 5 m/s\nspeed dimension = Length*Time^-1\nspeed standard uncertainty (m/s) = 0.5024937810560445\ndimensionless scalar covariance\nsum variance = 7\nsum uncertainty = 2.6458\ndimensioned source correlation\nproduct dimension = Length*Time\nproduct standard uncertainty = 0.6082762530298219\ninvalid correlation diagonal = correlation matrix diagonal must equal one\nmissing correlation source = correlation model is missing a measurement source id\nnear-perfect contributions\nnear-length = 10000000000000000\nnear-time = -10000000000000000\nrounded perfect correlation = correlation coefficient is numerically unresolved\nunit-conversion cancellation = correlated measurement uncertainty is numerically unresolved after unit conversion\n";
+    let analytic_uncertainty = (0.3_f64.powi(2) + 0.4_f64.powi(2) + 2.0 * 0.5 * 0.3 * 0.4).sqrt();
+    assert!((analytic_uncertainty - 0.608_276_253_029_821_9).abs() < 1e-15);
+    // The exact coherent residual is 128/100 = 32/25 metres.
+    let exact_sigma_difference_cm = 1_000_000_000_000_000_256_i128 - 1_000_000_000_000_000_128_i128;
+    assert_eq!(exact_sigma_difference_cm, 128);
+    let exact_residual_meters = (exact_sigma_difference_cm, 100_i128);
+    assert_eq!(exact_residual_meters, (128, 100));
     let interpreted = run(&["--run", &file]);
     assert!(
         interpreted.status.success(),
@@ -12666,6 +12673,34 @@ fn dimensional_measurement_lab_matches_interpreter_and_native() {
         stderr(&interpreted)
     );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "dimensional correlation type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("examples/measurement_lab.ostrin ir=")
+            && report_text.contains("ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "dimensioned correlation must lower without AST fallback or type divergence: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "dimensioned correlation WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("std_measurements__SourceCorrelation")
+            && wasi_source.contains("correlation matrix diagonal must equal one"),
+        "dimensioned correlation WASI output omitted its concrete model or validation path"
+    );
 
     let exe = temp_artifact("measurement-lab.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
@@ -13312,7 +13347,7 @@ fn dimensional_measurement_state_constructors_are_explicit_and_finite() {
 }
 
 #[test]
-fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
+fn native_temperature_point_measurement_matches_interpreter_and_wasi() {
     let source = temp_source(
         "temperature_point_measurement_boundary",
         "import std.measurements\n\
@@ -13333,19 +13368,199 @@ fn temperature_point_measurement_boundary_is_explicitly_rejected_natively() {
         "20 degC (absolute)\n"
     );
 
-    let native = run(&["--native-type-report", &source]);
+    let report = run(&["--native-type-report", &source]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&source);
+        return;
+    }
     assert!(
-        !native.status.success(),
-        "Measurement<TemperaturePoint> escaped through native AST fallback"
+        report.status.success(),
+        "Measurement<TemperaturePoint> native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &source]);
+    assert!(
+        wasi.status.success(),
+        "Measurement<TemperaturePoint> WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "std_measurements__Measurement__TemperaturePoint",
+        "List_std_measurements__Sensitivity__TemperaturePoint",
+        "OstrinTemperaturePoint",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "WASI Measurement<TemperaturePoint> C omitted `{marker}`"
+        );
+    }
+
+    let exe = temp_artifact("temperature_point_measurement_native.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    assert!(
+        compile.status.success(),
+        "Measurement<TemperaturePoint> native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native Measurement<TemperaturePoint> binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement<TemperaturePoint> native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "20 degC (absolute)\n"
     );
     assert!(
-        stderr(&native).contains(
-            "type 'Measurement<TemperaturePoint>' is not supported by the native backend yet"
-        ),
-        "native measurement boundary diagnostic was unclear: {}",
-        stderr(&native)
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement<TemperaturePoint> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
     let _ = fs::remove_file(source);
+}
+
+#[test]
+fn temperature_point_measurement_field_replacement_preserves_alias_ownership() {
+    let source = fixture_path("temperature_point_measurement_field.ostrin.txt");
+    let expected = "30 degC (absolute)\n30 degC (absolute)\nreplacement offline\n";
+
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "TemperaturePoint field replacement failed in interpreter: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &source]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "TemperaturePoint field replacement native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir=1 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "TemperaturePoint field replacement must lower through IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &source]);
+    assert!(
+        wasi.status.success(),
+        "TemperaturePoint field replacement WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__TemperaturePoint"),
+        "WASI output omitted the concrete TemperaturePoint measurement field type"
+    );
+
+    let exe = temp_artifact("temperature_point_measurement_field_replacement.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    assert!(
+        compile.status.success(),
+        "TemperaturePoint field replacement native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run TemperaturePoint field replacement binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "TemperaturePoint field replacement native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "TemperaturePoint field replacement leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn temperature_point_measurement_arguments_returns_and_phis_preserve_ownership() {
+    let source = fixture_path("temperature_point_measurement_phis.ostrin.txt");
+    let expected = "20 degC (absolute)\n30 degC (absolute)\n42 degC (absolute)\nsensor 42\n20 degC (absolute)\nsensor 20\n";
+
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "TemperaturePoint argument/return/Phi interpreter run failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &source]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "TemperaturePoint argument/return/Phi native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir=4 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "TemperaturePoint arguments, returns, Phi and loop-Phi must lower through IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &source]);
+    assert!(
+        wasi.status.success(),
+        "TemperaturePoint argument/return/Phi WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("std_measurements__Measurement__TemperaturePoint"),
+        "WASI output omitted the concrete TemperaturePoint measurement type"
+    );
+
+    let exe = temp_artifact("temperature_point_measurement_arguments_returns_phis.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    assert!(
+        compile.status.success(),
+        "TemperaturePoint argument/return/Phi native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run TemperaturePoint argument/return/Phi binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "TemperaturePoint argument/return/Phi native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "TemperaturePoint argument/return/Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
@@ -19595,7 +19810,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=31")
+        measurement_source.contains("ir=34")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
