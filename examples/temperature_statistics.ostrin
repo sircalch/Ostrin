@@ -1,0 +1,30 @@
+// Statistics over lists of absolute temperatures: scale conversion, hottest and coldest points,
+// the temperature span as an interval, and the affine mean. Points are never summed.
+import std.measurements
+
+fn show(result: Result<TemperaturePoint, String>) -> Void {
+    match result {
+        Ok(point) => print(point),
+        Err(message) => print(message),
+    }
+}
+
+fn main() -> Void {
+    readings = [
+        temperature_point(20.0, "degC"),
+        temperature_point(68.0, "degF"),
+        temperature_point(300.0, "K"),
+        temperature_point(-5.0, "degC")
+    ]
+    show(measurements.temperature_points_hottest(readings))
+    show(measurements.temperature_points_coldest(readings))
+    show(measurements.temperature_points_mean(readings))
+    match measurements.temperature_points_span(readings) {
+        Ok(span) => print(span),
+        Err(message) => print(message),
+    }
+    kelvin = measurements.temperature_points_to(readings, "K")
+    show(measurements.temperature_points_mean(kelvin))
+    empty: List<TemperaturePoint> = []
+    show(measurements.temperature_points_mean(empty))
+}

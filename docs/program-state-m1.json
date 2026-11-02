@@ -29,10 +29,10 @@
     ],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 394,
+      "integrationTests": 395,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 309,
+      "examples": 310,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [

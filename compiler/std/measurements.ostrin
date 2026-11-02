@@ -643,6 +643,66 @@ pub fn temperature_reading_difference(a: TemperatureReading, b: TemperatureReadi
     }
 }
 
+// Statistics over lists of absolute temperatures. Points are never added: the mean is the first
+// point shifted by the average of the intervals to it (an affine combination), the span is the
+// interval between the hottest and coldest points, and every result keeps the scale of the first
+// point. Empty lists return an error because no reference point exists.
+pub fn temperature_points_to(points: List<TemperaturePoint>, scale: String) -> List<TemperaturePoint> {
+    mut output: List<TemperaturePoint> = []
+    for point in points {
+        output.push(temperature_point_to(point, scale))
+    }
+    output
+}
+
+pub fn temperature_points_hottest(points: List<TemperaturePoint>) -> Result<TemperaturePoint, String> {
+    if points.length() == 0 {
+        return Err("temperature list is empty")
+    }
+    mut best = points[0]
+    for point in points {
+        if point > best {
+            best = point
+        }
+    }
+    Ok(best)
+}
+
+pub fn temperature_points_coldest(points: List<TemperaturePoint>) -> Result<TemperaturePoint, String> {
+    if points.length() == 0 {
+        return Err("temperature list is empty")
+    }
+    mut best = points[0]
+    for point in points {
+        if point < best {
+            best = point
+        }
+    }
+    Ok(best)
+}
+
+pub fn temperature_points_span(points: List<TemperaturePoint>) -> Result<Quantity<Temperature>, String> {
+    match temperature_points_hottest(points) {
+        Ok(hot) => match temperature_points_coldest(points) {
+            Ok(cold) => Ok(hot - cold),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+pub fn temperature_points_mean(points: List<TemperaturePoint>) -> Result<TemperaturePoint, String> {
+    if points.length() == 0 {
+        return Err("temperature list is empty")
+    }
+    reference = points[0]
+    mut total = reference - reference
+    for point in points {
+        total = total + (point - reference)
+    }
+    Ok(reference + total / (points.length() as Float))
+}
+
 pub fn unknown(value: Float, reason: String) -> Measurement<Float> {
     Measurement<Float> {
         value: value,
