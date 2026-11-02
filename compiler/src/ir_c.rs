@@ -792,6 +792,7 @@ fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
         || scalar(ty)
         || matches!(ty, Ty::Dyn(_))
         || quantity(ty)
+        || *ty == Ty::TemperaturePoint
         || array_supported(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))

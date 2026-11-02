@@ -19810,7 +19810,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=46")
+        measurement_source.contains("ir=51")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -20880,6 +20880,51 @@ fn temperature_readings_with_unknown_offsets_stay_unknown() {
         .output()
         .expect("failed to run native binary");
     let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn temperature_point_statistics_use_affine_means_with_backend_parity() {
+    // Mean of 20 degC, 68 degF (= 20 degC), 300 K (= 26.85 degC) and -5 degC is 15.4625 degC:
+    // points are averaged as reference + mean(offsets), never summed. Span is 26.85 - (-5) K.
+    let expected = "300 K (absolute)\n-5 degC (absolute)\n15.462500000000006 degC (absolute)\n31.850000000000023 K\n288.61249999999995 K (absolute)\ntemperature list is empty\n";
+    let path = example_path("temperature_statistics.ostrin");
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+
+    let exe = temp_artifact("temperature_statistics.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed");
     assert_eq!(
         String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
         expected

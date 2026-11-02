@@ -65,6 +65,13 @@ const programs = [
     leakCheck: true,
   },
   {
+    name: "temperature_statistics",
+    source: "examples/temperature_statistics.ostrin",
+    args: ["temperature_statistics.wasm"],
+    expected: "300 K (absolute)\n-5 degC (absolute)\n15.462500000000006 degC (absolute)\n31.850000000000023 K\n288.61249999999995 K (absolute)\ntemperature list is empty\n",
+    leakCheck: true,
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],
