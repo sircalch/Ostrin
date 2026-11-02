@@ -1,0 +1,75 @@
+{
+  "schema": "ostrin.m2c-pendulum-startup-and-phase-baseline/v1",
+  "scope": "Separates process-launch floor, load/analysis/render phases and managed allocations for the M1 pendulum calibration after the M2-B UTF-8 cursor cache. Measurements come from two hosts and are not mutually comparable; counters are deterministic work units, not timings.",
+  "windows": {
+    "host": "Windows 11 x64, AMD Ryzen 7 5700X, gcc (MinGW-W64 x86_64-ucrt-posix-seh) 13.2.0 -O2 -ffp-contract=off",
+    "method": "node:perf_hooks wall clock around child_process.spawnSync; 1 warm-up + 15 samples; native executables compiled with the compiler pinned in windows.provenance",
+    "processFloorEmptyMainMs": {
+      "median": 21.04,
+      "min": 18.09,
+      "max": 37.67
+    },
+    "pendulumTotalMs": {
+      "median": 17.91,
+      "min": 15.34,
+      "max": 29.31
+    },
+    "conclusion": "Process launch dominates: an empty main costs more wall time than the whole pendulum run, so load, compute and render cannot be separated by whole-process timing on Windows. In-process phase timing (as on Linux) is required to resolve them.",
+    "allocations": {
+      "live": 0,
+      "peak": 311,
+      "total": 12199,
+      "scope": "Ostrin managed allocation records only; excludes bytes, libc allocations and RSS"
+    },
+    "provenance": {
+      "baseMainRevision": "5fab917217a429e000057daa7a6e432e093c5855",
+      "compilerSourceRevision": "59fb6ae78bedabe13da0c22e050a1db534b04341",
+      "compilerSourceNote": "main 5fab9172 plus the temperature arithmetic changes of PR 245 (branch codex/m2a-temperature-exactness). That commit resolves in the repository once PR 245 is merged; until then the executables below are pinned by content hash. The measured workloads do not exercise the changed temperature code.",
+      "compilerSha256": "fb244cf6c8ac2d47aa38cd038559e8d8e07ee6a7c7ab58af32e9756ce09032dc",
+      "emptyMainExecutableSha256": "69c8523d06fd1f4dd3c8a5e197a2ac81c89a0965f03f300d16a202743f96d8e8",
+      "pendulumExecutableSha256": "037dfce4fa1630d3f389a2aa15e033c7f8fb88c4318dcc0446753c526f5d18da",
+      "pendulumSourcePath": "examples/viz_pendulum_calibration.ostrin",
+      "pendulumSourceSha256": "5e70c100480f0262ecc561048505029aee26ea1734655f94ccc3a4f1a2aaf3ea",
+      "inputPath": "experiments/pendulum-calibration.inputs.json",
+      "inputSha256": "ae4b2d447d5156c734c131e805dd607bbe20b103a0da44933dcc2e46b10accdf"
+    }
+  },
+  "linuxCi": {
+    "host": "GitHub-hosted ubuntu-latest runner, gcc",
+    "source": "Compiler benchmarks run 41354878952 (pull_request), head c0678486abfac27fdfad98dcf62b5c0b987b9767 of PR 242, step 'Profile scientific analysis and rendering (Linux GCC)', 7 iterations",
+    "medianMs": {
+      "controlProcess": 3.811,
+      "profiledProcess": 3.911,
+      "entryObservation": 1.649,
+      "processEntryInclusive": 1.966,
+      "applicationInclusive": 1.959,
+      "inputAndAnalysisInclusive": 0.502,
+      "inputAndAnalysisExclusive": 0.355,
+      "analysis": 0.149,
+      "render": 1.404,
+      "textReport": 0.02
+    },
+    "nativeVsInterpreterMedianMs": {
+      "interpreter": 180.113,
+      "native": 4.186,
+      "ratio": 43.025
+    }
+  },
+  "priorLinuxReference": {
+    "host": "WSL2 on AMD Ryzen 7 5700X (not a CI runner)",
+    "receipt": "validation/m1-pendulum-phases-linux.json at revision e612d73baf2307296e562502e342ce074794fb74",
+    "medianMs": {
+      "controlProcess": 31.426,
+      "inputAndAnalysisExclusive": 17.131,
+      "render": 2.504
+    },
+    "note": "Different host and revision from linuxCi; the 31.4 ms to 3.8 ms process drop and 17.1 ms to 0.36 ms load phase are an order-of-magnitude indication that the quadratic UTF-8 scans dominated, not a controlled comparison. The controlled before/after is validation/m2b-utf8-string-cursor-cache-windows.json."
+  },
+  "limits": [
+    "No resident-set-size or allocated-byte measurement is included here; see validation/m1-pendulum-process-memory.json for sampled RSS lower bounds on Windows.",
+    "Startup is not split into dynamic-loader, runtime-init and first-allocation costs; Linux entryObservation (1.65 ms) is the closest available figure.",
+    "Scientific-abstraction overhead (Float vs Quantity vs Measurement) is not isolated by this receipt.",
+    "Single runs of one workload on each host; no cross-platform claim."
+  ],
+  "nextMeasurement": "Add an in-process monotonic clock around load, analysis and render in the Windows profiler, or run the Linux phase profiler on the same host as the Windows run, so launch overhead can be subtracted."
+}

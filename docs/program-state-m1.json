@@ -1,6 +1,6 @@
 {
-  "schema": "ostrin.program-state/v1",
-  "goal": "M1",
+  "schema": "ostrin.program-state/v2",
+  "goal": "M2",
   "updatedAt": "2026-11-01",
   "release": {
     "version": "v0.2.0",
@@ -8,433 +8,527 @@
     "tag": "v0.2.0",
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
-  "checkpoint": {
-    "mainRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
-    "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
-    "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
-    "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
-    "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
-    "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
-    "releaseTag": "v0.2.0",
-    "revisionSemantics": "sourceRevision identifies the tested compiler tree; programSourceRevision identifies the application change; evidenceRevision records the source-bound receipts. dashboardRevision identifies the clean tree used to regenerate metrics. Receipt recording commits also resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
-  },
-  "completed": [
-    "integrated-authorized-prs-225-230-231-227-226-229",
-    "measurement-array-structural-profile-merged-pr-233",
-    "main-pr-233-post-merge-ci-eight-checks-green",
-    "measurement-scalar-covariance-analytical-native-parity-leak-and-wasi-emission",
-    "measurement-covariance-added-to-32-program-wasi-execution-matrix",
-    "main-r3-host-evidence-29-bundles-and-116-manifest-file-records-verified-against-main-0a3a824",
-    "scalar-covariance-underflow-guard-and-regression-example",
-    "full-cargo-suite-rerun-after-p2-fix-6-differential-383-integration-33-unit-green",
-    "full-cargo-test-6-differential-383-integration-33-unit-green",
-    "measurement-contract-gate-and-18-tests-green",
-    "project-plan-linguist-distribution-and-website-checks-green",
-    "scientific-lab-covariance-demo-and-generated-website-metadata-synchronized",
-    "measurement-covariance-large-matrix-psd-normalization-and-subnormal-midpoint-regressions-fixed",
-    "measurement-covariance-local-full-suite-wasi-chromium-webkit-and-numeric-validation-green",
-    "local-numeric-validation",
-    "local-benchmark-contract-check",
-    "measurement-covariance-propagation-preserves-correlations-across-matrix-scales",
-    "measurement-covariance-quadratic-form-compensated-sums-preserve-small-residuals",
-    "measurement-covariance-rounded-factor-projection-p2-rejected-as-unresolved-9d41693",
-    "measurement-covariance-lossy-subnormal-normalization-p2-rejected-9d41693",
-    "measurement-covariance-full-cargo-422-tests-green-on-source-9d41693",
-    "measurement-covariance-wasi-32-programs-green-on-source-9d41693",
-    "measurement-covariance-15-workload-benchmark-recorded-on-source-9d41693",
-    "covariance-generated-website-and-bars-effect-bundle-synchronized",
-    "pr-234-source-evidence-checkpoint-prepared-locally",
-    "measurement-covariance-near-perfect-correlation-p2-rejected-as-unresolved-5998717",
-    "full-cargo-422-tests-wasi-32-and-contract-18-green-source-5998717",
-    "measurement-covariance-benchmark-15-workloads-7-samples-source-5998717",
-    "website-lab-provenance-benchmark-status-data-regenerated-and-verified-source-5998717",
-    "chromium-and-webkit-36-browser-tests-green-firefox-launch-unavailable-source-5998717",
-    "numeric-validation-80-report-and-136-emitted-values-exact-live-allocations-zero-source-5998717",
-    "v0.2-readiness-12-of-12-ready-r3-open-0-of-29-host-captures-source-5998717",
-    "measurement-covariance-subnormal-variance-ratio-p2-fixed-source-140a53d",
-    "source-140a53d-full-validation-and-evidence-recorded-19f599b",
-    "measurement-covariance-unequal-subnormal-geometric-scale-rejected-source-6c4d1c8",
-    "full-source-6c4d1c8-cargo422-wasi32-contract18-web-lab-numeric-and-readiness-validation-green",
-    "measurement-covariance-adjustment-residual-p2-4371782448-fixed-source-06849b5",
-    "measurement-covariance-source-06849b5-focused-interpreter-native-leak-test-green",
-    "measurement-covariance-source-06849b5-full-cargo-422-tests-green-exact-tested-tree",
-    "measurement-covariance-source-06849b5-wasi-32-programs-green",
-    "measurement-covariance-source-06849b5-website-lab-replays-numeric-linguist-distribution-and-readiness-green",
-    "measurement-covariance-evidence-493edec-and-dashboard-9bbbf09-recorded-source-and-evidence-provenance",
-    "pr-234-rounded-root-square-and-rounded-adjustment-ratio-p2s-fixed-source-469b11a",
-    "source-469b11a-focused-interpreter-native-wasi-leak-contract-and-format-validation-passed",
-    "source-469b11a-full-cargo-suite-422-passed-before-final-conservative-root-bound-tightening",
-    "source-469b11a-wasi-32-programs-passed-after-final-root-bound-tightening",
-    "source-469b11a-web-lab-29-figures-11-r1-r2-bundles-and-provenance-regenerated",
-    "source-469b11a-numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero",
-    "source-469b11a-linguist-distribution-readiness-12-of-12-and-quality-dashboard-synchronized",
-    "pr-234-rounded-subnormal-square-root-adjustment-p2-fixed-source-ae9aaaa",
-    "source-ae9aaaa-focused-interpreter-native-wasi-leak-test-contract-18-and-format-pass",
-    "source-ae9aaaa-release-build-and-32-program-wasi-matrix-pass",
-    "source-ae9aaaa-web-lab-29-figures-r1-r2-replays-provenance-and-website-check-pass",
-    "source-ae9aaaa-numeric-validation-80-and-136-values-exact-live-allocation-zero",
-    "source-ae9aaaa-linguist-distribution-and-v0.2-readiness-12-of-12-pass",
-    "measurement-covariance-unequal-subnormal-midpoint-p2-4372155934-reproduced-192824a",
-    "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
-    "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
-    "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
-    "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
-    "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
-    "pr-234-merged-main-69c962d-all-five-main-workflows-green",
-    "bounded-r3-wasi-preview1-host-replay-profile-local-70-tests-website-and-plan-gates-green",
-    "pr-235-two-p2-covariance-findings-fixed-and-current-review-threads-resolved-targeted-native-wasi-leak-test-passed",
-    "pr-234-merged-into-main-69c962-and-all-eight-post-merge-checks-green",
-    "measurement-dimensional-source-correlation-implemented-at-source-c1a4281",
-    "measurement-correlation-analytic-oracle-variance-0.37-uncertainty-0.6082762530298219-interpreter-native-parity-live-allocations-zero",
-    "measurement-correlation-wasi-preview1-matrix-33-programs-green",
-    "measurement-correlation-lab-12-demos-29-figure-replays-generated-and-verified",
-    "measurement-correlation-website-17-pages-305-examples-383-integration-tests-green",
-    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-fallbacks",
-    "measurement-correlation-contract-gate-and-18-mutation-tests-green",
-    "measurement-correlation-numeric-validation-80-reports-136-emitted-values-exact",
-    "measurement-correlation-linguist-distribution-and-v0.2-readiness-12-of-12-green",
-    "measurement-correlation-evidence-9ac3446-and-dashboard-84b6c04-recorded",
-    "measurement-correlation-rounded-endpoint-p2-fixed-source-6c6c3aa-with-exact-rational-regression",
-    "measurement-correlation-p2-focused-interpreter-native-test-wasi33-and-contract18-green",
-    "measurement-scalar-native-lowering-ratchet-updated-31-to-34-after-three-sourcecorrelation-ir-bodies",
-    "stale-remote-pr235-failures-diagnosed-and-fixed-provenance-page-regenerated-website383-green",
-    "numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero-after-p2",
-    "project-plan-linguist-distribution-ownership-v0.2-readiness-and-scorecard-tests-green-after-p2",
-    "r3-bars-bundle-regenerated-effect-coverage-21063-r3-open-zero-host-captures",
-    "measurement-correlation-lossy-unit-conversion-cancellation-rejected-source-c20b087",
-    "unit-conversion-cancellation-exact-rational-residual-32-over-25-meters",
-    "measurement-correlation-full-cargo-422-tests-green-current-source-tree",
-    "measurement-correlation-wasi-33-programs-green-after-release-compiler-rebuild",
-    "measurement-correlation-contract-18-website-383-lab-replays-29-and-provenance-green",
-    "measurement-correlation-numeric-80-and-136-values-exact-live-allocations-zero",
-    "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green",
-    "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
-    "website-test-count-384-metadata-synchronized-pr239-29f8339",
-    "measurement-temperaturepoint-273e01e-five-workflows-green",
-    "authorized-prs-225-230-231-227-226-229-integrated",
-    "measurement-array-structural-profile-merged-pr233",
-    "scalar-covariance-analytical-native-numeric-and-wasi-evidence-preserved",
-    "pr239-7f7a3ba-ten-checks-green-and-wasi34",
-    "pr237-c80d26e-fourteen-checks-green-and-standalone-wasi-run41253542664",
-    "period-reuse-seven-allocation-samples-114-fewer-records-source49374d7",
-    "typed-analysis-result-and-render-boundary-source5960371",
-    "separated-workflow-windows-linux-asan-ubsan-and-compiled-wasi-three-runs",
-    "linux-gcc-seven-paired-wall-and-thread-cpu-phase-samples-sourcee612d73",
-    "current-windows-linux-backend-ratchets8789ir46hir0ast-sourcee612d73",
-    "native-report-svg-export-procedure-tested-windows-and-linux",
-    "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source",
-    "pr237-728d224-fourteen-checks-green-and-wasi-run41257538742",
-    "authoritative-json-arrays-analytical-three-row-case-and-covariance-limit-source3b60f21",
-    "ten-compiled-wasi-input-cases-and-seven-paired-phase-captures-clean3b60f21",
-    "hir-unwrap-uaf-reproduced-then-corrected-source434f3a2",
-    "source434f3a2-full-linux424-tests-pass-and-focused-windows-asan-ubsan-pass",
-    "source434f3a2-ten-compiled-wasi-cases-and-seven-native-phase-pairs-pass",
-    "input-stage-repeated-utf8-work-isolated-by-three-whitespace-only-counter-probes",
-    "pr-235-dimensional-source-correlation-merged-5df0254",
-    "pr-236-bounded-wasi-replay-profile-merged-406fad7",
-    "pr-237-pendulum-calibration-workflow-merged-42a7b1a",
-    "pr-238-r3-artifact-inventory-merged-f410ac5",
-    "pr-239-measurement-temperaturepoint-merged-06ce10d"
-  ],
-  "currentPackage": {
-    "name": "pendulum-calibration-end-to-end-validation",
-    "branch": "main",
-    "baseRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
-    "status": "PRs #235 to #240 merged into main; Phase 1 end-to-end validation on synthetic data; blocked on real experimental data for closure",
-    "scope": [
-      "validate examples/viz_pendulum_calibration.ostrin end-to-end on main",
-      "compare results with the independent JavaScript oracle",
-      "confirm ownership regressions from PR 237 remain covered",
-      "measure runtime phases and record reproducible benchmark evidence"
+  "currentVerifiedState": {
+    "mainRevision": "e2efe7485234971dc7a288ba6f8e2076db719578",
+    "mergedPullRequests": [
+      235,
+      236,
+      237,
+      238,
+      239,
+      240,
+      241,
+      242,
+      243,
+      244,
+      245,
+      247
     ],
-    "evidence": []
+    "activePullRequests": [
+      246
+    ],
+    "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
+    "suites": {
+      "integrationTests": 394,
+      "unitTests": 33,
+      "differentialTests": 6,
+      "examples": 309,
+      "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
+    },
+    "evidence": [
+      "validation/m2b-utf8-string-cursor-cache-windows.json",
+      "validation/m2c-pendulum-startup-and-phase-baseline.json",
+      "validation/m1-pendulum-performance-windows.json",
+      "validation/m1-pendulum-phases-linux.json"
+    ],
+    "reproducibility": "R0=18, R1=0, R2=11, R3=0 static fixtures; R3 host capture 0/29; the bounded single-host receipt is not a cross-platform reproducibility claim.",
+    "dataStatus": "The pendulum workflow uses synthetic data. Engineering validation does not need experimental data; experimental validation is pending real data with provenance."
   },
-  "pending": [
-    "PRs #235 to #239 are merged into main (42a7b1a7); PR #240 is the open checkpoint record for that state.",
-    "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
-    "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
-    "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0.",
-    "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
-    "Keep unit-carrying covariance matrices, Measurement arrays, and array reductions outside the supported profile until separately typed and validated.",
-    "Keep published v0.2.0 unchanged; do not create or publish a new release.",
-    "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
-    "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS.",
-    "Repeated UTF-8 scans are isolated by deterministic input-stage counts; implement and benchmark a bounded correction after current-head ownership validation. Measurement overhead, pure loader time, allocated bytes and compiler memory remain open.",
-    "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
-  ],
-  "lastCi": {
-    "workflow": "Ostrin CI",
-    "runId": 41167597498,
-    "status": "success",
-    "head": "d1974b052528eec47975297d094031c4081f0681",
-    "relatedRuns": [
+  "activeMilestone": {
+    "id": "M2",
+    "title": "Scientific core, performance and language maturity",
+    "packages": {
+      "M2-A": "List<TemperaturePoint> merged (#243); same-scale exactness and Windows fused multiply-add merged (#245); TemperatureReading (reference point plus interval measurement) prepared; open: numeric Array<T> of points, user-defined affine units, prefixes",
+      "M2-B": "Native UTF-8 cursor cache merged (#242); interpreter and WASI string paths not measured",
+      "M2-C": "Startup floor, Linux phases and allocation counters recorded in validation/m2c-pendulum-startup-and-phase-baseline.json; RSS and Float/Quantity/Measurement overhead open",
+      "M2-D": "Pendulum input hardening merged (#244); synthetic data only",
+      "M2-E": "Not started beyond the existing restricted R3 profile",
+      "M2-F": "Not started",
+      "M2-G": "Not started"
+    },
+    "gates": [
       {
-        "workflow": "Browser audit",
-        "runId": 41167597511,
-        "status": "success"
+        "gate": 1,
+        "name": "Temperature semantics",
+        "status": "IN_PROGRESS"
       },
       {
-        "workflow": "Native sanitizers",
-        "runId": 41167597496,
-        "status": "success",
-        "asan": "success",
-        "ubsan": "success"
+        "gate": 2,
+        "name": "Temperature collections",
+        "status": "PARTIAL",
+        "detail": "List<TemperaturePoint> only"
       },
       {
-        "workflow": "CodeQL",
-        "runId": 41167597546,
-        "status": "success"
+        "gate": 3,
+        "name": "Measurement",
+        "status": "OPEN",
+        "detail": "structural profile with empty sources only; a reference-plus-interval design runs natively with zero leaks in a prototype but is not merged"
       },
       {
-        "workflow": "Security audit",
-        "runId": 41167597514,
-        "status": "success"
+        "gate": 4,
+        "name": "UTF-8",
+        "status": "DONE_NATIVE",
+        "detail": "before/after counters and timings on one Windows host"
       },
       {
-        "workflow": "Deploy Ostrin website",
-        "runId": 40230630648,
-        "status": "success"
+        "gate": 5,
+        "name": "Profiling",
+        "status": "PARTIAL"
       },
       {
-        "workflow": "CodeQL",
-        "runId": 40230630661,
-        "status": "success"
+        "gate": 6,
+        "name": "Scientific workflow",
+        "status": "ENGINEERING_VALIDATED_SYNTHETIC",
+        "detail": "input errors exit with status 0 because main returns Void and the language has no exit"
       },
       {
-        "workflow": "Security audit",
-        "runId": 40230630640,
-        "status": "success"
+        "gate": 7,
+        "name": "Memory",
+        "status": "IN_PROGRESS"
       },
       {
-        "workflow": "Browser audit",
-        "runId": 40230630645,
-        "status": "success"
+        "gate": 8,
+        "name": "Portability",
+        "status": "PARTIAL"
       },
       {
-        "workflow": "Rust dependency advisories",
-        "runId": 40230630640,
-        "status": "success"
+        "gate": 9,
+        "name": "Documentation",
+        "status": "IN_PROGRESS"
       },
       {
-        "workflow": "Browser audit",
-        "runId": 41248858643,
-        "status": "success"
-      },
-      {
-        "workflow": "Native sanitizers",
-        "runId": 41248858644,
-        "status": "success",
-        "asan": "success",
-        "ubsan": "success"
-      },
-      {
-        "workflow": "CodeQL",
-        "runId": 41248858648,
-        "status": "success"
-      },
-      {
-        "workflow": "Security audit",
-        "runId": 41248858645,
-        "status": "success"
-      },
-      {
-        "workflow": "Native sanitizers",
-        "runId": 41261253440,
-        "status": "success"
+        "gate": 10,
+        "name": "Integration",
+        "status": "IN_PROGRESS"
       }
-    ],
-    "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
+    ]
   },
-  "blockers": [
-    "Phase 1 (pendulum end-to-end): blocked on real experimental pendulum data supplied by the owner; the current input is synthetic and labeled as such. Gates A-I cannot be closed on synthetic data.",
-    "R3 remains OPEN globally: host capture is missing from 29/29 bundles; current evidence is R0-R2 and does not establish cross-platform reproducibility.",
-    "Phase 2 remaining work: TemperaturePoint arrays and TemperaturePoint measurements, user-defined affine units, and automatic prefixes (scalar TemperaturePoint and dimensional Measurement correlation are on main).",
-    "Phase 4 open: startup, managed allocation counts, sampled RSS and abstraction overhead are not isolated; the repeated UTF-8 scan correction is not implemented.",
-    "Published v0.2.0 remains frozen; no new tag or release is authorized."
+  "knownBlockers": [
+    "Experimental validation of the pendulum needs real measurements with provenance and conditions from the owner; engineering validation is not blocked.",
+    "R3 stays OPEN: host capture is 0/29 and only R0-R2 evidence exists.",
+    "The language has no way to set a process exit status; programs that report errors on stdout exit with 0.",
+    "Whole-process timing on Windows cannot resolve the pendulum phases (an empty main costs more than the whole run); in-process timing is needed.",
+    "37 worktrees with unmerged or uncommitted work and list_phi_probe.ostrin are protected; nothing there may be deleted, reset or edited."
   ],
-  "next": "Obtain real pendulum data from the owner to start Phase 1 gates; implement the Phase 2 TemperaturePoint array/measurement work and the Phase 4 UTF-8 scan correction as separate PRs with exact-head CI.",
-  "latestPullRequestValidation": {
-    "number": 240,
-    "url": "https://github.com/sircalch/Ostrin/pull/240",
-    "mergeCommit": "dc6682cbf92185cac650f4716833ba0646fadc43",
-    "remoteHead": "215e03a235226d158675e010b03cb4a5311153ba",
-    "base": "main",
-    "state": "merged",
-    "note": "Checkpoint PR after merging PRs 235 to 239; Codex reported no findings on 51f5361 and the latest head 215e03a2 passed all checks before merge."
-  },
-  "activePullRequests": [
-    241
-  ],
-  "acceptanceCriteria": [
-    {
-      "gate": "A-compiler",
-      "status": "OPEN",
-      "remaining": "Validate the integrated dimensional reference workflow and nested managed paths at its actual source revision."
-    },
-    {
-      "gate": "B-science",
-      "status": "OPEN",
-      "remaining": "Retain independent analytical/finite-difference oracle results for dimensional uncertainty and shared-source correlation."
-    },
-    {
-      "gate": "C-memory",
-      "status": "OPEN",
-      "remaining": "Require leak-check/sanitizers for the integrated workflow; the TemperaturePoint profile proves only its tested structural paths."
-    },
-    {
-      "gate": "D-execution",
-      "status": "OPEN",
-      "remaining": "Record native multiplatform and actual WASI execution of the reference workflow; 34-program matrix is supporting evidence."
-    },
-    {
-      "gate": "E-reproducibility",
-      "status": "OPEN",
-      "remaining": "Integrate bounded R3 inspect/verify/replay/compare evidence without promoting host-specific replay to cross-platform equivalence."
-    },
-    {
-      "gate": "F-performance",
-      "status": "OPEN",
-      "remaining": "Isolate startup, numerical kernel, managed allocations and abstraction overhead; assess measured bottlenecks."
-    },
-    {
-      "gate": "G-product",
-      "status": "OPEN",
-      "remaining": "Validate installation, tutorial, figure export and rendered reference workflow."
-    },
-    {
-      "gate": "H-integration",
-      "status": "OPEN",
-      "remaining": "Integrate authorized packages only, then validate their combined source and CI; PRs #235-#239 remain open."
-    },
-    {
-      "gate": "I-documentation",
-      "status": "OPEN",
-      "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site."
-    },
-    {
-      "gate": "A-compiler",
-      "status": "OPEN",
-      "remaining": "HIR unwrap and iterable lifetime correction passes complete local Linux suite and focused Windows checks; require the corrected remote HEAD and integration.",
-      "evidenceStatus": "LOCAL_FULL_SUITE_PASS_NEW_HEAD_CI_PENDING"
-    },
-    {
-      "gate": "B-science",
-      "status": "OPEN",
-      "remaining": "Same authoritative arrays now feed application/oracle; retain six-row finite-difference and three-row analytical evidence on the integrated source.",
-      "evidenceStatus": "REFERENCE_CASE_PASS"
-    },
-    {
-      "gate": "C-memory",
-      "status": "OPEN",
-      "remaining": "Before/after ASan UAF reproduction and bounded corrected workflow pass focused ASan/leaks, UBSan and ten compiled-WASI cases. Require fresh remote Windows/macOS and sanitizer suites; general ownership remains open.",
-      "evidenceStatus": "LOCAL_ASAN_UBSAN_LEAK_AND_WASI_PASS"
-    },
-    {
-      "gate": "D-execution",
-      "status": "OPEN",
-      "remaining": "Corrected source runs locally on Windows/Linux and passes ten compiled-WASI cases; require actual new-head three-host CI and artifacts.",
-      "evidenceStatus": "LOCAL_HOSTS_AND_WASI_PASS_CI_PENDING"
-    },
-    {
-      "gate": "F-performance",
-      "status": "OPEN",
-      "remaining": "Wall/thread-CPU phase/control and allocation counts are captured; repeated UTF-8 input scans are isolated deterministically. Implement a supported optimization and measure scientific abstraction overhead, pure loader time, allocated bytes and compiler memory.",
-      "evidenceStatus": "WALL_CPU_PHASE_CAPTURE_PASS"
-    },
-    {
-      "gate": "G-product",
-      "status": "OPEN",
-      "remaining": "Native report/SVG export works on Windows/Linux; verify updated site/browser and installation instructions on the integrated source.",
-      "evidenceStatus": "NATIVE_EXPORT_TUTORIAL_PASS"
-    },
-    {
-      "gate": "I-documentation",
-      "status": "OPEN",
-      "remaining": "Keep source/evidence scopes, clock limitations, counts and current-head CI consistent after integration.",
-      "evidenceStatus": "SOURCE_BOUND_TUTORIAL_AND_METHODS"
-    }
-  ],
-  "historicalEvidence": "Earlier detailed checkpoint/P2 history remains in git log -- docs/program-state-m1.json; archived receipts and source revisions are retained, including validation/m1-pendulum-allocations-windows.json, validation/m1-pendulum-reuse-windows.json and validation/m1-pendulum-wasi-linux.json.",
-  "previousPullRequestValidation": {
-    "number": 238,
-    "url": "https://github.com/sircalch/Ostrin/pull/238",
-    "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
-    "base": "69c962dee40a4b12606d131df0e8655b90924516",
-    "state": "open-mergeable-exact-metadata-head-green",
-    "checks": {
-      "ostrinCi": {
-        "status": "success",
-        "runId": 41167597498
+  "nextAction": "Merge #245 when its checks are green, then M2-A: design Measurement<TemperaturePoint> as a reference point plus a Measurement<Quantity<Temperature>> offset, or user-defined affine units; in parallel M2-C RSS and abstraction-overhead measurement.",
+  "historicalEvidence": {
+    "note": "Earlier detailed history remains in git log -- docs/program-state-m1.json. Everything below was the M1 checkpoint and is retained for provenance; it is not the current state.",
+    "m1": {
+      "checkpoint": {
+        "mainRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
+        "sourceRevision": "69c962dee40a4b12606d131df0e8655b90924516",
+        "evidenceRevision": "0480bfd6ca3e143016c17a7c48158debcac62e3b",
+        "dashboardRevision": "245c53d3a4eb098f668a505383c8e64805d2f849",
+        "lastValidatedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
+        "lastObservedRemotePullRequestHead": "d1974b052528eec47975297d094031c4081f0681",
+        "releaseTag": "v0.2.0",
+        "revisionSemantics": "sourceRevision identifies the tested compiler tree; programSourceRevision identifies the application change; evidenceRevision records the source-bound receipts. dashboardRevision identifies the clean tree used to regenerate metrics. Receipt recording commits also resolve with git log -1 --format=%H -- <receipt-path>. No field refers to its own containing commit."
       },
-      "browserAudit": {
-        "status": "success",
-        "runId": 41167597511
+      "completed": [
+        "integrated-authorized-prs-225-230-231-227-226-229",
+        "measurement-array-structural-profile-merged-pr-233",
+        "main-pr-233-post-merge-ci-eight-checks-green",
+        "measurement-scalar-covariance-analytical-native-parity-leak-and-wasi-emission",
+        "measurement-covariance-added-to-32-program-wasi-execution-matrix",
+        "main-r3-host-evidence-29-bundles-and-116-manifest-file-records-verified-against-main-0a3a824",
+        "scalar-covariance-underflow-guard-and-regression-example",
+        "full-cargo-suite-rerun-after-p2-fix-6-differential-383-integration-33-unit-green",
+        "full-cargo-test-6-differential-383-integration-33-unit-green",
+        "measurement-contract-gate-and-18-tests-green",
+        "project-plan-linguist-distribution-and-website-checks-green",
+        "scientific-lab-covariance-demo-and-generated-website-metadata-synchronized",
+        "measurement-covariance-large-matrix-psd-normalization-and-subnormal-midpoint-regressions-fixed",
+        "measurement-covariance-local-full-suite-wasi-chromium-webkit-and-numeric-validation-green",
+        "local-numeric-validation",
+        "local-benchmark-contract-check",
+        "measurement-covariance-propagation-preserves-correlations-across-matrix-scales",
+        "measurement-covariance-quadratic-form-compensated-sums-preserve-small-residuals",
+        "measurement-covariance-rounded-factor-projection-p2-rejected-as-unresolved-9d41693",
+        "measurement-covariance-lossy-subnormal-normalization-p2-rejected-9d41693",
+        "measurement-covariance-full-cargo-422-tests-green-on-source-9d41693",
+        "measurement-covariance-wasi-32-programs-green-on-source-9d41693",
+        "measurement-covariance-15-workload-benchmark-recorded-on-source-9d41693",
+        "covariance-generated-website-and-bars-effect-bundle-synchronized",
+        "pr-234-source-evidence-checkpoint-prepared-locally",
+        "measurement-covariance-near-perfect-correlation-p2-rejected-as-unresolved-5998717",
+        "full-cargo-422-tests-wasi-32-and-contract-18-green-source-5998717",
+        "measurement-covariance-benchmark-15-workloads-7-samples-source-5998717",
+        "website-lab-provenance-benchmark-status-data-regenerated-and-verified-source-5998717",
+        "chromium-and-webkit-36-browser-tests-green-firefox-launch-unavailable-source-5998717",
+        "numeric-validation-80-report-and-136-emitted-values-exact-live-allocations-zero-source-5998717",
+        "v0.2-readiness-12-of-12-ready-r3-open-0-of-29-host-captures-source-5998717",
+        "measurement-covariance-subnormal-variance-ratio-p2-fixed-source-140a53d",
+        "source-140a53d-full-validation-and-evidence-recorded-19f599b",
+        "measurement-covariance-unequal-subnormal-geometric-scale-rejected-source-6c4d1c8",
+        "full-source-6c4d1c8-cargo422-wasi32-contract18-web-lab-numeric-and-readiness-validation-green",
+        "measurement-covariance-adjustment-residual-p2-4371782448-fixed-source-06849b5",
+        "measurement-covariance-source-06849b5-focused-interpreter-native-leak-test-green",
+        "measurement-covariance-source-06849b5-full-cargo-422-tests-green-exact-tested-tree",
+        "measurement-covariance-source-06849b5-wasi-32-programs-green",
+        "measurement-covariance-source-06849b5-website-lab-replays-numeric-linguist-distribution-and-readiness-green",
+        "measurement-covariance-evidence-493edec-and-dashboard-9bbbf09-recorded-source-and-evidence-provenance",
+        "pr-234-rounded-root-square-and-rounded-adjustment-ratio-p2s-fixed-source-469b11a",
+        "source-469b11a-focused-interpreter-native-wasi-leak-contract-and-format-validation-passed",
+        "source-469b11a-full-cargo-suite-422-passed-before-final-conservative-root-bound-tightening",
+        "source-469b11a-wasi-32-programs-passed-after-final-root-bound-tightening",
+        "source-469b11a-web-lab-29-figures-11-r1-r2-bundles-and-provenance-regenerated",
+        "source-469b11a-numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero",
+        "source-469b11a-linguist-distribution-readiness-12-of-12-and-quality-dashboard-synchronized",
+        "pr-234-rounded-subnormal-square-root-adjustment-p2-fixed-source-ae9aaaa",
+        "source-ae9aaaa-focused-interpreter-native-wasi-leak-test-contract-18-and-format-pass",
+        "source-ae9aaaa-release-build-and-32-program-wasi-matrix-pass",
+        "source-ae9aaaa-web-lab-29-figures-r1-r2-replays-provenance-and-website-check-pass",
+        "source-ae9aaaa-numeric-validation-80-and-136-values-exact-live-allocation-zero",
+        "source-ae9aaaa-linguist-distribution-and-v0.2-readiness-12-of-12-pass",
+        "measurement-covariance-unequal-subnormal-midpoint-p2-4372155934-reproduced-192824a",
+        "source-354f02c-normalizes-subnormal-covariance-entries-before-averaging",
+        "source-354f02c-focused-interpreter-native-wasi-leak-parity-2.75-passed",
+        "source-354f02c-wasi32-website383-lab29-r1-r2-numeric-linguist-distribution-readiness-passed",
+        "r3-restricted-artifact-inventory-filename-binding-pr238-0480bfd",
+        "r3-restricted-artifact-inventory-metadata-ci-green-d1974b",
+        "pr-234-merged-main-69c962d-all-five-main-workflows-green",
+        "bounded-r3-wasi-preview1-host-replay-profile-local-70-tests-website-and-plan-gates-green",
+        "pr-235-two-p2-covariance-findings-fixed-and-current-review-threads-resolved-targeted-native-wasi-leak-test-passed",
+        "pr-234-merged-into-main-69c962-and-all-eight-post-merge-checks-green",
+        "measurement-dimensional-source-correlation-implemented-at-source-c1a4281",
+        "measurement-correlation-analytic-oracle-variance-0.37-uncertainty-0.6082762530298219-interpreter-native-parity-live-allocations-zero",
+        "measurement-correlation-wasi-preview1-matrix-33-programs-green",
+        "measurement-correlation-lab-12-demos-29-figure-replays-generated-and-verified",
+        "measurement-correlation-website-17-pages-305-examples-383-integration-tests-green",
+        "measurement-correlation-project-plan-7261-hir-ir-zero-ast-fallbacks",
+        "measurement-correlation-contract-gate-and-18-mutation-tests-green",
+        "measurement-correlation-numeric-validation-80-reports-136-emitted-values-exact",
+        "measurement-correlation-linguist-distribution-and-v0.2-readiness-12-of-12-green",
+        "measurement-correlation-evidence-9ac3446-and-dashboard-84b6c04-recorded",
+        "measurement-correlation-rounded-endpoint-p2-fixed-source-6c6c3aa-with-exact-rational-regression",
+        "measurement-correlation-p2-focused-interpreter-native-test-wasi33-and-contract18-green",
+        "measurement-scalar-native-lowering-ratchet-updated-31-to-34-after-three-sourcecorrelation-ir-bodies",
+        "stale-remote-pr235-failures-diagnosed-and-fixed-provenance-page-regenerated-website383-green",
+        "numeric-validation-80-reports-136-emitted-values-exact-live-allocations-zero-after-p2",
+        "project-plan-linguist-distribution-ownership-v0.2-readiness-and-scorecard-tests-green-after-p2",
+        "r3-bars-bundle-regenerated-effect-coverage-21063-r3-open-zero-host-captures",
+        "measurement-correlation-lossy-unit-conversion-cancellation-rejected-source-c20b087",
+        "unit-conversion-cancellation-exact-rational-residual-32-over-25-meters",
+        "measurement-correlation-full-cargo-422-tests-green-current-source-tree",
+        "measurement-correlation-wasi-33-programs-green-after-release-compiler-rebuild",
+        "measurement-correlation-contract-18-website-383-lab-replays-29-and-provenance-green",
+        "measurement-correlation-numeric-80-and-136-values-exact-live-allocations-zero",
+        "measurement-correlation-project-plan-7261-hir-ir-zero-ast-readiness-and-distribution-gates-green",
+        "measurement-temperaturepoint-hir-ir-pr239-29f8339-all-gates-green",
+        "website-test-count-384-metadata-synchronized-pr239-29f8339",
+        "measurement-temperaturepoint-273e01e-five-workflows-green",
+        "authorized-prs-225-230-231-227-226-229-integrated",
+        "measurement-array-structural-profile-merged-pr233",
+        "scalar-covariance-analytical-native-numeric-and-wasi-evidence-preserved",
+        "pr239-7f7a3ba-ten-checks-green-and-wasi34",
+        "pr237-c80d26e-fourteen-checks-green-and-standalone-wasi-run41253542664",
+        "period-reuse-seven-allocation-samples-114-fewer-records-source49374d7",
+        "typed-analysis-result-and-render-boundary-source5960371",
+        "separated-workflow-windows-linux-asan-ubsan-and-compiled-wasi-three-runs",
+        "linux-gcc-seven-paired-wall-and-thread-cpu-phase-samples-sourcee612d73",
+        "current-windows-linux-backend-ratchets8789ir46hir0ast-sourcee612d73",
+        "native-report-svg-export-procedure-tested-windows-and-linux",
+        "thirty-regenerated-r2-replays-and-twelve-demos-pass-for-typed-result-source",
+        "pr237-728d224-fourteen-checks-green-and-wasi-run41257538742",
+        "authoritative-json-arrays-analytical-three-row-case-and-covariance-limit-source3b60f21",
+        "ten-compiled-wasi-input-cases-and-seven-paired-phase-captures-clean3b60f21",
+        "hir-unwrap-uaf-reproduced-then-corrected-source434f3a2",
+        "source434f3a2-full-linux424-tests-pass-and-focused-windows-asan-ubsan-pass",
+        "source434f3a2-ten-compiled-wasi-cases-and-seven-native-phase-pairs-pass",
+        "input-stage-repeated-utf8-work-isolated-by-three-whitespace-only-counter-probes",
+        "pr-235-dimensional-source-correlation-merged-5df0254",
+        "pr-236-bounded-wasi-replay-profile-merged-406fad7",
+        "pr-237-pendulum-calibration-workflow-merged-42a7b1a",
+        "pr-238-r3-artifact-inventory-merged-f410ac5",
+        "pr-239-measurement-temperaturepoint-merged-06ce10d"
+      ],
+      "currentPackage": {
+        "name": "pendulum-calibration-end-to-end-validation",
+        "branch": "main",
+        "baseRevision": "42a7b1a7ec0cff4dd6db4d6ca82287eb63a276d9",
+        "status": "PRs #235 to #240 merged into main; Phase 1 end-to-end validation on synthetic data; blocked on real experimental data for closure",
+        "scope": [
+          "validate examples/viz_pendulum_calibration.ostrin end-to-end on main",
+          "compare results with the independent JavaScript oracle",
+          "confirm ownership regressions from PR 237 remain covered",
+          "measure runtime phases and record reproducible benchmark evidence"
+        ],
+        "evidence": []
       },
-      "nativeSanitizers": {
+      "pending": [
+        "PRs #235 to #239 are merged into main (42a7b1a7); PR #240 is the open checkpoint record for that state.",
+        "Continue R3 profile work, Measurement covariance and ownership, compiler typing, performance profiling and scientific visualization.",
+        "Keep static fixture maturity at R0=18, R1=0, R2=11, R3=0; the bounded single-host receipt is not a cross-platform reproducibility claim.",
+        "Continue compiler/type, Measurement, effect-closure, benchmark and visualization work only with analytical and ownership evidence; preserve v0.2.0.",
+        "Continue the M1 reference scientific workflow and R3 host capture; current R3 remains OPEN with 0/29 host captures and only R0-R2 evidence.",
+        "Keep unit-carrying covariance matrices, Measurement arrays, and array reductions outside the supported profile until separately typed and validated.",
+        "Keep published v0.2.0 unchanged; do not create or publish a new release.",
+        "M1 Gates A-I require the integrated reference workflow, not isolated type fixtures; use PR #237 pendulum calibration as the integration target.",
+        "After the current package, verify the reference workflow performance scope: numerical kernel, startup, managed allocation counts and abstraction overhead are not yet isolated by end-to-end timing or sampled RSS.",
+        "Repeated UTF-8 scans are isolated by deterministic input-stage counts; implement and benchmark a bounded correction after current-head ownership validation. Measurement overhead, pure loader time, allocated bytes and compiler memory remain open.",
+        "Complete the combined restricted R3 artifact integration/replay and all nine M1 acceptance criteria; global R3 remains open."
+      ],
+      "blockers": [
+        "Phase 1 (pendulum end-to-end): blocked on real experimental pendulum data supplied by the owner; the current input is synthetic and labeled as such. Gates A-I cannot be closed on synthetic data.",
+        "R3 remains OPEN globally: host capture is missing from 29/29 bundles; current evidence is R0-R2 and does not establish cross-platform reproducibility.",
+        "Phase 2 remaining work: TemperaturePoint arrays and TemperaturePoint measurements, user-defined affine units, and automatic prefixes (scalar TemperaturePoint and dimensional Measurement correlation are on main).",
+        "Phase 4 open: startup, managed allocation counts, sampled RSS and abstraction overhead are not isolated; the repeated UTF-8 scan correction is not implemented.",
+        "Published v0.2.0 remains frozen; no new tag or release is authorized."
+      ],
+      "next": "Obtain real pendulum data from the owner to start Phase 1 gates; implement the Phase 2 TemperaturePoint array/measurement work and the Phase 4 UTF-8 scan correction as separate PRs with exact-head CI.",
+      "lastCi": {
+        "workflow": "Ostrin CI",
+        "runId": 41167597498,
         "status": "success",
-        "runId": 41167597496,
-        "asan": "success",
-        "ubsan": "success"
+        "head": "d1974b052528eec47975297d094031c4081f0681",
+        "relatedRuns": [
+          {
+            "workflow": "Browser audit",
+            "runId": 41167597511,
+            "status": "success"
+          },
+          {
+            "workflow": "Native sanitizers",
+            "runId": 41167597496,
+            "status": "success",
+            "asan": "success",
+            "ubsan": "success"
+          },
+          {
+            "workflow": "CodeQL",
+            "runId": 41167597546,
+            "status": "success"
+          },
+          {
+            "workflow": "Security audit",
+            "runId": 41167597514,
+            "status": "success"
+          },
+          {
+            "workflow": "Deploy Ostrin website",
+            "runId": 40230630648,
+            "status": "success"
+          },
+          {
+            "workflow": "CodeQL",
+            "runId": 40230630661,
+            "status": "success"
+          },
+          {
+            "workflow": "Security audit",
+            "runId": 40230630640,
+            "status": "success"
+          },
+          {
+            "workflow": "Browser audit",
+            "runId": 40230630645,
+            "status": "success"
+          },
+          {
+            "workflow": "Rust dependency advisories",
+            "runId": 40230630640,
+            "status": "success"
+          },
+          {
+            "workflow": "Browser audit",
+            "runId": 41248858643,
+            "status": "success"
+          },
+          {
+            "workflow": "Native sanitizers",
+            "runId": 41248858644,
+            "status": "success",
+            "asan": "success",
+            "ubsan": "success"
+          },
+          {
+            "workflow": "CodeQL",
+            "runId": 41248858648,
+            "status": "success"
+          },
+          {
+            "workflow": "Security audit",
+            "runId": 41248858645,
+            "status": "success"
+          },
+          {
+            "workflow": "Native sanitizers",
+            "runId": 41261253440,
+            "status": "success"
+          }
+        ],
+        "note": "All five required workflows for PR #238 succeeded on exact metadata head d1974b052528eec47975297d094031c4081f0681; review was fresh and no major issues were found."
       },
-      "codeql": {
-        "status": "success",
-        "runId": 41167597546
+      "latestPullRequestValidation": {
+        "number": 240,
+        "url": "https://github.com/sircalch/Ostrin/pull/240",
+        "mergeCommit": "dc6682cbf92185cac650f4716833ba0646fadc43",
+        "remoteHead": "215e03a235226d158675e010b03cb4a5311153ba",
+        "base": "main",
+        "state": "merged",
+        "note": "Checkpoint PR after merging PRs 235 to 239; Codex reported no findings on 51f5361 and the latest head 215e03a2 passed all checks before merge."
       },
-      "securityAudit": {
-        "status": "success",
-        "runId": 41167597514
+      "previousPullRequestValidation": {
+        "number": 238,
+        "url": "https://github.com/sircalch/Ostrin/pull/238",
+        "remoteHead": "d1974b052528eec47975297d094031c4081f0681",
+        "base": "69c962dee40a4b12606d131df0e8655b90924516",
+        "state": "open-mergeable-exact-metadata-head-green",
+        "checks": {
+          "ostrinCi": {
+            "status": "success",
+            "runId": 41167597498
+          },
+          "browserAudit": {
+            "status": "success",
+            "runId": 41167597511
+          },
+          "nativeSanitizers": {
+            "status": "success",
+            "runId": 41167597496,
+            "asan": "success",
+            "ubsan": "success"
+          },
+          "codeql": {
+            "status": "success",
+            "runId": 41167597546
+          },
+          "securityAudit": {
+            "status": "success",
+            "runId": 41167597514
+          },
+          "wasi": {
+            "status": "success",
+            "runId": 41251579139,
+            "artifactId": 13060939257
+          },
+          "successful": 10,
+          "failing": 0,
+          "pending": 0,
+          "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
+        },
+        "review": {
+          "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+          "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
+          "currentHeadReviewed": true,
+          "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
+          "unresolvedOutdatedThreads": 0
+        },
+        "openReviewThreads": [],
+        "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
+        "observedAt": "2026-10-31",
+        "head": "d1974b052528eec47975297d094031c4081f0681",
+        "integration": "not merged; no PR #238 merge authorization",
+        "mergeCommit": null,
+        "reviewThreads": {
+          "total": 2,
+          "unresolved": 2,
+          "comments": [
+            {
+              "id": 4372396523,
+              "priority": "P2",
+              "status": "fixed-locally-not-revalidated"
+            },
+            {
+              "id": 4372490005,
+              "priority": "P2",
+              "status": "fixed-locally-not-revalidated"
+            }
+          ]
+        },
+        "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
+        "runs": {
+          "ostrinCi": "success",
+          "browserAudit": "success",
+          "nativeSanitizersAsan": "success",
+          "nativeSanitizersUbsan": "success",
+          "codeql": "success",
+          "securityAudit": "success"
+        },
+        "resolvedReviewThreads": [
+          4372396523,
+          4372490005
+        ]
       },
-      "wasi": {
-        "status": "success",
-        "runId": 41251579139,
-        "artifactId": 13060939257
-      },
-      "successful": 10,
-      "failing": 0,
-      "pending": 0,
-      "validatedHead": "f58ed2ea0e567310661331b88a5a1b7521ece827"
-    },
-    "review": {
-      "latestSubmittedReviewHead": "d1974b052528eec47975297d094031c4081f0681",
-      "latestGitHubReviewHead": "d1974b052528eec47975297d094031c4081f0681",
-      "currentHeadReviewed": true,
-      "status": "fresh review found no major issues; P1 filename/ID thread fixed and resolved",
-      "unresolvedOutdatedThreads": 0
-    },
-    "openReviewThreads": [],
-    "localFollowUp": "Metadata-only status update records the completed exact-head validation for d1974b052528eec47975297d094031c4081f0681; no compiler, runtime, release, or v0.2.0 changes.",
-    "observedAt": "2026-10-31",
-    "head": "d1974b052528eec47975297d094031c4081f0681",
-    "integration": "not merged; no PR #238 merge authorization",
-    "mergeCommit": null,
-    "reviewThreads": {
-      "total": 2,
-      "unresolved": 2,
-      "comments": [
+      "acceptanceCriteria": [
         {
-          "id": 4372396523,
-          "priority": "P2",
-          "status": "fixed-locally-not-revalidated"
+          "gate": "A-compiler",
+          "status": "OPEN",
+          "remaining": "Validate the integrated dimensional reference workflow and nested managed paths at its actual source revision.",
+          "alternateRemaining": [
+            "HIR unwrap and iterable lifetime correction passes complete local Linux suite and focused Windows checks; require the corrected remote HEAD and integration."
+          ]
         },
         {
-          "id": 4372490005,
-          "priority": "P2",
-          "status": "fixed-locally-not-revalidated"
+          "gate": "B-science",
+          "status": "OPEN",
+          "remaining": "Retain independent analytical/finite-difference oracle results for dimensional uncertainty and shared-source correlation.",
+          "alternateRemaining": [
+            "Same authoritative arrays now feed application/oracle; retain six-row finite-difference and three-row analytical evidence on the integrated source."
+          ]
+        },
+        {
+          "gate": "C-memory",
+          "status": "OPEN",
+          "remaining": "Require leak-check/sanitizers for the integrated workflow; the TemperaturePoint profile proves only its tested structural paths.",
+          "alternateRemaining": [
+            "Before/after ASan UAF reproduction and bounded corrected workflow pass focused ASan/leaks, UBSan and ten compiled-WASI cases. Require fresh remote Windows/macOS and sanitizer suites; general ownership remains open."
+          ]
+        },
+        {
+          "gate": "D-execution",
+          "status": "OPEN",
+          "remaining": "Record native multiplatform and actual WASI execution of the reference workflow; 34-program matrix is supporting evidence.",
+          "alternateRemaining": [
+            "Corrected source runs locally on Windows/Linux and passes ten compiled-WASI cases; require actual new-head three-host CI and artifacts."
+          ]
+        },
+        {
+          "gate": "E-reproducibility",
+          "status": "OPEN",
+          "remaining": "Integrate bounded R3 inspect/verify/replay/compare evidence without promoting host-specific replay to cross-platform equivalence."
+        },
+        {
+          "gate": "F-performance",
+          "status": "OPEN",
+          "remaining": "Isolate startup, numerical kernel, managed allocations and abstraction overhead; assess measured bottlenecks.",
+          "alternateRemaining": [
+            "Wall/thread-CPU phase/control and allocation counts are captured; repeated UTF-8 input scans are isolated deterministically. Implement a supported optimization and measure scientific abstraction overhead, pure loader time, allocated bytes and compiler memory."
+          ]
+        },
+        {
+          "gate": "G-product",
+          "status": "OPEN",
+          "remaining": "Validate installation, tutorial, figure export and rendered reference workflow.",
+          "alternateRemaining": [
+            "Native report/SVG export works on Windows/Linux; verify updated site/browser and installation instructions on the integrated source."
+          ]
+        },
+        {
+          "gate": "H-integration",
+          "status": "OPEN",
+          "remaining": "Integrate authorized packages only, then validate their combined source and CI; PRs #235-#239 remain open."
+        },
+        {
+          "gate": "I-documentation",
+          "status": "OPEN",
+          "remaining": "Keep verified scope, exact provenance and reproducible commands consistent across repo and site.",
+          "alternateRemaining": [
+            "Keep source/evidence scopes, clock limitations, counts and current-head CI consistent after integration."
+          ]
         }
-      ]
-    },
-    "note": "The current a4a17ee head has 10/10 successful checks. Both previously substantive P2s are fixed in commits 6c6c3aa5 and c20b087d, covered by the current-head dimensional_measurement_lab_matches_interpreter_and_native test, and their review threads are resolved. A fresh @codex review was requested; no merge authorization is recorded.",
-    "runs": {
-      "ostrinCi": "success",
-      "browserAudit": "success",
-      "nativeSanitizersAsan": "success",
-      "nativeSanitizersUbsan": "success",
-      "codeql": "success",
-      "securityAudit": "success"
-    },
-    "resolvedReviewThreads": [
-      4372396523,
-      4372490005
-    ]
+      ],
+      "archive": "Earlier detailed checkpoint/P2 history remains in git log -- docs/program-state-m1.json; archived receipts and source revisions are retained, including validation/m1-pendulum-allocations-windows.json, validation/m1-pendulum-reuse-windows.json and validation/m1-pendulum-wasi-linux.json."
+    }
   }
 }
