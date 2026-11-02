@@ -164,7 +164,7 @@ No demuestra equivalencia temporal entre sistemas ni R3 global.
 
 ### Costo de memoria de las abstracciones científicas (M2-C)
 
-Los ejecutables nativos aceptan `OSTRIN_MEM_DETAIL=1` y agregan a stderr una línea
+Los ejecutables nativos compilados con `--leak-check` (los demás no emiten ningún informe de memoria) aceptan `OSTRIN_MEM_DETAIL=1` y agregan a stderr una línea
 `ostrin memory-detail: total_bytes=N peak_rss_kb=N` (bytes pedidos por los puntos de entrada de
 asignación de Ostrin y pico del conjunto residente del proceso; Linux y Windows x64, 0 en otros
 destinos). La línea `ostrin memory:` que parsean los benchmarks no cambia. El script

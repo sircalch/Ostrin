@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Memory and time cost of the scientific abstractions on the same 50,000-iteration accumulation
 // loop: plain Float, Quantity<Temperature> interval, TemperaturePoint shift and Measurement with
-// a shared source. Uses the opt-in `OSTRIN_MEM_DETAIL=1` report of native executables
+// a shared source. Uses the opt-in `OSTRIN_MEM_DETAIL=1` report of native executables built with
+// `--leak-check` (executables without it print no memory report at all)
 // (requested bytes and peak resident set) next to the managed allocation counters.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -10,7 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseAllocationCounters } from "./benchmark-allocation-profile.mjs";
 
-export const detailScope = "requested bytes through Ostrin managed allocation entry points and OS peak resident set at exit; excludes libc-internal and stack memory";
+export const detailScope = "requested bytes through Ostrin managed allocation entry points and OS peak resident set at exit (--leak-check builds only); excludes libc-internal and stack memory";
 
 export function parseMemoryDetail(stderr) {
   const lines = stderr.replaceAll("\r\n", "\n").split("\n").filter((line) => line.startsWith("ostrin memory-detail:"));

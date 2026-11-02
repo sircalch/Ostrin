@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.abstraction-overhead/v1",
-  "scope": "requested bytes through Ostrin managed allocation entry points and OS peak resident set at exit; excludes libc-internal and stack memory",
+  "scope": "requested bytes through Ostrin managed allocation entry points and OS peak resident set at exit (--leak-check builds only); excludes libc-internal and stack memory",
   "host": {
     "platform": "win32",
     "arch": "x64"
