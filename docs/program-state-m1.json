@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "7c432b341680d6083099c0d2b232acacbd6ce9c7",
+    "mainRevision": "e2efe7485234971dc7a288ba6f8e2076db719578",
     "mergedPullRequests": [
       235,
       236,
@@ -21,14 +21,15 @@
       242,
       243,
       244,
-      245
+      245,
+      247
     ],
     "activePullRequests": [
       246
     ],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 392,
+      "integrationTests": 394,
       "unitTests": 33,
       "differentialTests": 6,
       "examples": 308,

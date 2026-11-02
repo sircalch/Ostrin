@@ -200,6 +200,10 @@ closures y tareas de este payload requieren evidencia propia. El contrato cient�
 pendiente de separar nominales de puntos y contribuciones de intervalos. Estos cambios son de
 desarrollo y no alteran los binarios publicados de `v0.2.0`.
 
+### 5.1.1 Lecturas absolutas de temperatura (`TemperatureReading`)
+
+Mientras `Measurement<TemperaturePoint>` solo tiene perfil estructural, `std.measurements` ofrece una representación que cumple el contrato afín sin tipos paralelos: una lectura es un punto de referencia (`TemperaturePoint`) más un `Measurement<Quantity<Temperature>>` de desplazamiento. El punto nominal es `reference + offset.value`; toda la incertidumbre vive en el desplazamiento y es, por tanto, un intervalo lineal. Convertir la lectura (`temperature_reading_to`) cambia solo la referencia: el offset de escala (273.15 para degC, 32 para degF) no se trata como incertidumbre y la incertidumbre en kelvin no cambia. Dos lecturas que comparten `source_id` conservan su correlación: `temperature_reading_difference` devuelve un `Measurement<Quantity<Temperature>>` (resta de las referencias como intervalo exacto más la diferencia correlacionada de los desplazamientos), con incertidumbre 0 si ambas vienen de la misma fuente y `sqrt(u_a^2 + u_b^2)` si son independientes. Un desplazamiento desconocido mantiene el punto nominal pero nunca produce incertidumbre numérica. `examples/temperature_readings.ostrin` y las pruebas `temperature_readings_*` verifican los valores analíticos (20 degC + (0.3 +- 0.1) K = 20.3 degC, u = 0.1 K; diferencia misma sonda u = 0; fuentes independientes u = 0.2236 K), IR sin fallback AST, paridad intérprete/nativo, C para WASI y `live_allocations=0`. Límites: las operaciones sobre una lectura se limitan a las citadas (sin suma de lecturas ni producto), no hay arrays de lecturas ni covarianza con `source_correlation`, y magnitudes cercanas al desbordamiento heredan el error de desbordamiento de la aritmética de puntos.
+
 ### 5.2 Estados de conocimiento
 
 El diseño distingue explícitamente tres estados:
