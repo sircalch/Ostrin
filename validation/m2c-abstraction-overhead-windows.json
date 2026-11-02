@@ -1,0 +1,60 @@
+{
+  "schema": "ostrin.abstraction-overhead/v1",
+  "scope": "requested bytes through Ostrin managed allocation entry points and OS peak resident set at exit; excludes libc-internal and stack memory",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "runsPerWorkload": 9,
+  "note": "Whole-process wall time includes process launch; compare memory columns first. Results are machine-specific.",
+  "workloads": [
+    {
+      "id": "float",
+      "role": "control: scalar Float",
+      "output": "50000",
+      "totalBytes": 0,
+      "peakRssKb": 5036,
+      "peakAllocations": 0,
+      "totalAllocations": 0,
+      "wallMsMedian": 13.97,
+      "wallMsMin": 13.08,
+      "wallMsMax": 58.47
+    },
+    {
+      "id": "quantity-interval",
+      "role": "Quantity<Temperature> interval",
+      "output": "50000 K",
+      "totalBytes": 0,
+      "peakRssKb": 5044,
+      "peakAllocations": 0,
+      "totalAllocations": 0,
+      "wallMsMedian": 13.74,
+      "wallMsMin": 13.43,
+      "wallMsMax": 51.13
+    },
+    {
+      "id": "temperature-point",
+      "role": "TemperaturePoint shifted by an interval",
+      "output": "50000 degC (absolute)",
+      "totalBytes": 0,
+      "peakRssKb": 5044,
+      "peakAllocations": 0,
+      "totalAllocations": 0,
+      "wallMsMedian": 13.98,
+      "wallMsMin": 13.48,
+      "wallMsMax": 50.49
+    },
+    {
+      "id": "measurement-shared-source",
+      "role": "Measurement with one shared source",
+      "output": "50000 ± 49.99999999997417",
+      "totalBytes": 10400261,
+      "peakRssKb": 5104,
+      "peakAllocations": 14,
+      "totalAllocations": 450008,
+      "wallMsMedian": 51.42,
+      "wallMsMin": 48.74,
+      "wallMsMax": 81.33
+    }
+  ]
+}

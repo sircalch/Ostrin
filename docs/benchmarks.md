@@ -161,3 +161,25 @@ un supuesto overhead ni se los presenta como tiempos del kernel sin instrumentar
 La abstracción `Measurement` forma parte de la fase de análisis; este informe no
 aísla todavía su overhead frente a una implementación de la misma matemática.
 No demuestra equivalencia temporal entre sistemas ni R3 global.
+
+### Costo de memoria de las abstracciones científicas (M2-C)
+
+Los ejecutables nativos aceptan `OSTRIN_MEM_DETAIL=1` y agregan a stderr una línea
+`ostrin memory-detail: total_bytes=N peak_rss_kb=N` (bytes pedidos por los puntos de entrada de
+asignación de Ostrin y pico del conjunto residente del proceso; Linux y Windows x64, 0 en otros
+destinos). La línea `ostrin memory:` que parsean los benchmarks no cambia. El script
+`scripts/benchmark-abstraction-overhead.mjs` ejecuta el mismo bucle de 50 000 acumulaciones con
+`Float`, `Quantity<Temperature>`, `TemperaturePoint` y `Measurement` con una fuente compartida.
+Recibo local de Windows: `validation/m2c-abstraction-overhead-windows.json`.
+
+| Carga | Bytes pedidos | Asignaciones totales | Pico RSS | Mediana de proceso |
+| --- | ---: | ---: | ---: | ---: |
+| Float (control) | 0 | 0 | 5040 KB | 13,65 ms |
+| Quantity de temperatura | 0 | 0 | 5040 KB | 15,39 ms |
+| TemperaturePoint | 0 | 0 | 5044 KB | 13,10 ms |
+| Measurement, fuente compartida | 10 400 261 | 450 008 | 5100 KB | 51,24 ms |
+
+Lectura: las cantidades y los puntos absolutos son valores por copia sin montículo; el costo está
+en `Measurement`, que asigna unas nueve veces por iteración (lista de fuentes) pero libera casi todo
+al instante (pico de 14 asignaciones vivas, +60 KB de RSS). El tiempo incluye el arranque del proceso
+(~13 ms aquí) y es específico de esta máquina; la columna fiable es la de memoria.

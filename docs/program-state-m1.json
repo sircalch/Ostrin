@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "e2efe7485234971dc7a288ba6f8e2076db719578",
+    "mainRevision": "2c5efc43c99b4fd019e8ccc6052fce98d4eaa3a5",
     "mergedPullRequests": [
       235,
       236,
@@ -22,14 +22,14 @@
       243,
       244,
       245,
-      247
+      246,
+      247,
+      248
     ],
-    "activePullRequests": [
-      246
-    ],
+    "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 395,
+      "integrationTests": 396,
       "unitTests": 33,
       "differentialTests": 6,
       "examples": 310,
@@ -38,6 +38,7 @@
     "evidence": [
       "validation/m2b-utf8-string-cursor-cache-windows.json",
       "validation/m2c-pendulum-startup-and-phase-baseline.json",
+      "validation/m2c-abstraction-overhead-windows.json",
       "validation/m1-pendulum-performance-windows.json",
       "validation/m1-pendulum-phases-linux.json"
     ],
@@ -50,7 +51,7 @@
     "packages": {
       "M2-A": "List<TemperaturePoint> merged (#243); same-scale exactness and Windows fused multiply-add merged (#245); TemperatureReading (reference point plus interval measurement) prepared; open: numeric Array<T> of points, user-defined affine units, prefixes",
       "M2-B": "Native UTF-8 cursor cache merged (#242); interpreter and WASI string paths not measured",
-      "M2-C": "Startup floor, Linux phases and allocation counters recorded in validation/m2c-pendulum-startup-and-phase-baseline.json; RSS and Float/Quantity/Measurement overhead open",
+      "M2-C": "Startup floor, Linux phases and allocation counters in validation/m2c-pendulum-startup-and-phase-baseline.json; peak RSS and requested bytes via OSTRIN_MEM_DETAIL and Float/Quantity/TemperaturePoint/Measurement overhead in validation/m2c-abstraction-overhead-windows.json (Windows only); Linux/macOS receipts and in-process phase clock open",
       "M2-D": "Pendulum input hardening merged (#244); synthetic data only",
       "M2-E": "Not started beyond the existing restricted R3 profile",
       "M2-F": "Not started",

@@ -914,6 +914,7 @@ static OstrinAllocation** ostrin_table_link(const void* ptr) {\n\
 static size_t ostrin_allocation_count = 0;\n\
 static size_t ostrin_peak_allocation_count = 0;\n\
 static size_t ostrin_total_allocations = 0;\n\
+static size_t ostrin_total_bytes = 0;\n\
 static int ostrin_argc = 0;\n\
 static char** ostrin_argv = NULL;\n\
 static OstrinMutex ostrin_heap_mutex;\n\
@@ -1199,8 +1200,9 @@ static void ostrin_clear_task_handles(OstrinTaskExecution* execution, bool relea
     }\n\
 }\n\
 \n\
-static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*)) {\n\
+static void ostrin_register_allocation_with_drop(void* ptr, size_t bytes, void (*drop)(void*)) {\n\
     ostrin_heap_lock();\n\
+    ostrin_total_bytes += bytes;\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
     if (!entry) { free(ptr); OSTRIN_OOM(); }\n\
     entry->ptr = ptr;\n\
@@ -1217,8 +1219,8 @@ static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*))
     ostrin_heap_unlock();\n\
 }\n\
 \n\
-static void ostrin_register_allocation(void* ptr) {\n\
-    ostrin_register_allocation_with_drop(ptr, NULL);\n\
+static void ostrin_register_allocation(void* ptr, size_t bytes) {\n\
+    ostrin_register_allocation_with_drop(ptr, bytes, NULL);\n\
 }\n\
 \n\
 /* Cursor cache for long heap strings (see strings_runtime.c). Entries are dropped whenever the\n\
@@ -1240,14 +1242,14 @@ static void ostrin_str_cache_clear(void) {\n\
 static void* ostrin_alloc(size_t size) {\n\
     void* ptr = malloc(size == 0 ? 1 : size);\n\
     if (!ptr) OSTRIN_OOM();\n\
-    ostrin_register_allocation(ptr);\n\
+    ostrin_register_allocation(ptr, size);\n\
     return ptr;\n\
 }\n\
 \n\
 static void* ostrin_alloc_with_drop(size_t size, void (*drop)(void*)) {\n\
     void* ptr = malloc(size == 0 ? 1 : size);\n\
     if (!ptr) OSTRIN_OOM();\n\
-    ostrin_register_allocation_with_drop(ptr, drop);\n\
+    ostrin_register_allocation_with_drop(ptr, size, drop);\n\
     return ptr;\n\
 }\n\
 \n\
@@ -1256,7 +1258,7 @@ static void* ostrin_calloc_with_drop(size_t count, size_t size, void (*drop)(voi
     size_t bytes = count * size;\n\
     void* ptr = calloc(1, bytes == 0 ? 1 : bytes);\n\
     if (!ptr) OSTRIN_OOM();\n\
-    ostrin_register_allocation_with_drop(ptr, drop);\n\
+    ostrin_register_allocation_with_drop(ptr, bytes, drop);\n\
     return ptr;\n\
 }\n\
 \n\
@@ -1265,7 +1267,7 @@ static void* ostrin_calloc(size_t count, size_t size) {\n\
     size_t bytes = count * size;\n\
     void* ptr = calloc(1, bytes == 0 ? 1 : bytes);\n\
     if (!ptr) OSTRIN_OOM();\n\
-    ostrin_register_allocation(ptr);\n\
+    ostrin_register_allocation(ptr, bytes);\n\
     return ptr;\n\
 }\n\
 \n\
@@ -1275,6 +1277,7 @@ static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
     ostrin_str_cache_forget(old_ptr);\n\
     void* ptr = realloc(old_ptr, size == 0 ? 1 : size);\n\
     if (!ptr) { ostrin_heap_unlock(); OSTRIN_OOM(); }\n\
+    ostrin_total_bytes += size;\n\
     OstrinAllocation** old_link = ostrin_table_link(old_ptr);\n\
     if (old_link) {\n\
         OstrinAllocation* moved = *old_link;\n\
@@ -1351,10 +1354,36 @@ static void ostrin_release_owned(void* ptr) {\n\
     ostrin_mark_task_handle_released(ptr);\n\
     ostrin_release(ptr);\n\
 }\n\
-\nstatic void ostrin_mem_report(void) {\n\
+\nstatic size_t ostrin_peak_rss_kb(void) {\n\
+#if defined(_WIN64)\n\
+    /* Declared by hand so non-threaded builds do not need windows.h; K32GetProcessMemoryInfo lives in kernel32. */\n\
+    struct { unsigned long cb; unsigned long page_faults; size_t peak_working_set; size_t rest[7]; } counters;\n\
+    extern int ostrin_k32_process_memory(void*, void*, unsigned long) __asm__(\"K32GetProcessMemoryInfo\");\n\
+    counters.cb = (unsigned long)sizeof counters;\n\
+    if (ostrin_k32_process_memory((void*)(intptr_t)-1, &counters, counters.cb)) return counters.peak_working_set / 1024;\n\
+    return 0;\n\
+#elif defined(__linux__)\n\
+    FILE* status = fopen(\"/proc/self/status\", \"r\");\n\
+    char line[256];\n\
+    size_t kb = 0;\n\
+    if (!status) return 0;\n\
+    while (fgets(line, sizeof line, status)) {\n\
+        if (strncmp(line, \"VmHWM:\", 6) == 0) { kb = (size_t)strtoull(line + 6, NULL, 10); break; }\n\
+    }\n\
+    fclose(status);\n\
+    return kb;\n\
+#else\n\
+    return 0;\n\
+#endif\n\
+}\n\
+\n\
+static void ostrin_mem_report(void) {\n\
     ostrin_heap_lock();\n\
     fprintf(stderr, \"ostrin memory: live_allocations=%zu peak_allocations=%zu total_allocations=%zu\\n\",\n\
             ostrin_allocation_count, ostrin_peak_allocation_count, ostrin_total_allocations);\n\
+    if (getenv(\"OSTRIN_MEM_DETAIL\")) {\n\
+        fprintf(stderr, \"ostrin memory-detail: total_bytes=%zu peak_rss_kb=%zu\\n\", ostrin_total_bytes, ostrin_peak_rss_kb());\n\
+    }\n\
     ostrin_heap_unlock();\n\
 }\n\
 \n\
