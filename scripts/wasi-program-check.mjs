@@ -68,13 +68,7 @@ const programs = [
     name: "temperature_statistics",
     source: "examples/temperature_statistics.ostrin",
     args: ["temperature_statistics.wasm"],
-    expected: "300 K (absolute)
--5 degC (absolute)
-15.462500000000006 degC (absolute)
-31.850000000000023 K
-288.61249999999995 K (absolute)
-temperature list is empty
-",
+    expected: "300 K (absolute)\n-5 degC (absolute)\n15.462500000000006 degC (absolute)\n31.850000000000023 K\n288.61249999999995 K (absolute)\ntemperature list is empty\n",
     leakCheck: true,
   },
   {
