@@ -20733,6 +20733,50 @@ fn pendulum_calibration_rejects_invalid_inputs_with_typed_messages_and_backend_p
 }
 
 #[test]
+fn temperature_point_scale_arithmetic_is_exact_and_matches_across_backends() {
+    // Same-scale shifts and differences stay in the point's own scale, so 20 degC + 0.3 K is
+    // 20.3 degC, not a kelvin round trip (20.30000000000001). Conversions use fused multiply-add
+    // in both backends; 98.6 degF is exactly 37 degC and 310.15 K, and 36.6 - 36.0 is the exact
+    // binary difference of the two inputs.
+    let source = fixture_path("temperature_point_rounding.ostrin.txt");
+    let expected = "20.3 degC (absolute)\n68.54 degF (absolute)\n293.45 K (absolute)\n37 degC (absolute)\n310.15 K (absolute)\n-40 degF (absolute)\n0.6000000000000014 K\ntrue\ntrue\ntrue\n";
+
+    let interpreted = run(&["--run", &source]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("temperature_point_rounding.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &source]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native must match the interpreter bit for bit"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn temperature_readings_propagate_interval_uncertainty_with_backend_parity() {
     // a = 20 degC + (0.3 +- 0.1) K. Converting to degF changes only the reference, so the
     // uncertainty stays the 0.1 K interval. Two readings from the same probe cancel their shared

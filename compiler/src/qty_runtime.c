@@ -203,6 +203,49 @@ static const char* ostrin_unit_combine(const char* a, const char* b, int divide,
     return ostrin_unit_cat(buf, "", "");
 }
 
+/* Correctly rounded a*b+c. The interpreter uses Rust's fused `mul_add`; mingw-w64's libm `fma`
+ * is not fused (it returns a*b+c with two roundings), so Windows native conversions could differ
+ * from the interpreter by one ulp. On Windows this emulates the fused result exactly (Boldo and
+ * Melquiond: exact product, TwoSum, then a round-to-odd sum). Other platforms keep libm `fma`.
+ * Operands that could overflow or underflow in the error-free transforms fall back to a*b+c. */
+#ifdef _WIN32
+static double ostrin_fma_two_sum(double a, double b, double* err) {
+    double s = a + b;
+    double bb = s - a;
+    *err = (a - (s - bb)) + (b - bb);
+    return s;
+}
+static double ostrin_fma_add_round_to_odd(double x, double y) {
+    double err;
+    double s = ostrin_fma_two_sum(x, y, &err);
+    if (err != 0.0) {
+        uint64_t bits;
+        memcpy(&bits, &s, sizeof bits);
+        if ((bits & 1u) == 0) s = nextafter(s, err > 0.0 ? HUGE_VAL : -HUGE_VAL);
+    }
+    return s;
+}
+static double ostrin_fma(double a, double b, double c) {
+    double product = a * b;
+    if (!isfinite(a) || !isfinite(b) || !isfinite(c) || !isfinite(product) ||
+        fabs(a) > 1e150 || fabs(b) > 1e150 ||
+        (product != 0.0 && fabs(product) < 1e-250) || (a != 0.0 && fabs(a) < 1e-150) ||
+        (b != 0.0 && fabs(b) < 1e-150)) {
+        return a * b + c;
+    }
+    const double split = 134217729.0; /* 2^27 + 1 */
+    double ca = split * a, ahi = ca - (ca - a), alo = a - ahi;
+    double cb = split * b, bhi = cb - (cb - b), blo = b - bhi;
+    double product_err = ((ahi * bhi - product) + ahi * blo + alo * bhi) + alo * blo;
+    double tail;
+    double head = ostrin_fma_two_sum(c, product, &tail);
+    double low = ostrin_fma_add_round_to_odd(tail, product_err);
+    return head + low;
+}
+#else
+#define ostrin_fma fma
+#endif
+
 enum { OSTRIN_TEMP_K = 0, OSTRIN_TEMP_C = 1, OSTRIN_TEMP_F = 2 };
 static const double OSTRIN_TEMP_F_SCALE = 5.0 / 9.0;
 static const double OSTRIN_TEMP_F_OFFSET = 273.15 - 32.0 * (5.0 / 9.0);
@@ -211,7 +254,7 @@ static double ostrin_temperature_point_to_kelvin(OstrinTemperaturePoint point) {
     switch (point.scale) {
         case OSTRIN_TEMP_K: return point.value;
         case OSTRIN_TEMP_C: return point.value + 273.15;
-        case OSTRIN_TEMP_F: return fma(point.value, OSTRIN_TEMP_F_SCALE, OSTRIN_TEMP_F_OFFSET);
+        case OSTRIN_TEMP_F: return ostrin_fma(point.value, OSTRIN_TEMP_F_SCALE, OSTRIN_TEMP_F_OFFSET);
         default: OSTRIN_FAIL("invalid absolute temperature scale tag");
     }
     return 0.0;
@@ -260,14 +303,14 @@ static OstrinTemperaturePoint ostrin_temperature_point_to(
     if (point.scale == OSTRIN_TEMP_K) {
         converted = tag == OSTRIN_TEMP_K ? point.value :
             tag == OSTRIN_TEMP_C ? point.value - 273.15 :
-            fma(point.value, 9.0 / 5.0, -459.67);
+            ostrin_fma(point.value, 9.0 / 5.0, -459.67);
     } else if (point.scale == OSTRIN_TEMP_C) {
         converted = tag == OSTRIN_TEMP_K ? point.value + 273.15 :
             tag == OSTRIN_TEMP_C ? point.value :
-            fma(point.value, 9.0 / 5.0, 32.0);
+            ostrin_fma(point.value, 9.0 / 5.0, 32.0);
     } else {
         converted = tag == OSTRIN_TEMP_K ?
-            fma(point.value, 5.0 / 9.0, OSTRIN_TEMP_F_OFFSET) :
+            ostrin_fma(point.value, 5.0 / 9.0, OSTRIN_TEMP_F_OFFSET) :
             tag == OSTRIN_TEMP_C ? (point.value - 32.0) * (5.0 / 9.0) :
             point.value;
     }
@@ -277,7 +320,17 @@ static OstrinTemperaturePoint ostrin_temperature_point_to(
     return result;
 }
 
+/* Points in the same scale are compared, subtracted and shifted directly in that scale. The
+ * offset cancels, so this avoids the rounding noise of a round trip through kelvin (for example
+ * 20.0 degC + 0.3 K stays 20.3 degC). Points in different scales still meet in kelvin. */
+static double ostrin_temperature_scale_factor(int scale) {
+    return scale == OSTRIN_TEMP_F ? OSTRIN_TEMP_F_SCALE : 1.0;
+}
+
 static int ostrin_temperature_point_cmp(OstrinTemperaturePoint left, OstrinTemperaturePoint right) {
+    if (left.scale == right.scale) {
+        return (left.value > right.value) - (left.value < right.value);
+    }
     double a = ostrin_temperature_point_to_kelvin(left);
     double b = ostrin_temperature_point_to_kelvin(right);
     return (a > b) - (a < b);
@@ -286,8 +339,9 @@ static int ostrin_temperature_point_cmp(OstrinTemperaturePoint left, OstrinTempe
 static double ostrin_temperature_point_difference(
     OstrinTemperaturePoint left, OstrinTemperaturePoint right
 ) {
-    double difference = ostrin_temperature_point_to_kelvin(left) -
-        ostrin_temperature_point_to_kelvin(right);
+    double difference = left.scale == right.scale
+        ? (left.value - right.value) * ostrin_temperature_scale_factor(left.scale)
+        : ostrin_temperature_point_to_kelvin(left) - ostrin_temperature_point_to_kelvin(right);
     if (!isfinite(difference)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
     return difference;
 }
@@ -297,10 +351,10 @@ static OstrinTemperaturePoint ostrin_temperature_point_shift(
 ) {
     double delta = ostrin_convert(interval.v, interval.u, "K");
     if (!isfinite(delta)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
-    return ostrin_temperature_point_from_kelvin(
-        ostrin_temperature_point_to_kelvin(point) + direction * delta,
-        point.scale
-    );
+    OstrinTemperaturePoint shifted = point;
+    shifted.value = point.value + direction * (delta / ostrin_temperature_scale_factor(point.scale));
+    if (!isfinite(shifted.value)) OSTRIN_FAIL("absolute temperature arithmetic overflowed");
+    return shifted;
 }
 
 static void ostrin_print_temperature_point(OstrinTemperaturePoint point) {

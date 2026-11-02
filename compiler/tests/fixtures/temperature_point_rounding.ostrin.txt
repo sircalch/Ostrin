@@ -1,0 +1,15 @@
+fn main() -> Void {
+    base = temperature_point(20.0, "degC")
+    shifted = base + 0.3 K
+    print(shifted)
+    print(temperature_point_to(shifted, "degF"))
+    print(temperature_point_to(shifted, "K"))
+    body = temperature_point(98.6, "degF")
+    print(temperature_point_to(body, "degC"))
+    print(temperature_point_to(body, "K"))
+    print(temperature_point_to(temperature_point(-40.0, "degC"), "degF"))
+    print(temperature_point(36.6, "degC") - temperature_point(36.0, "degC"))
+    print(temperature_point(100.0, "degF") > temperature_point(37.0, "degC"))
+    print(temperature_point(20.3, "degC") == shifted)
+    print(temperature_point(68.0, "degF") == temperature_point(20.0, "degC"))
+}

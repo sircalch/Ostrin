@@ -424,9 +424,15 @@ pub fn combine_quantities_with_role(
             let QuantityRole::Point(_) = &left.role else {
                 unreachable!()
             };
-            let left_coherent = left.value.mul_add(left.unit.scale, left.unit.offset);
-            let right_coherent = right.value.mul_add(right.unit.scale, right.unit.offset);
-            let difference = left_coherent - right_coherent;
+            // Same-unit points share an offset, which cancels: subtract in the unit and scale
+            // once, avoiding the rounding noise of normalizing both to the coherent scale.
+            let difference = if left.unit == right.unit {
+                (left.value - right.value) * left.unit.scale
+            } else {
+                let left_coherent = left.value.mul_add(left.unit.scale, left.unit.offset);
+                let right_coherent = right.value.mul_add(right.unit.scale, right.unit.offset);
+                left_coherent - right_coherent
+            };
             if !difference.is_finite() {
                 return Err("absolute temperature arithmetic overflowed".to_string());
             }
@@ -527,10 +533,15 @@ pub fn compare_quantities_with_role(
                 &right.unit,
                 &QuantityRole::Point(right_space.clone()),
             )?;
-            (
-                left.value.mul_add(left.unit.scale, left.unit.offset),
-                right.value.mul_add(right.unit.scale, right.unit.offset),
-            )
+            if left.unit == right.unit {
+                // Same unit: ordering is the ordering of the stored values.
+                (left.value, right.value)
+            } else {
+                (
+                    left.value.mul_add(left.unit.scale, left.unit.offset),
+                    right.value.mul_add(right.unit.scale, right.unit.offset),
+                )
+            }
         }
         (QuantityRole::Point(_), QuantityRole::Point(_)) => {
             return Err("cannot compare points from different affine spaces".to_string())

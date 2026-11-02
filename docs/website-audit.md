@@ -14,7 +14,7 @@ generated `ostrinc.wasm` artifact:
 
 | Check | Result | Evidence and disposition |
 | --- | --- | --- |
-| Chromium visual regression | PASS | `npm test -- --project=chromium visual.spec.mjs`: 2 tests passed; six public surfaces were checked at desktop (1440×960), tablet (768×1024) and mobile (391×844), plus seven representative plots. Existing snapshots remained within the configured pixel-diff threshold. |
+| Chromium visual regression | PASS | `npm test -- --project=chromium visual.spec.mjs`: 2 tests passed; six public surfaces were checked at desktop (1440×960), tablet (768×1024) and mobile (394×844), plus seven representative plots. Existing snapshots remained within the configured pixel-diff threshold. |
 | Chromium functional/accessibility suite | PASS | `npm test -- --project=chromium website.spec.mjs`: 32 tests passed, including the benchmark report, keyboard navigation, accessible names, real WASM compiler flows, Viz/3D/animation/table/provenance controls and the public status dashboard. |
 | WebKit responsive smoke | PASS | `npm test -- --project=webkit-smoke cross-browser.spec.mjs`: public-page overflow and keyboard semantics passed. |
 | Firefox responsive smoke | PASS | Pinned Ubuntu 24.04 browser audit installed Firefox and passed the public-page overflow, keyboard and runtime-error suite in [CI run 38111107188](https://github.com/sircalch/Ostrin/actions/runs/38111107188). The Windows local `spawn UNKNOWN` limitation is a tooling note, not a site result. |
@@ -35,7 +35,7 @@ visual regression claim.
 
 `scripts/website-check.mjs` now verifies both logo copies are valid 256×256 PNGs, match byte for
 byte, and stay at or below 100,000 bytes. After regenerating the source-backed experiment bundles,
-`node scripts/website-check.mjs` passed with 17 public pages, 308 Ostrin examples and 384
+`node scripts/website-check.mjs` passed with 17 public pages, 309 Ostrin examples and 384
 integration tests. Chromium also loaded both desktop and mobile homepage layouts with the 256 px
 logo and no horizontal overflow. The reference now indexes 28 design documents, including the
 contextual reassignment package.
@@ -67,10 +67,10 @@ contextual reassignment package.
 
 ## Verified inventory
 
-- **308** `.ostrin` source files under `examples/`, including package-project sources and
+- **309** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **28** Markdown design documents under `docs/design/`.
-- Compiler suite: **391 integration**, **6 differential** and **33 unit** tests.
+- Compiler suite: **394 integration**, **6 differential** and **33 unit** tests.
 - WASI release smoke matrix: **23 program modules** passed in run [38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359) with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum

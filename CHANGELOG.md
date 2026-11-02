@@ -132,7 +132,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 308-example, 391-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 309-example, 394-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 
@@ -1291,7 +1291,7 @@ Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md).
   before `site.js`. CI and Pages now fail before publication when the generated metadata is stale.
 - Added a pinned Playwright browser suite and a shared CI/Pages verification action. It compiles the
   current compiler to WASM, runs the real homepage program and diagnostic in Chromium, verifies
-  mobile/tablet navigation and checks all nine public pages for horizontal overflow at 391 and
+  mobile/tablet navigation and checks all nine public pages for horizontal overflow at 394 and
   768 px. The new viewport checks also exposed and fixed mobile documentation overflow and the
   tablet-width desktop navigation and example-grid overflow.
 - Added a dedicated 1200×630 Ostrin social preview with the untouched official mark and current
