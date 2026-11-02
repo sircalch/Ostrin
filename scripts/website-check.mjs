@@ -390,6 +390,12 @@ check(benchmarks.includes('<script src="benchmark-data.js" defer></script>'), "b
 check(benchmarks.includes('<script src="benchmarks.js" defer></script>'), "benchmarks.html: missing benchmark renderer");
 check(benchmarks.includes("data-benchmark-rows"), "benchmarks.html: missing benchmark table");
 check(benchmarks.includes("data-benchmark-source-hash"), "benchmarks.html: missing normalized source identity");
+const overheadReceipt = JSON.parse(read("validation/m2c-abstraction-overhead-windows.json"));
+check(benchmarks.includes("data-abstraction-cost"), "benchmarks.html: missing abstraction cost table");
+for (const workload of overheadReceipt.workloads) {
+  check(benchmarks.includes(`<td>${workload.totalBytes.toLocaleString("en-US")}</td><td>${workload.totalAllocations.toLocaleString("en-US")}</td><td>${workload.peakRssKb.toLocaleString("en-US")} KB</td>`),
+    `benchmarks.html: abstraction cost row for ${workload.id} does not match validation/m2c-abstraction-overhead-windows.json`);
+}
 const benchmarkData = read("website/benchmark-data.js");
 check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.includes('"schema": 1'),
   "website/benchmark-data.js: missing generated benchmark record");

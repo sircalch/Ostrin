@@ -20935,3 +20935,55 @@ fn temperature_point_statistics_use_affine_means_with_backend_parity() {
         String::from_utf8_lossy(&native.stderr)
     );
 }
+
+#[test]
+fn native_memory_detail_report_is_opt_in_and_does_not_change_the_default_line() {
+    let path = format!(
+        "{}/../benchmarks/measurement-source-identity.ostrin",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let exe = temp_artifact("memory_detail.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+
+    let plain = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let plain_err = String::from_utf8_lossy(&plain.stderr).to_string();
+    assert!(
+        plain_err.contains("ostrin memory: live_allocations=0"),
+        "{plain_err}"
+    );
+    assert!(
+        !plain_err.contains("memory-detail"),
+        "default run must not print the detail line: {plain_err}"
+    );
+
+    let detailed = Command::new(&exe)
+        .env("OSTRIN_MEM_DETAIL", "1")
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    let detailed_err = String::from_utf8_lossy(&detailed.stderr).to_string();
+    let line = detailed_err
+        .lines()
+        .find(|line| line.starts_with("ostrin memory-detail: total_bytes="))
+        .unwrap_or_else(|| panic!("missing detail line: {detailed_err}"));
+    let bytes: u64 = line
+        .trim_start_matches("ostrin memory-detail: total_bytes=")
+        .split(' ')
+        .next()
+        .unwrap()
+        .parse()
+        .expect("total_bytes is numeric");
+    assert!(bytes > 0, "{line}");
+    assert!(line.contains(" peak_rss_kb="), "{line}");
+}

@@ -70,7 +70,7 @@ contextual reassignment package.
 - **310** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **28** Markdown design documents under `docs/design/`.
-- Compiler suite: **395 integration**, **6 differential** and **33 unit** tests.
+- Compiler suite: **396 integration**, **6 differential** and **33 unit** tests.
 - WASI release smoke matrix: **23 program modules** passed in run [38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359) with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum

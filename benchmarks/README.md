@@ -26,8 +26,9 @@ hashes for Linux, macOS and Windows while retaining the host-specific raw
 hashes and byte counts. Binary or invalid UTF-8 runtime inputs have no normalized
 text hash and are compared by their raw SHA-256.
 Results are machine-specific; a ratio is not a claim about another language or
-hardware. Peak child memory and allocation counters are still explicitly
-unmeasured and remain a future benchmark metric.
+hardware. Allocation counters and peak resident set are reported separately by
+`scripts/benchmark-abstraction-overhead.mjs` (`OSTRIN_MEM_DETAIL=1`); this runner
+still records only wall-clock time.
 
 ## Current workloads
 
