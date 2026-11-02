@@ -58,6 +58,13 @@ const programs = [
     leakCheck: true,
   },
   {
+    name: "temperature_readings",
+    source: "examples/temperature_readings.ostrin",
+    args: ["temperature_readings.wasm"],
+    expected: "20.3 degC (absolute)\n0.1\n68.54 degF (absolute)\n0.1\n0.8 K\n0\n0.8 K\n0.223606797749979\n",
+    leakCheck: true,
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],

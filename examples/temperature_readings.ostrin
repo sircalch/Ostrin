@@ -1,0 +1,33 @@
+import std.measurements
+
+// Absolute temperature readings as a reference point plus a measured interval.
+// Uncertainty is always a temperature interval; scale offsets never enter it, and readings that
+// share a source keep their correlation. Analytic checks:
+//   a = 20 degC + (0.3 +- 0.1) K -> 20.3 degC, u = 0.1 K, and the same reading in degF is 68.54 degF
+//   b - a, same probe          -> 0.8 K, u = 0 (fully correlated)
+//   c - a, independent sources -> 0.8 K, u = sqrt(0.2^2 + 0.1^2) = 0.2236...
+fn main() -> Void {
+    reference = temperature_point(20.0, "degC")
+    probe_a = measurements.from_quantity_source(0.3 K, 0.1 K, "probe", "probe").unwrap()
+    probe_b = measurements.from_quantity_source(1.1 K, 0.1 K, "probe", "same probe").unwrap()
+    thermocouple = measurements.from_quantity_source(1.1 K, 0.2 K, "thermocouple", "thermocouple").unwrap()
+
+    a = measurements.temperature_reading(reference, probe_a)
+    b = measurements.temperature_reading(reference, probe_b)
+    c = measurements.temperature_reading(temperature_point(68.0, "degF"), thermocouple)
+
+    print(measurements.temperature_reading_point(a))
+    print(measurements.temperature_reading_uncertainty(a).unwrap().value)
+
+    in_fahrenheit = measurements.temperature_reading_to(a, "degF")
+    print(measurements.temperature_reading_point(in_fahrenheit))
+    print(measurements.temperature_reading_uncertainty(in_fahrenheit).unwrap().value)
+
+    same_probe = measurements.temperature_reading_difference(b, a).unwrap()
+    print(same_probe.value)
+    print(measurements.quantity_uncertainty(same_probe).unwrap().value)
+
+    independent = measurements.temperature_reading_difference(c, a).unwrap()
+    print(independent.value)
+    print(measurements.quantity_uncertainty(independent).unwrap().value)
+}
