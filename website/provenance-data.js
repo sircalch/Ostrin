@@ -4,8 +4,8 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
     "effect_coverage": {
       "complete": true,
       "count_unit": "distinct_function_operation_edges",
-      "known_calls": 571,
-      "symbolic_calls": 9,
+      "known_calls": 579,
+      "symbolic_calls": 12,
       "unresolved_calls": 0
     },
     "effects": [
@@ -984,6 +984,16 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "type_errors": 0,
         "variables": []
       },
+      "std.numeric::adaptive_simpson": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
       "std.numeric::amplitude": {
         "effects": [
           "state(local)"
@@ -995,6 +1005,16 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "variables": []
       },
       "std.numeric::bisect": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
+      "std.numeric::brent": {
         "effects": [],
         "open_calls": [],
         "purity_proven": false,
@@ -1269,6 +1289,16 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
           "ε_f"
         ]
       },
+      "std.numeric::simpson_refine": {
+        "effects": [],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": false,
+        "type_errors": 0,
+        "variables": [
+          "ε_f"
+        ]
+      },
       "std.numeric::solution": {
         "effects": [],
         "open_calls": [],
@@ -1414,7 +1444,9 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
       "std.numeric::Spline.at",
       "std.numeric::Svd.condition_number",
       "std.numeric::Svd.rank",
+      "std.numeric::adaptive_simpson",
       "std.numeric::bisect",
+      "std.numeric::brent",
       "std.numeric::cis",
       "std.numeric::complex",
       "std.numeric::complex_matrix",
@@ -1430,6 +1462,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
       "std.numeric::secant",
       "std.numeric::segment",
       "std.numeric::simpson",
+      "std.numeric::simpson_refine",
       "std.numeric::solution",
       "std.numeric::trapz",
       "std.numeric::unit_interp",
@@ -1440,7 +1473,19 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "calls": [
           "f"
         ],
+        "function": "std.numeric::adaptive_simpson"
+      },
+      {
+        "calls": [
+          "f"
+        ],
         "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::brent"
       },
       {
         "calls": [
@@ -1484,6 +1529,12 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
           "f"
         ],
         "function": "std.numeric::simpson"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::simpson_refine"
       }
     ],
     "open_effect_calls": [
@@ -1491,7 +1542,19 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "calls": [
           "f"
         ],
+        "function": "std.numeric::adaptive_simpson"
+      },
+      {
+        "calls": [
+          "f"
+        ],
         "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::brent"
       },
       {
         "calls": [
@@ -1535,6 +1598,12 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
           "f"
         ],
         "function": "std.numeric::simpson"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::simpson_refine"
       }
     ],
     "sites": [
@@ -2535,7 +2604,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::interp_all",
-        "line": 177,
+        "line": 319,
         "operation": "out.push"
       },
       {
@@ -2543,7 +2612,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::spline",
-        "line": 197,
+        "line": 339,
         "operation": "c.push"
       },
       {
@@ -2551,7 +2620,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::spline",
-        "line": 198,
+        "line": 340,
         "operation": "d.push"
       },
       {
@@ -2559,7 +2628,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::spline",
-        "line": 204,
+        "line": 346,
         "operation": "c.push"
       },
       {
@@ -2567,7 +2636,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::spline",
-        "line": 205,
+        "line": 347,
         "operation": "d.push"
       },
       {
@@ -2575,7 +2644,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::spline",
-        "line": 209,
+        "line": 351,
         "operation": "m.set"
       },
       {
@@ -2583,7 +2652,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Spline.sample",
-        "line": 228,
+        "line": 370,
         "operation": "out.push"
       },
       {
@@ -2591,7 +2660,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::unit_cumtrapz",
-        "line": 255,
+        "line": 397,
         "operation": "out.push"
       },
       {
@@ -2599,7 +2668,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::unit_gradient",
-        "line": 267,
+        "line": 409,
         "operation": "out.push"
       },
       {
@@ -2607,7 +2676,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::qr",
-        "line": 357,
+        "line": 499,
         "operation": "r.set"
       },
       {
@@ -2615,7 +2684,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::qr",
-        "line": 364,
+        "line": 506,
         "operation": "r.set"
       },
       {
@@ -2623,7 +2692,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::qr",
-        "line": 366,
+        "line": 508,
         "operation": "q.set"
       },
       {
@@ -2631,7 +2700,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Cholesky.solve",
-        "line": 393,
+        "line": 535,
         "operation": "y.set"
       },
       {
@@ -2639,7 +2708,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Cholesky.solve",
-        "line": 402,
+        "line": 544,
         "operation": "x.set"
       },
       {
@@ -2647,7 +2716,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::cholesky",
-        "line": 437,
+        "line": 579,
         "operation": "l.set"
       },
       {
@@ -2655,7 +2724,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::cholesky",
-        "line": 439,
+        "line": 581,
         "operation": "l.set"
       },
       {
@@ -2663,7 +2732,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::mark_used",
-        "line": 456,
+        "line": 598,
         "operation": "out.push"
       },
       {
@@ -2671,7 +2740,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 469,
+        "line": 611,
         "operation": "matrix.set"
       },
       {
@@ -2679,7 +2748,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 490,
+        "line": 632,
         "operation": "matrix.set"
       },
       {
@@ -2687,7 +2756,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 491,
+        "line": 633,
         "operation": "matrix.set"
       },
       {
@@ -2695,7 +2764,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 496,
+        "line": 638,
         "operation": "matrix.set"
       },
       {
@@ -2703,7 +2772,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 497,
+        "line": 639,
         "operation": "matrix.set"
       },
       {
@@ -2711,7 +2780,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 502,
+        "line": 644,
         "operation": "vectors.set"
       },
       {
@@ -2719,7 +2788,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 503,
+        "line": 645,
         "operation": "vectors.set"
       },
       {
@@ -2727,7 +2796,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::symmetric_eigen",
-        "line": 513,
+        "line": 655,
         "operation": "values.set"
       },
       {
@@ -2735,7 +2804,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::eigen_order",
-        "line": 523,
+        "line": 665,
         "operation": "used.push"
       },
       {
@@ -2743,7 +2812,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::eigen_order",
-        "line": 536,
+        "line": 678,
         "operation": "order.push"
       },
       {
@@ -2751,7 +2820,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::eigen_order_ascending",
-        "line": 548,
+        "line": 690,
         "operation": "used.push"
       },
       {
@@ -2759,7 +2828,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::eigen_order_ascending",
-        "line": 561,
+        "line": 703,
         "operation": "order.push"
       },
       {
@@ -2767,7 +2836,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Eigen.reconstruct",
-        "line": 586,
+        "line": 728,
         "operation": "out.set"
       },
       {
@@ -2775,7 +2844,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::eigen",
-        "line": 616,
+        "line": 758,
         "operation": "values.set"
       },
       {
@@ -2783,7 +2852,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::eigen",
-        "line": 618,
+        "line": 760,
         "operation": "vectors.set"
       },
       {
@@ -2791,7 +2860,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Svd.reconstruct",
-        "line": 648,
+        "line": 790,
         "operation": "out.set"
       },
       {
@@ -2799,7 +2868,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Svd.solve",
-        "line": 693,
+        "line": 835,
         "operation": "projected.set"
       },
       {
@@ -2807,7 +2876,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Svd.solve",
-        "line": 701,
+        "line": 843,
         "operation": "solution.set"
       },
       {
@@ -2815,7 +2884,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::svd",
-        "line": 728,
+        "line": 870,
         "operation": "gram.set"
       },
       {
@@ -2823,7 +2892,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::svd",
-        "line": 740,
+        "line": 882,
         "operation": "singular.push"
       },
       {
@@ -2831,7 +2900,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::svd",
-        "line": 742,
+        "line": 884,
         "operation": "vt.set"
       },
       {
@@ -2839,7 +2908,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::svd",
-        "line": 750,
+        "line": 892,
         "operation": "u.set"
       },
       {
@@ -2847,7 +2916,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Lu.reconstruct",
-        "line": 780,
+        "line": 922,
         "operation": "out.set"
       },
       {
@@ -2855,7 +2924,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Lu.solve",
-        "line": 795,
+        "line": 937,
         "operation": "y.set"
       },
       {
@@ -2863,7 +2932,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::Lu.solve",
-        "line": 804,
+        "line": 946,
         "operation": "x.set"
       },
       {
@@ -2871,7 +2940,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 834,
+        "line": 976,
         "operation": "u.set"
       },
       {
@@ -2879,7 +2948,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 840,
+        "line": 982,
         "operation": "permutation.push"
       },
       {
@@ -2887,7 +2956,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 860,
+        "line": 1002,
         "operation": "u.set"
       },
       {
@@ -2895,7 +2964,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 861,
+        "line": 1003,
         "operation": "u.set"
       },
       {
@@ -2903,7 +2972,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 865,
+        "line": 1007,
         "operation": "l.set"
       },
       {
@@ -2911,7 +2980,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 866,
+        "line": 1008,
         "operation": "l.set"
       },
       {
@@ -2919,7 +2988,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 870,
+        "line": 1012,
         "operation": "reordered.push"
       },
       {
@@ -2927,7 +2996,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 875,
+        "line": 1017,
         "operation": "l.set"
       },
       {
@@ -2935,7 +3004,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 879,
+        "line": 1021,
         "operation": "l.set"
       },
       {
@@ -2943,7 +3012,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 880,
+        "line": 1022,
         "operation": "u.set"
       },
       {
@@ -2951,7 +3020,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::lu",
-        "line": 882,
+        "line": 1024,
         "operation": "u.set"
       },
       {
@@ -2959,7 +3028,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::rk4",
-        "line": 895,
+        "line": 1037,
         "operation": "states.push"
       },
       {
@@ -2967,7 +3036,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::rk4",
-        "line": 906,
+        "line": 1048,
         "operation": "times.push"
       },
       {
@@ -2975,7 +3044,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::rk4",
-        "line": 908,
+        "line": 1050,
         "operation": "states.push"
       },
       {
@@ -2983,7 +3052,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::rk45",
-        "line": 920,
+        "line": 1062,
         "operation": "states.push"
       },
       {
@@ -2991,7 +3060,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::rk45",
-        "line": 947,
+        "line": 1089,
         "operation": "times.push"
       },
       {
@@ -2999,7 +3068,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::rk45",
-        "line": 949,
+        "line": 1091,
         "operation": "states.push"
       },
       {
@@ -3007,7 +3076,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.conjugate_transpose",
-        "line": 1107,
+        "line": 1249,
         "operation": "out_re.push"
       },
       {
@@ -3015,7 +3084,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.conjugate_transpose",
-        "line": 1108,
+        "line": 1250,
         "operation": "out_im.push"
       },
       {
@@ -3023,7 +3092,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.matmul",
-        "line": 1131,
+        "line": 1273,
         "operation": "out_re.push"
       },
       {
@@ -3031,7 +3100,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.matmul",
-        "line": 1132,
+        "line": 1274,
         "operation": "out_im.push"
       },
       {
@@ -3039,7 +3108,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.mul_vector",
-        "line": 1154,
+        "line": 1296,
         "operation": "out_re.push"
       },
       {
@@ -3047,7 +3116,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.mul_vector",
-        "line": 1155,
+        "line": 1297,
         "operation": "out_im.push"
       },
       {
@@ -3055,7 +3124,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1191,
+        "line": 1333,
         "operation": "ar.set"
       },
       {
@@ -3063,7 +3132,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1192,
+        "line": 1334,
         "operation": "ai.set"
       },
       {
@@ -3071,7 +3140,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1193,
+        "line": 1335,
         "operation": "ar.set"
       },
       {
@@ -3079,7 +3148,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1194,
+        "line": 1336,
         "operation": "ai.set"
       },
       {
@@ -3087,7 +3156,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1198,
+        "line": 1340,
         "operation": "br.set"
       },
       {
@@ -3095,7 +3164,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1199,
+        "line": 1341,
         "operation": "bi.set"
       },
       {
@@ -3103,7 +3172,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1200,
+        "line": 1342,
         "operation": "br.set"
       },
       {
@@ -3111,7 +3180,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1201,
+        "line": 1343,
         "operation": "bi.set"
       },
       {
@@ -3119,7 +3188,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1207,
+        "line": 1349,
         "operation": "ar.set"
       },
       {
@@ -3127,7 +3196,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1208,
+        "line": 1350,
         "operation": "ai.set"
       },
       {
@@ -3135,7 +3204,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1211,
+        "line": 1353,
         "operation": "ar.set"
       },
       {
@@ -3143,7 +3212,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1212,
+        "line": 1354,
         "operation": "ai.set"
       },
       {
@@ -3151,7 +3220,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1215,
+        "line": 1357,
         "operation": "br.set"
       },
       {
@@ -3159,7 +3228,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1216,
+        "line": 1358,
         "operation": "bi.set"
       },
       {
@@ -3167,7 +3236,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1229,
+        "line": 1371,
         "operation": "xr.set"
       },
       {
@@ -3175,7 +3244,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::ComplexMatrix.solve",
-        "line": 1230,
+        "line": 1372,
         "operation": "xi.set"
       },
       {
@@ -3183,7 +3252,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1288,
+        "line": 1430,
         "operation": "out_re.set"
       },
       {
@@ -3191,7 +3260,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1289,
+        "line": 1431,
         "operation": "out_im.set"
       },
       {
@@ -3199,7 +3268,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1307,
+        "line": 1449,
         "operation": "ar.set"
       },
       {
@@ -3207,7 +3276,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1308,
+        "line": 1450,
         "operation": "ai.set"
       },
       {
@@ -3215,7 +3284,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1323,
+        "line": 1465,
         "operation": "ar.set"
       },
       {
@@ -3223,7 +3292,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1324,
+        "line": 1466,
         "operation": "ai.set"
       },
       {
@@ -3231,7 +3300,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1325,
+        "line": 1467,
         "operation": "ar.set"
       },
       {
@@ -3239,7 +3308,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::transform",
-        "line": 1326,
+        "line": 1468,
         "operation": "ai.set"
       },
       {
@@ -3247,7 +3316,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::frequencies",
-        "line": 1358,
+        "line": 1500,
         "operation": "out.push"
       },
       {
@@ -3255,7 +3324,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "effect": "state(local)",
         "file": "<ostrin-std>/numeric.ostrin",
         "function": "std.numeric::amplitude",
-        "line": 1369,
+        "line": 1511,
         "operation": "out.push"
       },
       {
@@ -3872,7 +3941,19 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "calls": [
           "f"
         ],
+        "function": "std.numeric::adaptive_simpson"
+      },
+      {
+        "calls": [
+          "f"
+        ],
         "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::brent"
       },
       {
         "calls": [
@@ -3916,13 +3997,27 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
           "f"
         ],
         "function": "std.numeric::simpson"
+      },
+      {
+        "calls": [
+          "f"
+        ],
+        "function": "std.numeric::simpson_refine"
       }
     ],
     "unresolved_call_sites": [],
     "unresolved_calls": [
       {
         "calls": [],
+        "function": "std.numeric::adaptive_simpson"
+      },
+      {
+        "calls": [],
         "function": "std.numeric::bisect"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::brent"
       },
       {
         "calls": [],
@@ -3951,6 +4046,10 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
       {
         "calls": [],
         "function": "std.numeric::simpson"
+      },
+      {
+        "calls": [],
+        "function": "std.numeric::simpson_refine"
       }
     ]
   },
@@ -3979,7 +4078,13 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "main": [
           "captured_outputs_and_hashes"
         ],
+        "std.numeric::adaptive_simpson": [
+          "callback_effect_rows"
+        ],
         "std.numeric::bisect": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::brent": [
           "callback_effect_rows"
         ],
         "std.numeric::derivative": [
@@ -4001,6 +4106,9 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
           "callback_effect_rows"
         ],
         "std.numeric::simpson": [
+          "callback_effect_rows"
+        ],
+        "std.numeric::simpson_refine": [
           "callback_effect_rows"
         ]
       },
