@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "5fab917217a429e000057daa7a6e432e093c5855",
+    "mainRevision": "7c432b341680d6083099c0d2b232acacbd6ce9c7",
     "mergedPullRequests": [
       235,
       236,
@@ -20,14 +20,15 @@
       241,
       242,
       243,
-      244
+      244,
+      245
     ],
     "activePullRequests": [
-      245
+      246
     ],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 391,
+      "integrationTests": 392,
       "unitTests": 33,
       "differentialTests": 6,
       "examples": 308,
@@ -46,7 +47,7 @@
     "id": "M2",
     "title": "Scientific core, performance and language maturity",
     "packages": {
-      "M2-A": "List<TemperaturePoint> merged (#243); same-scale exactness and Windows fused multiply-add in #245; open: numeric Array<T> of points, uncertainty in Measurement<TemperaturePoint>, user-defined affine units, prefixes",
+      "M2-A": "List<TemperaturePoint> merged (#243); same-scale exactness and Windows fused multiply-add merged (#245); TemperatureReading (reference point plus interval measurement) prepared; open: numeric Array<T> of points, user-defined affine units, prefixes",
       "M2-B": "Native UTF-8 cursor cache merged (#242); interpreter and WASI string paths not measured",
       "M2-C": "Startup floor, Linux phases and allocation counters recorded in validation/m2c-pendulum-startup-and-phase-baseline.json; RSS and Float/Quantity/Measurement overhead open",
       "M2-D": "Pendulum input hardening merged (#244); synthetic data only",
