@@ -1,0 +1,45 @@
+{
+  "schema": "ostrin.m2e-ci-artifact-replay/v1",
+  "scope": "Independent verification and replay of the host-bound R3 evidence artifact produced by CI on main; structural capture readiness and per-bundle replay on one host, not R3 maturity and not cross-platform equivalence.",
+  "ciRun": {
+    "repository": "sircalch/Ostrin",
+    "workflow": "Deploy Ostrin website",
+    "runId": "41501233443",
+    "ref": "refs/heads/main",
+    "testedSha": "2c5efc43c99b4fd019e8ccc6052fce98d4eaa3a5",
+    "runUrl": "https://github.com/sircalch/Ostrin/actions/runs/41501233443",
+    "artifactId": 13168952435,
+    "artifactName": "ostrin-r3-host-evidence-41501233443-attempt-1",
+    "artifactSizeBytes": 2690182
+  },
+  "artifactHashes": {
+    "website/ostrinc.wasm": "6b6c7660fbd8d32c2e270e39921ada5fcafcb70108ce8b225229116cccd5e631",
+    "target/r3-ci/surface-replay-receipt.json": "9cfdf9fb442dbcccdff4b1224ce30003c275db2a323bd78e080be9e601b561ac",
+    "target/r3-ci/r3-replay-profile-receipt.json": "99bdf1c61f204b02f415ad0aab62d92fc80a644ae8da8c3e08a192cca2fc2aff",
+    "validation/r3-readiness.json": "4282b195c55a75640237f590ea370ca23de29ad7d2a9db5ecef12c77aee88dc1",
+    "validation/quality-scorecard.json": "f0713c8d6486e2ef4688e4d99174cee7274b40a80d1d089ad564e1dba70eb23c"
+  },
+  "capturedReadiness": {
+    "status": "READY",
+    "bundleCount": 30,
+    "baseReadyCount": 30,
+    "extensionReadyCount": 30,
+    "captureReadyCount": 30,
+    "captureOpenCount": 0,
+    "closedEntryEffectBundleCount": 30,
+    "symbolicEffectCallCount": 93,
+    "unresolvedEffectCallCount": 0
+  },
+  "maturityInArtifact": { "R0": 18, "R1": 0, "R2": 12, "R3": 0 },
+  "verification": {
+    "surfaceReceipt": "node scripts/r3-surface-receipt.mjs --verify-artifact <dir> --run-id 41501233443 --tested-sha 2c5efc43c99b4fd019e8ccc6052fce98d4eaa3a5: verified",
+    "replayAll": "node scripts/experiment-replay.mjs --replay-artifact-all <dir> --run-id 41501233443 --tested-sha 2c5efc43c99b4fd019e8ccc6052fce98d4eaa3a5: independently replayed all 30 bundles in the archived R0/R1/R2 inventory; file-read and deterministic random evidence match all 30 replays",
+    "verifiedOn": "Windows 11 x64, Node v24.19.0, 2026-11-02"
+  },
+  "limits": [
+    "Per-bundle replay runs the archived WASM in fresh Node WASI processes on this one host; platforms are not compared bit by bit.",
+    "The host metadata is public runner labels, not a cryptographic attestation.",
+    "Fixture maturity remains R0=18, R1=0, R2=12, R3=0: capture readiness and replay do not promote any bundle to R3.",
+    "All fixtures and the pendulum workflow use synthetic data; no experimental validation is claimed."
+  ]
+}

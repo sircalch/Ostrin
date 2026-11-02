@@ -111,6 +111,8 @@ dos veces y se comparan sus salidas; los R1/R2 validan su evidencia de sensibili
 El resultado describe cada replay en ese host; no establece equivalencia general entre plataformas.
 El replay ejecutable no promueve por sí solo ningún bundle a R3.
 
+Verificación reciente sobre `main` en `2c5efc43`: el artefacto del run [`41501233443`](https://github.com/sircalch/Ostrin/actions/runs/41501233443) se descargó y verificó con `--verify-artifact`, y `--replay-artifact-all` reejecutó de forma independiente los **30 bundles** (18 R0 y 12 R2) desde el WASM archivado. El recibo con los hashes está en [`validation/m2e-ci-artifact-replay-2c5efc43.json`](validation/m2e-ci-artifact-replay-2c5efc43.json); la madurez R3 sigue en 0.
+
 La misma verificación se ejecutó sobre el paquete publicado por el run [`39700812531`](https://github.com/sircalch/Ostrin/actions/runs/39700812531), ligado a `main` en `bd021d242df94e58cfb4f31b97dc5ece83b3c523`. El artefacto [host-bound 12393350506](https://github.com/sircalch/Ostrin/actions/runs/39700812531/artifacts/12393350506) registró 29/29 capturas estructuralmente listas y scorecard R3=0. La reproducción independiente de esos bytes devolvió `match` para los 29 bundles y coincidencia para las evidencias archivadas de lectura/azar. Esta comprobación prueba la reproducción de ese paquete, no la ejecución independiente del replay por un job de GitHub Actions ni la completitud del contrato R3.
 
 Pages CI usa `OSTRIN_CAPTURE_HOST=1` y exige:
