@@ -4273,6 +4273,11 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
             _ => Ok(Value::Float(as_f64(&lv)? % as_f64(&rv)?)),
         },
         Eq | NotEq | Lt | Gt | LtEq | GtEq => {
+            // IEEE 754: a comparison with NaN is unordered, so only `!=` is true. The native backend
+            // already compiles to C comparisons; without this the interpreter reported NaN == NaN.
+            if is_nan_value(&lv) || is_nan_value(&rv) {
+                return Ok(Value::Bool(op == NotEq));
+            }
             let ordering = compare(&lv, &rv)?;
             Ok(Value::Bool(match op {
                 Eq => ordering == 0,
@@ -4421,6 +4426,14 @@ fn compare(lv: &Value, rv: &Value) -> Result<i32, RuntimeError> {
             1
         }),
         _ => Ok(cmp_f64(as_f64(lv)?, as_f64(rv)?)),
+    }
+}
+
+fn is_nan_value(value: &Value) -> bool {
+    match value {
+        Value::Float(x) => x.is_nan(),
+        Value::Quantity(x, ..) => x.is_nan(),
+        _ => false,
     }
 }
 

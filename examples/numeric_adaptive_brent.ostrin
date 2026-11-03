@@ -1,0 +1,59 @@
+// Adaptive Simpson quadrature with an error estimate, and Brent's root finder, checked against
+// closed-form values: the integral of sin over [0, pi] is 2, of sqrt over [0, 1] is 2/3 and of
+// exp over [0, 1] is e - 1; Wallis' cubic x^3 - 2x - 5 has its root at 2.0945514815423265 and the
+// fixed point of cos is 0.7390851332151607.
+import std.numeric
+
+fn sine(x: Float) -> Float { sin(x) }
+fn root(x: Float) -> Float { sqrt(x) }
+fn growth(x: Float) -> Float { exp(x) }
+fn wallis(x: Float) -> Float { x * x * x - 2.0 * x - 5.0 }
+fn fixed_cos(x: Float) -> Float { cos(x) - x }
+fn bad_root(x: Float) -> Float { sqrt(x) }
+
+fn quad_line(name: String, value: Float, error: Float, converged: Bool, evaluations: Int, exact: Float) -> Void {
+    print(name + ": within 1e-9 = " + (abs(value - exact) < 1e-9).to_string() + ", error estimate ok = " + (error < 1e-8).to_string() + ", converged = " + converged.to_string() + ", evaluations = " + evaluations.to_string())
+}
+
+fn root_line(name: String, result: Result<Float, String>, exact: Float) -> Void {
+    match result {
+        Ok(x) => print(name + ": within 1e-12 = " + (abs(x - exact) < 1e-12).to_string()),
+        Err(message) => print(name + ": " + message),
+    }
+}
+
+fn main() -> Void {
+    match numeric.adaptive_simpson(sine, 0.0, 3.141592653589793) {
+        Ok(q) => quad_line("sin", q.value, q.error, q.converged, q.evaluations, 2.0),
+        Err(message) => print("sin: " + message),
+    }
+    match numeric.adaptive_simpson(root, 0.0, 1.0, 1e-10, 40) {
+        Ok(q) => quad_line("sqrt", q.value, q.error, q.converged, q.evaluations, 2.0 / 3.0),
+        Err(message) => print("sqrt: " + message),
+    }
+    match numeric.adaptive_simpson(growth, 1.0, 0.0) {
+        Ok(q) => quad_line("exp reversed", q.value, q.error, q.converged, q.evaluations, -(2.718281828459045 - 1.0)),
+        Err(message) => print("exp reversed: " + message),
+    }
+    match numeric.adaptive_simpson(sine, 1.0, 1.0) {
+        Ok(q) => quad_line("empty", q.value, q.error, q.converged, q.evaluations, 0.0),
+        Err(message) => print("empty: " + message),
+    }
+    match numeric.adaptive_simpson(sine, 0.0, 1.0, 0.0) {
+        Ok(q) => quad_line("bad tolerance", q.value, q.error, q.converged, q.evaluations, 0.0),
+        Err(message) => print("bad tolerance: " + message),
+    }
+    match numeric.adaptive_simpson(root, 0.0, 1.0, 1e-14, 3) {
+        Ok(q) => quad_line("depth limited", q.value, q.error, q.converged, q.evaluations, 2.0 / 3.0),
+        Err(message) => print("depth limited: " + message),
+    }
+    match numeric.adaptive_simpson(bad_root, -1.0, 1.0) {
+        Ok(q) => quad_line("non-finite", q.value, q.error, q.converged, q.evaluations, 0.0),
+        Err(message) => print("non-finite: " + message),
+    }
+    nan = sqrt(-1.0)
+    print("nan comparisons: " + (nan == nan).to_string() + " " + (nan != nan).to_string() + " " + (nan <= 1.0).to_string() + " " + (nan >= 1.0).to_string())
+    root_line("wallis", numeric.brent(wallis, 2.0, 3.0), 2.0945514815423265)
+    root_line("fixed point of cos", numeric.brent(fixed_cos, 0.0, 1.0), 0.7390851332151607)
+    root_line("same sign", numeric.brent(wallis, 3.0, 4.0), 0.0)
+}

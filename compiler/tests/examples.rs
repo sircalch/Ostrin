@@ -19097,7 +19097,7 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=77")
+        numeric_source.contains("ir=81")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
@@ -20085,7 +20085,7 @@ fn std_numeric_svd_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=77")
+        numeric_source.contains("ir=81")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
@@ -20117,7 +20117,7 @@ fn std_numeric_eigen_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=77")
+        numeric_source.contains("ir=81")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric eigen lowering report changed unexpectedly: {numeric_source}"
@@ -20149,7 +20149,7 @@ fn std_numeric_complex_linear_algebra_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=77")
+        numeric_source.contains("ir=81")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric complex lowering report changed unexpectedly: {numeric_source}"
@@ -20223,7 +20223,7 @@ fn std_numeric_quantity_arrays_use_the_ir_boundary() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=81")
+        numeric_source.contains("ir=85")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "quantity-array IR coverage regressed: {numeric_source}"
@@ -20986,4 +20986,15 @@ fn native_memory_detail_report_is_opt_in_and_does_not_change_the_default_line() 
         .expect("total_bytes is numeric");
     assert!(bytes > 0, "{line}");
     assert!(line.contains(" peak_rss_kb="), "{line}");
+}
+
+#[test]
+fn std_numeric_adaptive_simpson_and_brent_match_interpreter_and_native() {
+    // Closed-form checks (sin, sqrt, exp integrals; Wallis cubic; fixed point of cos) with the
+    // error estimate and convergence flag, including the depth-limited case that must report
+    // converged = false.
+    assert_eq!(
+        interpreter_and_native_agree("numeric_adaptive_brent.ostrin"),
+        "sin: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 473\nsqrt: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 653\nexp reversed: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 129\nempty: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 0\nbad tolerance: adaptive_simpson needs a positive tolerance\ndepth limited: within 1e-9 = false, error estimate ok = false, converged = false, evaluations = 33\nnon-finite: adaptive_simpson integrand returned a non-finite value\nnan comparisons: false true false false\nwallis: within 1e-12 = true\nfixed point of cos: within 1e-12 = true\nsame sign: brent needs f(a) and f(b) with opposite signs\n"
+    );
 }

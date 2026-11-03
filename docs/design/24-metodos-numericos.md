@@ -24,7 +24,9 @@ import std.numeric
 
 numeric.trapz(xs, ys)                          // regla del trapecio sobre muestras
 numeric.simpson(f, a, b, n: 200)               // Simpson compuesta (n se hace par)
+numeric.adaptive_simpson(f, a, b, tol: 1e-10)  // Result<Quadrature, String>; .value .error .evaluations .converged
 numeric.bisect(f, a, b, tol: 1e-12)            // Result<Float, String>, exige cambio de signo
+numeric.brent(f, a, b, tol: 1e-12)             // Result<Float, String>; cuadrática inversa con respaldo de bisección
 numeric.secant(f, x0, x1)                      // Result<Float, String>
 numeric.newton(f, df, x0)                      // Result<Float, String>
 numeric.derivative(f, x, h: 1e-5)              // diferencia central
