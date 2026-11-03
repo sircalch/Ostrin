@@ -32,12 +32,18 @@ pub fn simpson(f: fn(Float) -> Float, a: Float, b: Float, n: Int = 200) -> Float
 }
 
 /// Result of an adaptive quadrature: the integral, an absolute error estimate, the
-/// number of integrand evaluations and whether every sub-interval met its tolerance.
+/// number of integrand evaluations, whether every sub-interval met its tolerance, and whether
+/// every sampled value was finite (always true in a returned result).
 pub record Quadrature {
     value: Float
     error: Float
     evaluations: Int
     converged: Bool
+    finite: Bool
+}
+
+fn is_finite_value(x: Float) -> Bool {
+    x == x and abs(x) <= 1.7976931348623157e308
 }
 
 fn simpson_refine(f: fn(Float) -> Float, a: Float, b: Float, fa: Float, fm: Float, fb: Float, whole: Float, tol: Float, floor: Float, depth: Int) -> Quadrature {
@@ -47,9 +53,12 @@ fn simpson_refine(f: fn(Float) -> Float, a: Float, b: Float, fa: Float, fm: Floa
     left = (m - a) / 6.0 * (fa + 4.0 * flm + fm)
     right = (b - m) / 6.0 * (fm + 4.0 * frm + fb)
     delta = left + right - whole
+    if not (is_finite_value(delta) and is_finite_value(flm) and is_finite_value(frm)) {
+        return Quadrature { value: 0.0, error: 0.0, evaluations: 2, converged: false, finite: false }
+    }
     small = abs(delta) <= 15.0 * tol
     if small or depth <= 0 {
-        return Quadrature { value: left + right + delta / 15.0, error: abs(delta) / 15.0, evaluations: 2, converged: small }
+        return Quadrature { value: left + right + delta / 15.0, error: abs(delta) / 15.0, evaluations: 2, converged: small, finite: true }
     }
     half = if tol / 2.0 > floor { tol / 2.0 } else { floor }
     l = simpson_refine(f, a, m, fa, flm, fm, left, half, floor, depth - 1)
@@ -59,15 +68,18 @@ fn simpson_refine(f: fn(Float) -> Float, a: Float, b: Float, fa: Float, fm: Floa
         error: l.error + r.error,
         evaluations: 2 + l.evaluations + r.evaluations,
         converged: l.converged and r.converged,
+        finite: l.finite and r.finite,
     }
 }
 
 /// Integral of `f` over [a, b] by adaptive Simpson quadrature with Richardson
 /// extrapolation. `tol` is the absolute tolerance for the whole interval (halved on each
 /// split, but never below tol / 1024 so that integrable singularities such as sqrt at 0 still
-/// settle); `max_depth` bounds the recursion. The result carries an error estimate and a
+/// settle); `max_depth` bounds the recursion (the worst case visits 2^max_depth
+/// sub-intervals, so the default is 20). A non-finite integrand value (NaN or infinity) aborts
+/// with an error instead of refining forever. The result carries an error estimate and a
 /// `converged` flag, so a caller can tell an accepted value from a depth-limited one.
-pub fn adaptive_simpson(f: fn(Float) -> Float, a: Float, b: Float, tol: Float = 1e-10, max_depth: Int = 40) -> Result<Quadrature, String> {
+pub fn adaptive_simpson(f: fn(Float) -> Float, a: Float, b: Float, tol: Float = 1e-10, max_depth: Int = 20) -> Result<Quadrature, String> {
     if not (tol > 0.0) {
         return Err("adaptive_simpson needs a positive tolerance")
     }
@@ -75,7 +87,7 @@ pub fn adaptive_simpson(f: fn(Float) -> Float, a: Float, b: Float, tol: Float = 
         return Err("adaptive_simpson needs max_depth of at least 1")
     }
     if a == b {
-        return Ok(Quadrature { value: 0.0, error: 0.0, evaluations: 0, converged: true })
+        return Ok(Quadrature { value: 0.0, error: 0.0, evaluations: 0, converged: true, finite: true })
     }
     sign = if a < b { 1.0 } else { -1.0 }
     lo = if a < b { a } else { b }
@@ -84,8 +96,14 @@ pub fn adaptive_simpson(f: fn(Float) -> Float, a: Float, b: Float, tol: Float = 
     fb = f(hi)
     fm = f((lo + hi) / 2.0)
     whole = (hi - lo) / 6.0 * (fa + 4.0 * fm + fb)
+    if not (is_finite_value(fa) and is_finite_value(fb) and is_finite_value(fm)) {
+        return Err("adaptive_simpson integrand returned a non-finite value")
+    }
     r = simpson_refine(f, lo, hi, fa, fm, fb, whole, tol, tol / 1024.0, max_depth)
-    Ok(Quadrature { value: sign * r.value, error: r.error, evaluations: 3 + r.evaluations, converged: r.converged })
+    if not r.finite {
+        return Err("adaptive_simpson integrand returned a non-finite value")
+    }
+    Ok(Quadrature { value: sign * r.value, error: r.error, evaluations: 3 + r.evaluations, converged: r.converged, finite: true })
 }
 
 // ---------------------------------------------------------------- roots and minima

@@ -75,7 +75,7 @@ const programs = [
     name: "numeric_adaptive_brent",
     source: "examples/numeric_adaptive_brent.ostrin",
     args: ["numeric_adaptive_brent.wasm"],
-    expected: "sin: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 473\nsqrt: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 653\nexp reversed: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 129\nempty: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 0\nbad tolerance: adaptive_simpson needs a positive tolerance\ndepth limited: within 1e-9 = false, error estimate ok = false, converged = false, evaluations = 33\nwallis: within 1e-12 = true\nfixed point of cos: within 1e-12 = true\nsame sign: brent needs f(a) and f(b) with opposite signs\n",
+    expected: "sin: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 473\nsqrt: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 653\nexp reversed: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 129\nempty: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 0\nbad tolerance: adaptive_simpson needs a positive tolerance\ndepth limited: within 1e-9 = false, error estimate ok = false, converged = false, evaluations = 33\nnon-finite: adaptive_simpson integrand returned a non-finite value\nnan comparisons: false true false false\nwallis: within 1e-12 = true\nfixed point of cos: within 1e-12 = true\nsame sign: brent needs f(a) and f(b) with opposite signs\n",
   },
   {
     name: "temperature_point_conversion_overflow",
