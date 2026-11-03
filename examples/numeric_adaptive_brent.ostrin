@@ -9,6 +9,7 @@ fn root(x: Float) -> Float { sqrt(x) }
 fn growth(x: Float) -> Float { exp(x) }
 fn wallis(x: Float) -> Float { x * x * x - 2.0 * x - 5.0 }
 fn fixed_cos(x: Float) -> Float { cos(x) - x }
+fn bad_root(x: Float) -> Float { sqrt(x) }
 
 fn quad_line(name: String, value: Float, error: Float, converged: Bool, evaluations: Int, exact: Float) -> Void {
     print(name + ": within 1e-9 = " + (abs(value - exact) < 1e-9).to_string() + ", error estimate ok = " + (error < 1e-8).to_string() + ", converged = " + converged.to_string() + ", evaluations = " + evaluations.to_string())
@@ -46,6 +47,12 @@ fn main() -> Void {
         Ok(q) => quad_line("depth limited", q.value, q.error, q.converged, q.evaluations, 2.0 / 3.0),
         Err(message) => print("depth limited: " + message),
     }
+    match numeric.adaptive_simpson(bad_root, -1.0, 1.0) {
+        Ok(q) => quad_line("non-finite", q.value, q.error, q.converged, q.evaluations, 0.0),
+        Err(message) => print("non-finite: " + message),
+    }
+    nan = sqrt(-1.0)
+    print("nan comparisons: " + (nan == nan).to_string() + " " + (nan != nan).to_string() + " " + (nan <= 1.0).to_string() + " " + (nan >= 1.0).to_string())
     root_line("wallis", numeric.brent(wallis, 2.0, 3.0), 2.0945514815423265)
     root_line("fixed point of cos", numeric.brent(fixed_cos, 0.0, 1.0), 0.7390851332151607)
     root_line("same sign", numeric.brent(wallis, 3.0, 4.0), 0.0)
