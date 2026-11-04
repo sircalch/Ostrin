@@ -1,0 +1,5 @@
+// A main that returns Int exits the process with that status (low 8 bits).
+fn main() -> Int {
+    print("computed")
+    return 3
+}
