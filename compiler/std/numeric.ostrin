@@ -529,6 +529,94 @@ pub fn qr(a: Array<Float>, tol: Float = 1e-12) -> Result<Qr, String> {
     Ok(Qr { q: q, r: r })
 }
 
+/// A least-squares polynomial fitted in the scaled variable t = (x - center) / scale, which keeps
+/// the Vandermonde system well conditioned. `coefficients[k]` multiplies t^k.
+pub record PolyFit {
+    degree: Int
+    center: Float
+    scale: Float
+    coefficients: Array<Float>
+    rms_residual: Float
+}
+
+impl PolyFit {
+    /// Evaluate the fitted polynomial at `x` with Horner's rule.
+    fn at(self, x: Float) -> Float {
+        t = (x - self.center) / self.scale
+        mut value = 0.0
+        mut k = self.degree
+        while k >= 0 {
+            value = value * t + self.coefficients[k]
+            k = k - 1
+        }
+        value
+    }
+}
+
+/// Least-squares polynomial of the given degree through the points (xs[i], ys[i]), solved by QR
+/// on the scaled Vandermonde matrix. Errors cover mismatched or too few samples, a negative
+/// degree, non-finite data and x values too close together to determine the degree.
+pub fn polyfit(xs: Array<Float>, ys: Array<Float>, degree: Int) -> Result<PolyFit, String> {
+    m = xs.length()
+    if ys.length() != m {
+        return Err("polyfit needs xs and ys with the same length")
+    }
+    if degree < 0 {
+        return Err("polyfit needs a non-negative degree")
+    }
+    if m < degree + 1 {
+        return Err("polyfit needs at least degree + 1 samples")
+    }
+    mut lo = xs[0]
+    mut hi = xs[0]
+    for i in 0 until m {
+        if not (is_finite_value(xs[i]) and is_finite_value(ys[i])) {
+            return Err("polyfit needs finite samples")
+        }
+        if xs[i] < lo {
+            lo = xs[i]
+        }
+        if xs[i] > hi {
+            hi = xs[i]
+        }
+    }
+    center = (lo + hi) / 2.0
+    half = (hi - lo) / 2.0
+    scale = if half > 0.0 { half } else { 1.0 }
+    n = degree + 1
+    mut a = zeros([m, n])
+    for i in 0 until m {
+        t = (xs[i] - center) / scale
+        mut power = 1.0
+        for k in 0 until n {
+            a.set(i, k, power)
+            power = power * t
+        }
+    }
+    match qr(a, 1e-10) {
+        Ok(factors) => {
+            qty = factors.q.transpose() @ ys
+            mut c = zeros([n])
+            for back in 0 until n {
+                k = n - 1 - back
+                mut value = qty[k]
+                for j in k + 1 until n {
+                    value = value - factors.r.get(k, j) * c[j]
+                }
+                c.set(k, value / factors.r.get(k, k))
+            }
+            fit = PolyFit { degree: degree, center: center, scale: scale, coefficients: c, rms_residual: 0.0 }
+            mut sum = 0.0
+            for i in 0 until m {
+                miss = ys[i] - fit.at(xs[i])
+                sum = sum + miss * miss
+            }
+            Ok(PolyFit { degree: degree, center: center, scale: scale, coefficients: c, rms_residual: sqrt(sum / (m as Float)) })
+        },
+        Err(message) => Err("polyfit could not determine the polynomial: " + message),
+    }
+}
+
 /// A lower-triangular Cholesky factor of a dense symmetric matrix: `a = l @ l.T`.
 pub record Cholesky {
     l: Array<Float>
