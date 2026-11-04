@@ -689,7 +689,9 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-card { display: flex; flex-direction: column; min-width: 0; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .viz-frame { display: block; background: #fff; border-bottom: 1px solid var(--line); }
 .viz-image { display: block; width: 100%; height: auto; }
-.viz-body { display: grid; gap: 10px; padding: 16px 18px 18px; }
+.viz-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px 18px 18px; }
+.viz-body > * { min-width: 0; }
+.viz-body p { overflow-wrap: anywhere; }
 .viz-body h3 { margin: 0; font-size: 1.05rem; font-weight: 560; }
 .viz-body p { margin: 0; }
 .viz-body .sl-actions { padding: 0; border: 0; }
