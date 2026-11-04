@@ -1,0 +1,470 @@
+// std.bigint — arbitrary-precision integers written in Ostrin.
+//
+// A `BigInt` is a sign and a little-endian list of base-10^9 limbs without leading zero limbs
+// (zero is the empty list and never negative). Every operation is exact; there is no overflow. The
+// same source runs in the interpreter, native code and WASI, so results are bit-identical on every
+// backend and no external library (or its license) is needed in generated programs.
+//
+// Cost: addition and subtraction are linear, multiplication is quadratic schoolbook, division is
+// schoolbook long division with a binary search for each quotient limb (about 30 limb
+// multiplications per limb), and `gcd` is the Euclidean algorithm. Intended for numbers of up to a
+// few thousand digits, not for cryptographic sizes.
+
+pub record BigInt {
+    negative: Bool
+    limbs: List<Int>
+}
+
+pub record DivMod {
+    quotient: BigInt
+    remainder: BigInt
+}
+
+record SmallDiv {
+    quotient: List<Int>
+    remainder: Int
+}
+
+fn base() -> Int {
+    1000000000
+}
+
+fn trim(limbs: List<Int>) -> List<Int> {
+    mut last = 0 - 1
+    for i in 0 until limbs.length() {
+        if limbs[i] != 0 {
+            last = i
+        }
+    }
+    mut out: List<Int> = []
+    for i in 0 until last + 1 {
+        out.push(limbs[i])
+    }
+    out
+}
+
+fn make(negative: Bool, limbs: List<Int>) -> BigInt {
+    trimmed = trim(limbs)
+    BigInt { negative: if trimmed.length() == 0 { false } else { negative }, limbs: trimmed }
+}
+
+// ---------------------------------------------------------------- magnitudes
+
+fn cmp_mag(a: List<Int>, b: List<Int>) -> Int {
+    if a.length() != b.length() {
+        return if a.length() < b.length() { 0 - 1 } else { 1 }
+    }
+    mut i = a.length() - 1
+    while i >= 0 {
+        if a[i] != b[i] {
+            return if a[i] < b[i] { 0 - 1 } else { 1 }
+        }
+        i = i - 1
+    }
+    0
+}
+
+fn add_mag(a: List<Int>, b: List<Int>) -> List<Int> {
+    longest = if a.length() > b.length() { a.length() } else { b.length() }
+    mut out: List<Int> = []
+    mut carry = 0
+    for i in 0 until longest {
+        x = if i < a.length() { a[i] } else { 0 }
+        y = if i < b.length() { b[i] } else { 0 }
+        total = x + y + carry
+        out.push(total % base())
+        carry = total / base()
+    }
+    if carry > 0 {
+        out.push(carry)
+    }
+    out
+}
+
+/// a - b for magnitudes with a >= b.
+fn sub_mag(a: List<Int>, b: List<Int>) -> List<Int> {
+    mut out: List<Int> = []
+    mut borrow = 0
+    for i in 0 until a.length() {
+        y = if i < b.length() { b[i] } else { 0 }
+        mut diff = a[i] - y - borrow
+        if diff < 0 {
+            diff = diff + base()
+            borrow = 1
+        } else {
+            borrow = 0
+        }
+        out.push(diff)
+    }
+    trim(out)
+}
+
+fn mul_small(a: List<Int>, m: Int) -> List<Int> {
+    mut out: List<Int> = []
+    mut carry = 0
+    for i in 0 until a.length() {
+        total = a[i] * m + carry
+        out.push(total % base())
+        carry = total / base()
+    }
+    if carry > 0 {
+        out.push(carry)
+    }
+    trim(out)
+}
+
+fn mul_mag(a: List<Int>, b: List<Int>) -> List<Int> {
+    la = a.length()
+    lb = b.length()
+    if la == 0 or lb == 0 {
+        return []
+    }
+    mut out: List<Int> = []
+    mut carry = 0
+    for k in 0 until la + lb {
+        mut lo = carry
+        mut hi = 0
+        first = if k - lb + 1 > 0 { k - lb + 1 } else { 0 }
+        last = if k < la - 1 { k } else { la - 1 }
+        mut i = first
+        while i <= last {
+            p = a[i] * b[k - i]
+            lo = lo + p % base()
+            hi = hi + p / base()
+            i = i + 1
+        }
+        out.push(lo % base())
+        carry = hi + lo / base()
+    }
+    trim(out)
+}
+
+fn divmod_small(a: List<Int>, d: Int) -> SmallDiv {
+    mut reversed: List<Int> = []
+    mut rem = 0
+    mut i = a.length() - 1
+    while i >= 0 {
+        current = rem * base() + a[i]
+        reversed.push(current / d)
+        rem = current % d
+        i = i - 1
+    }
+    mut out: List<Int> = []
+    mut j = reversed.length() - 1
+    while j >= 0 {
+        out.push(reversed[j])
+        j = j - 1
+    }
+    SmallDiv { quotient: trim(out), remainder: rem }
+}
+
+fn prepend_limb(rem: List<Int>, limb: Int) -> List<Int> {
+    mut out: List<Int> = [limb]
+    for x in rem {
+        out.push(x)
+    }
+    trim(out)
+}
+
+/// The top (up to) three limbs of a magnitude as a Float, with the limb count they were shifted by.
+fn lead_value(a: List<Int>) -> Float {
+    n = a.length()
+    mut value = 0.0
+    mut i = n - 1
+    mut taken = 0
+    while i >= 0 and taken < 3 {
+        value = value * 1000000000.0 + (a[i] as Float)
+        i = i - 1
+        taken = taken + 1
+    }
+    value
+}
+
+fn lead_shift(a: List<Int>) -> Int {
+    if a.length() > 3 {
+        return a.length() - 3
+    }
+    0
+}
+
+/// One quotient limb: the largest d with b * d <= rem, found from a floating estimate of the
+/// leading limbs and corrected exactly, so each limb costs a few limb multiplications instead of a
+/// 30-step search. Requires rem >= 0 and rem < b * base.
+fn quotient_digit(b: List<Int>, rem: List<Int>) -> Int {
+    if cmp_mag(rem, b) < 0 {
+        return 0
+    }
+    shift = lead_shift(rem) - lead_shift(b)
+    scale = if shift >= 1 { 1000000000.0 } else if shift <= 0 - 1 { 0.000000001 } else { 1.0 }
+    estimate = lead_value(rem) / lead_value(b) * scale
+    mut digit = if estimate >= 999999999.0 { 999999999 } else if estimate <= 0.0 { 0 } else { floor(estimate) as Int }
+    mut product = mul_small(b, digit)
+    while cmp_mag(product, rem) > 0 {
+        digit = digit - 1
+        product = mul_small(b, digit)
+    }
+    mut left = sub_mag(rem, product)
+    while cmp_mag(left, b) >= 0 {
+        digit = digit + 1
+        left = sub_mag(left, b)
+    }
+    digit
+}
+
+fn divmod_mag(a: List<Int>, b: List<Int>) -> DivMod {
+    if cmp_mag(a, b) < 0 {
+        return DivMod { quotient: make(false, []), remainder: make(false, a) }
+    }
+    if b.length() == 1 {
+        small = divmod_small(a, b[0])
+        return DivMod { quotient: make(false, small.quotient), remainder: make(false, if small.remainder == 0 { [] } else { [small.remainder] }) }
+    }
+    // The remainder starts as the top (len(b) - 1) limbs of a; the rest are brought down one by one.
+    mut rem: List<Int> = []
+    for k in 0 until b.length() - 1 {
+        rem.push(a[a.length() - b.length() + 1 + k])
+    }
+    mut digits: List<Int> = []
+    mut idx = a.length() - b.length()
+    while idx >= 0 {
+        rem = prepend_limb(rem, a[idx])
+        digit = quotient_digit(b, rem)
+        if digit > 0 {
+            rem = sub_mag(rem, mul_small(b, digit))
+        }
+        digits.push(digit)
+        idx = idx - 1
+    }
+    mut quotient: List<Int> = []
+    mut j = digits.length() - 1
+    while j >= 0 {
+        quotient.push(digits[j])
+        j = j - 1
+    }
+    DivMod { quotient: make(false, quotient), remainder: make(false, rem) }
+}
+
+// ---------------------------------------------------------------- construction and text
+
+pub fn zero() -> BigInt {
+    make(false, [])
+}
+
+pub fn from_int(n: Int) -> BigInt {
+    mut limbs: List<Int> = []
+    mut rest = n
+    while rest != 0 {
+        r = rest % base()
+        limbs.push(if r < 0 { 0 - r } else { r })
+        rest = rest / base()
+    }
+    make(n < 0, limbs)
+}
+
+fn pad9(limb: Int) -> String {
+    text = limb.to_string()
+    mut out = ""
+    for i in 0 until 9 - text.length() {
+        out = out + "0"
+    }
+    out + text
+}
+
+pub fn to_string(a: BigInt) -> String {
+    if a.limbs.length() == 0 {
+        return "0"
+    }
+    mut text = a.limbs[a.limbs.length() - 1].to_string()
+    mut i = a.limbs.length() - 2
+    while i >= 0 {
+        text = text + pad9(a.limbs[i])
+        i = i - 1
+    }
+    if a.negative {
+        return "-" + text
+    }
+    text
+}
+
+/// Parse an optional sign followed by decimal digits.
+pub fn parse(text: String) -> Result<BigInt, String> {
+    negative = text.starts_with("-")
+    start = if negative or text.starts_with("+") { 1 } else { 0 }
+    if text.length() <= start {
+        return Err("bigint needs at least one digit")
+    }
+    mut limbs: List<Int> = []
+    mut end = text.length()
+    while end > start {
+        begin = if end - 9 > start { end - 9 } else { start }
+        chunk = text.slice(begin, end)
+        for k in 0 until chunk.length() {
+            digit = chunk.slice(k, k + 1)
+            if digit.to_int().is_err() {
+                return Err("bigint found a non-digit character")
+            }
+            if digit == "-" or digit == "+" {
+                return Err("bigint found a non-digit character")
+            }
+        }
+        limbs.push(chunk.to_int().unwrap())
+        end = begin
+    }
+    Ok(make(negative, limbs))
+}
+
+// ---------------------------------------------------------------- queries
+
+pub fn is_zero(a: BigInt) -> Bool {
+    a.limbs.length() == 0
+}
+
+/// -1, 0 or 1.
+pub fn sign(a: BigInt) -> Int {
+    if a.limbs.length() == 0 {
+        return 0
+    }
+    if a.negative {
+        return 0 - 1
+    }
+    1
+}
+
+/// -1, 0 or 1 comparing a with b.
+pub fn compare(a: BigInt, b: BigInt) -> Int {
+    if a.negative != b.negative {
+        return if a.negative { 0 - 1 } else { 1 }
+    }
+    c = cmp_mag(a.limbs, b.limbs)
+    if a.negative {
+        return 0 - c
+    }
+    c
+}
+
+pub fn equals(a: BigInt, b: BigInt) -> Bool {
+    compare(a, b) == 0
+}
+
+/// The nearest Float (rounded limb by limb; large values can lose low digits).
+pub fn to_float(a: BigInt) -> Float {
+    mut value = 0.0
+    mut i = a.limbs.length() - 1
+    while i >= 0 {
+        value = value * 1000000000.0 + (a.limbs[i] as Float)
+        i = i - 1
+    }
+    if a.negative {
+        return 0.0 - value
+    }
+    value
+}
+
+/// The value as an Int, or an error when it does not fit in 64 bits.
+pub fn to_int(a: BigInt) -> Result<Int, String> {
+    if a.limbs.length() > 3 {
+        return Err("bigint does not fit in Int")
+    }
+    if a.limbs.length() == 3 and a.limbs[2] > 9 {
+        return Err("bigint does not fit in Int")
+    }
+    mut value = 0
+    mut i = a.limbs.length() - 1
+    while i >= 0 {
+        value = value * 1000000000 + a.limbs[i]
+        i = i - 1
+    }
+    if a.negative {
+        return Ok(0 - value)
+    }
+    Ok(value)
+}
+
+// ---------------------------------------------------------------- arithmetic
+
+pub fn negate(a: BigInt) -> BigInt {
+    make(not a.negative, a.limbs)
+}
+
+pub fn abs_value(a: BigInt) -> BigInt {
+    make(false, a.limbs)
+}
+
+pub fn add(a: BigInt, b: BigInt) -> BigInt {
+    if a.negative == b.negative {
+        return make(a.negative, add_mag(a.limbs, b.limbs))
+    }
+    c = cmp_mag(a.limbs, b.limbs)
+    if c == 0 {
+        return zero()
+    }
+    if c > 0 {
+        return make(a.negative, sub_mag(a.limbs, b.limbs))
+    }
+    make(b.negative, sub_mag(b.limbs, a.limbs))
+}
+
+pub fn sub(a: BigInt, b: BigInt) -> BigInt {
+    add(a, negate(b))
+}
+
+pub fn mul(a: BigInt, b: BigInt) -> BigInt {
+    make(a.negative != b.negative, mul_mag(a.limbs, b.limbs))
+}
+
+/// Truncated division, like Int: the quotient rounds toward zero and the remainder takes the sign
+/// of the dividend, so a = quotient * b + remainder.
+pub fn divmod(a: BigInt, b: BigInt) -> Result<DivMod, String> {
+    if b.limbs.length() == 0 {
+        return Err("bigint division by zero")
+    }
+    parts = divmod_mag(a.limbs, b.limbs)
+    Ok(DivMod {
+        quotient: make(a.negative != b.negative, parts.quotient.limbs),
+        remainder: make(a.negative, parts.remainder.limbs),
+    })
+}
+
+/// a raised to the non-negative Int power `exponent` by repeated squaring.
+pub fn pow(a: BigInt, exponent: Int) -> Result<BigInt, String> {
+    if exponent < 0 {
+        return Err("bigint power needs a non-negative exponent")
+    }
+    mut result = from_int(1)
+    mut square = a
+    mut remaining = exponent
+    while remaining > 0 {
+        if remaining % 2 == 1 {
+            result = mul(result, square)
+        }
+        remaining = remaining / 2
+        if remaining > 0 {
+            square = mul(square, square)
+        }
+    }
+    Ok(result)
+}
+
+/// Greatest common divisor (non-negative); gcd(0, 0) = 0.
+pub fn gcd(a: BigInt, b: BigInt) -> BigInt {
+    mut x = abs_value(a)
+    mut y = abs_value(b)
+    while y.limbs.length() > 0 {
+        parts = divmod_mag(x.limbs, y.limbs)
+        x = y
+        y = parts.remainder
+    }
+    x
+}
+
+/// n! for a non-negative Int.
+pub fn factorial(n: Int) -> Result<BigInt, String> {
+    if n < 0 {
+        return Err("factorial needs a non-negative number")
+    }
+    mut result = from_int(1)
+    for k in 2 to n {
+        result = make(false, mul_small(result.limbs, k))
+    }
+    Ok(result)
+}
