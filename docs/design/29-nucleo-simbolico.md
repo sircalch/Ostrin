@@ -30,13 +30,14 @@ nodos.
 
 ## 3. Números exactos
 
-Los racionales usan `Int` de 64 bits con comprobación de desbordamiento. Si el resultado exacto no
-cabe, el almacén se marca como fallido (`symbolic.status`) y `diff`/`eval` devuelven ese error tipado;
-nunca se redondea ni se envuelve en silencio. La comprobación es conservadora (rechaza productos cuyo
-valor en coma flotante supera 9·10¹⁸). Validado con el número armónico H₂₀ = 55835135/15519504.
-
-`BigInt`, `Rational` de precisión arbitraria y multiprecisión quedan para una entrega propia (H2); este
-núcleo fija la semántica de promoción y errores que esa entrega deberá respetar.
+Los racionales se guardan como dos `Int` de 64 bits mientras caben y pasan a precisión arbitraria
+(`std.bigint`, documento 30) en cuanto un resultado exacto no cabe, de modo que **no hay desbordamiento**:
+`2^62 · 4`, `2^200` y la suma armónica H₆₀ = 15117092380124150817026911/3230237388259077233637600 son exactos.
+Solo un denominador cero marca el almacén como fallido (`symbolic.status`), y `diff`/`eval` devuelven
+entonces ese error tipado. Validado con H₂₀ (camino de 64 bits) y con H₆₀, 2²⁰⁰, 2⁶²·4 y un coeficiente
+de 30 dígitos contra el `BigInt` de JavaScript. `big_number` y `rational_from_text` crean números de
+cualquier longitud desde texto decimal. Los exponentes numéricos se evalúan solo hasta |e| ≤ 100000; más
+allá la potencia se deja sin evaluar.
 
 ## 4. Supuestos y simplificaciones válidas
 
@@ -70,12 +71,12 @@ está implementada**.
 
 - 28 comprobaciones de derivadas simbólicas contra diferencias centrales (algoritmo independiente).
 - Expansión y sustitución contra evaluación directa.
-- Identidades canónicas, H₂₀ exacto, detección de desbordamiento y las reglas condicionadas por
+- Identidades canónicas, H₂₀ y H₆₀ exactos, aritmética exacta más allá de 64 bits y las reglas condicionadas por
   supuestos (también los casos en que **no** deben dispararse).
 - Workflow completo: modelo `x(t) = A·exp(−g·t)·cos(w·t)`, derivadas primera y segunda, residuo de la
   EDO `x'' + 2g·x' + (g² + w²)·x = 0` por debajo de 10⁻¹² en 240 muestras, y figura SVG real de
   `std.viz`.
-- Paridad intérprete/nativo, cero fallbacks al AST (`ir=62`) y cero asignaciones vivas.
+- Paridad intérprete/nativo, cero fallbacks al AST (`ir=67`) y cero asignaciones vivas.
 
 ## 8. Límites actuales
 

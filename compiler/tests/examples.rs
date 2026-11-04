@@ -21036,12 +21036,12 @@ fn std_symbolic_core_matches_interpreter_and_native_without_leaks() {
 #[test]
 fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
     // 28 derivative checks against central differences, expansion and substitution against direct
-    // evaluation, H20 against its exact value, overflow detection, assumption-gated rules and the
+    // evaluation, H20 and H60 against their exact values, exact arithmetic beyond 64 bits, assumption-gated rules and the
     // typed failure cases.
     let output = interpreter_and_native_agree("symbolic_validation.ostrin");
     assert_eq!(
         output,
-        "derivative checks: 28, failures: 0\nd(q^q) at 2: true\nexpansion and substitution agree: 8 of 8\ncommutative sum: true\ncommutative product: true\ndistributive law: true\nx - x: 0\nx * x: x^2\nH20 = 55835135/15519504\nH20 exact: true\nstatus of a healthy store: []\nstatus after overflow: exact rational arithmetic overflowed 64 bits\ndiff on a failed store: error: exact rational arithmetic overflowed 64 bits\nx / x with real x: x^0\nq / q with positive q: 1\nexp(ln(x)) with real x: exp(ln(x))\nexp(ln(q)) with positive q: q\nln(exp(x)): x\n(x^2)^(1/2) with real x: (x^2)^(1/2)\n(q^2)^(1/2) with positive q: q\nd(x^x)/dx: error: differentiating a power with a variable exponent needs a positive base\nd(tan(x))/dx: error: no derivative rule for function tan\ndiff by a number: error: diff needs a symbol to differentiate by\nmissing value: error: no value for symbol x\nln(-1): error: ln of a non-positive number\n"
+        "derivative checks: 28, failures: 0\nd(q^q) at 2: true\nexpansion and substitution agree: 8 of 8\ncommutative sum: true\ncommutative product: true\ndistributive law: true\nx - x: 0\nx * x: x^2\nH20 = 55835135/15519504\nH20 exact: true\nstatus of a healthy store: []\n2^62 * 4 = 18446744073709551616\n2^200 = 1606938044258990275541962092341162602522202993782792835301376\nH60 = 15117092380124150817026911/3230237388259077233637600\nd(huge * x^3)/dx = 370370367037037036703703703670*x^2\nhuge as float: 123456789012345680000000000000\n1/huge * huge = 1\nstatus after big arithmetic: []\nstatus after division by zero: division by zero\ndiff on a failed store: error: division by zero\nx / x with real x: x^0\nq / q with positive q: 1\nexp(ln(x)) with real x: exp(ln(x))\nexp(ln(q)) with positive q: q\nln(exp(x)): x\n(x^2)^(1/2) with real x: (x^2)^(1/2)\n(q^2)^(1/2) with positive q: q\nd(x^x)/dx: error: differentiating a power with a variable exponent needs a positive base\nd(tan(x))/dx: error: no derivative rule for function tan\ndiff by a number: error: diff needs a symbol to differentiate by\nmissing value: error: no value for symbol x\nln(-1): error: ln of a non-positive number\n"
     );
     let path = example_path("symbolic_validation.ostrin");
     let report = run(&["--native-type-report", &path]);
@@ -21054,7 +21054,7 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        symbolic_source.contains("ir=62")
+        symbolic_source.contains("ir=67")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -21324,7 +21324,7 @@ fn std_bigint_validation_matches_an_independent_oracle_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/bigint.ostrin "))
         .unwrap_or_else(|| panic!("missing std.bigint source report: {report_text}"));
     assert!(
-        source.contains("ir=34") && source.contains("hir=0") && source.contains("ast=0"),
+        source.contains("ir=45") && source.contains("hir=0") && source.contains("ast=0"),
         "bigint lowering regressed: {source}"
     );
 }

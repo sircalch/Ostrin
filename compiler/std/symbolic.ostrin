@@ -7,8 +7,11 @@
 // every symbol is a real variable, `positive`, `nonzero` and `integer` are explicit assumptions, and
 // rules such as x^0 = 1, x * x^-1 = 1 or exp(ln(x)) = x fire only when the assumptions justify them.
 //
-// Exact numbers are rationals over Int (64-bit). An operation whose exact result does not fit marks
-// the store as failed (`symbolic.status`) instead of wrapping or rounding.
+// Exact numbers are rationals. They are stored as two 64-bit integers while they fit and switch to
+// arbitrary precision (std.bigint, as decimal text) as soon as a result does not, so there is no
+// overflow: only a zero denominator marks the store as failed (`symbolic.status`).
+
+import std.bigint
 
 // ---------------------------------------------------------------- store and nodes
 
@@ -35,6 +38,7 @@ pub record Expr {
 record Rat {
     n: Int
     d: Int
+    big: String
 }
 
 pub fn store() -> Store {
@@ -133,45 +137,87 @@ fn fits(value: Float) -> Bool {
 fn rat(s: Store, n: Int, d: Int) -> Rat {
     if d == 0 {
         fail(s, "division by zero in an exact number")
-        return Rat { n: 0, d: 1 }
+        return Rat { n: 0, d: 1, big: "" }
     }
     g = gcd_int(n, d)
     sign = if d < 0 { 0 - 1 } else { 1 }
-    Rat { n: sign * (n / g), d: sign * (d / g) }
+    Rat { n: sign * (n / g), d: sign * (d / g), big: "" }
+}
+
+fn rat_text_of(r: Rat) -> String {
+    if r.big != "" {
+        return r.big
+    }
+    if r.d == 1 {
+        return r.n.to_string()
+    }
+    r.n.to_string() + "/" + r.d.to_string()
+}
+
+/// A rational from reduced decimal text: two 64-bit integers when they fit, otherwise the text.
+fn rat_from_text(s: Store, text: String) -> Rat {
+    if bigint.rational_fits_int(text) {
+        return rat(s, bigint.rational_numerator_int(text), bigint.rational_denominator_int(text))
+    }
+    Rat { n: bigint.rational_sign(text), d: 0, big: text }
+}
+
+fn rat_big_result(s: Store, result: Result<String, String>) -> Rat {
+    match result {
+        Ok(text) => rat_from_text(s, text),
+        Err(message) => {
+            fail(s, message)
+            Rat { n: 0, d: 1, big: "" }
+        },
+    }
 }
 
 fn rat_add(s: Store, a: Rat, b: Rat) -> Rat {
-    if not (fits((a.n as Float) * (b.d as Float)) and fits((b.n as Float) * (a.d as Float)) and fits((a.d as Float) * (b.d as Float))) {
-        fail(s, "exact rational arithmetic overflowed 64 bits")
-        return Rat { n: 0, d: 1 }
+    if a.big == "" and b.big == "" and fits((a.n as Float) * (b.d as Float)) and fits((b.n as Float) * (a.d as Float)) and fits((a.d as Float) * (b.d as Float)) {
+        return rat(s, a.n * b.d + b.n * a.d, a.d * b.d)
     }
-    rat(s, a.n * b.d + b.n * a.d, a.d * b.d)
+    rat_big_result(s, bigint.rational_add(rat_text_of(a), rat_text_of(b)))
 }
 
 fn rat_mul(s: Store, a: Rat, b: Rat) -> Rat {
-    if not (fits((a.n as Float) * (b.n as Float)) and fits((a.d as Float) * (b.d as Float))) {
-        fail(s, "exact rational arithmetic overflowed 64 bits")
-        return Rat { n: 0, d: 1 }
+    if a.big == "" and b.big == "" and fits((a.n as Float) * (b.n as Float)) and fits((a.d as Float) * (b.d as Float)) {
+        return rat(s, a.n * b.n, a.d * b.d)
     }
-    rat(s, a.n * b.n, a.d * b.d)
+    rat_big_result(s, bigint.rational_mul(rat_text_of(a), rat_text_of(b)))
+}
+
+fn rat_is_zero(r: Rat) -> Bool {
+    r.big == "" and r.n == 0
 }
 
 fn rat_pow_int(s: Store, base: Rat, exponent: Int) -> Rat {
     if exponent < 0 {
-        if base.n == 0 {
+        if rat_is_zero(base) {
             fail(s, "zero raised to a negative power")
-            return Rat { n: 0, d: 1 }
+            return Rat { n: 0, d: 1, big: "" }
         }
-        return rat_pow_int(s, rat(s, base.d, base.n), 0 - exponent)
+        inverse = rat_big_result(s, bigint.rational_reciprocal(rat_text_of(base)))
+        return rat_pow_int(s, inverse, 0 - exponent)
     }
-    mut result = Rat { n: 1, d: 1 }
-    for i in 0 until exponent {
-        result = rat_mul(s, result, base)
+    mut result = Rat { n: 1, d: 1, big: "" }
+    mut square = base
+    mut remaining = exponent
+    while remaining > 0 {
+        if remaining % 2 == 1 {
+            result = rat_mul(s, result, square)
+        }
+        remaining = remaining / 2
+        if remaining > 0 {
+            square = rat_mul(s, square, square)
+        }
     }
     result
 }
 
 fn num_id(s: Store, r: Rat) -> Int {
+    if r.big != "" {
+        return intern(s, 0, r.n, 0, r.big, [])
+    }
     intern(s, 0, r.n, r.d, "", [])
 }
 
@@ -184,7 +230,10 @@ fn is_num(s: Store, id: Int) -> Bool {
 }
 
 fn rat_of(s: Store, id: Int) -> Rat {
-    Rat { n: s.nums[id], d: s.dens[id] }
+    if s.dens[id] == 0 {
+        return Rat { n: s.nums[id], d: 0, big: s.names[id] }
+    }
+    Rat { n: s.nums[id], d: s.dens[id], big: "" }
 }
 
 fn is_int_num(s: Store, id: Int) -> Bool {
@@ -295,7 +344,7 @@ fn term_coefficient(s: Store, id: Int) -> Rat {
     if s.kinds[id] == 3 and s.kinds[arg_of(s, id, 0)] == 0 {
         return rat_of(s, arg_of(s, id, 0))
     }
-    Rat { n: 1, d: 1 }
+    Rat { n: 1, d: 1, big: "" }
 }
 
 fn term_rest(s: Store, id: Int) -> Int {
@@ -325,7 +374,7 @@ fn add_ids(s: Store, items: List<Int>) -> Int {
             flat.push(item)
         }
     }
-    mut constant = Rat { n: 0, d: 1 }
+    mut constant = Rat { n: 0, d: 1, big: "" }
     mut rests: List<Int> = []
     mut coefs: List<Rat> = []
     for term in flat {
@@ -390,7 +439,7 @@ fn factor_exponent(s: Store, id: Int) -> Rat {
     if s.kinds[id] == 4 and s.kinds[arg_of(s, id, 1)] == 0 {
         return rat_of(s, arg_of(s, id, 1))
     }
-    Rat { n: 1, d: 1 }
+    Rat { n: 1, d: 1, big: "" }
 }
 
 fn mul_ids(s: Store, items: List<Int>) -> Int {
@@ -402,7 +451,7 @@ fn mul_ids(s: Store, items: List<Int>) -> Int {
             flat.push(item)
         }
     }
-    mut constant = Rat { n: 1, d: 1 }
+    mut constant = Rat { n: 1, d: 1, big: "" }
     mut bases: List<Int> = []
     mut exps: List<Rat> = []
     for factor in flat {
@@ -461,6 +510,9 @@ fn mul_ids(s: Store, items: List<Int>) -> Int {
 }
 
 fn pow_ids(s: Store, base: Int, exponent: Int) -> Int {
+    if s.kinds[exponent] == 0 and (s.dens[exponent] == 0 or abs(s.nums[exponent]) > 100000) {
+        return intern(s, 4, 0, 1, "", [base, exponent])
+    }
     if s.kinds[exponent] == 0 {
         e = rat_of(s, exponent)
         if e.n == 0 {
@@ -693,6 +745,9 @@ fn expand_ids(s: Store, id: Int) -> Int {
 fn eval_ids(s: Store, id: Int, names: List<String>, values: List<Float>) -> Result<Float, String> {
     kind = s.kinds[id]
     if kind == 0 {
+        if s.dens[id] == 0 {
+            return Ok(bigint.rational_to_float(s.names[id]))
+        }
         return Ok((s.nums[id] as Float) / (s.dens[id] as Float))
     }
     if kind == 1 {
@@ -759,13 +814,6 @@ fn eval_ids(s: Store, id: Int, names: List<String>, values: List<Float>) -> Resu
 
 // ---------------------------------------------------------------- printing
 
-fn rat_text(r: Rat) -> String {
-    if r.d == 1 {
-        return r.n.to_string()
-    }
-    r.n.to_string() + "/" + r.d.to_string()
-}
-
 fn atomic(s: Store, id: Int) -> Bool {
     kind = s.kinds[id]
     if kind == 0 {
@@ -777,7 +825,7 @@ fn atomic(s: Store, id: Int) -> Bool {
 fn show_ids(s: Store, id: Int) -> String {
     kind = s.kinds[id]
     if kind == 0 {
-        return rat_text(rat_of(s, id))
+        return rat_text_of(rat_of(s, id))
     }
     if kind == 1 {
         return s.names[id]
@@ -964,5 +1012,27 @@ pub fn eval_or(a: Expr, names: List<String>, values: List<Float>, fallback: Floa
     match eval(a, names, values) {
         Ok(value) => value,
         Err(message) => fallback,
+    }
+}
+
+/// An exact integer given as decimal text of any length ("-123456789012345678901234567890").
+pub fn big_number(s: Store, text: String) -> Expr {
+    match bigint.rational_make(text, "1") {
+        Ok(reduced) => wrap(s, num_id(s, rat_from_text(s, reduced))),
+        Err(message) => {
+            fail(s, message)
+            wrap(s, int_id(s, 0))
+        },
+    }
+}
+
+/// An exact rational from two decimal integer texts of any length.
+pub fn rational_from_text(s: Store, numerator: String, denominator: String) -> Expr {
+    match bigint.rational_make(numerator, denominator) {
+        Ok(reduced) => wrap(s, num_id(s, rat_from_text(s, reduced))),
+        Err(message) => {
+            fail(s, message)
+            wrap(s, int_id(s, 0))
+        },
     }
 }

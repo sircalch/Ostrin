@@ -468,3 +468,139 @@ pub fn factorial(n: Int) -> Result<BigInt, String> {
     }
     Ok(result)
 }
+
+// ---------------------------------------------------------------- exact rationals as text
+//
+// A rational is the decimal text "N" or "N/D" with D > 1, in lowest terms and with the sign on N.
+// Text is the interchange form because other std modules cannot name `bigint.BigInt` in a
+// signature; `std.symbolic` uses these functions once an exact number leaves 64 bits.
+
+fn split_rational(text: String) -> Result<DivMod, String> {
+    mut slash = 0 - 1
+    for i in 0 until text.length() {
+        if text.slice(i, i + 1) == "/" {
+            slash = i
+        }
+    }
+    if slash < 0 {
+        return match parse(text) {
+            Ok(n) => Ok(DivMod { quotient: n, remainder: from_int(1) }),
+            Err(message) => Err(message),
+        }
+    }
+    match parse(text.slice(0, slash)) {
+        Ok(n) => match parse(text.slice(slash + 1, text.length())) {
+            Ok(d) => Ok(DivMod { quotient: n, remainder: d }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+fn reduce_rational(n: BigInt, d: BigInt) -> Result<String, String> {
+    if d.limbs.length() == 0 {
+        return Err("rational with a zero denominator")
+    }
+    g = gcd(n, d)
+    mut num = n
+    mut den = d
+    if g.limbs.length() > 0 {
+        num = divmod(n, g).unwrap().quotient
+        den = divmod(d, g).unwrap().quotient
+    }
+    if den.negative {
+        num = negate(num)
+        den = negate(den)
+    }
+    if den.limbs.length() == 1 and den.limbs[0] == 1 {
+        return Ok(to_string(num))
+    }
+    Ok(to_string(num) + "/" + to_string(den))
+}
+
+/// n/d in lowest terms from two decimal integer texts.
+pub fn rational_make(numerator: String, denominator: String) -> Result<String, String> {
+    match parse(numerator) {
+        Ok(n) => match parse(denominator) {
+            Ok(d) => reduce_rational(n, d),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// The sum of two rational texts.
+pub fn rational_add(a: String, b: String) -> Result<String, String> {
+    match split_rational(a) {
+        Ok(x) => match split_rational(b) {
+            Ok(y) => reduce_rational(add(mul(x.quotient, y.remainder), mul(y.quotient, x.remainder)), mul(x.remainder, y.remainder)),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// The product of two rational texts.
+pub fn rational_mul(a: String, b: String) -> Result<String, String> {
+    match split_rational(a) {
+        Ok(x) => match split_rational(b) {
+            Ok(y) => reduce_rational(mul(x.quotient, y.quotient), mul(x.remainder, y.remainder)),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// The sign of a rational text: -1, 0 or 1.
+pub fn rational_sign(a: String) -> Int {
+    match split_rational(a) {
+        Ok(x) => sign(x.quotient),
+        Err(message) => 0,
+    }
+}
+
+/// The nearest Float to a rational text (NaN when the text is not a rational).
+pub fn rational_to_float(a: String) -> Float {
+    match split_rational(a) {
+        Ok(x) => to_float(x.quotient) / to_float(x.remainder),
+        Err(message) => sqrt(0.0 - 1.0),
+    }
+}
+
+/// True when the rational text fits two 64-bit integers; then `rational_small` gives them.
+pub fn rational_fits_int(a: String) -> Bool {
+    match split_rational(a) {
+        Ok(x) => to_int(x.quotient).is_ok() and to_int(x.remainder).is_ok(),
+        Err(message) => false,
+    }
+}
+
+/// The numerator as an Int (0 when it does not fit; check `rational_fits_int` first).
+pub fn rational_numerator_int(a: String) -> Int {
+    match split_rational(a) {
+        Ok(x) => match to_int(x.quotient) {
+            Ok(value) => value,
+            Err(message) => 0,
+        },
+        Err(message) => 0,
+    }
+}
+
+/// The denominator as an Int (1 when it does not fit; check `rational_fits_int` first).
+pub fn rational_denominator_int(a: String) -> Int {
+    match split_rational(a) {
+        Ok(x) => match to_int(x.remainder) {
+            Ok(value) => value,
+            Err(message) => 1,
+        },
+        Err(message) => 1,
+    }
+}
+
+/// The reciprocal of a rational text (an error for zero).
+pub fn rational_reciprocal(a: String) -> Result<String, String> {
+    match split_rational(a) {
+        Ok(x) => reduce_rational(x.remainder, x.quotient),
+        Err(message) => Err(message),
+    }
+}

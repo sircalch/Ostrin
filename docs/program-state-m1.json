@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "e838c58843b357b35225c0010d424bc314515457",
+    "mainRevision": "bca94fee537654a2afc70647a3dfcb8e75737dcd",
     "mergedPullRequests": [
       235,
       236,
@@ -32,6 +32,7 @@
       253,
       254,
       255,
+      256,
       257
     ],
     "activePullRequests": [],
@@ -65,9 +66,9 @@
       "M2-E": "CI artifact of main 2c5efc43 verified and all 30 bundles replayed independently (validation/m2e-ci-artifact-replay-2c5efc43.json); R3 maturity stays 0; open: cross-platform replay comparison and the full R3 definition",
       "M2-F": "Adaptive Simpson quadrature, Brent root finder (#251) and least-squares polyfit by QR in the scaled variable with typed error cases; NaN comparisons follow IEEE in the interpreter; open: relative tolerance mode, weighted/uncertainty-aware fits, exact-rational reference harness",
       "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling",
-      "H3": "std.symbolic first cut: hash-consed expression store, exact 64-bit rationals, assumption-gated canonicalization, differentiation, substitution, expansion, numeric evaluation, validated against central differences, H20 and a model-to-figure workflow (docs/design/29); open: factoring, equation solving, integration, units in expressions (H4), code generation, BigInt/arbitrary precision (H2), native recursive enums",
+      "H3": "std.symbolic merged (#254) with exact numbers beyond 64 bits; open: factoring, equation solving, integration, units in expressions (H4), code generation",
       "H-exit-status": "main return type sets the process exit status (Int, Result<_, String>) in interpreter, native and WASI; docs/design/04; open: an exit(code) function for nested code",
-      "H2": "std.bigint first cut: exact arbitrary-precision integers in Ostrin (MIT-compatible, identical on interpreter/native/WASI), validated row by row against an independent BigInt oracle, ~0.37 s for 5000-digit factorial/power/division/gcd natively (docs/design/30); open: Rational and BigFloat, symbolic integration of BigInt, operator overloads, subquadratic algorithms",
+      "H2": "std.bigint merged (#257); std.symbolic now switches its exact rationals to arbitrary precision on overflow (H60, 2^200 and 2^62*4 exact, validated against JavaScript BigInt); text-based rational API in std.bigint; open: typed Rational, BigFloat, operator overloads, subquadratic algorithms",
       "M2-H": "Recursive algebraic data types compile in the native C backend and WASI: a payload naming its own enum (directly, through mutual recursion, inside Option/Result, or in a generic instance) is a ref-counted heap box owned by the parent variant; open: Option/Result payloads of non-recursive enums, AST-fallback ownership of enum payloads"
     },
     "gates": [
