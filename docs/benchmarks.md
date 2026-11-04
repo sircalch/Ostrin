@@ -174,12 +174,16 @@ Recibo local de Windows: `validation/m2c-abstraction-overhead-windows.json`.
 
 | Carga | Bytes pedidos | Asignaciones totales | Pico RSS | Mediana de proceso |
 | --- | ---: | ---: | ---: | ---: |
-| Float (control) | 0 | 0 | 5040 KB | 13,65 ms |
-| Quantity de temperatura | 0 | 0 | 5040 KB | 15,39 ms |
-| TemperaturePoint | 0 | 0 | 5044 KB | 13,10 ms |
-| Measurement, fuente compartida | 10 400 261 | 450 008 | 5100 KB | 51,24 ms |
+| Float (control) | 0 | 0 | 5040 KB | 13,74 ms |
+| Quantity de temperatura | 0 | 0 | 5040 KB | 14,38 ms |
+| TemperaturePoint | 0 | 0 | 5044 KB | 14,02 ms |
+| Measurement, fuente compartida | 5 200 293 | 200 010 | 5104 KB | 35,78 ms |
 
 Lectura: las cantidades y los puntos absolutos son valores por copia sin montículo; el costo está
-en `Measurement`, que asigna unas nueve veces por iteración (lista de fuentes) pero libera casi todo
-al instante (pico de 14 asignaciones vivas, +60 KB de RSS). El tiempo incluye el arranque del proceso
-(~13 ms aquí) y es específico de esta máquina; la columna fiable es la de memoria.
+en `Measurement`. Antes de unificar la fusión de fuentes en una sola pasada (`combine_sources`, que
+comparte los registros sin escalar en lugar de copiarlos dos veces) la misma carga hacía 450 008 asignaciones
+y pedía 10 400 261 bytes con una mediana de 54 ms; ahora hace 200 010 asignaciones y pide
+5 200 293 bytes (−56 % y −50 %) con la misma salida bit a bit y un pico de 12 asignaciones
+vivas. Quedan unas cuatro asignaciones por operación (la lista de fuentes nueva, el registro de la fuente
+combinada y la medición). El tiempo incluye el arranque del proceso (~13 ms aquí) y es específico de esta
+máquina; la columna fiable es la de memoria.

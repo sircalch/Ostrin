@@ -5,7 +5,7 @@
     "platform": "win32",
     "arch": "x64"
   },
-  "runsPerWorkload": 9,
+  "runsPerWorkload": 15,
   "note": "Whole-process wall time includes process launch; compare memory columns first. Results are machine-specific.",
   "workloads": [
     {
@@ -13,24 +13,24 @@
       "role": "control: scalar Float",
       "output": "50000",
       "totalBytes": 0,
-      "peakRssKb": 5036,
+      "peakRssKb": 5040,
       "peakAllocations": 0,
       "totalAllocations": 0,
-      "wallMsMedian": 13.97,
-      "wallMsMin": 13.08,
-      "wallMsMax": 58.47
+      "wallMsMedian": 13.74,
+      "wallMsMin": 12.93,
+      "wallMsMax": 57.49
     },
     {
       "id": "quantity-interval",
       "role": "Quantity<Temperature> interval",
       "output": "50000 K",
       "totalBytes": 0,
-      "peakRssKb": 5044,
+      "peakRssKb": 5040,
       "peakAllocations": 0,
       "totalAllocations": 0,
-      "wallMsMedian": 13.74,
-      "wallMsMin": 13.43,
-      "wallMsMax": 51.13
+      "wallMsMedian": 14.38,
+      "wallMsMin": 13.44,
+      "wallMsMax": 55.26
     },
     {
       "id": "temperature-point",
@@ -40,21 +40,40 @@
       "peakRssKb": 5044,
       "peakAllocations": 0,
       "totalAllocations": 0,
-      "wallMsMedian": 13.98,
-      "wallMsMin": 13.48,
-      "wallMsMax": 50.49
+      "wallMsMedian": 14.02,
+      "wallMsMin": 13.65,
+      "wallMsMax": 49.94
     },
     {
       "id": "measurement-shared-source",
       "role": "Measurement with one shared source",
       "output": "50000 ± 49.99999999997417",
-      "totalBytes": 10400261,
+      "totalBytes": 5200293,
       "peakRssKb": 5104,
-      "peakAllocations": 14,
-      "totalAllocations": 450008,
-      "wallMsMedian": 51.42,
-      "wallMsMin": 48.74,
-      "wallMsMax": 81.33
+      "peakAllocations": 12,
+      "totalAllocations": 200010,
+      "wallMsMedian": 35.78,
+      "wallMsMin": 33.61,
+      "wallMsMax": 65.31
+    }
+  ],
+  "history": [
+    {
+      "change": "std.measurements: sources are combined in one pass and unscaled records are shared (combine_sources)",
+      "workload": "measurement-shared-source",
+      "before": {
+        "totalBytes": 10400261,
+        "totalAllocations": 450008,
+        "peakAllocations": 14,
+        "wallMsMedian": 51.42
+      },
+      "after": {
+        "totalBytes": 5200293,
+        "totalAllocations": 200010,
+        "peakAllocations": 12,
+        "wallMsMedian": 35.78
+      },
+      "note": "Same output (50000 +- 49.99999999997417); whole-process medians include about 13 ms of process start-up."
     }
   ]
 }

@@ -871,6 +871,69 @@ fn merge_scaled(
     Ok(output)
 }
 
+/// The sources of lf * left + rf * right in one pass: a source present on both sides adds its two
+/// scaled contributions (current + factor * item, the same expression as before), a source on one side
+/// is scaled, and an unscaled one (factor exactly 1.0) is shared instead of copied. Sources keep the
+/// order of the left list followed by the right-only ones. Reusing records is safe because
+/// Sensitivity values are never mutated.
+fn combine_sources(
+    left: List<Sensitivity<Float>>,
+    lf: Float,
+    right: List<Sensitivity<Float>>,
+    rf: Float
+) -> Result<List<Sensitivity<Float>>, String> {
+    mut output: List<Sensitivity<Float>> = []
+    for current in left {
+        mut contribution = lf * current.contribution
+        mut matched = false
+        for item in right {
+            if item.source_id == current.source_id {
+                if current.source_dimension != item.source_dimension {
+                    return Err("measurement source id was reused with a different dimension or sigma")
+                }
+                if current.source_sigma != item.source_sigma {
+                    return Err("measurement source id was reused with a different sigma")
+                }
+                contribution = contribution + rf * item.contribution
+                matched = true
+            }
+        }
+        if matched or lf != 1.0 {
+            output.push(Sensitivity<Float> {
+                source_id: current.source_id,
+                label: current.label,
+                source_dimension: current.source_dimension,
+                source_sigma: current.source_sigma,
+                contribution: contribution,
+            })
+        } else {
+            output.push(current)
+        }
+    }
+    for item in right {
+        mut seen = false
+        for current in left {
+            if current.source_id == item.source_id {
+                seen = true
+            }
+        }
+        if not seen {
+            if rf == 1.0 {
+                output.push(item)
+            } else {
+                output.push(Sensitivity<Float> {
+                    source_id: item.source_id,
+                    label: item.label,
+                    source_dimension: item.source_dimension,
+                    source_sigma: item.source_sigma,
+                    contribution: rf * item.contribution,
+                })
+            }
+        }
+    }
+    Ok(output)
+}
+
 fn unknown_from(operation: String, value: Float) -> Measurement<Float> {
     unknown(value, operation + " received a measurement with unknown uncertainty")
 }
@@ -879,7 +942,7 @@ pub fn scale(measurement: Measurement<Float>, factor: Float) -> Measurement<Floa
     if not measurement.known {
         return unknown_from("scale", measurement.value * factor)
     }
-    match merge_scaled([], measurement.sources, factor) {
+    match combine_sources(measurement.sources, factor, [], 0.0) {
         Ok(sources) => Measurement<Float> {
             value: measurement.value * factor,
             sources: sources,
@@ -897,16 +960,13 @@ pub fn add(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     if not b.known {
         return Ok(unknown_from("add", a.value + b.value))
     }
-    match merge_scaled([], a.sources, 1.0) {
-        Ok(left) => match merge_scaled(left, b.sources, 1.0) {
-            Ok(sources) => Ok(Measurement<Float> {
-                value: a.value + b.value,
-                sources: sources,
-                known: true,
-                reason: "",
-            }),
-            Err(message) => Err(message),
-        },
+    match combine_sources(a.sources, 1.0, b.sources, 1.0) {
+        Ok(sources) => Ok(Measurement<Float> {
+            value: a.value + b.value,
+            sources: sources,
+            known: true,
+            reason: "",
+        }),
         Err(message) => Err(message),
     }
 }
@@ -918,16 +978,13 @@ pub fn sub(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     if not b.known {
         return Ok(unknown_from("sub", a.value - b.value))
     }
-    match merge_scaled([], a.sources, 1.0) {
-        Ok(left) => match merge_scaled(left, b.sources, -1.0) {
-            Ok(sources) => Ok(Measurement<Float> {
-                value: a.value - b.value,
-                sources: sources,
-                known: true,
-                reason: "",
-            }),
-            Err(message) => Err(message),
-        },
+    match combine_sources(a.sources, 1.0, b.sources, -1.0) {
+        Ok(sources) => Ok(Measurement<Float> {
+            value: a.value - b.value,
+            sources: sources,
+            known: true,
+            reason: "",
+        }),
         Err(message) => Err(message),
     }
 }
@@ -937,16 +994,13 @@ pub fn mul(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     if not a.known or not b.known {
         return Ok(unknown_from("mul", result))
     }
-    match merge_scaled([], a.sources, b.value) {
-        Ok(left) => match merge_scaled(left, b.sources, a.value) {
-            Ok(sources) => Ok(Measurement<Float> {
-                value: result,
-                sources: sources,
-                known: true,
-                reason: "",
-            }),
-            Err(message) => Err(message),
-        },
+    match combine_sources(a.sources, b.value, b.sources, a.value) {
+        Ok(sources) => Ok(Measurement<Float> {
+            value: result,
+            sources: sources,
+            known: true,
+            reason: "",
+        }),
         Err(message) => Err(message),
     }
 }
@@ -961,16 +1015,13 @@ pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<F
     }
     a_factor = 1.0 / b.value
     b_factor = 0.0 - a.value / (b.value * b.value)
-    match merge_scaled([], a.sources, a_factor) {
-        Ok(left) => match merge_scaled(left, b.sources, b_factor) {
-            Ok(sources) => Ok(Measurement<Float> {
-                value: result,
-                sources: sources,
-                known: true,
-                reason: "",
-            }),
-            Err(message) => Err(message),
-        },
+    match combine_sources(a.sources, a_factor, b.sources, b_factor) {
+        Ok(sources) => Ok(Measurement<Float> {
+            value: result,
+            sources: sources,
+            known: true,
+            reason: "",
+        }),
         Err(message) => Err(message),
     }
 }

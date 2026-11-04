@@ -19810,7 +19810,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=51")
+        measurement_source.contains("ir=52")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -21326,5 +21326,56 @@ fn std_bigint_validation_matches_an_independent_oracle_in_both_backends() {
     assert!(
         source.contains("ir=45") && source.contains("hir=0") && source.contains("ast=0"),
         "bigint lowering regressed: {source}"
+    );
+}
+
+#[test]
+fn measurement_accumulation_shares_unscaled_sources_and_allocates_less() {
+    // 50,000 additions of a measurement with one shared source. Merging sources used to copy every
+    // source twice per operation (450,008 managed allocations in total); one pass that reuses
+    // unscaled records needs 200,010. The output is unchanged and the bound guards the regression.
+    let path = format!(
+        "{}/../benchmarks/measurement-source-identity.ostrin",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let exe = temp_artifact("measurement_accumulation.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n")
+    );
+    let native_err = String::from_utf8_lossy(&native.stderr).to_string();
+    assert!(
+        native_err.contains("live_allocations=0"),
+        "leaked: {native_err}"
+    );
+    let total: u64 = native_err
+        .split("total_allocations=")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|digits| digits.parse().ok())
+        .unwrap_or_else(|| panic!("no total_allocations in: {native_err}"));
+    assert!(
+        total <= 220_000,
+        "measurement accumulation regressed to {total} allocations"
     );
 }
