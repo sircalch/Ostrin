@@ -21432,7 +21432,7 @@ fn symbolic_units_propagate_dimensions_through_expressions_in_both_backends() {
     // are reported as typed errors; E / E simplifies to the dimensionless 1.
     assert_eq!(
         interpreter_and_native_agree("symbolic_units.ostrin"),
-        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*(L*g^(-1))^(1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
+        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*(L*g^(-1))^(1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
     );
     let path = example_path("symbolic_units.ostrin");
     let report = run(&["--native-type-report", &path]);

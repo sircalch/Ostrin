@@ -1044,7 +1044,8 @@ pub fn rational_from_text(s: Store, numerator: String, denominator: String) -> E
 // ---------------------------------------------------------------- physical dimensions
 //
 // A symbol may be declared with a dimension such as "Mass*Length^2/Time^2". Dimensions are vectors of
-// rational exponents over named base dimensions (any identifier). `dimension_of(expr)` propagates them:
+// rational exponents over named base dimensions (a name without a leading digit or syntax characters,
+// so "Base2" and "Ángulo" are valid). `dimension_of(expr)` propagates them:
 // a sum needs equal dimensions, a product adds exponents, a power with a numeric exponent scales them,
 // and sin, cos, exp and ln need a dimensionless argument and return a dimensionless value. Canonical
 // text lists base dimensions alphabetically ("Length*Mass*Time^-2"); "1" is dimensionless. Values are
@@ -1192,8 +1193,8 @@ fn parse_frac(text: String) -> Result<Frac, String> {
 }
 
 fn dim_parse(text: String) -> Result<DimVec, String> {
-    letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
     digits = "0123456789"
+    delimiters = " */^()-+,"
     mut v = dim_empty()
     n = text.length()
     mut i = 0
@@ -1209,8 +1210,12 @@ fn dim_parse(text: String) -> Result<DimVec, String> {
             i = i + 1
         }
         start = i
-        while i < n and letters.contains(text.slice(i, i + 1)) {
-            i = i + 1
+        // A base dimension is any name that does not start with a digit and contains none of the
+        // syntax characters, so digits after the first character and non-ASCII letters are allowed.
+        if i < n and not digits.contains(text.slice(i, i + 1)) {
+            while i < n and not delimiters.contains(text.slice(i, i + 1)) {
+                i = i + 1
+            }
         }
         if i == start {
             return Err("dimension '" + text + "' has an unexpected character at position " + start.to_string())

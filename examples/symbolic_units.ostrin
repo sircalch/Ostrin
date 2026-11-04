@@ -45,6 +45,14 @@ fn main() -> Void {
     // dimension text is canonical and malformed text is rejected
     area_rate = symbolic.unit_symbol(s, "k", "Time^-1 * Length^2").unwrap()
     print("k: " + symbolic.dimension_text(area_rate))
+    // base dimension names may contain digits and non-ASCII letters
+    wave = symbolic.unit_symbol(s, "w", "Base2^2/Ángulo").unwrap()
+    print("w: " + symbolic.dimension_text(wave))
+    print("w^2: " + symbolic.dimension_text(symbolic.power(wave, two)))
+    match symbolic.unit_symbol(s, "digit", "2D") {
+        Ok(e) => print("leading digit accepted"),
+        Err(message) => print("leading digit: " + message),
+    }
     match symbolic.unit_symbol(s, "bad", "Length^x") {
         Ok(e) => print("bad dimension accepted"),
         Err(message) => print("bad dimension: " + message),

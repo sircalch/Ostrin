@@ -70,7 +70,8 @@ está implementada**.
 ## 6b. Dimensiones físicas
 
 Un símbolo puede declararse con una dimensión (`unit_symbol(s, "v", "Length/Time")`). Las dimensiones son
-vectores de exponentes racionales sobre dimensiones base con nombre; `dimension_of(expr)` las propaga: una
+vectores de exponentes racionales sobre dimensiones base con nombre (cualquier nombre sin dígito inicial ni caracteres
+de sintaxis, de modo que `Base2` y `Ángulo` son válidos); `dimension_of(expr)` las propaga: una
 suma exige dimensiones iguales, un producto suma exponentes, una potencia con exponente numérico los
 multiplica (la raíz cuadrada los divide por dos) y `sin`, `cos`, `exp` y `ln` exigen un argumento
 adimensional. El texto canónico ordena las dimensiones base alfabéticamente (`Length^2*Mass*Time^-2`) y
