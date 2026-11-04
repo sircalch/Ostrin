@@ -51,6 +51,19 @@ if (existsSync(socialCardAbsolutePath)) {
   }
 }
 
+// The header image is displayed at 36 px, so it ships as a 72 px (2x) asset instead of the 256 px
+// icon; every page that shows the brand must use it and its size must stay small.
+{
+  const headerLogoPath = path.join(repositoryRoot, "website/assets/ostrin-logo-72.png");
+  check(existsSync(headerLogoPath), "website/assets/ostrin-logo-72.png: missing header logo");
+  const headerLogo = existsSync(headerLogoPath) ? readFileSync(headerLogoPath) : Buffer.alloc(24);
+  check(headerLogo.readUInt32BE(16) === 72 && headerLogo.readUInt32BE(20) === 72, "website/assets/ostrin-logo-72.png must be 72x72");
+  check(headerLogo.length < 16 * 1024, "website/assets/ostrin-logo-72.png must stay under 16 KiB");
+  for (const file of readdirSync(websiteRoot).filter((name) => name.endsWith(".html") && name !== "404.html")) {
+    const html = read("website/" + file);
+    check(!html.includes('<img src="assets/ostrin-logo.png" alt="" width="36"'), file + ": the 36 px header logo must use assets/ostrin-logo-72.png");
+  }
+}
 const logoPaths = ["assets/ostrin-logo.png", "website/assets/ostrin-logo.png"];
 const logos = [];
 for (const logoPath of logoPaths) {

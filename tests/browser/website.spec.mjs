@@ -36,6 +36,48 @@ async function expectNoHorizontalOverflow(page, route, width) {
   expect(dimensions.body, `${route} body overflows at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
 }
 
+// Content that a container with overflow hidden/clip cuts off does not widen the document, so the
+// horizontal-overflow check above cannot see it. Report every in-flow element that extends past the
+// right edge of a clipping ancestor, ignoring anything inside an intentional scroller (overflow
+// auto/scroll, such as code blocks and table wrappers).
+async function expectNoClippedContent(page, route, width) {
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  const clipped = await page.evaluate(() => {
+    const found = [];
+    const clippers = [...document.querySelectorAll("*")].filter((element) => {
+      const overflow = getComputedStyle(element).overflowX;
+      return (overflow === "hidden" || overflow === "clip") && element.clientWidth > 0;
+    });
+    for (const container of clippers) {
+      const edge = container.getBoundingClientRect().right;
+      for (const element of container.querySelectorAll("*")) {
+        let ancestor = element.parentElement;
+        let scrolls = false;
+        while (ancestor && ancestor !== container) {
+          const overflow = getComputedStyle(ancestor).overflowX;
+          if (overflow === "auto" || overflow === "scroll") {
+            scrolls = true;
+            break;
+          }
+          ancestor = ancestor.parentElement;
+        }
+        if (scrolls) continue;
+        const style = getComputedStyle(element);
+        if (style.position === "absolute" || style.position === "fixed") continue;
+        const box = element.getBoundingClientRect();
+        if (box.width > 0 && box.right > edge + 2) {
+          found.push(`${container.tagName.toLowerCase()}.${String(container.className).slice(0, 24)} > ${element.tagName.toLowerCase()}.${String(element.className).slice(0, 24)} (+${Math.round(box.right - edge)}px)`);
+        }
+      }
+    }
+    return found;
+  });
+  expect(clipped, `${route} clips content inside a container at ${width}px`).toEqual([]);
+}
+
 test("homepage runs the real compiler and renders its diagnostics", async ({ page }) => {
   const runtimeErrors = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
@@ -195,6 +237,7 @@ test("all public pages fit phone and tablet viewports", async ({ page }) => {
       await expect(page.locator("main")).toBeVisible();
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
       await expectNoHorizontalOverflow(page, route, width);
+      await expectNoClippedContent(page, route, width);
     }
   }
 });

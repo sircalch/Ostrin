@@ -40,6 +40,24 @@ integration tests. Chromium also loaded both desktop and mobile homepage layouts
 logo and no horizontal overflow. The reference now indexes 30 design documents, including the
 contextual reassignment package.
 
+## Real-browser audit (2026-11-04)
+
+Method: the deployed site (`https://sircalch.github.io/Ostrin/`) and a local copy of this checkout were
+opened in a real browser; the 17 public pages were measured at 390 px (phone) and, for the complex ones, at
+768 px (tablet) with DOM measurements, not screenshots alone.
+
+| Finding | Evidence | Disposition |
+| --- | --- | --- |
+| Viz gallery cards clip their content on phones | At 390 px all 30 `.viz-card` bodies were wider than the card (a 444 px heading in a 348 px card): the implicit grid column took the minimum width of long hashes and the card (`overflow: hidden`) cut the text ("shad…"). The document did not scroll, so the existing horizontal-overflow test could not see it | **Fixed**: `.viz-body` now has `grid-template-columns: minmax(0, 1fr)`, children `min-width: 0` and wrapping paragraphs. After the fix 0 of 30 cards clip at 390 px and at 768 px |
+| The automated gate missed clipped content | `tests/browser/website.spec.mjs` only compared `scrollWidth` with the viewport | **Added** `expectNoClippedContent` to "all public pages fit phone and tablet viewports": it reports any in-flow element that extends past a clipping ancestor, excluding intentional scrollers (code blocks, table wrappers). Measured with the same logic on all 17 pages at 390 px: 0 offenders after the fix. The Playwright run itself was not executed locally (browsers are not installed here); CI runs it |
+| Header logo was a 256 px, 59.7 KB PNG shown at 36 px on every page | Resource Timing and the file's dimensions | **Fixed**: `assets/ostrin-logo-72.png` (72x72, 4.1 KB, 2x density) is used by the 36 px header image on 17 pages; the 256 px file stays as icon and Open Graph source. `website-check` verifies size, dimensions and use |
+| The home page downloads the 1.38 MB compiler eagerly | `ostrinc.wasm` was 1,378 KB of the 1,565 KB transferred on the home page (the Viz page already defers it until a live action) | **Open**: deferring it on the home page needs a design decision about the Scientific Lab's first paint and the existing "homepage runs the real compiler" test |
+| Basic hygiene | `lang`, meta description, 0 images without `alt`, no horizontal overflow, descriptive headings on the home page | No action |
+
+Not established by this audit: Core Web Vitals under reproducible conditions (paint times measured in
+the embedded pane were distorted by a background tab and are not reported), a full WCAG 2.2 AA review, a
+screen-reader pass, and any comparison of the redesign candidates; these remain open.
+
 ## Existing surfaces
 
 | Surface | Evidence | Current state |
