@@ -1,6 +1,6 @@
 // Independent checks of std.symbolic. Symbolic derivatives are compared with central differences
 // (a different algorithm), substitution and expansion with direct evaluation, exact rational sums
-// with a known constant (H20 = 55835135/15519504), and assumption-gated rules with the cases where
+// with known constants (H20 = 55835135/15519504; H60 and 2^200 checked against JavaScript BigInt), and assumption-gated rules with the cases where
 // they must not fire.
 import std.symbolic
 
@@ -90,10 +90,26 @@ fn main() -> Void {
     print("H20 = " + symbolic.show(harmonic))
     print("H20 exact: " + (symbolic.show(harmonic) == "55835135/15519504").to_string())
     print("status of a healthy store: [" + symbolic.status(s) + "]")
-    overflowing = symbolic.store()
-    big = symbolic.mul(symbolic.number(overflowing, 4611686018427387904), symbolic.number(overflowing, 4))
-    print("status after overflow: " + symbolic.status(overflowing))
-    print("diff on a failed store: " + symbolic.diff_text(big, symbolic.symbol(overflowing, "x")))
+
+    // beyond 64 bits the numbers switch to arbitrary precision instead of failing
+    wide = symbolic.mul(symbolic.number(s, 4611686018427387904), symbolic.number(s, 4))
+    print("2^62 * 4 = " + symbolic.show(wide))
+    print("2^200 = " + symbolic.show(symbolic.power(two, symbolic.number(s, 200))))
+    mut h60 = symbolic.number(s, 0)
+    for k in 1 to 60 {
+        h60 = symbolic.add(h60, symbolic.number(s, 1, k))
+    }
+    print("H60 = " + symbolic.show(h60))
+    huge = symbolic.big_number(s, "123456789012345678901234567890")
+    cubic = symbolic.mul(huge, symbolic.power(x, three))
+    print("d(huge * x^3)/dx = " + symbolic.diff_text(cubic, x))
+    print("huge as float: " + symbolic.eval_text(huge, [], []))
+    print("1/huge * huge = " + symbolic.show(symbolic.mul(symbolic.div(one, huge), huge)))
+    print("status after big arithmetic: [" + symbolic.status(s) + "]")
+    failing = symbolic.store()
+    zero_divisor = symbolic.div(symbolic.number(failing, 1), symbolic.number(failing, 0))
+    print("status after division by zero: " + symbolic.status(failing))
+    print("diff on a failed store: " + symbolic.diff_text(zero_divisor, symbolic.symbol(failing, "x")))
 
     // 6. assumptions gate unsound rules
     print("x / x with real x: " + symbolic.show(symbolic.div(x, x)))

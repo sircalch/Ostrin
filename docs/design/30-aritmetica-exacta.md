@@ -59,8 +59,17 @@ bloques en coma flotante y lo corrige exactamente. El intérprete es considerabl
 algoritmo sigue siendo escolar: multiplicación y división cuadráticas. No hay Karatsuba, Newton ni FFT; no es
 apto para tamaños criptográficos.
 
-## 5. Límites actuales
+## 5. Racionales exactos y motor simbólico
 
-No hay `Rational` ni `BigFloat` (multiprecisión de coma flotante) todavía, ni conversiones automáticas con
-`Int` (`from_int`/`to_int` explícitas), ni operadores `+ - * /` sobrecargados. El motor simbólico aún usa
-racionales de 64 bits; integrar `BigInt` en él (y exponer `Rational`) es el siguiente paso de esta entrega.
+`std.bigint` expone también racionales exactos como texto decimal reducido (`"N"` o `"N/D"`):
+`rational_make`, `rational_add`, `rational_mul`, `rational_reciprocal`, `rational_sign`,
+`rational_to_float` y conversiones a `Int` cuando caben. Se usa texto porque otros módulos de la
+biblioteca estándar no pueden nombrar `bigint.BigInt` en una firma. `std.symbolic` los usa para pasar
+a precisión arbitraria solo cuando un resultado exacto deja de caber en 64 bits (documento 29 §3).
+
+## 6. Límites actuales
+
+No hay `BigFloat` (multiprecisión de coma flotante) ni un tipo `Rational` tipado todavía, ni conversiones
+automáticas con `Int` (`from_int`/`to_int` explícitas), ni operadores `+ - * /` sobrecargados. Los
+racionales en texto reparsean en cada operación, lo que es correcto pero lento para cargas intensivas; un tipo
+`Rational` con `BigInt` interno es el siguiente paso.
