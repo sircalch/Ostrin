@@ -1,0 +1,81 @@
+// Independent validation of std.bigint: 40 pseudo-random signed operands (a Park-Miller generator
+// with a fixed seed) are added, subtracted, multiplied and divided. For each case the example
+// prints the length and last six characters of every result, which an external BigInt oracle
+// reproduces, and checks the identities a = q * b + r, |r| < |b|, gcd | a and gcd | b.
+import std.bigint
+
+fn next(state: Int) -> Int {
+    (state * 48271) % 2147483647
+}
+
+fn digits(state: Int, count: Int) -> String {
+    mut s = state
+    mut out = ""
+    for i in 0 until count {
+        s = next(s)
+        d = s % 10
+        out = out + (if i == 0 and d == 0 { 1 } else { d }).to_string()
+    }
+    out
+}
+
+fn tail(text: String) -> String {
+    n = text.length()
+    start = if n > 6 { n - 6 } else { 0 }
+    text.length().to_string() + "/" + text.slice(start, n)
+}
+
+fn main() -> Void {
+    mut state = 20260416
+    mut identities = 0
+    mut cases = 0
+    for case_index in 0 until 40 {
+        state = next(state)
+        da = 1 + state % 60
+        state = next(state)
+        db = 1 + state % 40
+        state = next(state)
+        sa = if state % 2 == 0 { "" } else { "-" }
+        state = next(state)
+        sb = if state % 2 == 0 { "" } else { "-" }
+        state = next(state)
+        a = bigint.parse(sa + digits(state, da)).unwrap()
+        state = next(state)
+        b = bigint.parse(sb + digits(state, db)).unwrap()
+        sum = bigint.add(a, b)
+        diff = bigint.sub(a, b)
+        prod = bigint.mul(a, b)
+        parts = bigint.divmod(a, b).unwrap()
+        divisor = bigint.gcd(a, b)
+        print("case " + case_index.to_string() + ": sum=" + tail(bigint.to_string(sum)) + " diff=" + tail(bigint.to_string(diff)) + " prod=" + tail(bigint.to_string(prod)) + " quot=" + tail(bigint.to_string(parts.quotient)) + " rem=" + tail(bigint.to_string(parts.remainder)) + " gcd=" + tail(bigint.to_string(divisor)))
+        rebuilt = bigint.equals(bigint.add(bigint.mul(parts.quotient, b), parts.remainder), a)
+        smaller = bigint.compare(bigint.abs_value(parts.remainder), bigint.abs_value(b)) < 0
+        sign_ok = bigint.is_zero(parts.remainder) or bigint.sign(parts.remainder) == bigint.sign(a)
+        divides_a = bigint.is_zero(bigint.divmod(a, divisor).unwrap().remainder)
+        divides_b = bigint.is_zero(bigint.divmod(b, divisor).unwrap().remainder)
+        roundtrip = bigint.equals(bigint.parse(bigint.to_string(prod)).unwrap(), prod)
+        cases = cases + 1
+        if rebuilt and smaller and sign_ok and divides_a and divides_b and roundtrip {
+            identities = identities + 1
+        }
+    }
+    print("identities held: " + identities.to_string() + " of " + cases.to_string())
+    match bigint.divmod(bigint.from_int(5), bigint.zero()) {
+        Ok(parts) => print("division by zero accepted"),
+        Err(message) => print("division by zero: " + message),
+    }
+    match bigint.parse("12x4") {
+        Ok(value) => print("bad digit accepted"),
+        Err(message) => print("bad digit: " + message),
+    }
+    match bigint.parse("-") {
+        Ok(value) => print("empty accepted"),
+        Err(message) => print("empty: " + message),
+    }
+    match bigint.pow(bigint.from_int(2), 0 - 1) {
+        Ok(value) => print("negative power accepted"),
+        Err(message) => print("negative power: " + message),
+    }
+    print("min int: " + bigint.to_string(bigint.from_int(0 - 9223372036854775807 - 1)))
+    print("zero is not negative: " + bigint.to_string(bigint.negate(bigint.zero())))
+}
