@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "902f3178c71647f2ac30fa639785d5a1e8870598",
+    "mainRevision": "c67789323c2b2b65fd771f4f38ea8dcb039f7234",
     "mergedPullRequests": [
       235,
       236,
@@ -26,7 +26,8 @@
       247,
       248,
       249,
-      250
+      250,
+      251
     ],
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
@@ -57,8 +58,8 @@
       "M2-C": "Startup floor, Linux phases and allocation counters in validation/m2c-pendulum-startup-and-phase-baseline.json; peak RSS, requested bytes (OSTRIN_MEM_DETAIL, --leak-check builds) and Float/Quantity/TemperaturePoint/Measurement overhead merged (#249, Windows receipt); open: Linux/macOS receipts, in-process phase clock",
       "M2-D": "Pendulum input hardening merged (#244); synthetic data only",
       "M2-E": "CI artifact of main 2c5efc43 verified and all 30 bundles replayed independently (validation/m2e-ci-artifact-replay-2c5efc43.json); R3 maturity stays 0; open: cross-platform replay comparison and the full R3 definition",
-      "M2-F": "Adaptive Simpson quadrature (value, error estimate, convergence flag) and Brent root finder added to std.numeric with closed-form checks and backend parity; open: least squares/polyfit, adaptive tolerance policy review, wider reference-value validation",
-      "M2-G": "Not started"
+      "M2-F": "Adaptive Simpson quadrature (error estimate, convergence flag, non-finite integrands rejected) and Brent root finder merged (#251) with closed-form checks and backend parity; interpreter NaN comparisons now follow IEEE like native code; open: least squares/polyfit, relative tolerance mode, exact-rational reference harness",
+      "M2-G": "Live browser examples for absolute temperatures and numerical methods on the examples page, checked against the repository sources by website-check; open: playground diagnostics polish and editor tooling"
     },
     "gates": [
       {
@@ -124,7 +125,7 @@
     "Whole-process timing on Windows cannot resolve the pendulum phases (an empty main costs more than the whole run); in-process timing is needed.",
     "37 worktrees with unmerged or uncommitted work and list_phi_probe.ostrin are protected; nothing there may be deleted, reset or edited."
   ],
-  "nextAction": "Merge the M2-F numerical PR, then M2-A numeric Array<T> of temperature points or M2-G visual/DX; keep refreshing this checkpoint with each merge.",
+  "nextAction": "Merge the M2-G web PR, then M2-A numeric Array<T> of temperature points (interpreter, IR and C runtime) and M2-C Linux/macOS receipts; refresh this checkpoint with each merge.",
   "historicalEvidence": {
     "note": "Earlier detailed history remains in git log -- docs/program-state-m1.json. Everything below was the M1 checkpoint and is retained for provenance; it is not the current state.",
     "m1": {

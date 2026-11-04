@@ -355,7 +355,7 @@ for (const marker of ["language.html#quantities", "language.html#errors", "langu
 
 const examples = read("website/examples.html");
 check(examples.includes('type="module" src="playground.js"'), "examples.html: missing live example module");
-for (const key of ["quantities", "standard", "records", "concurrency"]) {
+for (const key of ["quantities", "standard", "records", "concurrency", "temperature", "numeric"]) {
   check(examples.includes(`data-live-example="${key}"`), `examples.html: missing live example ${key}`);
 }
 
@@ -368,6 +368,8 @@ for (const [key, sourceFile] of Object.entries({
   standard: "examples/std_library.ostrin",
   records: "examples/match_nested.ostrin",
   concurrency: "examples/concurrency.ostrin",
+  temperature: "examples/temperature_statistics.ostrin",
+  numeric: "examples/numeric_adaptive_brent.ostrin",
 })) {
   const source = read(sourceFile).replaceAll("\r\n", "\n").trim();
   check(playgroundScript.includes(source), `playground.js: live example ${key} drifted from ${sourceFile}`);
