@@ -1,0 +1,51 @@
+// Symbolic modelling to a figure: a damped oscillator x(t) = A exp(-g t) cos(w t) is built as an
+// expression, differentiated twice for velocity and acceleration, checked against the ODE
+// x'' + 2 g x' + (g^2 + w^2) x = 0 at sampled times, and plotted from numeric evaluation of the
+// symbolic results.
+import std.symbolic
+import std.viz
+
+fn main() -> Void {
+    s = symbolic.store()
+    t = symbolic.symbol(s, "t")
+    amp = symbolic.symbol(s, "A")
+    g = symbolic.symbol(s, "g", "positive")
+    w = symbolic.symbol(s, "w", "positive")
+    decay = symbolic.call("exp", symbolic.neg(symbolic.mul(g, t)))
+    x = symbolic.mul(amp, symbolic.mul(decay, symbolic.call("cos", symbolic.mul(w, t))))
+    print("x(t) = " + symbolic.show(x))
+    v = symbolic.diff(x, t).unwrap()
+    a = symbolic.diff(v, t).unwrap()
+    print("v(t) = " + symbolic.show(v))
+    print("a(t) = " + symbolic.show(a))
+
+    names = ["t", "A", "g", "w"]
+    n = 240
+    times = linspace(0.0, 12.0, n)
+    mut position = zeros([n])
+    mut velocity = zeros([n])
+    mut worst = 0.0
+    for i in 0 until n {
+        values = [times[i], 1.0, 0.2, 2.0]
+        xi = symbolic.eval_or(x, names, values, 0.0 / 0.0)
+        vi = symbolic.eval_or(v, names, values, 0.0 / 0.0)
+        ai = symbolic.eval_or(a, names, values, 0.0 / 0.0)
+        position.set(i, xi)
+        velocity.set(i, vi)
+        residual = abs(ai + 2.0 * 0.2 * vi + (0.2 * 0.2 + 2.0 * 2.0) * xi)
+        if residual > worst {
+            worst = residual
+        }
+    }
+    print("ODE residual below 1e-12: " + (worst < 1e-12).to_string())
+    print("samples: " + n.to_string())
+    fig = viz.figure("Damped oscillator from a symbolic model")
+        .describe("x(t) = A exp(-g t) cos(w t) with A = 1, g = 0.2, w = 2, and its symbolic derivative")
+        .labels("time t", "x and dx/dt")
+        .line(times, position, label: "x(t)")
+        .line(times, velocity, label: "dx/dt", dash: "6 4")
+        .hline(0.0)
+    svg = fig.svg()
+    print("figure is svg: " + svg.starts_with("<svg").to_string())
+    print(svg)
+}
