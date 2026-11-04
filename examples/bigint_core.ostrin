@@ -1,0 +1,19 @@
+// std.bigint: exact arbitrary-precision integers. Powers, factorials, signed division with Int
+// semantics, parsing and printing, gcd and conversion back to Int.
+import std.bigint
+
+fn main() -> Void {
+    two = bigint.from_int(2)
+    print(bigint.to_string(bigint.pow(two, 100).unwrap()))
+    print(bigint.to_string(bigint.factorial(30).unwrap()))
+    print(bigint.to_string(bigint.parse("-123456789012345678901234567890").unwrap()))
+    a = bigint.parse("1000000000000000000000000000007").unwrap()
+    b = bigint.parse("-998877665544332211").unwrap()
+    parts = bigint.divmod(a, b).unwrap()
+    print(bigint.to_string(parts.quotient))
+    print(bigint.to_string(parts.remainder))
+    print(bigint.equals(bigint.add(bigint.mul(parts.quotient, b), parts.remainder), a))
+    print(bigint.to_string(bigint.gcd(bigint.factorial(20).unwrap(), bigint.pow(two, 70).unwrap())))
+    print(bigint.to_int(bigint.from_int(9223372036854775807)))
+    print(bigint.to_int(bigint.pow(two, 64).unwrap()))
+}
