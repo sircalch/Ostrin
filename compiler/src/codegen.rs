@@ -11728,11 +11728,40 @@ fn generate_impl(
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
-    out.push_str("int main(int argc, char** argv) {\n    ostrin_runtime_init();\n    ostrin_argc = argc > 0 ? argc - 1 : 0;\n    ostrin_argv = argc > 0 ? argv + 1 : argv;\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n");
+    out.push_str("int main(int argc, char** argv) {\n    ostrin_runtime_init();\n    ostrin_argc = argc > 0 ? argc - 1 : 0;\n    ostrin_argv = argc > 0 ? argv + 1 : argv;\n    atexit(ostrin_mem_cleanup);\n    int ostrin_exit_status = 0;\n");
+    // The process exit status follows the type of `main`: `Int` is the status (low 8 bits),
+    // `Result<T, String>` exits 1 after printing `error: <message>` on `Err` (and with the
+    // integer on `Ok(Int)`), and `Void` exits 0, so existing programs are unchanged.
+    let main_return = codegen.signatures.get("main").map(|(_, ret)| ret.clone());
+    match &main_return {
+        Some(CType::Int) => {
+            out.push_str("    ostrin_exit_status = (int)(ostrin_main() & 255);\n");
+        }
+        Some(result_ty @ CType::Result(ok, err)) => {
+            out.push_str(&format!(
+                "    {} ostrin_main_result = ostrin_main();\n",
+                c_type_name(result_ty)
+            ));
+            let failure = if **err == CType::Str {
+                "fprintf(stderr, \"error: %s\\n\", ostrin_main_result.error);"
+            } else {
+                "fprintf(stderr, \"error\\n\");"
+            };
+            let success = if **ok == CType::Int {
+                "ostrin_exit_status = (int)(ostrin_main_result.value & 255);"
+            } else {
+                ""
+            };
+            out.push_str(&format!(
+                "    if (!ostrin_main_result.ok) {{ fflush(stdout); {failure} ostrin_exit_status = 1; }} else {{ {success} }}\n"
+            ));
+        }
+        _ => out.push_str("    ostrin_main();\n"),
+    }
     if leak_check {
         out.push_str("    ostrin_mem_report();\n");
     }
-    out.push_str("    return 0;\n}\n");
+    out.push_str("    return ostrin_exit_status;\n}\n");
     if out.contains("Qty") || out.contains("ostrin_temperature_point_") {
         // Declared units join the runtime's table; a simple one (one base dimension, exponent 1)
         // gets the same base code as the built-in units, so `ft * m` folds like `km * m`.

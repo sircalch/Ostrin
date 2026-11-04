@@ -102,6 +102,12 @@ const programs = [
     expected: "(2 * x + 5)\n25\n(3 * y + 3 * y)\n24\nz\n20\n28\n3\n2\n",
   },
   {
+    name: "exit_status_result",
+    source: "examples/exit_status_result.ostrin",
+    args: ["exit_status_result.wasm"],
+    expectedError: "error: value too large",
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],

@@ -21207,4 +21207,63 @@ fn native_recursive_enum_boxes_wrapper_list_and_generic_payloads() {
         "recursive enum shapes leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
+fn main_return_type_sets_the_process_exit_status_in_both_backends() {
+    // `Int` is the status; `Err` of a `Result<Int, String>` prints `error: <message>` on stderr and
+    // exits 1; `Void` still exits 0. Native binaries report no leaked allocations.
+    for (file, status, stdout_expected, stderr_expected) in [
+        ("exit_status_code.ostrin", 3, "computed\n", ""),
+        (
+            "exit_status_result.ostrin",
+            1,
+            "start\n",
+            "error: value too large",
+        ),
+        ("exit_status_void.ostrin", 0, "done\n", ""),
+    ] {
+        let path = example_path(file);
+        let interpreted = run(&["--run", &path]);
+        assert_eq!(
+            interpreted.status.code(),
+            Some(status),
+            "{file} interpreter status"
+        );
+        assert_eq!(
+            stdout(&interpreted).replace("\r\n", "\n"),
+            stdout_expected,
+            "{file} interpreter stdout"
+        );
+        assert!(
+            stderr(&interpreted).contains(stderr_expected),
+            "{file}: {}",
+            stderr(&interpreted)
+        );
+
+        let report = run(&["--native-type-report", &path]);
+        if skip_if_no_c_compiler(&report) {
+            return;
+        }
+        let exe = temp_artifact(&format!("{file}.exit.exe"));
+        let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+        assert!(
+            compile.status.success(),
+            "{file} compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("failed to run native binary");
+        let _ = fs::remove_file(&exe);
+        let native_err = String::from_utf8_lossy(&native.stderr).to_string();
+        assert_eq!(native.status.code(), Some(status), "{file} native status");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            stdout_expected,
+            "{file} native stdout"
+        );
+        assert!(native_err.contains(stderr_expected), "{file}: {native_err}");
+        assert!(
+            native_err.contains("live_allocations=0"),
+            "{file} leaked: {native_err}"
+        );
+    }
 }

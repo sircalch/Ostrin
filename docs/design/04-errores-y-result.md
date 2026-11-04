@@ -155,3 +155,20 @@ Use 'try', '.unwrap()', or explicitly '_ = ...' to acknowledge it.
 1. ~~Panics dentro de concurrencia~~ — resuelto en el documento 09, §1 (`.join()` propaga el panic de la tarea).
 2. ~~`enum` en general~~ — resuelto en el documento 05.
 3. ~~`as D`~~ y ~~`dyn Trait`~~ — resueltos en los documentos 16 y 15 respectivamente.
+
+## Estado de salida del proceso
+
+El estado de salida depende del tipo de retorno de `main`; no cambia ningún programa existente
+(un `main` que devuelve `Void` sigue terminando con 0):
+
+| `main` devuelve | Estado de salida |
+| --- | --- |
+| `Void` | 0 |
+| `Int` | el valor, módulo 256 |
+| `Result<Int, String>` | `Ok(n)` sale con `n` módulo 256; `Err(m)` escribe `error: m` en stderr y sale con 1 |
+| `Result<T, String>` con `T` distinto de `Int` | `Ok` sale con 0; `Err(m)` escribe `error: m` en stderr y sale con 1 |
+
+Un error de ejecución (por ejemplo `unwrap` sobre un `Err`) ya terminaba con estado 1 en el intérprete y
+en el backend nativo. El intérprete, el binario nativo y el módulo WASI dan el mismo estado. Aún no existe
+una función `exit(código)` que termine el programa desde una función anidada; los errores se propagan
+con `Result` hasta `main`.

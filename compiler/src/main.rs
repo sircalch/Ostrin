@@ -882,7 +882,7 @@ test result: {}. {} passed; {failed} failed",
         .with_literal_kinds(typed_program.literal_kinds.clone())
         .run_main()
     {
-        Ok(_) => ExitCode::SUCCESS,
+        Ok(value) => main_exit_code(&value),
         Err(msg) => {
             if json {
                 emit_json_diagnostic(
@@ -897,6 +897,29 @@ test result: {}. {} passed; {failed} failed",
             }
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Exit status of a program run by the interpreter, following the type of `main`: an `Int` is the
+/// status (low 8 bits), `Err(message)` of a `Result` prints `error: <message>` and exits 1, and
+/// anything else (`Void`, `Ok` of a non-integer) exits 0.
+fn main_exit_code(value: &interpreter::Value) -> ExitCode {
+    match value {
+        interpreter::Value::Int(n) => ExitCode::from((*n & 255) as u8),
+        interpreter::Value::EnumInstance(name, variant, fields, _) if name == "Result" => {
+            if variant == "Err" {
+                match fields.get("0") {
+                    Some(interpreter::Value::String(message)) => eprintln!("error: {message}"),
+                    _ => eprintln!("error"),
+                }
+                ExitCode::FAILURE
+            } else if let Some(interpreter::Value::Int(n)) = fields.get("0") {
+                ExitCode::from((*n & 255) as u8)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
+        _ => ExitCode::SUCCESS,
     }
 }
 
