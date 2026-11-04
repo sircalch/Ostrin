@@ -78,6 +78,12 @@ const programs = [
     expected: "sin: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 473\nsqrt: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 653\nexp reversed: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 129\nempty: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 0\nbad tolerance: adaptive_simpson needs a positive tolerance\ndepth limited: within 1e-9 = false, error estimate ok = false, converged = false, evaluations = 33\nnon-finite: adaptive_simpson integrand returned a non-finite value\nnan comparisons: false true false false\nwallis: within 1e-12 = true\nfixed point of cos: within 1e-12 = true\nsame sign: brent needs f(a) and f(b) with opposite signs\n",
   },
   {
+    name: "numeric_polyfit",
+    source: "examples/numeric_polyfit.ostrin",
+    args: ["numeric_polyfit.wasm"],
+    expected: "quadratic at 0: true\nquadratic at 2.5: true\nquadratic residual small: true\nline intercept: true\nline slope: true\nline residual positive: true\nlength mismatch: polyfit needs xs and ys with the same length\ntoo few: polyfit needs at least degree + 1 samples\nnegative degree: polyfit needs a non-negative degree\nrepeated x: polyfit could not determine the polynomial: qr found a linearly dependent column\nnon-finite: polyfit needs finite samples\n",
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],
