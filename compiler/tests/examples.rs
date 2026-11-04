@@ -21207,6 +21207,9 @@ fn native_recursive_enum_boxes_wrapper_list_and_generic_payloads() {
         "recursive enum shapes leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
+}
+
+#[test]
 fn main_return_type_sets_the_process_exit_status_in_both_backends() {
     // `Int` is the status; `Err` of a `Result<Int, String>` prints `error: <message>` on stderr and
     // exits 1; `Void` still exits 0. Native binaries report no leaked allocations.
