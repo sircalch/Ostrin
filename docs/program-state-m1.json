@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "a97c6f86eb06a34e1d1a0d65ba1b040bc8f6e2d0",
+    "mainRevision": "7a1c4753eb587a2d76f37266df11542925577cc0",
     "mergedPullRequests": [
       235,
       236,
@@ -35,15 +35,16 @@
       256,
       257,
       258,
-      259
+      259,
+      260
     ],
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 409,
+      "integrationTests": 411,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 321,
+      "examples": 323,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
@@ -70,7 +71,7 @@
       "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling",
       "H3": "std.symbolic merged (#254) with exact numbers beyond 64 bits; open: factoring, equation solving, integration, units in expressions (H4), code generation",
       "H-exit-status": "main return type sets the process exit status (Int, Result<_, String>) in interpreter, native and WASI; docs/design/04; open: an exit(code) function for nested code",
-      "H2": "std.bigint merged (#257); std.symbolic now switches its exact rationals to arbitrary precision on overflow (H60, 2^200 and 2^62*4 exact, validated against JavaScript BigInt); text-based rational API in std.bigint; open: typed Rational, BigFloat, operator overloads, subquadratic algorithms",
+      "H2": "std.bigint with operators and a typed Rational (+, -, *, comparisons; H30/H60/H100 exact) validated against JavaScript BigInt; std.symbolic switches to arbitrary precision on overflow; open: BigFloat, / and % operators, subquadratic algorithms",
       "M2-H": "Recursive algebraic data types compile in the native C backend and WASI: a payload naming its own enum (directly, through mutual recursion, inside Option/Result, or in a generic instance) is a ref-counted heap box owned by the parent variant; open: Option/Result payloads of non-recursive enums, AST-fallback ownership of enum payloads",
       "H10": "Real-browser audit of the 17 public pages (docs/website-audit.md, 2026-11-04): mobile clipping in Viz cards fixed, clipped-content check added to the Playwright suite, header logo 59.7 KB -> 4.1 KB; open: eager 1.38 MB WASM on the home page, Core Web Vitals under reproducible conditions, WCAG 2.2 AA and screen-reader review, structure redesign",
       "H1": "Measurement source merging is now one pass that shares unscaled records (450,008 -> 200,010 managed allocations and 10.4 -> 5.2 MB requested on the 50,000-step accumulation, identical output, guarded by an integration test); open: multidimensional array views/strides/broadcasting audit, in-place source updates, Quantity/TemperaturePoint arrays, BLAS/LAPACK interop"

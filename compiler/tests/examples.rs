@@ -21324,7 +21324,7 @@ fn std_bigint_validation_matches_an_independent_oracle_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/bigint.ostrin "))
         .unwrap_or_else(|| panic!("missing std.bigint source report: {report_text}"));
     assert!(
-        source.contains("ir=45") && source.contains("hir=0") && source.contains("ast=0"),
+        source.contains("ir=74") && source.contains("hir=0") && source.contains("ast=0"),
         "bigint lowering regressed: {source}"
     );
 }
@@ -21417,6 +21417,74 @@ fn measurement_duplicate_source_ids_keep_merging_and_validating_in_both_backends
         String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
         expected
     );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_bigint_operators_match_an_external_oracle_in_both_backends() {
+    // +, -, * and the six comparisons on BigInt values; 30 random pairs satisfy the ring identity
+    // (a+b)(a-b) = a*a - b*b, commutativity and the order laws, and 19 of them have x < y, which
+    // JavaScript BigInt reproduces from the same generator.
+    assert_eq!(
+        interpreter_and_native_agree("bigint_operators.ostrin"),
+        "-864197532086419753208641975320\n1111111110111111111011111111100\n-121932631137021795226185032733622923332237463801111263526900\n-121932631137021795226185032732511812222126352690100152415800\ntrue\ntrue\nfalse\ntrue\ntrue\nfalse\nring identity: 30 of 30\ncommutative sum: 30 of 30\norder laws: 30 of 30\npairs with x < y: 19\n"
+    );
+    let path = example_path("bigint_operators.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    let exe = temp_artifact("bigint_operators_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_bigint_rationals_match_an_external_oracle_in_both_backends() {
+    // Typed exact rationals: the harmonic numbers H30, H60 and H100, a reduced negative fraction and
+    // a 30-digit numerator were reproduced with JavaScript BigInt; field identities, ordering and the
+    // typed zero-denominator, zero-divisor and zero-reciprocal errors hold in both backends.
+    assert_eq!(
+        interpreter_and_native_agree("bigint_rational.ostrin"),
+        "H30 = 9304682830147/2329089562800\nH60 = 15117092380124150817026911/3230237388259077233637600\nH100 = 14466636279520351160221518043104131447711/2788815009188499086581352357412492142272\ntrue\n1/18\n1/6\ntrue\nfalse\ntrue\n-3/4\n2\n6\n1371742100137174210013717421/109739369\n0.3333333333333333\nzero denominator: rational with a zero denominator\ndivision by zero: rational division by zero\nreciprocal of zero: rational reciprocal of zero\n"
+    );
+    let path = example_path("bigint_rational.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    let exe = temp_artifact("bigint_rational_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "leaked: {}",

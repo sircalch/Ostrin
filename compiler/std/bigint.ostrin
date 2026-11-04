@@ -604,3 +604,200 @@ pub fn rational_reciprocal(a: String) -> Result<String, String> {
         Err(message) => Err(message),
     }
 }
+
+// ---------------------------------------------------------------- operators
+//
+// `+`, `-` and `*` work on BigInt values, and `==`, `!=`, `<`, `<=`, `>` and `>=` compare them by
+// numeric value (values are canonical, so equality is exact). Division and remainder stay explicit
+// (`divmod`) because dividing by zero must be a typed error, not a crash.
+
+fn cmp_big(a: BigInt, b: BigInt) -> Int {
+    compare(a, b)
+}
+
+fn plus(a: BigInt, b: BigInt) -> BigInt {
+    add(a, b)
+}
+
+fn minus(a: BigInt, b: BigInt) -> BigInt {
+    sub(a, b)
+}
+
+fn times(a: BigInt, b: BigInt) -> BigInt {
+    mul(a, b)
+}
+
+impl Add for BigInt {
+    fn add(self, other: BigInt) -> BigInt {
+        plus(self, other)
+    }
+}
+
+impl Sub for BigInt {
+    fn sub(self, other: BigInt) -> BigInt {
+        minus(self, other)
+    }
+}
+
+impl Mul for BigInt {
+    fn mul(self, other: BigInt) -> BigInt {
+        times(self, other)
+    }
+}
+
+impl Eq for BigInt {
+    fn equals(self, other: BigInt) -> Bool {
+        cmp_big(self, other) == 0
+    }
+}
+
+impl Ord for BigInt {
+    fn compare(self, other: BigInt) -> Ordering {
+        c = cmp_big(self, other)
+        if c < 0 {
+            return Less
+        }
+        if c > 0 {
+            return Greater
+        }
+        Equal
+    }
+}
+
+// ---------------------------------------------------------------- typed rationals
+//
+// A Rational is a BigInt numerator and a positive BigInt denominator in lowest terms, so equality is
+// structural and every operation is exact. `+`, `-`, `*`, `==`, `<` and the other comparisons work on
+// Rational values; division and reciprocals return Results because the divisor may be zero.
+
+pub record Rational {
+    numerator: BigInt
+    denominator: BigInt
+}
+
+fn ratio_reduce(n: BigInt, d: BigInt) -> Rational {
+    g = gcd(n, d)
+    mut num = n
+    mut den = d
+    if g.limbs.length() > 0 {
+        num = divmod(n, g).unwrap().quotient
+        den = divmod(d, g).unwrap().quotient
+    }
+    if den.negative {
+        num = negate(num)
+        den = negate(den)
+    }
+    Rational { numerator: num, denominator: den }
+}
+
+/// n/d in lowest terms; a zero denominator is an error.
+pub fn fraction(n: BigInt, d: BigInt) -> Result<Rational, String> {
+    if d.limbs.length() == 0 {
+        return Err("rational with a zero denominator")
+    }
+    Ok(ratio_reduce(n, d))
+}
+
+pub fn fraction_from_ints(n: Int, d: Int) -> Result<Rational, String> {
+    fraction(from_int(n), from_int(d))
+}
+
+pub fn fraction_whole(n: Int) -> Rational {
+    Rational { numerator: from_int(n), denominator: from_int(1) }
+}
+
+/// Parse the decimal text "N" or "N/D".
+pub fn fraction_parse(text: String) -> Result<Rational, String> {
+    match split_rational(text) {
+        Ok(parts) => fraction(parts.quotient, parts.remainder),
+        Err(message) => Err(message),
+    }
+}
+
+pub fn fraction_to_string(r: Rational) -> String {
+    if r.denominator.limbs.length() == 1 and r.denominator.limbs[0] == 1 {
+        return to_string(r.numerator)
+    }
+    to_string(r.numerator) + "/" + to_string(r.denominator)
+}
+
+pub fn fraction_to_float(r: Rational) -> Float {
+    to_float(r.numerator) / to_float(r.denominator)
+}
+
+pub fn fraction_add(a: Rational, b: Rational) -> Rational {
+    ratio_reduce(add(mul(a.numerator, b.denominator), mul(b.numerator, a.denominator)), mul(a.denominator, b.denominator))
+}
+
+pub fn fraction_sub(a: Rational, b: Rational) -> Rational {
+    ratio_reduce(sub(mul(a.numerator, b.denominator), mul(b.numerator, a.denominator)), mul(a.denominator, b.denominator))
+}
+
+pub fn fraction_mul(a: Rational, b: Rational) -> Rational {
+    ratio_reduce(mul(a.numerator, b.numerator), mul(a.denominator, b.denominator))
+}
+
+/// a / b; dividing by zero is an error.
+pub fn fraction_div(a: Rational, b: Rational) -> Result<Rational, String> {
+    if b.numerator.limbs.length() == 0 {
+        return Err("rational division by zero")
+    }
+    Ok(ratio_reduce(mul(a.numerator, b.denominator), mul(a.denominator, b.numerator)))
+}
+
+pub fn fraction_negate(a: Rational) -> Rational {
+    Rational { numerator: negate(a.numerator), denominator: a.denominator }
+}
+
+pub fn fraction_reciprocal(a: Rational) -> Result<Rational, String> {
+    if a.numerator.limbs.length() == 0 {
+        return Err("rational reciprocal of zero")
+    }
+    Ok(ratio_reduce(a.denominator, a.numerator))
+}
+
+/// -1, 0 or 1 comparing a with b (denominators are positive, so cross-multiplication is exact).
+pub fn fraction_compare(a: Rational, b: Rational) -> Int {
+    compare(mul(a.numerator, b.denominator), mul(b.numerator, a.denominator))
+}
+
+pub fn fraction_sign(a: Rational) -> Int {
+    sign(a.numerator)
+}
+
+impl Add for Rational {
+    fn add(self, other: Rational) -> Rational {
+        fraction_add(self, other)
+    }
+}
+
+impl Sub for Rational {
+    fn sub(self, other: Rational) -> Rational {
+        fraction_sub(self, other)
+    }
+}
+
+impl Mul for Rational {
+    fn mul(self, other: Rational) -> Rational {
+        fraction_mul(self, other)
+    }
+}
+
+impl Eq for Rational {
+    fn equals(self, other: Rational) -> Bool {
+        fraction_compare(self, other) == 0
+    }
+}
+
+impl Ord for Rational {
+    fn compare(self, other: Rational) -> Ordering {
+        c = fraction_compare(self, other)
+        if c < 0 {
+            return Less
+        }
+        if c > 0 {
+            return Greater
+        }
+        Equal
+    }
+}

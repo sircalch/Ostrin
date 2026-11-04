@@ -122,6 +122,20 @@ const programs = [
     leakCheck: true,
   },
   {
+    name: "bigint_operators",
+    source: "examples/bigint_operators.ostrin",
+    args: ["bigint_operators.wasm"],
+    expected: "-864197532086419753208641975320\n1111111110111111111011111111100\n-121932631137021795226185032733622923332237463801111263526900\n-121932631137021795226185032732511812222126352690100152415800\ntrue\ntrue\nfalse\ntrue\ntrue\nfalse\nring identity: 30 of 30\ncommutative sum: 30 of 30\norder laws: 30 of 30\npairs with x < y: 19\n",
+    leakCheck: true,
+  },
+  {
+    name: "bigint_rational",
+    source: "examples/bigint_rational.ostrin",
+    args: ["bigint_rational.wasm"],
+    expected: "H30 = 9304682830147/2329089562800\nH60 = 15117092380124150817026911/3230237388259077233637600\nH100 = 14466636279520351160221518043104131447711/2788815009188499086581352357412492142272\ntrue\n1/18\n1/6\ntrue\nfalse\ntrue\n-3/4\n2\n6\n1371742100137174210013717421/109739369\n0.3333333333333333\nzero denominator: rational with a zero denominator\ndivision by zero: rational division by zero\nreciprocal of zero: rational reciprocal of zero\n",
+    leakCheck: true,
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],
