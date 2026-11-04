@@ -90,6 +90,10 @@ const programs = [
     args: ["symbolic_validation.wasm"],
     expected: "derivative checks: 28, failures: 0\nd(q^q) at 2: true\nexpansion and substitution agree: 8 of 8\ncommutative sum: true\ncommutative product: true\ndistributive law: true\nx - x: 0\nx * x: x^2\nH20 = 55835135/15519504\nH20 exact: true\nstatus of a healthy store: []\nstatus after overflow: exact rational arithmetic overflowed 64 bits\ndiff on a failed store: error: exact rational arithmetic overflowed 64 bits\nx / x with real x: x^0\nq / q with positive q: 1\nexp(ln(x)) with real x: exp(ln(x))\nexp(ln(q)) with positive q: q\nln(exp(x)): x\n(x^2)^(1/2) with real x: (x^2)^(1/2)\n(q^2)^(1/2) with positive q: q\nd(x^x)/dx: error: differentiating a power with a variable exponent needs a positive base\nd(tan(x))/dx: error: no derivative rule for function tan\ndiff by a number: error: diff needs a symbol to differentiate by\nmissing value: error: no value for symbol x\nln(-1): error: ln of a non-positive number\n",
     leakCheck: true,
+    name: "numeric_polyfit",
+    source: "examples/numeric_polyfit.ostrin",
+    args: ["numeric_polyfit.wasm"],
+    expected: "quadratic at 0: true\nquadratic at 2.5: true\nquadratic residual small: true\nline intercept: true\nline slope: true\nline residual positive: true\nlength mismatch: polyfit needs xs and ys with the same length\ntoo few: polyfit needs at least degree + 1 samples\nnegative degree: polyfit needs a non-negative degree\nrepeated x: polyfit could not determine the polynomial: qr found a linearly dependent column\nnon-finite: polyfit needs finite samples\n",
   },
   {
     name: "temperature_point_conversion_overflow",

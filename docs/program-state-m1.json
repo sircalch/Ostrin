@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "c67789323c2b2b65fd771f4f38ea8dcb039f7234",
+    "mainRevision": "8e5544f9c5a739a9dede42e097e51c7f05656b73",
     "mergedPullRequests": [
       235,
       236,
@@ -27,15 +27,17 @@
       248,
       249,
       250,
-      251
+      251,
+      252,
+      253
     ],
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 397,
+      "integrationTests": 401,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 311,
+      "examples": 315,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
@@ -58,8 +60,9 @@
       "M2-C": "Startup floor, Linux phases and allocation counters in validation/m2c-pendulum-startup-and-phase-baseline.json; peak RSS, requested bytes (OSTRIN_MEM_DETAIL, --leak-check builds) and Float/Quantity/TemperaturePoint/Measurement overhead merged (#249, Windows receipt); open: Linux/macOS receipts, in-process phase clock",
       "M2-D": "Pendulum input hardening merged (#244); synthetic data only",
       "M2-E": "CI artifact of main 2c5efc43 verified and all 30 bundles replayed independently (validation/m2e-ci-artifact-replay-2c5efc43.json); R3 maturity stays 0; open: cross-platform replay comparison and the full R3 definition",
-      "M2-F": "Adaptive Simpson quadrature (error estimate, convergence flag, non-finite integrands rejected) and Brent root finder merged (#251) with closed-form checks and backend parity; interpreter NaN comparisons now follow IEEE like native code; open: least squares/polyfit, relative tolerance mode, exact-rational reference harness",
-      "M2-G": "Live browser examples for absolute temperatures and numerical methods on the examples page, checked against the repository sources by website-check; open: playground diagnostics polish and editor tooling"
+      "M2-F": "Adaptive Simpson quadrature, Brent root finder (#251) and least-squares polyfit by QR in the scaled variable with typed error cases; NaN comparisons follow IEEE in the interpreter; open: relative tolerance mode, weighted/uncertainty-aware fits, exact-rational reference harness",
+      "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling",
+      "H3": "std.symbolic first cut: hash-consed expression store, exact 64-bit rationals, assumption-gated canonicalization, differentiation, substitution, expansion, numeric evaluation, validated against central differences, H20 and a model-to-figure workflow (docs/design/29); open: factoring, equation solving, integration, units in expressions (H4), code generation, BigInt/arbitrary precision (H2), native recursive enums"
     },
     "gates": [
       {
@@ -125,7 +128,7 @@
     "Whole-process timing on Windows cannot resolve the pendulum phases (an empty main costs more than the whole run); in-process timing is needed.",
     "37 worktrees with unmerged or uncommitted work and list_phi_probe.ostrin are protected; nothing there may be deleted, reset or edited."
   ],
-  "nextAction": "Merge the M2-G web PR, then M2-A numeric Array<T> of temperature points (interpreter, IR and C runtime) and M2-C Linux/macOS receipts; refresh this checkpoint with each merge.",
+  "nextAction": "Merge the H3 symbolic core PR, then H2 exact arithmetic (BigInt/Rational design), H4 unit-aware symbolic science, and H1 arrays/Measurement overhead; exit status design; refresh this checkpoint with each merge.",
   "historicalEvidence": {
     "note": "Earlier detailed history remains in git log -- docs/program-state-m1.json. Everything below was the M1 checkpoint and is retained for provenance; it is not the current state.",
     "m1": {

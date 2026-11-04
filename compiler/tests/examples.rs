@@ -19097,7 +19097,7 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=81")
+        numeric_source.contains("ir=83")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
@@ -20085,7 +20085,7 @@ fn std_numeric_svd_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=81")
+        numeric_source.contains("ir=83")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
@@ -20117,7 +20117,7 @@ fn std_numeric_eigen_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=81")
+        numeric_source.contains("ir=83")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric eigen lowering report changed unexpectedly: {numeric_source}"
@@ -20149,7 +20149,7 @@ fn std_numeric_complex_linear_algebra_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=81")
+        numeric_source.contains("ir=83")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "numeric complex lowering report changed unexpectedly: {numeric_source}"
@@ -20223,7 +20223,7 @@ fn std_numeric_quantity_arrays_use_the_ir_boundary() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=85")
+        numeric_source.contains("ir=87")
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "quantity-array IR coverage regressed: {numeric_source}"
@@ -21089,4 +21089,14 @@ figure is svg: true
         "figure missing"
     );
     assert!(output.contains("</svg>"), "figure is not closed");
+}
+
+#[test]
+fn std_numeric_polyfit_matches_interpreter_and_native() {
+    // The quadratic 1 - 3x + 0.5x^2 is recovered from exact samples; the noisy line has slope 1.97
+    // and intercept 1.06 from the normal equations; invalid inputs return typed messages.
+    assert_eq!(
+        interpreter_and_native_agree("numeric_polyfit.ostrin"),
+        "quadratic at 0: true\nquadratic at 2.5: true\nquadratic residual small: true\nline intercept: true\nline slope: true\nline residual positive: true\nlength mismatch: polyfit needs xs and ys with the same length\ntoo few: polyfit needs at least degree + 1 samples\nnegative degree: polyfit needs a non-negative degree\nrepeated x: polyfit could not determine the polynomial: qr found a linearly dependent column\nnon-finite: polyfit needs finite samples\n"
+    );
 }

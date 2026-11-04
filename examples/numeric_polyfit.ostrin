@@ -1,0 +1,51 @@
+// Least-squares polynomial fitting. The quadratic 1 - 3x + 0.5x^2 is recovered to rounding;
+// the straight line through noisy samples has the textbook slope 1.97 and intercept 1.06
+// (Sxy / Sxx = 19.7 / 10 and mean(y) - slope * mean(x)).
+import std.numeric
+
+fn near(a: Float, b: Float, tol: Float) -> String {
+    (abs(a - b) <= tol).to_string()
+}
+
+fn main() -> Void {
+    xs = array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+    exact = array([1.0, -1.5, -3.0, -3.5, -3.0, -1.5])
+    match numeric.polyfit(xs, exact, 2) {
+        Ok(fit) => {
+            print("quadratic at 0: " + near(fit.at(0.0), 1.0, 1e-9))
+            print("quadratic at 2.5: " + near(fit.at(2.5), -3.375, 1e-9))
+            print("quadratic residual small: " + (fit.rms_residual < 1e-9).to_string())
+        },
+        Err(message) => print("quadratic: " + message),
+    }
+    line_x = array([0.0, 1.0, 2.0, 3.0, 4.0])
+    noisy = array([1.1, 2.9, 5.2, 6.8, 9.0])
+    match numeric.polyfit(line_x, noisy, 1) {
+        Ok(fit) => {
+            print("line intercept: " + near(fit.at(0.0), 1.06, 1e-9))
+            print("line slope: " + near(fit.at(1.0) - fit.at(0.0), 1.97, 1e-9))
+            print("line residual positive: " + (fit.rms_residual > 0.0).to_string())
+        },
+        Err(message) => print("line: " + message),
+    }
+    match numeric.polyfit(line_x, array([1.0, 2.0, 3.0]), 1) {
+        Ok(fit) => print("length mismatch accepted"),
+        Err(message) => print("length mismatch: " + message),
+    }
+    match numeric.polyfit(array([0.0, 1.0]), array([0.0, 1.0]), 2) {
+        Ok(fit) => print("too few accepted"),
+        Err(message) => print("too few: " + message),
+    }
+    match numeric.polyfit(line_x, noisy, -1) {
+        Ok(fit) => print("negative degree accepted"),
+        Err(message) => print("negative degree: " + message),
+    }
+    match numeric.polyfit(array([2.0, 2.0, 2.0]), array([1.0, 2.0, 3.0]), 1) {
+        Ok(fit) => print("repeated x accepted"),
+        Err(message) => print("repeated x: " + message),
+    }
+    match numeric.polyfit(array([0.0, 1.0, 2.0]), array([1.0, sqrt(-1.0), 3.0]), 1) {
+        Ok(fit) => print("non-finite accepted"),
+        Err(message) => print("non-finite: " + message),
+    }
+}

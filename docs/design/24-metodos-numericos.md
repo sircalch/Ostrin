@@ -26,6 +26,7 @@ numeric.trapz(xs, ys)                          // regla del trapecio sobre muest
 numeric.simpson(f, a, b, n: 200)               // Simpson compuesta (n se hace par)
 numeric.adaptive_simpson(f, a, b, tol: 1e-10)  // Result<Quadrature, String>; .value .error .evaluations .converged
 numeric.bisect(f, a, b, tol: 1e-12)            // Result<Float, String>, exige cambio de signo
+numeric.polyfit(xs, ys, degree)               // Result<PolyFit, String>: mínimos cuadrados por QR en la variable escalada; fit.at(x), fit.rms_residual
 numeric.brent(f, a, b, tol: 1e-12)             // Result<Float, String>; cuadrática inversa con respaldo de bisección
 numeric.secant(f, x0, x1)                      // Result<Float, String>
 numeric.newton(f, df, x0)                      // Result<Float, String>
@@ -81,6 +82,15 @@ numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
 numeric.unit_gradient(xs, ys)                  // Array<Quantity<Y / X>>
 numeric.unit_interp(xs, ys, x)                 // Quantity<Y>; x en cualquier unidad de X
 ```
+
+**Límites medidos de `polyfit`.** El ajuste usa Gram–Schmidt modificado sobre la variable escalada
+`t = (x − centro)/escala`. Con 40 muestras equiespaciadas de un polinomio de grado 8 en [0, 100], el error máximo
+de reconstrucción en los nodos fue ≈5·10⁻¹⁴ (grado 8), ≈2·10⁻¹¹ (grado 15), ≈9·10⁻¹⁰ (grado 20) y
+≈1·10⁻⁶ (grado 25, 30 muestras), con valores de magnitud O(1). El error crece con el grado porque Gram–Schmidt
+modificado pierde ortogonalidad en proporción al número de condición; no se afirma estabilidad universal.
+Para grados altos o datos casi colineales hace falta un QR por reflexiones de Householder, aún no implementado,
+y el chequeo de rango del QR (`tol = 1e-10`) rechaza columnas dependientes con un error tipado.
+
 
 Las funciones `unit_*` se escriben con aritmética de cantidades escalares (`xs[i] - xs[i-1]`,
 `ys[i] + ys[i-1]`), así que la unidad del resultado sale de las reglas de siempre y no hace falta
