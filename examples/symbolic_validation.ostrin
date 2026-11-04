@@ -1,0 +1,113 @@
+// Independent checks of std.symbolic. Symbolic derivatives are compared with central differences
+// (a different algorithm), substitution and expansion with direct evaluation, exact rational sums
+// with a known constant (H20 = 55835135/15519504), and assumption-gated rules with the cases where
+// they must not fire.
+import std.symbolic
+
+fn near(a: Float, b: Float) -> Bool {
+    abs(a - b) <= 1e-5 * (1.0 + abs(b))
+}
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    y = symbolic.symbol(s, "y")
+    q = symbolic.symbol(s, "q", "positive")
+    one = symbolic.number(s, 1)
+    two = symbolic.number(s, 2)
+    three = symbolic.number(s, 3)
+    half = symbolic.number(s, 1, 2)
+
+    // 1. symbolic derivatives against central differences
+    models = [
+        symbolic.add(symbolic.power(x, three), symbolic.mul(two, x)),
+        symbolic.mul(x, symbolic.call("sin", x)),
+        symbolic.mul(symbolic.call("exp", symbolic.mul(two, x)), symbolic.call("cos", x)),
+        symbolic.call("ln", symbolic.add(symbolic.power(x, two), one)),
+        symbolic.power(symbolic.add(symbolic.power(x, two), one), half),
+        symbolic.mul(symbolic.call("sin", x), symbolic.call("cos", x)),
+        symbolic.div(one, symbolic.add(one, symbolic.power(x, two)))
+    ]
+    points = [0.3, 0.9, 1.7, 2.4]
+    mut derivative_checks = 0
+    mut derivative_failures = 0
+    for model in models {
+        match symbolic.diff(model, x) {
+            Ok(d) => {
+                for p in points {
+                    h = 1e-5
+                    numeric = (symbolic.eval_or(model, ["x"], [p + h], 0.0 / 0.0) - symbolic.eval_or(model, ["x"], [p - h], 0.0 / 0.0)) / (2.0 * h)
+                    exact = symbolic.eval_or(d, ["x"], [p], 0.0 / 0.0)
+                    derivative_checks = derivative_checks + 1
+                    if not near(exact, numeric) {
+                        derivative_failures = derivative_failures + 1
+                    }
+                }
+            },
+            Err(message) => {
+                derivative_failures = derivative_failures + 1
+            },
+        }
+    }
+    print("derivative checks: " + derivative_checks.to_string() + ", failures: " + derivative_failures.to_string())
+
+    // 2. positive-base variable exponent: d(q^q)/dq = q^q (ln q + 1)
+    qq = symbolic.power(q, q)
+    match symbolic.diff(qq, q) {
+        Ok(d) => print("d(q^q) at 2: " + near(symbolic.eval_or(d, ["q"], [2.0], 0.0 / 0.0), 4.0 * (ln(2.0) + 1.0)).to_string()),
+        Err(message) => print("d(q^q): " + message),
+    }
+
+    // 3. substitution and expansion agree with direct evaluation
+    poly = symbolic.mul(symbolic.power(symbolic.add(x, y), three), symbolic.sub(x, y))
+    expanded = symbolic.expand(poly)
+    mut agree = 0
+    for p in points {
+        direct = symbolic.eval_or(poly, ["x", "y"], [p, 1.5 - p], 0.0 / 0.0)
+        from_expand = symbolic.eval_or(expanded, ["x", "y"], [p, 1.5 - p], 0.0 / 0.0)
+        via_subs = symbolic.eval_or(symbolic.subs(symbolic.subs(poly, x, symbolic.number(s, 3, 2)), y, symbolic.number(s, 1, 4)), [], [], 0.0 / 0.0)
+        if near(direct, from_expand) {
+            agree = agree + 1
+        }
+        if near(via_subs, symbolic.eval_or(poly, ["x", "y"], [1.5, 0.25], 0.0 / 0.0)) {
+            agree = agree + 1
+        }
+    }
+    print("expansion and substitution agree: " + agree.to_string() + " of 8")
+
+    // 4. canonical identities
+    print("commutative sum: " + symbolic.same(symbolic.add(x, y), symbolic.add(y, x)).to_string())
+    print("commutative product: " + symbolic.same(symbolic.mul(x, y), symbolic.mul(y, x)).to_string())
+    print("distributive law: " + symbolic.same(symbolic.expand(symbolic.mul(x, symbolic.add(y, one))), symbolic.add(symbolic.mul(x, y), x)).to_string())
+    print("x - x: " + symbolic.show(symbolic.sub(x, x)))
+    print("x * x: " + symbolic.show(symbolic.mul(x, x)))
+
+    // 5. exact rationals: H20 and overflow detection
+    mut harmonic = symbolic.number(s, 0)
+    for k in 1 to 20 {
+        harmonic = symbolic.add(harmonic, symbolic.number(s, 1, k))
+    }
+    print("H20 = " + symbolic.show(harmonic))
+    print("H20 exact: " + (symbolic.show(harmonic) == "55835135/15519504").to_string())
+    print("status of a healthy store: [" + symbolic.status(s) + "]")
+    overflowing = symbolic.store()
+    big = symbolic.mul(symbolic.number(overflowing, 4611686018427387904), symbolic.number(overflowing, 4))
+    print("status after overflow: " + symbolic.status(overflowing))
+    print("diff on a failed store: " + symbolic.diff_text(big, symbolic.symbol(overflowing, "x")))
+
+    // 6. assumptions gate unsound rules
+    print("x / x with real x: " + symbolic.show(symbolic.div(x, x)))
+    print("q / q with positive q: " + symbolic.show(symbolic.div(q, q)))
+    print("exp(ln(x)) with real x: " + symbolic.show(symbolic.call("exp", symbolic.call("ln", x))))
+    print("exp(ln(q)) with positive q: " + symbolic.show(symbolic.call("exp", symbolic.call("ln", q))))
+    print("ln(exp(x)): " + symbolic.show(symbolic.call("ln", symbolic.call("exp", x))))
+    print("(x^2)^(1/2) with real x: " + symbolic.show(symbolic.power(symbolic.power(x, two), half)))
+    print("(q^2)^(1/2) with positive q: " + symbolic.show(symbolic.power(symbolic.power(q, two), half)))
+
+    // 7. typed failures
+    print("d(x^x)/dx: " + symbolic.diff_text(symbolic.power(x, x), x))
+    print("d(tan(x))/dx: " + symbolic.diff_text(symbolic.call("tan", x), x))
+    print("diff by a number: " + symbolic.diff_text(x, two))
+    print("missing value: " + symbolic.eval_text(x, ["y"], [1.0]))
+    print("ln(-1): " + symbolic.eval_text(symbolic.call("ln", symbolic.number(s, 0 - 1)), [], []))
+}

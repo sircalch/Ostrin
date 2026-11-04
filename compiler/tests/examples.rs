@@ -20998,3 +20998,95 @@ fn std_numeric_adaptive_simpson_and_brent_match_interpreter_and_native() {
         "sin: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 473\nsqrt: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 653\nexp reversed: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 129\nempty: within 1e-9 = true, error estimate ok = true, converged = true, evaluations = 0\nbad tolerance: adaptive_simpson needs a positive tolerance\ndepth limited: within 1e-9 = false, error estimate ok = false, converged = false, evaluations = 33\nnon-finite: adaptive_simpson integrand returned a non-finite value\nnan comparisons: false true false false\nwallis: within 1e-12 = true\nfixed point of cos: within 1e-12 = true\nsame sign: brent needs f(a) and f(b) with opposite signs\n"
     );
 }
+
+#[test]
+fn std_symbolic_core_matches_interpreter_and_native_without_leaks() {
+    // Canonical sums and products, exact rationals, assumption-gated division, derivatives of
+    // polynomial, product, chain and logarithmic forms, substitution, evaluation and expansion.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_core.ostrin"),
+        "2*x\n5/2*x\ntrue\nx^2\n0\nx^0\n1\nd(x^3)/dx = 3*x^2\nd(x*sin(x))/dx = sin(x) + x*cos(x)\nd(exp(2x))/dx = 2*exp(2*x)\nd(ln(x^2))/dx = 2*x^(-1)\nd(x^x)/dx = error: differentiating a power with a variable exponent needs a positive base\nd(x^p)/dx = p^p*(1 + ln(p))\nd(y)/dx = 0\n1 + x + 3*x^2\n15\n15\nerror: no value for symbol x\nx^2 + y^2 + 2*x*y\n"
+    );
+    let path = example_path("symbolic_core.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_core_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
+    // 28 derivative checks against central differences, expansion and substitution against direct
+    // evaluation, H20 against its exact value, overflow detection, assumption-gated rules and the
+    // typed failure cases.
+    let output = interpreter_and_native_agree("symbolic_validation.ostrin");
+    assert_eq!(
+        output,
+        "derivative checks: 28, failures: 0\nd(q^q) at 2: true\nexpansion and substitution agree: 8 of 8\ncommutative sum: true\ncommutative product: true\ndistributive law: true\nx - x: 0\nx * x: x^2\nH20 = 55835135/15519504\nH20 exact: true\nstatus of a healthy store: []\nstatus after overflow: exact rational arithmetic overflowed 64 bits\ndiff on a failed store: error: exact rational arithmetic overflowed 64 bits\nx / x with real x: x^0\nq / q with positive q: 1\nexp(ln(x)) with real x: exp(ln(x))\nexp(ln(q)) with positive q: q\nln(exp(x)): x\n(x^2)^(1/2) with real x: (x^2)^(1/2)\n(q^2)^(1/2) with positive q: q\nd(x^x)/dx: error: differentiating a power with a variable exponent needs a positive base\nd(tan(x))/dx: error: no derivative rule for function tan\ndiff by a number: error: diff needs a symbol to differentiate by\nmissing value: error: no value for symbol x\nln(-1): error: ln of a non-positive number\n"
+    );
+    let path = example_path("symbolic_validation.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    let symbolic_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
+    assert!(
+        symbolic_source.contains("ir=62")
+            && symbolic_source.contains("hir=0")
+            && symbolic_source.contains("ast=0"),
+        "symbolic lowering regressed: {symbolic_source}"
+    );
+}
+
+#[test]
+fn std_symbolic_workflow_builds_derivatives_and_a_real_figure_in_both_backends() {
+    let output = interpreter_and_native_agree("symbolic_workflow.ostrin");
+    assert!(
+        output.starts_with(
+            "x(t) = A*exp(-t*g)*cos(t*w)
+v(t) = -A*g*exp(-t*g)*cos(t*w) - A*w*exp(-t*g)*sin(t*w)
+"
+        ),
+        "{}",
+        &output[..output.len().min(400)]
+    );
+    assert!(
+        output.contains(
+            "ODE residual below 1e-12: true
+"
+        ),
+        "ODE residual check failed"
+    );
+    assert!(
+        output.contains(
+            "samples: 240
+figure is svg: true
+<svg "
+        ),
+        "figure missing"
+    );
+    assert!(output.contains("</svg>"), "figure is not closed");
+}

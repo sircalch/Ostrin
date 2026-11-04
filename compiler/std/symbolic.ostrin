@@ -1,0 +1,968 @@
+// std.symbolic — typed symbolic algebra on a hash-consed expression store.
+//
+// Expressions live in a `Store` as nodes addressed by index (a DAG), so equal sub-expressions are
+// shared and equality is an integer comparison. Constructors canonicalize as they build: sums and
+// products are flattened and ordered, numeric constants are folded exactly, and like terms and
+// repeated factors are collected. Nothing is simplified unless it is valid on the declared domain:
+// every symbol is a real variable, `positive`, `nonzero` and `integer` are explicit assumptions, and
+// rules such as x^0 = 1, x * x^-1 = 1 or exp(ln(x)) = x fire only when the assumptions justify them.
+//
+// Exact numbers are rationals over Int (64-bit). An operation whose exact result does not fit marks
+// the store as failed (`symbolic.status`) instead of wrapping or rounding.
+
+// ---------------------------------------------------------------- store and nodes
+
+/// Node kinds: 0 number, 1 symbol, 2 sum, 3 product, 4 power, 5 function call.
+pub record Store {
+    kinds: List<Int>
+    nums: List<Int>
+    dens: List<Int>
+    names: List<String>
+    starts: List<Int>
+    counts: List<Int>
+    pool: List<Int>
+    index: Map<String, Int>
+    failures: List<String>
+    notes: List<String>
+}
+
+/// A handle to one expression of a store.
+pub record Expr {
+    store: Store
+    id: Int
+}
+
+record Rat {
+    n: Int
+    d: Int
+}
+
+pub fn store() -> Store {
+    Store {
+        kinds: [],
+        nums: [],
+        dens: [],
+        names: [],
+        starts: [],
+        counts: [],
+        pool: [],
+        index: Map<String, Int>(),
+        failures: [],
+        notes: [],
+    }
+}
+
+/// "" while every exact operation fit in 64 bits, otherwise the first failure.
+pub fn status(s: Store) -> String {
+    if s.failures.length() == 0 {
+        return ""
+    }
+    s.failures[0]
+}
+
+fn fail(s: Store, message: String) -> Void {
+    s.failures.push(message)
+}
+
+fn note(s: Store, message: String) -> Void {
+    s.notes.push(message)
+}
+
+fn join_ints(items: List<Int>) -> String {
+    mut text = ""
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ","
+        }
+        text = text + items[i].to_string()
+    }
+    text
+}
+
+fn intern(s: Store, kind: Int, num: Int, den: Int, name: String, args: List<Int>) -> Int {
+    key = kind.to_string() + "|" + num.to_string() + "|" + den.to_string() + "|" + name + "|" + join_ints(args)
+    found = s.index.get(key)
+    match found {
+        Some(id) => id,
+        None => {
+            id = s.kinds.length()
+            s.kinds.push(kind)
+            s.nums.push(num)
+            s.dens.push(den)
+            s.names.push(name)
+            s.starts.push(s.pool.length())
+            s.counts.push(args.length())
+            for i in 0 until args.length() {
+                s.pool.push(args[i])
+            }
+            s.index.set(key, id)
+            id
+        },
+    }
+}
+
+fn arg_of(s: Store, id: Int, i: Int) -> Int {
+    s.pool[s.starts[id] + i]
+}
+
+fn args_of(s: Store, id: Int) -> List<Int> {
+    mut out: List<Int> = []
+    for i in 0 until s.counts[id] {
+        out.push(arg_of(s, id, i))
+    }
+    out
+}
+
+// ---------------------------------------------------------------- exact rationals
+
+fn gcd_int(a: Int, b: Int) -> Int {
+    mut x = if a < 0 { 0 - a } else { a }
+    mut y = if b < 0 { 0 - b } else { b }
+    while y != 0 {
+        r = x % y
+        x = y
+        y = r
+    }
+    x
+}
+
+fn fits(value: Float) -> Bool {
+    abs(value) < 9.0e18
+}
+
+fn rat(s: Store, n: Int, d: Int) -> Rat {
+    if d == 0 {
+        fail(s, "division by zero in an exact number")
+        return Rat { n: 0, d: 1 }
+    }
+    g = gcd_int(n, d)
+    sign = if d < 0 { 0 - 1 } else { 1 }
+    Rat { n: sign * (n / g), d: sign * (d / g) }
+}
+
+fn rat_add(s: Store, a: Rat, b: Rat) -> Rat {
+    if not (fits((a.n as Float) * (b.d as Float)) and fits((b.n as Float) * (a.d as Float)) and fits((a.d as Float) * (b.d as Float))) {
+        fail(s, "exact rational arithmetic overflowed 64 bits")
+        return Rat { n: 0, d: 1 }
+    }
+    rat(s, a.n * b.d + b.n * a.d, a.d * b.d)
+}
+
+fn rat_mul(s: Store, a: Rat, b: Rat) -> Rat {
+    if not (fits((a.n as Float) * (b.n as Float)) and fits((a.d as Float) * (b.d as Float))) {
+        fail(s, "exact rational arithmetic overflowed 64 bits")
+        return Rat { n: 0, d: 1 }
+    }
+    rat(s, a.n * b.n, a.d * b.d)
+}
+
+fn rat_pow_int(s: Store, base: Rat, exponent: Int) -> Rat {
+    if exponent < 0 {
+        if base.n == 0 {
+            fail(s, "zero raised to a negative power")
+            return Rat { n: 0, d: 1 }
+        }
+        return rat_pow_int(s, rat(s, base.d, base.n), 0 - exponent)
+    }
+    mut result = Rat { n: 1, d: 1 }
+    for i in 0 until exponent {
+        result = rat_mul(s, result, base)
+    }
+    result
+}
+
+fn num_id(s: Store, r: Rat) -> Int {
+    intern(s, 0, r.n, r.d, "", [])
+}
+
+fn int_id(s: Store, n: Int) -> Int {
+    intern(s, 0, n, 1, "", [])
+}
+
+fn is_num(s: Store, id: Int) -> Bool {
+    s.kinds[id] == 0
+}
+
+fn rat_of(s: Store, id: Int) -> Rat {
+    Rat { n: s.nums[id], d: s.dens[id] }
+}
+
+fn is_int_num(s: Store, id: Int) -> Bool {
+    s.kinds[id] == 0 and s.dens[id] == 1
+}
+
+fn is_zero(s: Store, id: Int) -> Bool {
+    s.kinds[id] == 0 and s.nums[id] == 0
+}
+
+fn is_one(s: Store, id: Int) -> Bool {
+    s.kinds[id] == 0 and s.nums[id] == 1 and s.dens[id] == 1
+}
+
+/// True when the expression is provably nonzero: a nonzero number, a symbol assumed nonzero or
+/// positive, or a power or product of such factors.
+fn known_nonzero(s: Store, id: Int) -> Bool {
+    kind = s.kinds[id]
+    if kind == 0 {
+        return s.nums[id] != 0
+    }
+    if kind == 1 {
+        return s.nums[id] % 4 >= 2 or s.nums[id] % 2 == 1
+    }
+    if kind == 3 {
+        for i in 0 until s.counts[id] {
+            if not known_nonzero(s, arg_of(s, id, i)) {
+                return false
+            }
+        }
+        return true
+    }
+    if kind == 4 {
+        return known_nonzero(s, arg_of(s, id, 0))
+    }
+    false
+}
+
+/// True when the expression is provably positive.
+fn known_positive(s: Store, id: Int) -> Bool {
+    kind = s.kinds[id]
+    if kind == 0 {
+        return s.nums[id] > 0
+    }
+    if kind == 1 {
+        return s.nums[id] % 2 == 1
+    }
+    if kind == 3 {
+        for i in 0 until s.counts[id] {
+            if not known_positive(s, arg_of(s, id, i)) {
+                return false
+            }
+        }
+        return true
+    }
+    if kind == 4 {
+        return known_positive(s, arg_of(s, id, 0))
+    }
+    if kind == 2 {
+        for i in 0 until s.counts[id] {
+            if not known_positive(s, arg_of(s, id, i)) {
+                return false
+            }
+        }
+        return true
+    }
+    false
+}
+
+fn sort_ids(items: List<Int>) -> List<Int> {
+    mut out: List<Int> = []
+    for x in items {
+        mut next: List<Int> = []
+        mut placed = false
+        for y in out {
+            if not placed and x < y {
+                next.push(x)
+                placed = true
+            }
+            next.push(y)
+        }
+        if not placed {
+            next.push(x)
+        }
+        out = next
+    }
+    out
+}
+
+// ---------------------------------------------------------------- canonical constructors
+
+fn concat_ids(a: List<Int>, b: List<Int>) -> List<Int> {
+    mut out: List<Int> = []
+    for x in a {
+        out.push(x)
+    }
+    for y in b {
+        out.push(y)
+    }
+    out
+}
+
+/// Split a term into its numeric coefficient and the remaining factor id (-1 for a pure number).
+fn term_coefficient(s: Store, id: Int) -> Rat {
+    if s.kinds[id] == 0 {
+        return rat_of(s, id)
+    }
+    if s.kinds[id] == 3 and s.kinds[arg_of(s, id, 0)] == 0 {
+        return rat_of(s, arg_of(s, id, 0))
+    }
+    Rat { n: 1, d: 1 }
+}
+
+fn term_rest(s: Store, id: Int) -> Int {
+    if s.kinds[id] == 0 {
+        return 0 - 1
+    }
+    if s.kinds[id] == 3 and s.kinds[arg_of(s, id, 0)] == 0 {
+        count = s.counts[id]
+        if count == 2 {
+            return arg_of(s, id, 1)
+        }
+        mut rest: List<Int> = []
+        for i in 1 until count {
+            rest.push(arg_of(s, id, i))
+        }
+        return intern(s, 3, 0, 1, "", rest)
+    }
+    id
+}
+
+fn add_ids(s: Store, items: List<Int>) -> Int {
+    mut flat: List<Int> = []
+    for item in items {
+        if s.kinds[item] == 2 {
+            flat = concat_ids(flat, args_of(s, item))
+        } else {
+            flat.push(item)
+        }
+    }
+    mut constant = Rat { n: 0, d: 1 }
+    mut rests: List<Int> = []
+    mut coefs: List<Rat> = []
+    for term in flat {
+        c = term_coefficient(s, term)
+        r = term_rest(s, term)
+        if r == 0 - 1 {
+            constant = rat_add(s, constant, c)
+        } else {
+            mut found = false
+            mut next_coefs: List<Rat> = []
+            for k in 0 until rests.length() {
+                if rests[k] == r {
+                    next_coefs.push(rat_add(s, coefs[k], c))
+                    found = true
+                } else {
+                    next_coefs.push(coefs[k])
+                }
+            }
+            if found {
+                coefs = next_coefs
+            } else {
+                rests.push(r)
+                coefs.push(c)
+            }
+        }
+    }
+    mut terms: List<Int> = []
+    for k in 0 until rests.length() {
+        c = coefs[k]
+        if c.n != 0 {
+            if c.n == 1 and c.d == 1 {
+                terms.push(rests[k])
+            } else {
+                terms.push(mul_ids(s, [num_id(s, c), rests[k]]))
+            }
+        }
+    }
+    sorted = sort_ids(terms)
+    mut all: List<Int> = []
+    if constant.n != 0 {
+        all.push(num_id(s, constant))
+    }
+    all = concat_ids(all, sorted)
+    if all.length() == 0 {
+        return int_id(s, 0)
+    }
+    if all.length() == 1 {
+        return all[0]
+    }
+    intern(s, 2, 0, 1, "", all)
+}
+
+/// A factor as (base, exponent): a power with a numeric exponent splits, anything else has exponent 1.
+fn factor_base(s: Store, id: Int) -> Int {
+    if s.kinds[id] == 4 and s.kinds[arg_of(s, id, 1)] == 0 {
+        return arg_of(s, id, 0)
+    }
+    id
+}
+
+fn factor_exponent(s: Store, id: Int) -> Rat {
+    if s.kinds[id] == 4 and s.kinds[arg_of(s, id, 1)] == 0 {
+        return rat_of(s, arg_of(s, id, 1))
+    }
+    Rat { n: 1, d: 1 }
+}
+
+fn mul_ids(s: Store, items: List<Int>) -> Int {
+    mut flat: List<Int> = []
+    for item in items {
+        if s.kinds[item] == 3 {
+            flat = concat_ids(flat, args_of(s, item))
+        } else {
+            flat.push(item)
+        }
+    }
+    mut constant = Rat { n: 1, d: 1 }
+    mut bases: List<Int> = []
+    mut exps: List<Rat> = []
+    for factor in flat {
+        if s.kinds[factor] == 0 {
+            constant = rat_mul(s, constant, rat_of(s, factor))
+        } else {
+            b = factor_base(s, factor)
+            e = factor_exponent(s, factor)
+            mut found = false
+            mut next_exps: List<Rat> = []
+            for k in 0 until bases.length() {
+                if bases[k] == b {
+                    next_exps.push(rat_add(s, exps[k], e))
+                    found = true
+                } else {
+                    next_exps.push(exps[k])
+                }
+            }
+            if found {
+                exps = next_exps
+            } else {
+                bases.push(b)
+                exps.push(e)
+            }
+        }
+    }
+    if constant.n == 0 {
+        return int_id(s, 0)
+    }
+    mut factors: List<Int> = []
+    for k in 0 until bases.length() {
+        factors.push(pow_ids(s, bases[k], num_id(s, exps[k])))
+    }
+    mut numeric_extra = constant
+    mut kept: List<Int> = []
+    for f in factors {
+        if s.kinds[f] == 0 {
+            numeric_extra = rat_mul(s, numeric_extra, rat_of(s, f))
+        } else {
+            kept.push(f)
+        }
+    }
+    sorted = sort_ids(kept)
+    mut all: List<Int> = []
+    if not (numeric_extra.n == 1 and numeric_extra.d == 1) {
+        all.push(num_id(s, numeric_extra))
+    }
+    all = concat_ids(all, sorted)
+    if all.length() == 0 {
+        return int_id(s, 1)
+    }
+    if all.length() == 1 {
+        return all[0]
+    }
+    intern(s, 3, 0, 1, "", all)
+}
+
+fn pow_ids(s: Store, base: Int, exponent: Int) -> Int {
+    if s.kinds[exponent] == 0 {
+        e = rat_of(s, exponent)
+        if e.n == 0 {
+            if known_nonzero(s, base) {
+                return int_id(s, 1)
+            }
+            return intern(s, 4, 0, 1, "", [base, exponent])
+        }
+        if e.n == 1 and e.d == 1 {
+            return base
+        }
+        if is_one(s, base) {
+            return base
+        }
+        if s.kinds[base] == 0 and e.d == 1 {
+            return num_id(s, rat_pow_int(s, rat_of(s, base), e.n))
+        }
+        if s.kinds[base] == 0 and s.nums[base] == 0 and e.n > 0 {
+            return base
+        }
+        if s.kinds[base] == 4 and s.kinds[arg_of(s, base, 1)] == 0 {
+            inner_base = arg_of(s, base, 0)
+            inner = rat_of(s, arg_of(s, base, 1))
+            if e.d == 1 or known_positive(s, inner_base) {
+                return pow_ids(s, inner_base, num_id(s, rat_mul(s, inner, e)))
+            }
+        }
+        if s.kinds[base] == 3 and e.d == 1 {
+            mut parts: List<Int> = []
+            for i in 0 until s.counts[base] {
+                parts.push(pow_ids(s, arg_of(s, base, i), exponent))
+            }
+            return mul_ids(s, parts)
+        }
+    }
+    intern(s, 4, 0, 1, "", [base, exponent])
+}
+
+fn call_id(s: Store, name: String, arg: Int) -> Int {
+    if name == "sin" and is_zero(s, arg) {
+        return int_id(s, 0)
+    }
+    if name == "cos" and is_zero(s, arg) {
+        return int_id(s, 1)
+    }
+    if name == "exp" {
+        if is_zero(s, arg) {
+            return int_id(s, 1)
+        }
+        if s.kinds[arg] == 5 and s.names[arg] == "ln" and known_positive(s, arg_of(s, arg, 0)) {
+            return arg_of(s, arg, 0)
+        }
+    }
+    if name == "ln" {
+        if is_one(s, arg) {
+            return int_id(s, 0)
+        }
+        if s.kinds[arg] == 5 and s.names[arg] == "exp" {
+            return arg_of(s, arg, 0)
+        }
+    }
+    intern(s, 5, 0, 1, name, [arg])
+}
+
+// ---------------------------------------------------------------- structure queries
+
+fn free_of(s: Store, id: Int, v: Int) -> Bool {
+    if id == v {
+        return false
+    }
+    if s.kinds[id] <= 1 {
+        return true
+    }
+    for i in 0 until s.counts[id] {
+        if not free_of(s, arg_of(s, id, i), v) {
+            return false
+        }
+    }
+    true
+}
+
+// ---------------------------------------------------------------- differentiation
+
+fn diff_ids(s: Store, id: Int, v: Int) -> Int {
+    kind = s.kinds[id]
+    if kind == 0 {
+        return int_id(s, 0)
+    }
+    if kind == 1 {
+        return int_id(s, if id == v { 1 } else { 0 })
+    }
+    if kind == 2 {
+        mut parts: List<Int> = []
+        for i in 0 until s.counts[id] {
+            parts.push(diff_ids(s, arg_of(s, id, i), v))
+        }
+        return add_ids(s, parts)
+    }
+    if kind == 3 {
+        mut terms: List<Int> = []
+        n = s.counts[id]
+        for i in 0 until n {
+            mut factors: List<Int> = []
+            for j in 0 until n {
+                if i == j {
+                    factors.push(diff_ids(s, arg_of(s, id, j), v))
+                } else {
+                    factors.push(arg_of(s, id, j))
+                }
+            }
+            terms.push(mul_ids(s, factors))
+        }
+        return add_ids(s, terms)
+    }
+    if kind == 4 {
+        base = arg_of(s, id, 0)
+        exponent = arg_of(s, id, 1)
+        base_d = diff_ids(s, base, v)
+        if free_of(s, exponent, v) {
+            reduced = add_ids(s, [exponent, int_id(s, 0 - 1)])
+            return mul_ids(s, [exponent, pow_ids(s, base, reduced), base_d])
+        }
+        if known_positive(s, base) {
+            exp_d = diff_ids(s, exponent, v)
+            inner = add_ids(s, [mul_ids(s, [exp_d, call_id(s, "ln", base)]), mul_ids(s, [exponent, base_d, pow_ids(s, base, int_id(s, 0 - 1))])])
+            return mul_ids(s, [id, inner])
+        }
+        note(s, "differentiating a power with a variable exponent needs a positive base")
+        return int_id(s, 0)
+    }
+    arg = arg_of(s, id, 0)
+    inner_d = diff_ids(s, arg, v)
+    name = s.names[id]
+    if name == "sin" {
+        return mul_ids(s, [call_id(s, "cos", arg), inner_d])
+    }
+    if name == "cos" {
+        return mul_ids(s, [int_id(s, 0 - 1), call_id(s, "sin", arg), inner_d])
+    }
+    if name == "exp" {
+        return mul_ids(s, [id, inner_d])
+    }
+    if name == "ln" {
+        return mul_ids(s, [inner_d, pow_ids(s, arg, int_id(s, 0 - 1))])
+    }
+    note(s, "no derivative rule for function " + name)
+    int_id(s, 0)
+}
+
+// ---------------------------------------------------------------- substitution and expansion
+
+fn subs_ids(s: Store, id: Int, v: Int, replacement: Int) -> Int {
+    if id == v {
+        return replacement
+    }
+    kind = s.kinds[id]
+    if kind <= 1 {
+        return id
+    }
+    mut parts: List<Int> = []
+    for i in 0 until s.counts[id] {
+        parts.push(subs_ids(s, arg_of(s, id, i), v, replacement))
+    }
+    if kind == 2 {
+        return add_ids(s, parts)
+    }
+    if kind == 3 {
+        return mul_ids(s, parts)
+    }
+    if kind == 4 {
+        return pow_ids(s, parts[0], parts[1])
+    }
+    call_id(s, s.names[id], parts[0])
+}
+
+fn product_of_two(s: Store, a: Int, b: Int) -> Int {
+    if s.kinds[a] == 2 {
+        mut parts: List<Int> = []
+        for i in 0 until s.counts[a] {
+            parts.push(product_of_two(s, arg_of(s, a, i), b))
+        }
+        return add_ids(s, parts)
+    }
+    if s.kinds[b] == 2 {
+        mut parts: List<Int> = []
+        for i in 0 until s.counts[b] {
+            parts.push(product_of_two(s, a, arg_of(s, b, i)))
+        }
+        return add_ids(s, parts)
+    }
+    mul_ids(s, [a, b])
+}
+
+fn expand_ids(s: Store, id: Int) -> Int {
+    kind = s.kinds[id]
+    if kind <= 1 {
+        return id
+    }
+    if kind == 5 {
+        return call_id(s, s.names[id], expand_ids(s, arg_of(s, id, 0)))
+    }
+    if kind == 2 {
+        mut parts: List<Int> = []
+        for i in 0 until s.counts[id] {
+            parts.push(expand_ids(s, arg_of(s, id, i)))
+        }
+        return add_ids(s, parts)
+    }
+    if kind == 3 {
+        mut acc = int_id(s, 1)
+        for i in 0 until s.counts[id] {
+            acc = product_of_two(s, acc, expand_ids(s, arg_of(s, id, i)))
+        }
+        return acc
+    }
+    base = expand_ids(s, arg_of(s, id, 0))
+    exponent = arg_of(s, id, 1)
+    if s.kinds[base] == 2 and is_int_num(s, exponent) and s.nums[exponent] >= 2 and s.nums[exponent] <= 32 {
+        mut acc = int_id(s, 1)
+        for i in 0 until s.nums[exponent] {
+            acc = product_of_two(s, acc, base)
+        }
+        return acc
+    }
+    pow_ids(s, base, exponent)
+}
+
+// ---------------------------------------------------------------- numeric evaluation
+
+fn eval_ids(s: Store, id: Int, names: List<String>, values: List<Float>) -> Result<Float, String> {
+    kind = s.kinds[id]
+    if kind == 0 {
+        return Ok((s.nums[id] as Float) / (s.dens[id] as Float))
+    }
+    if kind == 1 {
+        for i in 0 until names.length() {
+            if names[i] == s.names[id] {
+                return Ok(values[i])
+            }
+        }
+        return Err("no value for symbol " + s.names[id])
+    }
+    mut parts: List<Float> = []
+    for i in 0 until s.counts[id] {
+        match eval_ids(s, arg_of(s, id, i), names, values) {
+            Ok(value) => parts.push(value),
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    if kind == 2 {
+        mut total = 0.0
+        for p in parts {
+            total = total + p
+        }
+        return Ok(total)
+    }
+    if kind == 3 {
+        mut total = 1.0
+        for p in parts {
+            total = total * p
+        }
+        return Ok(total)
+    }
+    if kind == 4 {
+        base = parts[0]
+        exponent = parts[1]
+        if base < 0.0 and exponent != floor(exponent) {
+            return Err("negative base with a non-integer exponent")
+        }
+        if base == 0.0 and exponent < 0.0 {
+            return Err("division by zero")
+        }
+        return Ok(pow(base, exponent))
+    }
+    name = s.names[id]
+    x = parts[0]
+    if name == "sin" {
+        return Ok(sin(x))
+    }
+    if name == "cos" {
+        return Ok(cos(x))
+    }
+    if name == "exp" {
+        return Ok(exp(x))
+    }
+    if name == "ln" {
+        if x <= 0.0 {
+            return Err("ln of a non-positive number")
+        }
+        return Ok(ln(x))
+    }
+    Err("cannot evaluate function " + name)
+}
+
+// ---------------------------------------------------------------- printing
+
+fn rat_text(r: Rat) -> String {
+    if r.d == 1 {
+        return r.n.to_string()
+    }
+    r.n.to_string() + "/" + r.d.to_string()
+}
+
+fn atomic(s: Store, id: Int) -> Bool {
+    kind = s.kinds[id]
+    if kind == 0 {
+        return s.dens[id] == 1 and s.nums[id] >= 0
+    }
+    kind == 1 or kind == 5
+}
+
+fn show_ids(s: Store, id: Int) -> String {
+    kind = s.kinds[id]
+    if kind == 0 {
+        return rat_text(rat_of(s, id))
+    }
+    if kind == 1 {
+        return s.names[id]
+    }
+    if kind == 5 {
+        return s.names[id] + "(" + show_ids(s, arg_of(s, id, 0)) + ")"
+    }
+    if kind == 4 {
+        base = arg_of(s, id, 0)
+        exponent = arg_of(s, id, 1)
+        mut left = show_ids(s, base)
+        if not atomic(s, base) {
+            left = "(" + left + ")"
+        }
+        mut right = show_ids(s, exponent)
+        if not atomic(s, exponent) {
+            right = "(" + right + ")"
+        }
+        return left + "^" + right
+    }
+    if kind == 3 {
+        mut text = ""
+        for i in 0 until s.counts[id] {
+            factor = arg_of(s, id, i)
+            mut piece = show_ids(s, factor)
+            if s.kinds[factor] == 2 or (s.kinds[factor] == 0 and i > 0) {
+                piece = "(" + piece + ")"
+            }
+            if i == 0 and s.kinds[factor] == 0 and s.nums[factor] == 0 - 1 and s.dens[factor] == 1 {
+                text = "-"
+            } else {
+                if i > 0 and text != "-" {
+                    text = text + "*"
+                }
+                text = text + piece
+            }
+        }
+        return text
+    }
+    mut text = ""
+    for i in 0 until s.counts[id] {
+        piece = show_ids(s, arg_of(s, id, i))
+        if i == 0 {
+            text = piece
+        } else {
+            if piece.starts_with("-") {
+                text = text + " - " + piece.slice(1, piece.length())
+            } else {
+                text = text + " + " + piece
+            }
+        }
+    }
+    text
+}
+
+// ---------------------------------------------------------------- public API
+
+fn wrap(s: Store, id: Int) -> Expr {
+    Expr { store: s, id: id }
+}
+
+/// The exact rational n/d (d defaults to 1).
+pub fn number(s: Store, n: Int, d: Int = 1) -> Expr {
+    wrap(s, num_id(s, rat(s, n, d)))
+}
+
+/// A real symbol. `assumption` is "real" (no assumption), "positive", "nonzero" or "integer".
+pub fn symbol(s: Store, name: String, assumption: String = "real") -> Expr {
+    bits = if assumption == "positive" {
+        1
+    } else if assumption == "nonzero" {
+        2
+    } else if assumption == "integer" {
+        4
+    } else {
+        0
+    }
+    wrap(s, intern(s, 1, bits, 1, name, []))
+}
+
+pub fn add(a: Expr, b: Expr) -> Expr {
+    wrap(a.store, add_ids(a.store, [a.id, b.id]))
+}
+
+pub fn neg(a: Expr) -> Expr {
+    wrap(a.store, mul_ids(a.store, [int_id(a.store, 0 - 1), a.id]))
+}
+
+pub fn sub(a: Expr, b: Expr) -> Expr {
+    add(a, neg(b))
+}
+
+pub fn mul(a: Expr, b: Expr) -> Expr {
+    wrap(a.store, mul_ids(a.store, [a.id, b.id]))
+}
+
+/// a / b as a * b^-1; fails the store when b is the number zero.
+pub fn div(a: Expr, b: Expr) -> Expr {
+    if is_zero(b.store, b.id) {
+        fail(b.store, "division by zero")
+    }
+    wrap(a.store, mul_ids(a.store, [a.id, pow_ids(a.store, b.id, int_id(a.store, 0 - 1))]))
+}
+
+pub fn power(a: Expr, b: Expr) -> Expr {
+    wrap(a.store, pow_ids(a.store, a.id, b.id))
+}
+
+/// A named function call: "sin", "cos", "exp" or "ln".
+pub fn call(name: String, a: Expr) -> Expr {
+    wrap(a.store, call_id(a.store, name, a.id))
+}
+
+/// Structural equality (expressions of one store are canonical and shared).
+pub fn same(a: Expr, b: Expr) -> Bool {
+    a.id == b.id
+}
+
+pub fn show(a: Expr) -> String {
+    show_ids(a.store, a.id)
+}
+
+/// Distribute products over sums and expand small integer powers of sums.
+pub fn expand(a: Expr) -> Expr {
+    wrap(a.store, expand_ids(a.store, a.id))
+}
+
+/// Replace `v` (a symbol) by `replacement`, re-canonicalizing.
+pub fn subs(a: Expr, v: Expr, replacement: Expr) -> Expr {
+    wrap(a.store, subs_ids(a.store, a.id, v.id, replacement.id))
+}
+
+/// d a / d v for a symbol `v`. Fails with a typed message for unsupported functions, a variable
+/// exponent over a base that is not known positive, or a store that already failed.
+pub fn diff(a: Expr, v: Expr) -> Result<Expr, String> {
+    if a.store.kinds[v.id] != 1 {
+        return Err("diff needs a symbol to differentiate by")
+    }
+    if a.store.failures.length() > 0 {
+        return Err(a.store.failures[0])
+    }
+    before = a.store.notes.length()
+    result = diff_ids(a.store, a.id, v.id)
+    if a.store.notes.length() > before {
+        return Err(a.store.notes[before])
+    }
+    if a.store.failures.length() > 0 {
+        return Err(a.store.failures[0])
+    }
+    Ok(wrap(a.store, result))
+}
+
+/// Numeric value with the given symbol values (`names[i]` takes `values[i]`).
+pub fn eval(a: Expr, names: List<String>, values: List<Float>) -> Result<Float, String> {
+    if a.store.failures.length() > 0 {
+        return Err(a.store.failures[0])
+    }
+    eval_ids(a.store, a.id, names, values)
+}
+
+/// True when `a` contains the symbol `v`.
+pub fn depends_on(a: Expr, v: Expr) -> Bool {
+    not free_of(a.store, a.id, v.id)
+}
+
+/// The derivative rendered as text, or "error: ..." with the typed message.
+pub fn diff_text(a: Expr, v: Expr) -> String {
+    match diff(a, v) {
+        Ok(d) => show(d),
+        Err(message) => "error: " + message,
+    }
+}
+
+/// The numeric value rendered as text, or "error: ..." with the typed message.
+pub fn eval_text(a: Expr, names: List<String>, values: List<Float>) -> String {
+    match eval(a, names, values) {
+        Ok(value) => value.to_string(),
+        Err(message) => "error: " + message,
+    }
+}
+
+/// The numeric value, or `fallback` when evaluation fails (unknown symbol, domain error).
+pub fn eval_or(a: Expr, names: List<String>, values: List<Float>, fallback: Float) -> Float {
+    match eval(a, names, values) {
+        Ok(value) => value,
+        Err(message) => fallback,
+    }
+}
