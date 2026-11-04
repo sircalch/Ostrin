@@ -1,0 +1,41 @@
+// std.symbolic: exact numbers, canonical expressions, assumptions, differentiation, substitution
+// and numeric evaluation on a hash-consed store.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    y = symbolic.symbol(s, "y")
+    two = symbolic.number(s, 2)
+    half = symbolic.number(s, 1, 2)
+
+    // canonical form: commutativity, like terms and exact rationals
+    print(symbolic.show(symbolic.add(x, x)))
+    print(symbolic.show(symbolic.add(symbolic.mul(two, x), symbolic.mul(half, x))))
+    print(symbolic.same(symbolic.add(x, y), symbolic.add(y, x)))
+    print(symbolic.show(symbolic.mul(x, x)))
+    print(symbolic.show(symbolic.sub(x, x)))
+
+    // assumptions gate unsound simplifications
+    print(symbolic.show(symbolic.div(x, x)))
+    p = symbolic.symbol(s, "p", "positive")
+    print(symbolic.show(symbolic.div(p, p)))
+
+    // derivatives
+    cube = symbolic.power(x, symbolic.number(s, 3))
+    print("d(x^3)/dx = " + symbolic.diff_text(cube, x))
+    print("d(x*sin(x))/dx = " + symbolic.diff_text(symbolic.mul(x, symbolic.call("sin", x)), x))
+    print("d(exp(2x))/dx = " + symbolic.diff_text(symbolic.call("exp", symbolic.mul(two, x)), x))
+    print("d(ln(x^2))/dx = " + symbolic.diff_text(symbolic.call("ln", symbolic.power(x, two)), x))
+    print("d(x^x)/dx = " + symbolic.diff_text(symbolic.power(x, x), x))
+    print("d(x^p)/dx = " + symbolic.diff_text(symbolic.power(p, p), p))
+    print("d(y)/dx = " + symbolic.diff_text(y, x))
+
+    // substitution and numeric evaluation
+    poly = symbolic.add(symbolic.mul(symbolic.number(s, 3), symbolic.power(x, two)), symbolic.add(x, symbolic.number(s, 1)))
+    print(symbolic.show(poly))
+    print(symbolic.show(symbolic.subs(poly, x, symbolic.number(s, 2))))
+    print(symbolic.eval_text(poly, ["x"], [2.0]))
+    print(symbolic.eval_text(poly, ["z"], [2.0]))
+    print(symbolic.show(symbolic.expand(symbolic.power(symbolic.add(x, y), two))))
+}
