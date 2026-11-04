@@ -4,6 +4,13 @@
 
 ### Correctness
 
+- Recursive enums (`enum Expr { Num(Int) Add(Expr, Expr) }`, mutual recursion,
+  `Option<Self>` payloads and generic instances) now compile in the native C and
+  WASI backends. A payload whose type reaches the enclosing enum is stored as a
+  ref-counted heap box owned by the parent variant; construction, pattern
+  binding, retain/drop, display and hashing go through the box, and
+  `--compile --leak-check` reports `live_allocations=0`. New example
+  `recursive_enum.ostrin` with interpreter/native, leak and WASI coverage.
 - HIR now preserves borrowed managed payloads when unwrapping `Option`/`Result`,
   including list iteration and string concatenation. Owned loop temporaries are
   released on early return as well as normal loop exit; regression coverage
@@ -132,7 +139,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 320-example, 404-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 321-example, 407-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 

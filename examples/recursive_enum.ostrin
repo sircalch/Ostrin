@@ -1,0 +1,129 @@
+// Recursive algebraic data types: a variant payload may name its own enum
+// (directly or through another enum). The native backend stores such a payload
+// as a reference-counted heap box owned by the parent value.
+
+enum Expr {
+    Num(Int)
+    Var(String)
+    Add(Expr, Expr)
+    Mul(Expr, Expr)
+}
+
+enum Tree {
+    Leaf
+    Node(Tree, Int, Tree)
+}
+
+// Mutually recursive enums.
+enum Stmt {
+    Print(Int)
+    Block(Body)
+}
+
+enum Body {
+    Empty
+    Cons(Stmt, Body)
+}
+
+fn eval(e: Expr, x: Int) -> Int {
+    match e {
+        Num(n) => n,
+        Var(name) => x,
+        Add(a, b) => eval(a, x) + eval(b, x),
+        Mul(a, b) => eval(a, x) * eval(b, x),
+    }
+}
+
+fn show(e: Expr) -> String {
+    match e {
+        Num(n) => n.to_string(),
+        Var(name) => name,
+        Add(a, b) => "(" + show(a) + " + " + show(b) + ")",
+        Mul(a, b) => show(a) + " * " + show(b),
+    }
+}
+
+// Nested patterns reach through two boxes.
+fn simplify(e: Expr) -> Expr {
+    match e {
+        Add(Num(0), rhs) => simplify(rhs),
+        Add(lhs, Num(0)) => simplify(lhs),
+        Mul(Num(1), rhs) => simplify(rhs),
+        Mul(Num(0), rhs) => Num(0),
+        Add(a, b) => Add(simplify(a), simplify(b)),
+        Mul(a, b) => Mul(simplify(a), simplify(b)),
+        other => other,
+    }
+}
+
+fn insert(t: Tree, v: Int) -> Tree {
+    match t {
+        Leaf => Node(Leaf, v, Leaf),
+        Node(l, x, r) => if v < x { Node(insert(l, v), x, r) } else { Node(l, x, insert(r, v)) },
+    }
+}
+
+fn tree_sum(t: Tree) -> Int {
+    match t {
+        Leaf => 0,
+        Node(l, x, r) => tree_sum(l) + x + tree_sum(r),
+    }
+}
+
+fn depth(t: Tree) -> Int {
+    match t {
+        Leaf => 0,
+        Node(l, x, r) => {
+            dl = depth(l)
+            dr = depth(r)
+            1 + if dl > dr { dl } else { dr }
+        },
+    }
+}
+
+fn count_stmt(s: Stmt) -> Int {
+    match s {
+        Print(n) => 1,
+        Block(body) => count_body(body),
+    }
+}
+
+fn count_body(b: Body) -> Int {
+    match b {
+        Empty => 0,
+        Cons(s, rest) => count_stmt(s) + count_body(rest),
+    }
+}
+
+fn main() -> Void {
+    e = Add(Mul(Num(2), Var("x")), Num(5))
+    print(show(e))
+    print(eval(e, 10))
+
+    // The same subtree is shared by two parents.
+    shared = Mul(Num(3), Var("y"))
+    both = Add(shared, shared)
+    print(show(both))
+    print(eval(both, 4))
+    print(show(simplify(Add(Num(0), Mul(Num(1), Var("z"))))))
+
+    mut exprs: List<Expr> = []
+    exprs.push(e)
+    exprs.push(both)
+    exprs.push(simplify(Add(Num(0), e)))
+    mut total = 0
+    for item in exprs {
+        total = total + eval(item, 1)
+    }
+    print(total)
+
+    mut t: Tree = Leaf
+    for v in [5, 2, 8, 1, 9, 3] {
+        t = insert(t, v)
+    }
+    print(tree_sum(t))
+    print(depth(t))
+
+    program = Block(Cons(Print(1), Cons(Block(Cons(Print(2), Empty)), Empty)))
+    print(count_stmt(program))
+}
