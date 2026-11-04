@@ -362,7 +362,10 @@ impl Emitter<'_> {
             if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
                 return Err(());
             }
-            inits.push(format!(".{field} = {}", self.expr(&arg.value)?));
+            inits.push(format!(
+                ".{field} = {}",
+                crate::codegen::enum_field_init(&self.expr(&arg.value)?, &v.enum_name, want)
+            ));
         }
         Ok(format!(
             "(({}){{ .tag = {}, .data.{name} = {{ {} }} }})",
@@ -1107,7 +1110,11 @@ impl Emitter<'_> {
                     let field_ty = self.ty_of_c(&field_c)?;
                     self.pattern(
                         sub,
-                        &format!("{var}.data.{name}.{actual}"),
+                        &crate::codegen::enum_field_value(
+                            &format!("{var}.data.{name}.{actual}"),
+                            &v.enum_name,
+                            &field_c,
+                        ),
                         &field_ty,
                         condition,
                         bindings,

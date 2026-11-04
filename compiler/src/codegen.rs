@@ -1616,6 +1616,91 @@ struct MethodInfo<'a> {
     self_ty: CType,
 }
 
+thread_local! {
+    /// By-value enum-typed payload edges (`enum -> field C type names`) used
+    /// to find recursive enums. C cannot embed an incomplete struct by value,
+    /// so a payload whose enum type can reach back to the enclosing enum is
+    /// stored as a heap box (`T*`) owned by the parent variant.
+    static ENUM_FIELD_EDGES: std::cell::RefCell<HashMap<String, Vec<String>>> =
+        std::cell::RefCell::new(HashMap::new());
+}
+
+pub(crate) fn reset_enum_field_edges() {
+    ENUM_FIELD_EDGES.with(|edges| edges.borrow_mut().clear());
+}
+
+/// Records the by-value dependencies of one variant's payload. Option/Result
+/// wrappers are graph nodes of their own so `Link(Int, Option<Chain>)` is
+/// detected as recursive.
+fn register_enum_field_edges(enum_name: &str, fields: &[(String, CType)]) {
+    fn add(edges: &mut HashMap<String, Vec<String>>, from: &str, ty: &CType) {
+        let name = c_type_name(ty);
+        edges
+            .entry(from.to_string())
+            .or_default()
+            .push(name.clone());
+        match ty {
+            CType::Option(inner) => add(edges, &name, inner),
+            CType::Result(ok, err) => {
+                add(edges, &name, ok);
+                add(edges, &name, err);
+            }
+            _ => {}
+        }
+    }
+    ENUM_FIELD_EDGES.with(|edges| {
+        let mut edges = edges.borrow_mut();
+        edges.entry(enum_name.to_string()).or_default();
+        for (_, ty) in fields {
+            add(&mut edges, enum_name, ty);
+        }
+    });
+}
+
+/// Whether a payload field of C type `field_c_type` inside `enum_name` is a
+/// heap box (the field type is the enclosing enum, directly or through other
+/// enums that embed it by value).
+pub(crate) fn enum_field_is_boxed(enum_name: &str, field_c_type: &str) -> bool {
+    ENUM_FIELD_EDGES.with(|edges| {
+        let edges = edges.borrow();
+        if !edges.contains_key(field_c_type) {
+            return false;
+        }
+        let mut seen = HashSet::new();
+        let mut stack = vec![field_c_type.to_string()];
+        while let Some(current) = stack.pop() {
+            if current == enum_name {
+                return true;
+            }
+            if !seen.insert(current.clone()) {
+                continue;
+            }
+            if let Some(next) = edges.get(&current) {
+                stack.extend(next.iter().cloned());
+            }
+        }
+        false
+    })
+}
+
+/// The by-value view of an enum payload field: dereferences boxed fields.
+pub(crate) fn enum_field_value(code: &str, enum_name: &str, field_c_type: &str) -> String {
+    if enum_field_is_boxed(enum_name, field_c_type) {
+        format!("(*({code}))")
+    } else {
+        code.to_string()
+    }
+}
+
+/// Wraps an owned by-value payload into its heap box when the field is boxed.
+pub(crate) fn enum_field_init(code: &str, enum_name: &str, field_c_type: &str) -> String {
+    if enum_field_is_boxed(enum_name, field_c_type) {
+        format!("ostrin_box_enum_{field_c_type}({code})")
+    } else {
+        code.to_string()
+    }
+}
+
 /// A variant resolved at codegen time: which enum it belongs to, its `switch`
 /// tag, and its fields (already `CType`-resolved) in declaration order. Named
 /// fields keep their name; positional fields (`name: None` in the AST) are
@@ -2419,6 +2504,9 @@ impl<'a> Codegen<'a> {
                     tag,
                     fields,
                 });
+            }
+            for info in &infos {
+                register_enum_field_edges(&mangled, &info.fields);
             }
             self.instance_variants.insert(mangled.clone(), infos);
             self.enum_names.insert(mangled.clone());
@@ -5690,8 +5778,11 @@ impl<'a> Codegen<'a> {
                             "variant '{name}' has no field matching '{field_name}'"
                         ));
                     };
-                    let field_path =
-                        format!("{scrutinee_var}.data.{}.{actual_field_name}", variant.name);
+                    let field_path = enum_field_value(
+                        &format!("{scrutinee_var}.data.{}.{actual_field_name}", variant.name),
+                        &variant.enum_name,
+                        &c_type_name(&field_ty),
+                    );
                     self.gen_pattern(
                         sub_pattern,
                         &field_path,
@@ -6024,7 +6115,11 @@ impl<'a> Codegen<'a> {
                         format!("ostrin_hash_string(\"Enum::{name}::{}\")", variant.name);
                     for (field, field_ty) in &variant.fields {
                         let field_hash = self.hash_expr(
-                            &format!("{value}.data.{}.{field}", variant.name),
+                            &enum_field_value(
+                                &format!("{value}.data.{}.{field}", variant.name),
+                                &variant.enum_name,
+                                &c_type_name(field_ty),
+                            ),
                             field_ty,
                         )?;
                         hash = format!("ostrin_hash_combine({hash}, {field_hash})");
@@ -6123,8 +6218,16 @@ impl<'a> Codegen<'a> {
                     let mut terms = Vec::new();
                     for (f, fty) in &v.fields {
                         terms.push(self.eq_expr(
-                            &format!("a.data.{}.{f}", v.name),
-                            &format!("b.data.{}.{f}", v.name),
+                            &enum_field_value(
+                                &format!("a.data.{}.{f}", v.name),
+                                &v.enum_name,
+                                &c_type_name(fty),
+                            ),
+                            &enum_field_value(
+                                &format!("b.data.{}.{f}", v.name),
+                                &v.enum_name,
+                                &c_type_name(fty),
+                            ),
                             fty,
                         )?);
                     }
@@ -7523,7 +7626,9 @@ impl<'a> Codegen<'a> {
                             variant.fields.len()
                         ));
                     }
-                    let (code, _) = self.gen_expr(expr)?;
+                    let field_ty = variant.fields[next_positional].1.clone();
+                    let (code, ty) = self.gen_expr_hint(expr, Some(field_ty.clone()))?;
+                    let code = self.coerce(&code, &ty, &field_ty)?;
                     codes[next_positional] = Some(code);
                     next_positional += 1;
                 }
@@ -7538,7 +7643,9 @@ impl<'a> Codegen<'a> {
                             variant.name
                         ));
                     };
-                    let (code, _) = self.gen_expr(expr)?;
+                    let field_ty = variant.fields[index].1.clone();
+                    let (code, ty) = self.gen_expr_hint(expr, Some(field_ty.clone()))?;
+                    let code = self.coerce(&code, &ty, &field_ty)?;
                     codes[index] = Some(code);
                 }
             }
@@ -7584,7 +7691,12 @@ impl<'a> Codegen<'a> {
             .fields
             .iter()
             .zip(arg_codes)
-            .map(|((field_name, _), code)| format!(".{field_name} = {code}"))
+            .map(|((field_name, field_ty), code)| {
+                format!(
+                    ".{field_name} = {}",
+                    enum_field_init(code, &variant.enum_name, &c_type_name(field_ty))
+                )
+            })
             .collect();
         Ok((
             format!(
@@ -8616,8 +8728,14 @@ impl<'a> Codegen<'a> {
                             ));
                         }
                         let cat = show_cat(field_ty);
-                        let shown =
-                            self.show_expr(&format!("v.data.{}.{field_name}", v.name), field_ty)?;
+                        let shown = self.show_expr(
+                            &enum_field_value(
+                                &format!("v.data.{}.{field_name}", v.name),
+                                &v.enum_name,
+                                &c_type_name(field_ty),
+                            ),
+                            field_ty,
+                        )?;
                         out.push_str(&format!("        s = {cat}(s, {shown});\n"));
                     }
                     if !v.fields.is_empty() {
@@ -9530,6 +9648,7 @@ fn generate_impl(
         enums.push(&ordering_decl);
     }
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
+    reset_enum_field_edges();
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
     let mut hir = typed.map(|t| crate::hir::lower(items, t));
@@ -9690,6 +9809,7 @@ fn generate_impl(
             for (_, ty) in &fields {
                 codegen.register_list_types(ty);
             }
+            register_enum_field_edges(&e.name, &fields);
             codegen.variants.insert(
                 variant.name.clone(),
                 VariantInfo {
@@ -11260,6 +11380,20 @@ fn generate_impl(
         ));
     }
     out.push('\n');
+    // Option/Result wrappers are complete types defined after the enum bodies;
+    // forward-declare them so a recursive payload can point at one.
+    for (ok, err) in &result_pairs {
+        let name = mangle_ctype(&CType::Result(Box::new(ok.clone()), Box::new(err.clone())));
+        if enum_field_is_boxed(&name, &name) {
+            out.push_str(&format!("typedef struct {name} {name};\n"));
+        }
+    }
+    for inner in &option_inners {
+        let name = mangle_ctype(&CType::Option(Box::new(inner.clone())));
+        if enum_field_is_boxed(&name, &name) {
+            out.push_str(&format!("typedef struct {name} {name};\n"));
+        }
+    }
     let emit_enum = |out: &mut String, name: &str, variants: &[VariantInfo]| {
         out.push_str(&format!("struct {name} {{\n    int tag;\n"));
         if variants.iter().any(|variant| !variant.fields.is_empty()) {
@@ -11270,9 +11404,11 @@ fn generate_impl(
                 }
                 out.push_str("        struct {\n");
                 for (field_name, field_ty) in &info.fields {
+                    let boxed = enum_field_is_boxed(name, &c_type_name(field_ty));
                     out.push_str(&format!(
-                        "            {} {};\n",
+                        "            {}{} {};\n",
                         c_type_name(field_ty),
+                        if boxed { "*" } else { "" },
                         field_name
                     ));
                 }
@@ -11331,7 +11467,17 @@ fn generate_impl(
         };
         let wrapper = wrapper_types.remove(index);
         let name = mangle_ctype(&wrapper);
+        let forward_declared = enum_field_is_boxed(&name, &name);
         match &wrapper {
+            CType::Option(inner) if forward_declared => out.push_str(&format!(
+                "struct {name} {{ bool has; {} value; }};\n\n",
+                c_type_name(inner)
+            )),
+            CType::Result(ok, err) if forward_declared => out.push_str(&format!(
+                "struct {name} {{ bool ok; {} value; {} error; }};\n\n",
+                field_c_type(ok),
+                field_c_type(err)
+            )),
             CType::Option(inner) => out.push_str(&format!(
                 "typedef struct {{ bool has; {} value; }} {name};\n\n",
                 c_type_name(inner)
@@ -11419,6 +11565,8 @@ fn generate_impl(
     );
     enum_drop_types.sort_by(|left, right| left.0.cmp(&right.0));
     enum_drop_types.dedup_by(|left, right| left.0 == right.0);
+    let mut boxed_payload_types: std::collections::BTreeMap<String, CType> =
+        std::collections::BTreeMap::new();
     for (name, variants) in enum_drop_types {
         let retain_signature = format!("static void ostrin_retain_enum_{name}({name} value)");
         let drop_signature = format!("static void ostrin_drop_enum_{name}({name} value)");
@@ -11429,6 +11577,12 @@ fn generate_impl(
             drop_body.push_str(&format!("    case {}: {{\n", variant.tag));
             for (field, ty) in &variant.fields {
                 let access = format!("value.data.{}.{}", variant.name, field);
+                if enum_field_is_boxed(&name, &c_type_name(ty)) {
+                    boxed_payload_types.insert(c_type_name(ty), ty.clone());
+                    retain_body.push_str(&format!("        ostrin_retain((void*)({access}));\n"));
+                    drop_body.push_str(&format!("        ostrin_release((void*)({access}));\n"));
+                    continue;
+                }
                 if let Some(retain) = retain_managed_value(&access, ty) {
                     retain_body.push_str(&format!("        {retain};\n"));
                 }
@@ -11445,6 +11599,31 @@ fn generate_impl(
         list_helper_prototypes.push(format!("{drop_signature};"));
         bodies.push((retain_signature, retain_body));
         bodies.push((drop_signature, drop_body));
+    }
+
+    // A payload that names its own enum (directly, through another enum, or
+    // inside an Option/Result wrapper) is stored behind a ref-counted heap box
+    // owned by the parent variant; the box drops its value with the last
+    // reference.
+    for (type_name, ty) in &boxed_payload_types {
+        let box_drop_signature = format!("static void ostrin_drop_box_enum_{type_name}(void* raw)");
+        let box_signature =
+            format!("static {type_name}* ostrin_box_enum_{type_name}({type_name} value)");
+        let release = release_managed_value(&format!("(*({type_name}*)raw)"), ty)
+            .map(|body| format!("    {body};\n"))
+            .unwrap_or_default();
+        list_helper_prototypes.push(format!("{box_drop_signature};"));
+        list_helper_prototypes.push(format!("{box_signature};"));
+        bodies.push((
+            box_drop_signature,
+            format!("    if (!raw) return;\n{release}"),
+        ));
+        bodies.push((
+            box_signature,
+            format!(
+                "    {type_name}* box = ({type_name}*)ostrin_alloc_with_drop(sizeof({type_name}), ostrin_drop_box_enum_{type_name});\n    if (!box) OSTRIN_OOM();\n    *box = value;\n    return box;\n"
+            ),
+        ));
     }
 
     // Record instances own any managed fields they contain, including

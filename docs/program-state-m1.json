@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.program-state/v2",
   "goal": "M2",
-  "updatedAt": "2026-11-01",
+  "updatedAt": "2026-11-03",
   "release": {
     "version": "v0.2.0",
     "status": "published-and-frozen",
@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "b70c1894d4aa4a2c214ca2da960465e5498ab4ed",
+    "mainRevision": "8e5544f9c5a739a9dede42e097e51c7f05656b73",
     "mergedPullRequests": [
       235,
       236,
@@ -28,15 +28,16 @@
       249,
       250,
       251,
-      252
+      252,
+      253
     ],
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 398,
+      "integrationTests": 401,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 312,
+      "examples": 313,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
@@ -60,7 +61,8 @@
       "M2-D": "Pendulum input hardening merged (#244); synthetic data only",
       "M2-E": "CI artifact of main 2c5efc43 verified and all 30 bundles replayed independently (validation/m2e-ci-artifact-replay-2c5efc43.json); R3 maturity stays 0; open: cross-platform replay comparison and the full R3 definition",
       "M2-F": "Adaptive Simpson quadrature, Brent root finder (#251) and least-squares polyfit by QR in the scaled variable with typed error cases; NaN comparisons follow IEEE in the interpreter; open: relative tolerance mode, weighted/uncertainty-aware fits, exact-rational reference harness",
-      "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling"
+      "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling",
+      "M2-H": "Recursive algebraic data types compile in the native C backend and WASI: a payload naming its own enum (directly, through mutual recursion, inside Option/Result, or in a generic instance) is a ref-counted heap box owned by the parent variant; open: Option/Result payloads of non-recursive enums, AST-fallback ownership of enum payloads"
     },
     "gates": [
       {

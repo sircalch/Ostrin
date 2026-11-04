@@ -21008,3 +21008,111 @@ fn std_numeric_polyfit_matches_interpreter_and_native() {
         "quadratic at 0: true\nquadratic at 2.5: true\nquadratic residual small: true\nline intercept: true\nline slope: true\nline residual positive: true\nlength mismatch: polyfit needs xs and ys with the same length\ntoo few: polyfit needs at least degree + 1 samples\nnegative degree: polyfit needs a non-negative degree\nrepeated x: polyfit could not determine the polynomial: qr found a linearly dependent column\nnon-finite: polyfit needs finite samples\n"
     );
 }
+
+#[test]
+fn recursive_enum_matches_interpreter_and_native() {
+    // Direct (Expr, Tree) and mutual (Stmt/Body) recursion, shared subtrees, nested patterns and
+    // lists of recursive values all run natively with the interpreter's output.
+    assert_eq!(
+        interpreter_and_native_agree("recursive_enum.ostrin"),
+        "(2 * x + 5)\n25\n(3 * y + 3 * y)\n24\nz\n20\n28\n3\n2\n"
+    );
+}
+
+#[test]
+fn native_recursive_enum_boxes_payloads_and_frees_them() {
+    // A payload whose type is the enclosing enum is a ref-counted heap box owned by the parent
+    // variant; construction, matching, retain/drop and WASI emission must all agree on that.
+    let file = example_path("recursive_enum.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| line == "ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "recursive enums should lower without AST fallback: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Expr* f0;")
+            && wasi_source.contains("ostrin_box_enum_Expr(")
+            && wasi_source.contains("ostrin_release((void*)(value.data.Add.f0))"),
+        "WASI output omitted the recursive enum box"
+    );
+
+    let exe = temp_artifact("recursive-enum-leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run recursive enum binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success());
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "recursive enum leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_recursive_enum_boxes_wrapper_list_and_generic_payloads() {
+    // Recursion through an Option wrapper, a List of the enum itself and a generic enum
+    // instance: each must compile natively, match the interpreter and free every box.
+    let file = temp_source(
+        "native-recursive-enum-shapes.ostrin",
+        "enum Chain {\n    End\n    Link(Int, Option<Chain>)\n}\n\nenum Bag {\n    Items(List<Bag>)\n    Item(Int)\n}\n\nenum Tree<T> {\n    Leaf\n    Node(Tree<T>, T, Tree<T>)\n}\n\nfn chain_length(c: Chain) -> Int {\n    match c {\n        End => 0,\n        Link(n, next) => match next {\n            Some(rest) => 1 + chain_length(rest),\n            None => 1,\n        },\n    }\n}\n\nfn bag_sum(b: Bag) -> Int {\n    match b {\n        Items(items) => {\n            mut total = 0\n            for item in items {\n                total = total + bag_sum(item)\n            }\n            total\n        },\n        Item(n) => n,\n    }\n}\n\nfn size<T>(t: Tree<T>) -> Int {\n    match t {\n        Leaf => 0,\n        Node(l, v, r) => size(l) + 1 + size(r),\n    }\n}\n\nfn main() -> Void {\n    print(chain_length(Link(1, Some(Link(2, Some(Link(3, None)))))))\n    print(bag_sum(Items([Item(1), Items([Item(2), Item(3)])])))\n    t: Tree<Int> = Node(Node(Leaf, 1, Leaf), 2, Leaf)\n    print(size(t))\n}\n",
+    );
+    let expected = "3\n6\n2\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-recursive-enum-shapes.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run recursive shapes binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "recursive enum shapes leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
