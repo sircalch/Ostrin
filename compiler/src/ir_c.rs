@@ -407,6 +407,10 @@ pub fn register_scalar_enum_markers(records: &mut RecordFields, variants: &Varia
                 if primitive {
                     return false;
                 }
+                // A recursive payload lives in a ref-counted heap box.
+                if crate::codegen::enum_field_is_boxed(name, field_type) {
+                    return true;
+                }
                 if let Some(fields) = records.get(&enum_marker(field_type)) {
                     return fields.iter().any(|field| field == MANAGED_ENUM_MARKER);
                 }
@@ -505,7 +509,11 @@ fn nested_enum_field_code(
         let (variant_name, index) = enum_field_path(std::slice::from_ref(part))?;
         let variant = enum_variant(&current_ty, variant_name, variants, records)?;
         let (field_name, field_c_type) = variant.fields.get(index)?;
-        code = format!("({code}).data.{}.{}", variant.name, field_name);
+        code = crate::codegen::enum_field_value(
+            &format!("({code}).data.{}.{}", variant.name, field_name),
+            &enum_name(&current_ty, records)?,
+            field_c_type,
+        );
         if segment_index + 1 == path.len() {
             return (c_type(expected_ty, records).ok()?.as_str() == field_c_type).then_some(code);
         }
@@ -614,7 +622,11 @@ fn nested_enum_projection_code(
         if !records.contains_key(&enum_marker(field_c_type)) {
             return None;
         }
-        code = format!("({code}).data.{}.{}", variant.name, field_name);
+        code = crate::codegen::enum_field_value(
+            &format!("({code}).data.{}.{}", variant.name, field_name),
+            &enum_name(&current_ty, records)?,
+            field_c_type,
+        );
         current_ty = Ty::Named(field_c_type.clone());
     }
     Some((code, current_ty))
@@ -4445,9 +4457,15 @@ fn emit_instruction(
                         if let Some(retain) = retain_payload(&temp, &arg_ty, records) {
                             setup.push(format!("{retain};"));
                         }
-                        fields.push(format!(".{field} = {temp}"));
+                        fields.push(format!(
+                            ".{field} = {}",
+                            crate::codegen::enum_field_init(&temp, &enum_name, field_c_type)
+                        ));
                     } else {
-                        fields.push(format!(".{field} = {code}"));
+                        fields.push(format!(
+                            ".{field} = {}",
+                            crate::codegen::enum_field_init(code, &enum_name, field_c_type)
+                        ));
                     }
                 }
                 let value = format!(
@@ -4756,11 +4774,15 @@ fn emit_instruction(
                         }
                         let variant = matches[0].1;
                         let field = variant.fields.first().ok_or(())?;
-                        let code = format!(
-                            "({}).data.{}.{}",
-                            value_code(values, *subject)?,
-                            variant.name,
-                            field.0
+                        let code = crate::codegen::enum_field_value(
+                            &format!(
+                                "({}).data.{}.{}",
+                                value_code(values, *subject)?,
+                                variant.name,
+                                field.0
+                            ),
+                            &enum_name,
+                            &field.1,
                         );
                         (code, ty.clone())
                     }

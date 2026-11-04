@@ -82,5 +82,5 @@ está implementada**.
 
 No hay factorización, resolución de ecuaciones, integración simbólica, matrices simbólicas, unidades
 dentro de las expresiones (H4), generación de código ni operadores sobrecargados (`+`, `*`). La
-validación contra un motor externo (por ejemplo SymPy) no se ha ejecutado. Un enum recursivo nativo es un
-hueco del backend que conviene cerrar por separado.
+validación contra un motor externo (por ejemplo SymPy) no se ha ejecutado. El almacén plano se mantiene; un enum recursivo nativo (`enum Expr { Num(Int) Add(Expr, Expr) }`, ver
+`examples/recursive_enum.ostrin`) ya compila y es una representación alternativa para código simbólico futuro.
