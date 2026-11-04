@@ -871,17 +871,40 @@ fn merge_scaled(
     Ok(output)
 }
 
+fn has_duplicate_source(sources: List<Sensitivity<Float>>) -> Bool {
+    for i in 0 until sources.length() {
+        for j in i + 1 until sources.length() {
+            if sources[i].source_id == sources[j].source_id {
+                return true
+            }
+        }
+    }
+    false
+}
+
 /// The sources of lf * left + rf * right in one pass: a source present on both sides adds its two
 /// scaled contributions (current + factor * item, the same expression as before), a source on one side
 /// is scaled, and an unscaled one (factor exactly 1.0) is shared instead of copied. Sources keep the
 /// order of the left list followed by the right-only ones. Reusing records is safe because
-/// Sensitivity values are never mutated.
+/// Sensitivity values are never mutated. A list that repeats a source id (possible when a caller pushes
+/// into `sources` by hand) keeps the original semantics: its duplicates are merged and validated by the
+/// two-step `merge_scaled` path.
 fn combine_sources(
     left: List<Sensitivity<Float>>,
     lf: Float,
     right: List<Sensitivity<Float>>,
     rf: Float
 ) -> Result<List<Sensitivity<Float>>, String> {
+    if has_duplicate_source(left) or has_duplicate_source(right) {
+        match merge_scaled([], left, lf) {
+            Ok(scaled) => {
+                return merge_scaled(scaled, right, rf)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
     mut output: List<Sensitivity<Float>> = []
     for current in left {
         mut contribution = lf * current.contribution

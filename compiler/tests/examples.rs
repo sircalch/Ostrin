@@ -19810,7 +19810,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=52")
+        measurement_source.contains("ir=53")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -21377,5 +21377,49 @@ fn measurement_accumulation_shares_unscaled_sources_and_allocates_less() {
     assert!(
         total <= 220_000,
         "measurement accumulation regressed to {total} allocations"
+    );
+}
+
+#[test]
+fn measurement_duplicate_source_ids_keep_merging_and_validating_in_both_backends() {
+    // A caller can push a second source with the same id into a measurement's list. The single-pass
+    // source merge must keep the original semantics for such lists: duplicates are merged (1 source,
+    // contribution 2 + 3 scaled), a different sigma is rejected, and nothing leaks.
+    let path = format!(
+        "{}/tests/fixtures/measurement_duplicate_sources.ostrin.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let expected =
+        "2\n1\n1\n1\n0.1\n1\n1\nfalse\nmeasurement source id was reused with a different sigma\n";
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let exe = temp_artifact("measurement_duplicates.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }

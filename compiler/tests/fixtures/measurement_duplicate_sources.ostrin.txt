@@ -1,0 +1,25 @@
+// A caller can push a second source with the same id into a Measurement's list. Combining must still
+// merge the duplicates and validate their sigma, exactly as when every operation copied its sources.
+import std.measurements
+
+fn main() -> Void {
+    a = measurements.from_source(10.0, 0.5, "s", "shared").unwrap()
+    b = measurements.from_source(3.0, 0.5, "s", "shared").unwrap()
+    a.sources.push(b.sources[0])
+    print(a.sources.length())
+    scaled = measurements.scale(a, 1.0)
+    print(scaled.sources.length())
+    print(scaled.sources[0].contribution)
+    shrunk = measurements.scale(a, 0.1)
+    print(shrunk.sources.length())
+    print(shrunk.sources[0].contribution)
+    summed = measurements.add(a, measurements.exact(1.0)).unwrap()
+    print(summed.sources.length())
+    print(summed.sources[0].contribution)
+    c = measurements.from_source(10.0, 0.5, "t", "shared").unwrap()
+    d = measurements.from_source(3.0, 0.7, "t", "shared").unwrap()
+    c.sources.push(d.sources[0])
+    rejected = measurements.scale(c, 1.0)
+    print(rejected.known)
+    print(rejected.reason)
+}
