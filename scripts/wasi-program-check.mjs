@@ -96,6 +96,12 @@ const programs = [
     expected: "quadratic at 0: true\nquadratic at 2.5: true\nquadratic residual small: true\nline intercept: true\nline slope: true\nline residual positive: true\nlength mismatch: polyfit needs xs and ys with the same length\ntoo few: polyfit needs at least degree + 1 samples\nnegative degree: polyfit needs a non-negative degree\nrepeated x: polyfit could not determine the polynomial: qr found a linearly dependent column\nnon-finite: polyfit needs finite samples\n",
   },
   {
+    name: "exit_status_result",
+    source: "examples/exit_status_result.ostrin",
+    args: ["exit_status_result.wasm"],
+    expectedError: "error: value too large",
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],

@@ -1,0 +1,4 @@
+// A Void main keeps the historical behaviour: exit status 0.
+fn main() -> Void {
+    print("done")
+}
