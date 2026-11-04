@@ -27,6 +27,8 @@ pub record Store {
     index: Map<String, Int>
     failures: List<String>
     notes: List<String>
+    dimtable: List<String>
+    dimmemo: Map<Int, String>
 }
 
 /// A handle to one expression of a store.
@@ -53,6 +55,8 @@ pub fn store() -> Store {
         index: Map<String, Int>(),
         failures: [],
         notes: [],
+        dimtable: ["1"],
+        dimmemo: Map<Int, String>(),
     }
 }
 
@@ -1034,5 +1038,392 @@ pub fn rational_from_text(s: Store, numerator: String, denominator: String) -> E
             fail(s, message)
             wrap(s, int_id(s, 0))
         },
+    }
+}
+
+// ---------------------------------------------------------------- physical dimensions
+//
+// A symbol may be declared with a dimension such as "Mass*Length^2/Time^2". Dimensions are vectors of
+// rational exponents over named base dimensions (any identifier). `dimension_of(expr)` propagates them:
+// a sum needs equal dimensions, a product adds exponents, a power with a numeric exponent scales them,
+// and sin, cos, exp and ln need a dimensionless argument and return a dimensionless value. Canonical
+// text lists base dimensions alphabetically ("Length*Mass*Time^-2"); "1" is dimensionless. Values are
+// meant in coherent units of those dimensions. Constructors never fail on a mismatch; the check is the
+// explicit `dimension_of` call, so an expression can still be built and inspected.
+
+record DimVec {
+    names: List<String>
+    nums: List<Int>
+    dens: List<Int>
+}
+
+record Frac {
+    n: Int
+    d: Int
+}
+
+fn dim_empty() -> DimVec {
+    DimVec { names: [], nums: [], dens: [] }
+}
+
+fn dim_add_term(v: DimVec, name: String, n: Int, d: Int) -> DimVec {
+    mut names: List<String> = []
+    mut nums: List<Int> = []
+    mut dens: List<Int> = []
+    mut found = false
+    for i in 0 until v.names.length() {
+        if v.names[i] == name {
+            found = true
+            nn = v.nums[i] * d + n * v.dens[i]
+            dd = v.dens[i] * d
+            if nn != 0 {
+                g = gcd_int(nn, dd)
+                names.push(name)
+                nums.push(nn / g)
+                dens.push(dd / g)
+            }
+        } else {
+            names.push(v.names[i])
+            nums.push(v.nums[i])
+            dens.push(v.dens[i])
+        }
+    }
+    if not found and n != 0 {
+        names.push(name)
+        nums.push(n)
+        dens.push(d)
+    }
+    DimVec { names: names, nums: nums, dens: dens }
+}
+
+fn dim_combine(a: DimVec, b: DimVec, sign: Int) -> DimVec {
+    mut result = a
+    for i in 0 until b.names.length() {
+        result = dim_add_term(result, b.names[i], sign * b.nums[i], b.dens[i])
+    }
+    result
+}
+
+fn dim_scale(v: DimVec, n: Int, d: Int) -> DimVec {
+    mut result = dim_empty()
+    if n == 0 {
+        return result
+    }
+    for i in 0 until v.names.length() {
+        nn = v.nums[i] * n
+        dd = v.dens[i] * d
+        g = gcd_int(nn, dd)
+        sign = if dd < 0 { 0 - 1 } else { 1 }
+        result = dim_add_term(result, v.names[i], sign * (nn / g), sign * (dd / g))
+    }
+    result
+}
+
+fn dim_to_text(v: DimVec) -> String {
+    if v.names.length() == 0 {
+        return "1"
+    }
+    mut order: List<Int> = []
+    for i in 0 until v.names.length() {
+        mut next: List<Int> = []
+        mut placed = false
+        for j in order {
+            if not placed and v.names[i] < v.names[j] {
+                next.push(i)
+                placed = true
+            }
+            next.push(j)
+        }
+        if not placed {
+            next.push(i)
+        }
+        order = next
+    }
+    mut text = ""
+    mut first = true
+    for i in order {
+        mut piece = v.names[i]
+        if v.dens[i] == 1 {
+            if v.nums[i] != 1 {
+                piece = piece + "^" + v.nums[i].to_string()
+            }
+        } else {
+            piece = piece + "^(" + v.nums[i].to_string() + "/" + v.dens[i].to_string() + ")"
+        }
+        if first {
+            text = piece
+            first = false
+        } else {
+            text = text + "*" + piece
+        }
+    }
+    text
+}
+
+fn parse_frac(text: String) -> Result<Frac, String> {
+    if text.length() == 0 {
+        return Err("a dimension exponent after ^ must be an integer or n/d")
+    }
+    mut slash = 0 - 1
+    for i in 0 until text.length() {
+        if text.slice(i, i + 1) == "/" {
+            slash = i
+        }
+    }
+    if slash < 0 {
+        return match text.to_int() {
+            Ok(n) => Ok(Frac { n: n, d: 1 }),
+            Err(message) => Err("dimension exponent '" + text + "' is not an integer or n/d"),
+        }
+    }
+    match text.slice(0, slash).to_int() {
+        Ok(n) => match text.slice(slash + 1, text.length()).to_int() {
+            Ok(d) => {
+                if d <= 0 {
+                    return Err("dimension exponent '" + text + "' needs a positive denominator")
+                }
+                g = gcd_int(n, d)
+                Ok(Frac { n: n / g, d: d / g })
+            },
+            Err(message) => Err("dimension exponent '" + text + "' is not an integer or n/d"),
+        },
+        Err(message) => Err("dimension exponent '" + text + "' is not an integer or n/d"),
+    }
+}
+
+fn dim_parse(text: String) -> Result<DimVec, String> {
+    letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+    digits = "0123456789"
+    mut v = dim_empty()
+    n = text.length()
+    mut i = 0
+    mut sign = 1
+    while i < n and text.slice(i, i + 1) == " " {
+        i = i + 1
+    }
+    if i >= n or text.slice(i, n) == "1" {
+        return Ok(v)
+    }
+    while i < n {
+        while i < n and text.slice(i, i + 1) == " " {
+            i = i + 1
+        }
+        start = i
+        while i < n and letters.contains(text.slice(i, i + 1)) {
+            i = i + 1
+        }
+        if i == start {
+            return Err("dimension '" + text + "' has an unexpected character at position " + start.to_string())
+        }
+        name = text.slice(start, i)
+        mut exponent = Frac { n: 1, d: 1 }
+        if i < n and text.slice(i, i + 1) == "^" {
+            i = i + 1
+            if i < n and text.slice(i, i + 1) == "(" {
+                i = i + 1
+                mut j = i
+                while j < n and text.slice(j, j + 1) != ")" {
+                    j = j + 1
+                }
+                if j >= n {
+                    return Err("dimension '" + text + "' has an unclosed exponent")
+                }
+                match parse_frac(text.slice(i, j)) {
+                    Ok(parsed) => {
+                        exponent = parsed
+                    },
+                    Err(message) => {
+                        return Err(message)
+                    },
+                }
+                i = j + 1
+            } else {
+                mut j = i
+                if j < n and text.slice(j, j + 1) == "-" {
+                    j = j + 1
+                }
+                while j < n and digits.contains(text.slice(j, j + 1)) {
+                    j = j + 1
+                }
+                match parse_frac(text.slice(i, j)) {
+                    Ok(parsed) => {
+                        exponent = parsed
+                    },
+                    Err(message) => {
+                        return Err(message)
+                    },
+                }
+                i = j
+            }
+        }
+        v = dim_add_term(v, name, sign * exponent.n, exponent.d)
+        while i < n and text.slice(i, i + 1) == " " {
+            i = i + 1
+        }
+        if i < n {
+            c = text.slice(i, i + 1)
+            if c == "*" {
+                sign = 1
+            } else if c == "/" {
+                sign = 0 - 1
+            } else {
+                return Err("dimension '" + text + "' has an unexpected character '" + c + "'")
+            }
+            i = i + 1
+        }
+    }
+    Ok(v)
+}
+
+/// The dimension of node `id`, or the first inconsistency found below it.
+fn dim_of(s: Store, id: Int) -> Result<String, String> {
+    cached = s.dimmemo.get(id)
+    match cached {
+        Some(text) => {
+            return Ok(text)
+        },
+        None => {},
+    }
+    kind = s.kinds[id]
+    mut result = "1"
+    if kind == 1 {
+        result = s.dimtable[s.dens[id] - 1]
+    }
+    if kind == 2 {
+        match dim_of(s, arg_of(s, id, 0)) {
+            Ok(first) => {
+                result = first
+                for i in 1 until s.counts[id] {
+                    match dim_of(s, arg_of(s, id, i)) {
+                        Ok(other) => {
+                            if other != first {
+                                return Err("cannot add terms with different dimensions: " + first + " and " + other)
+                            }
+                        },
+                        Err(message) => {
+                            return Err(message)
+                        },
+                    }
+                }
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    if kind == 3 {
+        mut total = dim_empty()
+        for i in 0 until s.counts[id] {
+            match dim_of(s, arg_of(s, id, i)) {
+                Ok(text) => {
+                    match dim_parse(text) {
+                        Ok(vector) => {
+                            total = dim_combine(total, vector, 1)
+                        },
+                        Err(message) => {
+                            return Err(message)
+                        },
+                    }
+                },
+                Err(message) => {
+                    return Err(message)
+                },
+            }
+        }
+        result = dim_to_text(total)
+    }
+    if kind == 4 {
+        base = arg_of(s, id, 0)
+        exponent = arg_of(s, id, 1)
+        match dim_of(s, base) {
+            Ok(base_text) => {
+                match dim_of(s, exponent) {
+                    Ok(exponent_text) => {
+                        if exponent_text != "1" {
+                            return Err("an exponent must be dimensionless, got " + exponent_text)
+                        }
+                        if base_text != "1" {
+                            if s.kinds[exponent] != 0 or s.dens[exponent] == 0 {
+                                return Err("a dimensional base needs a small numeric exponent, got base " + base_text)
+                            }
+                            match dim_parse(base_text) {
+                                Ok(vector) => {
+                                    result = dim_to_text(dim_scale(vector, s.nums[exponent], s.dens[exponent]))
+                                },
+                                Err(message) => {
+                                    return Err(message)
+                                },
+                            }
+                        }
+                    },
+                    Err(message) => {
+                        return Err(message)
+                    },
+                }
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    if kind == 5 {
+        match dim_of(s, arg_of(s, id, 0)) {
+            Ok(argument) => {
+                if argument != "1" {
+                    return Err(s.names[id] + " needs a dimensionless argument, got " + argument)
+                }
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    s.dimmemo.set(id, result)
+    Ok(result)
+}
+
+fn dim_index(s: Store, canonical: String) -> Int {
+    for i in 0 until s.dimtable.length() {
+        if s.dimtable[i] == canonical {
+            return i
+        }
+    }
+    s.dimtable.push(canonical)
+    s.dimtable.length() - 1
+}
+
+/// A real symbol that carries a physical dimension such as "Mass*Length^2/Time^2" ("1" or "" is
+/// dimensionless). The dimension text is canonicalized; a malformed one is an error.
+pub fn unit_symbol(s: Store, name: String, dim_text: String, assumption: String = "real") -> Result<Expr, String> {
+    match dim_parse(dim_text) {
+        Ok(vector) => {
+            bits = if assumption == "positive" {
+                1
+            } else if assumption == "nonzero" {
+                2
+            } else if assumption == "integer" {
+                4
+            } else {
+                0
+            }
+            index = dim_index(s, dim_to_text(vector))
+            Ok(wrap(s, intern(s, 1, bits, index + 1, name, [])))
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// The canonical dimension of the expression, or the first dimensional inconsistency (adding
+/// different dimensions, a dimensional argument to a transcendental function, a variable exponent
+/// on a dimensional base).
+pub fn dimension_of(a: Expr) -> Result<String, String> {
+    dim_of(a.store, a.id)
+}
+
+/// The dimension as text, or "error: ..." with the inconsistency.
+pub fn dimension_text(a: Expr) -> String {
+    match dimension_of(a) {
+        Ok(text) => text,
+        Err(message) => "error: " + message,
     }
 }
