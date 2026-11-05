@@ -141,7 +141,7 @@ pub fn solve_quadratic(a: Int, b: Int, c: Int) -> Result<List<String>, String> {
     }
     disc = b * b - 4 * a * c
     if disc < 0 {
-        return Err("solve_quadratic: no real roots (negative discriminant)")
+        return Err("no real roots")
     }
     if disc == 0 {
         mut single: List<String> = []
@@ -199,7 +199,7 @@ pub fn solve_quadratic(a: Int, b: Int, c: Int) -> Result<List<String>, String> {
 pub fn solve_rational_roots(coeffs: List<Int>) -> Result<List<String>, String> {
     p = polynomial.poly_from_ints(coeffs)
     if polynomial.poly_degree(p) < 0 {
-        return Err("solve_rational_roots: the zero polynomial has every rational root")
+        return Err("zero polynomial")
     }
     match polynomial.poly_roots_rational(p) {
         Ok(texts) => {
