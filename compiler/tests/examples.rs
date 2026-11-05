@@ -21542,7 +21542,11 @@ fn std_polynomial_core_matches_node_oracle_in_both_backends() {
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(stdout(&report).contains("ast-fallback: 0"), "{}", stdout(&report));
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
 }
 
 #[test]
