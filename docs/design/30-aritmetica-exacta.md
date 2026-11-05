@@ -67,9 +67,26 @@ apto para tamaños criptográficos.
 biblioteca estándar no pueden nombrar `bigint.BigInt` en una firma. `std.symbolic` los usa para pasar
 a precisión arbitraria solo cuando un resultado exacto deja de caber en 64 bits (documento 29 §3).
 
+## 5b. Operadores
+
+`+`, `-` y `*` operan directamente sobre valores `BigInt`, y `==`, `!=`, `<`, `<=`, `>` y `>=` comparan por valor
+(los valores son canónicos, de modo que la igualdad es exacta). Validado con 30 pares aleatorios con signo: la
+identidad de anillo `(a+b)(a-b) = a·a - b·b`, la conmutatividad, las leyes del orden y el recuento de pares con
+`x < y` (19), que reproduce el `BigInt` de JavaScript con el mismo generador. Sin fallbacks al AST (`ir=54`).
+
+## 5c. Racionales tipados
+
+`Rational { numerator, denominator }` (BigInt, denominador positivo, forma irreducible) vive en el mismo módulo y
+se construye con `fraction(n, d)`, `fraction_from_ints`, `fraction_whole` o `fraction_parse("N/D")`; un denominador
+cero es un error tipado. `+`, `-`, `*`, `==`, `!=`, `<`, `<=`, `>` y `>=` operan directamente; la división y el
+recíproco devuelven `Result` (`fraction_div`, `fraction_reciprocal`) porque el divisor puede ser cero. Validado con los
+números armónicos H₃₀, H₆₀ y H₁₀₀ (el último con numerador de 41 dígitos), una fracción negativa reducida y un numerador
+de 30 dígitos, todos reproducidos con el `BigInt` de JavaScript. Sin fallbacks al AST (`ir=74`).
+
 ## 6. Límites actuales
 
-No hay `BigFloat` (multiprecisión de coma flotante) ni un tipo `Rational` tipado todavía, ni conversiones
-automáticas con `Int` (`from_int`/`to_int` explícitas), ni operadores `+ - * /` sobrecargados. Los
+No hay `BigFloat` (multiprecisión de coma flotante), ni conversiones
+automáticas con `Int` (`from_int`/`to_int` explícitas), ni `/` ni `%` sobrecargados (la división es `divmod`, porque
+dividir por cero debe ser un error tipado y no un fallo). Los
 racionales en texto reparsean en cada operación, lo que es correcto pero lento para cargas intensivas; un tipo
 `Rational` con `BigInt` interno es el siguiente paso.

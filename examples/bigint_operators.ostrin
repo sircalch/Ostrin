@@ -1,0 +1,71 @@
+// std.bigint operators: +, -, * and the six comparisons work directly on BigInt values. Thirty
+// pseudo-random signed pairs (the same Park-Miller generator as bigint_validation) check the
+// ring identities (a+b)(a-b) = a*a - b*b and a+b = b+a, the order laws and the count of pairs
+// with a < b, which an external BigInt reproduces.
+import std.bigint
+
+fn next(state: Int) -> Int {
+    (state * 48271) % 2147483647
+}
+
+fn digits(state: Int, count: Int) -> String {
+    mut s = state
+    mut out = ""
+    for i in 0 until count {
+        s = next(s)
+        d = s % 10
+        out = out + (if i == 0 and d == 0 { 1 } else { d }).to_string()
+    }
+    out
+}
+
+fn main() -> Void {
+    a = bigint.parse("123456789012345678901234567890").unwrap()
+    b = bigint.parse("-987654321098765432109876543210").unwrap()
+    print(bigint.to_string(a + b))
+    print(bigint.to_string(a - b))
+    print(bigint.to_string(a * b))
+    print(bigint.to_string(a + b * a - b))
+    print(a == a)
+    print(a != b)
+    print(a < b)
+    print(b < a)
+    print(a >= a)
+    print(a <= b)
+
+    mut state = 7919
+    mut ring = 0
+    mut commutes = 0
+    mut order = 0
+    mut less = 0
+    for case_index in 0 until 30 {
+        state = next(state)
+        da = 1 + state % 50
+        state = next(state)
+        db = 1 + state % 50
+        state = next(state)
+        sa = if state % 2 == 0 { "" } else { "-" }
+        state = next(state)
+        sb = if state % 2 == 0 { "" } else { "-" }
+        state = next(state)
+        x = bigint.parse(sa + digits(state, da)).unwrap()
+        state = next(state)
+        y = bigint.parse(sb + digits(state, db)).unwrap()
+        if (x + y) * (x - y) == x * x - y * y {
+            ring = ring + 1
+        }
+        if x + y == y + x {
+            commutes = commutes + 1
+        }
+        if (x < y) == (y > x) and (x <= y) == not (x > y) and (x == y) == ((x >= y) and (x <= y)) {
+            order = order + 1
+        }
+        if x < y {
+            less = less + 1
+        }
+    }
+    print("ring identity: " + ring.to_string() + " of 30")
+    print("commutative sum: " + commutes.to_string() + " of 30")
+    print("order laws: " + order.to_string() + " of 30")
+    print("pairs with x < y: " + less.to_string())
+}
