@@ -1,0 +1,60 @@
+// Unit-aware symbolic science: symbols carry physical dimensions, expressions propagate them, and
+// derivatives and simplifications keep them consistent. Dimensions are vectors of rational
+// exponents, so a square root halves them (the pendulum period below comes out as Time).
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    m = symbolic.unit_symbol(s, "m", "Mass", "positive").unwrap()
+    v = symbolic.unit_symbol(s, "v", "Length/Time", "nonzero").unwrap()
+    length = symbolic.unit_symbol(s, "L", "Length", "positive").unwrap()
+    g = symbolic.unit_symbol(s, "g", "Length/Time^2", "positive").unwrap()
+    pi = symbolic.symbol(s, "pi", "positive")
+    two = symbolic.number(s, 2)
+    half = symbolic.number(s, 1, 2)
+
+    // kinetic energy and its derivative with respect to the velocity
+    energy = symbolic.mul(half, symbolic.mul(m, symbolic.power(v, two)))
+    print("E = " + symbolic.show(energy))
+    print("dim E = " + symbolic.dimension_text(energy))
+    print("dE/dv = " + symbolic.diff_text(energy, v))
+    momentum = symbolic.diff(energy, v).unwrap()
+    print("dim dE/dv = " + symbolic.dimension_text(momentum))
+    power = symbolic.diff(symbolic.mul(energy, symbolic.power(length, symbolic.number(s, 0 - 1))), length).unwrap()
+    print("dim d(E/L)/dL = " + symbolic.dimension_text(power))
+
+    // a pendulum period T = 2 pi sqrt(L / g): the square root halves the exponents
+    ratio = symbolic.div(length, g)
+    period = symbolic.mul(symbolic.mul(two, pi), symbolic.power(ratio, half))
+    print("T = " + symbolic.show(period))
+    print("dim L/g = " + symbolic.dimension_text(ratio))
+    print("dim T = " + symbolic.dimension_text(period))
+    print("dim dT/dL = " + symbolic.dimension_text(symbolic.diff(period, length).unwrap()))
+
+    // a ratio of equal energies is dimensionless and, with m positive and v nonzero, simplifies to 1
+    group = symbolic.div(energy, energy)
+    print("E / E = " + symbolic.show(group) + " with dim " + symbolic.dimension_text(group))
+
+    // inconsistent expressions are reported, not silently accepted
+    print("m + v: " + symbolic.dimension_text(symbolic.add(m, v)))
+    print("sin(L): " + symbolic.dimension_text(symbolic.call("sin", length)))
+    print("sin(L / L): " + symbolic.dimension_text(symbolic.call("sin", symbolic.div(length, length))))
+    print("m^v: " + symbolic.dimension_text(symbolic.power(m, v)))
+    print("L^(1/3): " + symbolic.dimension_text(symbolic.power(length, symbolic.number(s, 1, 3))))
+
+    // dimension text is canonical and malformed text is rejected
+    area_rate = symbolic.unit_symbol(s, "k", "Time^-1 * Length^2").unwrap()
+    print("k: " + symbolic.dimension_text(area_rate))
+    // base dimension names may contain digits and non-ASCII letters
+    wave = symbolic.unit_symbol(s, "w", "Base2^2/Ángulo").unwrap()
+    print("w: " + symbolic.dimension_text(wave))
+    print("w^2: " + symbolic.dimension_text(symbolic.power(wave, two)))
+    match symbolic.unit_symbol(s, "digit", "2D") {
+        Ok(e) => print("leading digit accepted"),
+        Err(message) => print("leading digit: " + message),
+    }
+    match symbolic.unit_symbol(s, "bad", "Length^x") {
+        Ok(e) => print("bad dimension accepted"),
+        Err(message) => print("bad dimension: " + message),
+    }
+}
