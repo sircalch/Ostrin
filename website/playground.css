@@ -27,3 +27,6 @@
 .status { font-size: .8rem; color: #98a2b3; }
 .playground-note { color: #98a2b3; font-size: .9rem; margin-top: 1rem; }
 @media (max-width: 800px) { .playground-panes { grid-template-columns: 1fr; } }
+.output .figure-preview { display: block; width: 100%; background: #fff; border: 1px solid #263045; border-radius: 6px; overflow: hidden; margin: .5rem 0; white-space: normal; }
+.output .figure-preview img { display: block; width: 100%; height: auto; }
+.output .figure-actions { display: block; white-space: normal; }
