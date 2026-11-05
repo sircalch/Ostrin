@@ -1,0 +1,174 @@
+// std.polynomial over exact rationals: 40 generated integer polynomials, each put through every public
+// operation, plus fixed edge cases. The inputs come from a 31-bit linear congruential generator so
+// scripts/polynomial-oracle.mjs can regenerate the same cases in BigInt arithmetic and print the same
+// rows; the two outputs are compared line by line.
+import std.polynomial
+
+fn next_state(s: Int) -> Int {
+    (s * 1103515245 + 12345) % 2147483648
+}
+
+/// A value in lo..=hi from a generator state.
+fn draw(s: Int, lo: Int, hi: Int) -> Int {
+    lo + s % (hi - lo + 1)
+}
+
+fn int_mul(a: List<Int>, b: List<Int>) -> List<Int> {
+    mut out: List<Int> = []
+    for k in 0 until a.length() + b.length() - 1 {
+        mut acc = 0
+        for i in 0 until a.length() {
+            j = k - i
+            if j >= 0 and j < b.length() {
+                acc = acc + a[i] * b[j]
+            }
+        }
+        out.push(acc)
+    }
+    out
+}
+
+fn row(idx: Int, label: String, text: String) -> Void {
+    print("case " + idx.to_string() + " " + label + " " + text)
+}
+
+fn join(items: List<String>) -> String {
+    mut text = "["
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + items[i]
+    }
+    text + "]"
+}
+
+fn main() -> Void {
+    mut state = 20260417
+    for idx in 0 until 40 {
+        // shared linear factor (fq x - fr)
+        state = next_state(state)
+        fq = draw(state, 1, 3)
+        state = next_state(state)
+        fr = draw(state, 0 - 4, 4)
+        shared = [0 - fr, fq]
+
+        // p: shared times a constant and one or two more linear factors, or shared times a quadratic
+        state = next_state(state)
+        mode = draw(state, 0, 2)
+        mut p_list = shared
+        if mode == 2 {
+            state = next_state(state)
+            qa = draw(state, 0 - 3, 3)
+            state = next_state(state)
+            qb = draw(state, 0 - 3, 3)
+            p_list = int_mul(shared, [qb, qa, 1])
+        } else {
+            state = next_state(state)
+            mut c = draw(state, 0 - 3, 3)
+            if c == 0 {
+                c = 2
+            }
+            p_list = int_mul(shared, [c])
+            state = next_state(state)
+            l1q = draw(state, 1, 3)
+            state = next_state(state)
+            l1r = draw(state, 0 - 4, 4)
+            p_list = int_mul(p_list, [0 - l1r, l1q])
+            if mode == 1 {
+                state = next_state(state)
+                l2q = draw(state, 1, 3)
+                state = next_state(state)
+                l2r = draw(state, 0 - 4, 4)
+                p_list = int_mul(p_list, [0 - l2r, l2q])
+            }
+        }
+
+        // q: a fresh linear factor, shared times a fresh linear factor, or a general quadratic
+        state = next_state(state)
+        qmode = draw(state, 0, 2)
+        mut q_list = shared
+        if qmode == 2 {
+            state = next_state(state)
+            a0 = draw(state, 0 - 4, 4)
+            state = next_state(state)
+            a1 = draw(state, 0 - 4, 4)
+            state = next_state(state)
+            mut a2 = draw(state, 0 - 4, 4)
+            if a2 == 0 {
+                a2 = 1
+            }
+            q_list = [a0, a1, a2]
+        } else {
+            state = next_state(state)
+            l3q = draw(state, 1, 3)
+            state = next_state(state)
+            l3r = draw(state, 0 - 4, 4)
+            q_list = [0 - l3r, l3q]
+            if qmode == 1 {
+                q_list = int_mul(shared, q_list)
+            }
+        }
+
+        // evaluation point en/ed
+        state = next_state(state)
+        en = draw(state, 0 - 3, 3)
+        state = next_state(state)
+        ed = draw(state, 1, 3)
+        xtext = en.to_string() + "/" + ed.to_string()
+
+        p = polynomial.poly_from_ints(p_list)
+        q = polynomial.poly_from_ints(q_list)
+        row(idx, "p", polynomial.poly_to_string(p))
+        row(idx, "q", polynomial.poly_to_string(q))
+        row(idx, "add", polynomial.poly_to_string(polynomial.poly_add(p, q).unwrap()))
+        row(idx, "sub", polynomial.poly_to_string(polynomial.poly_sub(p, q).unwrap()))
+        row(idx, "mul", polynomial.poly_to_string(polynomial.poly_mul(p, q).unwrap()))
+        d = polynomial.poly_divmod(p, q).unwrap()
+        row(idx, "quotient", polynomial.poly_to_string(d.quotient))
+        row(idx, "remainder", polynomial.poly_to_string(d.remainder))
+        row(idx, "gcd", polynomial.poly_to_string(polynomial.poly_gcd(p, q).unwrap()))
+        row(idx, "eval " + xtext, polynomial.poly_eval(p, xtext).unwrap())
+        row(idx, "derivative", polynomial.poly_to_string(polynomial.poly_derivative(p).unwrap()))
+        roots = polynomial.poly_roots_rational(p).unwrap()
+        row(idx, "roots", join(roots))
+        f = polynomial.poly_factor_linear(p).unwrap()
+        mut factor_text = ""
+        mut prod = f.cofactor
+        for i in 0 until f.factors.length() {
+            factor_text = factor_text + polynomial.poly_to_string(f.factors[i]) + " "
+            prod = polynomial.poly_mul(prod, f.factors[i]).unwrap()
+        }
+        row(idx, "factors", factor_text + "cofactor " + polynomial.poly_to_string(f.cofactor))
+        if polynomial.poly_to_string(prod) == polynomial.poly_to_string(p) {
+            row(idx, "check", "ok")
+        } else {
+            row(idx, "check", "FAIL")
+        }
+        match polynomial.poly_divmod(p, polynomial.poly_from_ints([])) {
+            Ok(x) => row(idx, "divzero", "accepted"),
+            Err(message) => row(idx, "divzero", "error " + message),
+        }
+    }
+
+    // Fixed edge cases.
+    half_third = polynomial.poly_from_texts(["2/3", "1/3"]).unwrap()
+    row(0 - 1, "rational-roots", join(polynomial.poly_roots_rational(half_third).unwrap()))
+    match polynomial.poly_from_texts(["1/0"]) {
+        Ok(x) => row(0 - 1, "bad-text", "accepted"),
+        Err(message) => row(0 - 1, "bad-text", "error " + message),
+    }
+    huge = polynomial.poly_from_ints([10000000000000, 1])
+    match polynomial.poly_roots_rational(huge) {
+        Ok(x) => row(0 - 1, "huge-constant", join(x)),
+        Err(message) => row(0 - 1, "huge-constant", "error " + message),
+    }
+    match polynomial.poly_roots_rational(polynomial.poly_from_ints([])) {
+        Ok(x) => row(0 - 1, "zero-roots", join(x)),
+        Err(message) => row(0 - 1, "zero-roots", "error " + message),
+    }
+    row(0 - 1, "constant-derivative", polynomial.poly_to_string(polynomial.poly_derivative(polynomial.poly_from_ints([5])).unwrap()))
+    gcd_a = polynomial.poly_from_ints([1, 2])
+    gcd_b = polynomial.poly_from_texts(["1/2", "1"]).unwrap()
+    row(0 - 1, "gcd-rational", polynomial.poly_to_string(polynomial.poly_gcd(gcd_a, gcd_b).unwrap()))
+}

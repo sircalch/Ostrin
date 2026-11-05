@@ -1,0 +1,566 @@
+case 0 p [-3, 1, 5, 2]
+case 0 q [4, 2]
+case 0 add [1, 3, 5, 2]
+case 0 sub [-7, -1, 5, 2]
+case 0 mul [-12, -2, 22, 18, 4]
+case 0 quotient [-1/2, 1/2, 1]
+case 0 remainder [-1]
+case 0 gcd [1]
+case 0 eval 1/3 -55/27
+case 0 derivative [1, 10, 6]
+case 0 roots [-3/2]
+case 0 factors [3/2, 1] cofactor [-2, 2, 2]
+case 0 check ok
+case 0 divzero error polynomial division by the zero polynomial
+case 1 p [2, -7, 2, 3]
+case 1 q [-1, -2, -1]
+case 1 add [1, -9, 1, 3]
+case 1 sub [3, -5, 3, 3]
+case 1 mul [-2, 3, 10, 0, -8, -3]
+case 1 quotient [4, -3]
+case 1 remainder [6, -2]
+case 1 gcd [1]
+case 1 eval 0/2 2
+case 1 derivative [-7, 4, 9]
+case 1 roots [-2, 1/3, 1]
+case 1 factors [2, 1] [-1/3, 1] [-1, 1] cofactor [3]
+case 1 check ok
+case 1 divzero error polynomial division by the zero polynomial
+case 2 p [4, -5, -2, 3]
+case 2 q [-2, 1, 1]
+case 2 add [2, -4, -1, 3]
+case 2 sub [6, -6, -3, 3]
+case 2 mul [-8, 14, 3, -13, 1, 3]
+case 2 quotient [-5, 3]
+case 2 remainder [-6, 6]
+case 2 gcd [-1, 1]
+case 2 eval 0/1 4
+case 2 derivative [-5, -4, 9]
+case 2 roots [-4/3, 1]
+case 2 factors [4/3, 1] [-1, 1] [-1, 1] cofactor [3]
+case 2 check ok
+case 2 divzero error polynomial division by the zero polynomial
+case 3 p [-24, 10, 22, -12]
+case 3 q [-4, 2]
+case 3 add [-28, 12, 22, -12]
+case 3 sub [-20, 8, 22, -12]
+case 3 mul [96, -88, -68, 92, -24]
+case 3 quotient [3, -1, -6]
+case 3 remainder [-12]
+case 3 gcd [1]
+case 3 eval -3/3 0
+case 3 derivative [10, 44, -36]
+case 3 roots [-1, 4/3, 3/2]
+case 3 factors [1, 1] [-4/3, 1] [-3/2, 1] cofactor [-12]
+case 3 check ok
+case 3 divzero error polynomial division by the zero polynomial
+case 4 p [0, -16, 8]
+case 4 q [0, 1]
+case 4 add [0, -15, 8]
+case 4 sub [0, -17, 8]
+case 4 mul [0, 0, -16, 8]
+case 4 quotient [-16, 8]
+case 4 remainder 0
+case 4 gcd [0, 1]
+case 4 eval -1/2 10
+case 4 derivative [-16, 16]
+case 4 roots [0, 2]
+case 4 factors [0, 1] [-2, 1] cofactor [8]
+case 4 check ok
+case 4 divzero error polynomial division by the zero polynomial
+case 5 p [-18, 24, -6]
+case 5 q [9, -12, 3]
+case 5 add [-9, 12, -3]
+case 5 sub [-27, 36, -9]
+case 5 mul [-162, 432, -396, 144, -18]
+case 5 quotient [-2]
+case 5 remainder 0
+case 5 gcd [3, -4, 1]
+case 5 eval 0/3 -18
+case 5 derivative [24, -12]
+case 5 roots [1, 3]
+case 5 factors [-1, 1] [-3, 1] cofactor [-6]
+case 5 check ok
+case 5 divzero error polynomial division by the zero polynomial
+case 6 p [9, 0, -4]
+case 6 q [-3, -2, 1]
+case 6 add [6, -2, -3]
+case 6 sub [12, 2, -5]
+case 6 mul [-27, -18, 21, 8, -4]
+case 6 quotient [-4]
+case 6 remainder [-3, -8]
+case 6 gcd [1]
+case 6 eval -2/3 65/9
+case 6 derivative [0, -8]
+case 6 roots [-3/2, 3/2]
+case 6 factors [3/2, 1] [-3/2, 1] cofactor [-4]
+case 6 check ok
+case 6 divzero error polynomial division by the zero polynomial
+case 7 p [0, 12, -6]
+case 7 q [2, 1]
+case 7 add [2, 13, -6]
+case 7 sub [-2, 11, -6]
+case 7 mul [0, 24, 0, -6]
+case 7 quotient [24, -6]
+case 7 remainder [-48]
+case 7 gcd [1]
+case 7 eval -1/2 -15/2
+case 7 derivative [12, -12]
+case 7 roots [0, 2]
+case 7 factors [0, 1] [-2, 1] cofactor [-6]
+case 7 check ok
+case 7 divzero error polynomial division by the zero polynomial
+case 8 p [0, -4, 2, 2]
+case 8 q [0, 1]
+case 8 add [0, -3, 2, 2]
+case 8 sub [0, -5, 2, 2]
+case 8 mul [0, 0, -4, 2, 2]
+case 8 quotient [-4, 2, 2]
+case 8 remainder 0
+case 8 gcd [0, 1]
+case 8 eval -2/3 80/27
+case 8 derivative [-4, 4, 6]
+case 8 roots [-2, 0, 1]
+case 8 factors [2, 1] [0, 1] [-1, 1] cofactor [2]
+case 8 check ok
+case 8 divzero error polynomial division by the zero polynomial
+case 9 p [0, -2, 5, 3]
+case 9 q [2, 3]
+case 9 add [2, 1, 5, 3]
+case 9 sub [-2, -5, 5, 3]
+case 9 mul [0, -4, 4, 21, 9]
+case 9 quotient [-4/3, 1, 1]
+case 9 remainder [8/3]
+case 9 gcd [1]
+case 9 eval 1/1 6
+case 9 derivative [-2, 10, 9]
+case 9 roots [-2, 0, 1/3]
+case 9 factors [2, 1] [0, 1] [-1/3, 1] cofactor [3]
+case 9 check ok
+case 9 divzero error polynomial division by the zero polynomial
+case 10 p [6, -15, 12, -3]
+case 10 q [-1, 1, 1]
+case 10 add [5, -14, 13, -3]
+case 10 sub [7, -16, 11, -3]
+case 10 mul [-6, 21, -21, 0, 9, -3]
+case 10 quotient [15, -3]
+case 10 remainder [21, -33]
+case 10 gcd [1]
+case 10 eval 1/2 9/8
+case 10 derivative [-15, 24, -9]
+case 10 roots [1, 2]
+case 10 factors [-1, 1] [-1, 1] [-2, 1] cofactor [-3]
+case 10 check ok
+case 10 divzero error polynomial division by the zero polynomial
+case 11 p [0, 8, 4]
+case 11 q [0, 2]
+case 11 add [0, 10, 4]
+case 11 sub [0, 6, 4]
+case 11 mul [0, 0, 16, 8]
+case 11 quotient [4, 2]
+case 11 remainder 0
+case 11 gcd [0, 1]
+case 11 eval -2/2 -4
+case 11 derivative [8, 8]
+case 11 roots [-2, 0]
+case 11 factors [2, 1] [0, 1] cofactor [4]
+case 11 check ok
+case 11 divzero error polynomial division by the zero polynomial
+case 12 p [4, 6, 2]
+case 12 q [4, 1]
+case 12 add [8, 7, 2]
+case 12 sub [0, 5, 2]
+case 12 mul [16, 28, 14, 2]
+case 12 quotient [-2, 2]
+case 12 remainder [12]
+case 12 gcd [1]
+case 12 eval 3/1 40
+case 12 derivative [6, 4]
+case 12 roots [-2, -1]
+case 12 factors [2, 1] [1, 1] cofactor [2]
+case 12 check ok
+case 12 divzero error polynomial division by the zero polynomial
+case 13 p [144, -72, -63, -9]
+case 13 q [-4, 3, -3]
+case 13 add [140, -69, -66, -9]
+case 13 sub [148, -75, -60, -9]
+case 13 mul [-576, 720, -396, 63, 162, 27]
+case 13 quotient [24, 3]
+case 13 remainder [240, -132]
+case 13 gcd [1]
+case 13 eval -2/3 500/3
+case 13 derivative [-72, -126, -27]
+case 13 roots [-4, 1]
+case 13 factors [4, 1] [4, 1] [-1, 1] cofactor [-9]
+case 13 check ok
+case 13 divzero error polynomial division by the zero polynomial
+case 14 p [-18, -9, 36, 27]
+case 14 q [0, 1, -4]
+case 14 add [-18, -8, 32, 27]
+case 14 sub [-18, -10, 40, 27]
+case 14 mul [0, -18, 63, 72, -117, -108]
+case 14 quotient [-171/16, -27/4]
+case 14 remainder [-18, 27/16]
+case 14 gcd [1]
+case 14 eval 0/3 -18
+case 14 derivative [-9, 72, 81]
+case 14 roots [-1, 2/3]
+case 14 factors [1, 1] [1, 1] [-2/3, 1] cofactor [27]
+case 14 check ok
+case 14 divzero error polynomial division by the zero polynomial
+case 15 p [-12, 9, -4, 3]
+case 15 q [-1, -3, -4]
+case 15 add [-13, 6, -8, 3]
+case 15 sub [-11, 12, 0, 3]
+case 15 mul [12, 27, 25, -27, 7, -12]
+case 15 quotient [25/16, -3/4]
+case 15 remainder [-167/16, 207/16]
+case 15 gcd [1]
+case 15 eval 0/3 -12
+case 15 derivative [9, -8, 9]
+case 15 roots [4/3]
+case 15 factors [-4/3, 1] cofactor [9, 0, 3]
+case 15 check ok
+case 15 divzero error polynomial division by the zero polynomial
+case 16 p [0, 12, 8]
+case 16 q [-1, -2, -1]
+case 16 add [-1, 10, 7]
+case 16 sub [1, 14, 9]
+case 16 mul [0, -12, -32, -28, -8]
+case 16 quotient [-8]
+case 16 remainder [-8, -4]
+case 16 gcd [1]
+case 16 eval -2/2 -4
+case 16 derivative [12, 16]
+case 16 roots [-3/2, 0]
+case 16 factors [3/2, 1] [0, 1] cofactor [8]
+case 16 check ok
+case 16 divzero error polynomial division by the zero polynomial
+case 17 p [-6, 5, -4, 1]
+case 17 q [0, -9, 3]
+case 17 add [-6, -4, -1, 1]
+case 17 sub [-6, 14, -7, 1]
+case 17 mul [0, 54, -63, 51, -21, 3]
+case 17 quotient [-1/3, 1/3]
+case 17 remainder [-6, 2]
+case 17 gcd [-3, 1]
+case 17 eval -1/2 -77/8
+case 17 derivative [5, -8, 3]
+case 17 roots [3]
+case 17 factors [-3, 1] cofactor [2, -1, 1]
+case 17 check ok
+case 17 divzero error polynomial division by the zero polynomial
+case 18 p [-2, -1, 2, 1]
+case 18 q [1, 2]
+case 18 add [-1, 1, 2, 1]
+case 18 sub [-3, -3, 2, 1]
+case 18 mul [-2, -5, 0, 5, 2]
+case 18 quotient [-7/8, 3/4, 1/2]
+case 18 remainder [-9/8]
+case 18 gcd [1]
+case 18 eval -2/2 0
+case 18 derivative [-1, 4, 3]
+case 18 roots [-2, -1, 1]
+case 18 factors [2, 1] [1, 1] [-1, 1] cofactor [1]
+case 18 check ok
+case 18 divzero error polynomial division by the zero polynomial
+case 19 p [-36, -21, -3]
+case 19 q [3, 1]
+case 19 add [-33, -20, -3]
+case 19 sub [-39, -22, -3]
+case 19 mul [-108, -99, -30, -3]
+case 19 quotient [-12, -3]
+case 19 remainder 0
+case 19 gcd [3, 1]
+case 19 eval 3/2 -297/4
+case 19 derivative [-21, -6]
+case 19 roots [-4, -3]
+case 19 factors [4, 1] [3, 1] cofactor [-3]
+case 19 check ok
+case 19 divzero error polynomial division by the zero polynomial
+case 20 p [-1, 4, -4]
+case 20 q [-1, 3]
+case 20 add [-2, 7, -4]
+case 20 sub [0, 1, -4]
+case 20 mul [1, -7, 16, -12]
+case 20 quotient [8/9, -4/3]
+case 20 remainder [-1/9]
+case 20 gcd [1]
+case 20 eval 3/3 -1
+case 20 derivative [4, -8]
+case 20 roots [1/2]
+case 20 factors [-1/2, 1] [-1/2, 1] cofactor [-4]
+case 20 check ok
+case 20 divzero error polynomial division by the zero polynomial
+case 21 p [-8, 4, 8, 2]
+case 21 q [2, 1]
+case 21 add [-6, 5, 8, 2]
+case 21 sub [-10, 3, 8, 2]
+case 21 mul [-16, 0, 20, 12, 2]
+case 21 quotient [-4, 4, 2]
+case 21 remainder 0
+case 21 gcd [2, 1]
+case 21 eval 2/2 6
+case 21 derivative [4, 16, 6]
+case 21 roots [-2]
+case 21 factors [2, 1] cofactor [-4, 4, 2]
+case 21 check ok
+case 21 divzero error polynomial division by the zero polynomial
+case 22 p [0, -12, 8]
+case 22 q [2, -1, 3]
+case 22 add [2, -13, 11]
+case 22 sub [-2, -11, 5]
+case 22 mul [0, -24, 28, -44, 24]
+case 22 quotient [8/3]
+case 22 remainder [-16/3, -28/3]
+case 22 gcd [1]
+case 22 eval 2/2 -4
+case 22 derivative [-12, 16]
+case 22 roots [0, 3/2]
+case 22 factors [0, 1] [-3/2, 1] cofactor [8]
+case 22 check ok
+case 22 divzero error polynomial division by the zero polynomial
+case 23 p [-12, -13, 5, 6]
+case 23 q [3, 1]
+case 23 add [-9, -12, 5, 6]
+case 23 sub [-15, -14, 5, 6]
+case 23 mul [-36, -51, 2, 23, 6]
+case 23 quotient [26, -13, 6]
+case 23 remainder [-90]
+case 23 gcd [1]
+case 23 eval -1/2 -5
+case 23 derivative [-13, 10, 18]
+case 23 roots [-4/3, -1, 3/2]
+case 23 factors [4/3, 1] [1, 1] [-3/2, 1] cofactor [6]
+case 23 check ok
+case 23 divzero error polynomial division by the zero polynomial
+case 24 p [4, 1, 4, 1]
+case 24 q [4, 4, -2]
+case 24 add [8, 5, 2, 1]
+case 24 sub [0, -3, 6, 1]
+case 24 mul [16, 20, 12, 18, -4, -2]
+case 24 quotient [-3, -1/2]
+case 24 remainder [16, 15]
+case 24 gcd [1]
+case 24 eval -3/1 10
+case 24 derivative [1, 8, 3]
+case 24 roots [-4]
+case 24 factors [4, 1] cofactor [1, 0, 1]
+case 24 check ok
+case 24 divzero error polynomial division by the zero polynomial
+case 25 p [-16, 28, 10, -4]
+case 25 q [2, 7, 3]
+case 25 add [-14, 35, 13, -4]
+case 25 sub [-18, 21, 7, -4]
+case 25 mul [-32, -56, 168, 146, 2, -12]
+case 25 quotient [58/9, -4/3]
+case 25 remainder [-260/9, -130/9]
+case 25 gcd [2, 1]
+case 25 eval 0/3 -16
+case 25 derivative [28, 20, -12]
+case 25 roots [-2, 1/2, 4]
+case 25 factors [2, 1] [-1/2, 1] [-4, 1] cofactor [-4]
+case 25 check ok
+case 25 divzero error polynomial division by the zero polynomial
+case 26 p [12, 10, -12]
+case 26 q [6, 13, 6]
+case 26 add [18, 23, -6]
+case 26 sub [6, -3, -18]
+case 26 mul [72, 216, 130, -96, -72]
+case 26 quotient [-2]
+case 26 remainder [24, 36]
+case 26 gcd [2/3, 1]
+case 26 eval -1/3 22/3
+case 26 derivative [10, -24]
+case 26 roots [-2/3, 3/2]
+case 26 factors [2/3, 1] [-3/2, 1] cofactor [-12]
+case 26 check ok
+case 26 divzero error polynomial division by the zero polynomial
+case 27 p [0, 3, -9, 3]
+case 27 q [1, 3]
+case 27 add [1, 6, -9, 3]
+case 27 sub [-1, 0, -9, 3]
+case 27 mul [0, 3, 0, -24, 9]
+case 27 quotient [19/9, -10/3, 1]
+case 27 remainder [-19/9]
+case 27 gcd [1]
+case 27 eval -1/3 -19/9
+case 27 derivative [3, -18, 9]
+case 27 roots [0]
+case 27 factors [0, 1] cofactor [3, -9, 3]
+case 27 check ok
+case 27 divzero error polynomial division by the zero polynomial
+case 28 p [12, -27, -30, 9]
+case 28 q [-1, -1, -1]
+case 28 add [11, -28, -31, 9]
+case 28 sub [13, -26, -29, 9]
+case 28 mul [-12, 15, 45, 48, 21, -9]
+case 28 quotient [39, -9]
+case 28 remainder [51, 3]
+case 28 gcd [1]
+case 28 eval 3/2 -525/8
+case 28 derivative [-27, -60, 27]
+case 28 roots [-1, 1/3, 4]
+case 28 factors [1, 1] [-1/3, 1] [-4, 1] cofactor [9]
+case 28 check ok
+case 28 divzero error polynomial division by the zero polynomial
+case 29 p [0, 6, -16, 8]
+case 29 q [4, 1]
+case 29 add [4, 7, -16, 8]
+case 29 sub [-4, 5, -16, 8]
+case 29 mul [0, 24, -58, 16, 8]
+case 29 quotient [198, -48, 8]
+case 29 remainder [-792]
+case 29 gcd [1]
+case 29 eval 1/3 14/27
+case 29 derivative [6, -32, 24]
+case 29 roots [0, 1/2, 3/2]
+case 29 factors [0, 1] [-1/2, 1] [-3/2, 1] cofactor [8]
+case 29 check ok
+case 29 divzero error polynomial division by the zero polynomial
+case 30 p [48, -12, -42, 18]
+case 30 q [1, 3]
+case 30 add [49, -9, -42, 18]
+case 30 sub [47, -15, -42, 18]
+case 30 mul [48, 132, -78, -108, 54]
+case 30 quotient [4/3, -16, 6]
+case 30 remainder [140/3]
+case 30 gcd [1]
+case 30 eval 1/1 12
+case 30 derivative [-12, -84, 54]
+case 30 roots [-1, 4/3, 2]
+case 30 factors [1, 1] [-4/3, 1] [-2, 1] cofactor [18]
+case 30 check ok
+case 30 divzero error polynomial division by the zero polynomial
+case 31 p [0, -12, 6, 6]
+case 31 q [-4, 2]
+case 31 add [-4, -10, 6, 6]
+case 31 sub [4, -14, 6, 6]
+case 31 mul [0, 48, -48, -12, 12]
+case 31 quotient [12, 9, 3]
+case 31 remainder [48]
+case 31 gcd [1]
+case 31 eval -3/2 45/4
+case 31 derivative [-12, 12, 18]
+case 31 roots [-2, 0, 1]
+case 31 factors [2, 1] [0, 1] [-1, 1] cofactor [6]
+case 31 check ok
+case 31 divzero error polynomial division by the zero polynomial
+case 32 p [-12, -21, -9]
+case 32 q [-4, -2, 2]
+case 32 add [-16, -23, -7]
+case 32 sub [-8, -19, -11]
+case 32 mul [48, 108, 54, -24, -18]
+case 32 quotient [-9/2]
+case 32 remainder [-30, -30]
+case 32 gcd [1, 1]
+case 32 eval 1/1 -42
+case 32 derivative [-21, -18]
+case 32 roots [-4/3, -1]
+case 32 factors [4/3, 1] [1, 1] cofactor [-9]
+case 32 check ok
+case 32 divzero error polynomial division by the zero polynomial
+case 33 p [16, 60, 38, 6]
+case 33 q [2, -3, -2]
+case 33 add [18, 57, 36, 6]
+case 33 sub [14, 63, 40, 6]
+case 33 mul [32, 72, -136, -222, -94, -12]
+case 33 quotient [-29/2, -3]
+case 33 remainder [45, 45/2]
+case 33 gcd [2, 1]
+case 33 eval -1/3 0
+case 33 derivative [60, 76, 18]
+case 33 roots [-4, -2, -1/3]
+case 33 factors [4, 1] [2, 1] [1/3, 1] cofactor [6]
+case 33 check ok
+case 33 divzero error polynomial division by the zero polynomial
+case 34 p [-9, 3, 3, 3]
+case 34 q [-2, 1, 3]
+case 34 add [-11, 4, 6, 3]
+case 34 sub [-7, 2, 0, 3]
+case 34 mul [18, -15, -30, 6, 12, 9]
+case 34 quotient [2/3, 1]
+case 34 remainder [-23/3, 13/3]
+case 34 gcd [1]
+case 34 eval -3/1 -72
+case 34 derivative [3, 6, 9]
+case 34 roots [1]
+case 34 factors [-1, 1] cofactor [9, 6, 3]
+case 34 check ok
+case 34 divzero error polynomial division by the zero polynomial
+case 35 p [27, 27, 6]
+case 35 q [-3, 8, 3]
+case 35 add [24, 35, 9]
+case 35 sub [30, 19, 3]
+case 35 mul [-81, 135, 279, 129, 18]
+case 35 quotient [2]
+case 35 remainder [33, 11]
+case 35 gcd [3, 1]
+case 35 eval 0/2 27
+case 35 derivative [27, 12]
+case 35 roots [-3, -3/2]
+case 35 factors [3, 1] [3/2, 1] cofactor [6]
+case 35 check ok
+case 35 divzero error polynomial division by the zero polynomial
+case 36 p [0, 0, -9, 18]
+case 36 q [3, -4, -4]
+case 36 add [3, -4, -13, 18]
+case 36 sub [-3, 4, -5, 18]
+case 36 mul [0, 0, -27, 90, -36, -72]
+case 36 quotient [27/4, -9/2]
+case 36 remainder [-81/4, 81/2]
+case 36 gcd [-1/2, 1]
+case 36 eval 2/2 9
+case 36 derivative [0, -18, 54]
+case 36 roots [0, 1/2]
+case 36 factors [0, 1] [0, 1] [-1/2, 1] cofactor [18]
+case 36 check ok
+case 36 divzero error polynomial division by the zero polynomial
+case 37 p [0, 4, -6, 2]
+case 37 q [0, -4, 4]
+case 37 add [0, 0, -2, 2]
+case 37 sub [0, 8, -10, 2]
+case 37 mul [0, 0, -16, 40, -32, 8]
+case 37 quotient [-1, 1/2]
+case 37 remainder 0
+case 37 gcd [0, -1, 1]
+case 37 eval 0/2 0
+case 37 derivative [4, -12, 6]
+case 37 roots [0, 1, 2]
+case 37 factors [0, 1] [-1, 1] [-2, 1] cofactor [2]
+case 37 check ok
+case 37 divzero error polynomial division by the zero polynomial
+case 38 p [0, 24, 18]
+case 38 q [0, -1, -1]
+case 38 add [0, 23, 17]
+case 38 sub [0, 25, 19]
+case 38 mul [0, 0, -24, -42, -18]
+case 38 quotient [-18]
+case 38 remainder [0, 6]
+case 38 gcd [0, 1]
+case 38 eval 0/1 0
+case 38 derivative [24, 36]
+case 38 roots [-4/3, 0]
+case 38 factors [4/3, 1] [0, 1] cofactor [18]
+case 38 check ok
+case 38 divzero error polynomial division by the zero polynomial
+case 39 p [0, 0, -27, 18]
+case 39 q [2, -2, -2]
+case 39 add [2, -2, -29, 18]
+case 39 sub [-2, 2, -25, 18]
+case 39 mul [0, 0, -54, 90, 18, -36]
+case 39 quotient [45/2, -9]
+case 39 remainder [-45, 63]
+case 39 gcd [1]
+case 39 eval 1/2 -9/2
+case 39 derivative [0, -54, 54]
+case 39 roots [0, 3/2]
+case 39 factors [0, 1] [0, 1] [-3/2, 1] cofactor [18]
+case 39 check ok
+case 39 divzero error polynomial division by the zero polynomial
+case -1 rational-roots [-2]
+case -1 bad-text error rational with a zero denominator
+case -1 huge-constant error constant or leading coefficient too large for a root search (above 10^12)
+case -1 zero-roots error the zero polynomial has every rational root
+case -1 constant-derivative 0
+case -1 gcd-rational [1/2, 1]
