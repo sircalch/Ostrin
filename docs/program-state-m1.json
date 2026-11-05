@@ -41,10 +41,10 @@
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 411,
+      "integrationTests": 412,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 323,
+      "examples": 324,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
@@ -74,7 +74,8 @@
       "H2": "std.bigint with operators and a typed Rational (+, -, *, comparisons; H30/H60/H100 exact) validated against JavaScript BigInt; std.symbolic switches to arbitrary precision on overflow; open: BigFloat, / and % operators, subquadratic algorithms",
       "M2-H": "Recursive algebraic data types compile in the native C backend and WASI: a payload naming its own enum (directly, through mutual recursion, inside Option/Result, or in a generic instance) is a ref-counted heap box owned by the parent variant; open: Option/Result payloads of non-recursive enums, AST-fallback ownership of enum payloads",
       "H10": "Real-browser audit of the 17 public pages (docs/website-audit.md, 2026-11-04): mobile clipping in Viz cards fixed, clipped-content check added to the Playwright suite, header logo 59.7 KB -> 4.1 KB; open: eager 1.38 MB WASM on the home page, Core Web Vitals under reproducible conditions, WCAG 2.2 AA and screen-reader review, structure redesign",
-      "H1": "Measurement source merging is now one pass that shares unscaled records (450,008 -> 200,010 managed allocations and 10.4 -> 5.2 MB requested on the 50,000-step accumulation, identical output, guarded by an integration test); open: multidimensional array views/strides/broadcasting audit, in-place source updates, Quantity/TemperaturePoint arrays, BLAS/LAPACK interop"
+      "H1": "Measurement source merging is now one pass that shares unscaled records (450,008 -> 200,010 managed allocations and 10.4 -> 5.2 MB requested on the 50,000-step accumulation, identical output, guarded by an integration test); open: multidimensional array views/strides/broadcasting audit, in-place source updates, Quantity/TemperaturePoint arrays, BLAS/LAPACK interop",
+      "H4": "std.symbolic carries physical dimensions: unit_symbol, dimension_of with rational exponents (sqrt halves them), typed dimensional errors, derivative and simplification consistency (docs/design/29 6b); open: link to the static Quantity<D> system, unit conversion, uncertainty in expressions"
     },
     "gates": [
       {

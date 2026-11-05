@@ -67,6 +67,20 @@ valor, `ln` de un no positivo, base negativa con exponente no entero, división 
 interpretación del DAG, no código generado: **la compilación de expresiones a funciones nativas no
 está implementada**.
 
+## 6b. Dimensiones físicas
+
+Un símbolo puede declararse con una dimensión (`unit_symbol(s, "v", "Length/Time")`). Las dimensiones son
+vectores de exponentes racionales sobre dimensiones base con nombre (cualquier nombre sin dígito inicial ni caracteres
+de sintaxis, de modo que `Base2` y `Ángulo` son válidos); `dimension_of(expr)` las propaga: una
+suma exige dimensiones iguales, un producto suma exponentes, una potencia con exponente numérico los
+multiplica (la raíz cuadrada los divide por dos) y `sin`, `cos`, `exp` y `ln` exigen un argumento
+adimensional. El texto canónico ordena las dimensiones base alfabéticamente (`Length^2*Mass*Time^-2`) y
+`"1"` es adimensional. Los constructores no fallan ante una incoherencia; la comprobación es la llamada
+explícita a `dimension_of`. Las derivadas conservan la coherencia por construcción: `d(E)/dv` de una
+energía cinética tiene dimensión `Length*Mass*Time^-1`, y la simplificación no elimina dimensiones sin
+justificación (`E/E` solo da `1` si los factores son no nulos). Los valores se interpretan en unidades
+coherentes. Aún no se conectan estas dimensiones con `Quantity<D>` del sistema de tipos estático.
+
 ## 7. Validación
 
 - 28 comprobaciones de derivadas simbólicas contra diferencias centrales (algoritmo independiente).
@@ -80,7 +94,6 @@ está implementada**.
 
 ## 8. Límites actuales
 
-No hay factorización, resolución de ecuaciones, integración simbólica, matrices simbólicas, unidades
-dentro de las expresiones (H4), generación de código ni operadores sobrecargados (`+`, `*`). La
+No hay factorización, resolución de ecuaciones, integración simbólica, matrices simbólicas, generación de código ni operadores sobrecargados (`+`, `*`). La
 validación contra un motor externo (por ejemplo SymPy) no se ha ejecutado. El almacén plano se mantiene; un enum recursivo nativo (`enum Expr { Num(Int) Add(Expr, Expr) }`, ver
 `examples/recursive_enum.ostrin`) ya compila y es una representación alternativa para código simbólico futuro.

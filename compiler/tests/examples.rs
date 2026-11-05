@@ -21054,7 +21054,7 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        symbolic_source.contains("ir=67")
+        symbolic_source.contains("ir=79")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -21417,6 +21417,39 @@ fn measurement_duplicate_source_ids_keep_merging_and_validating_in_both_backends
         String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
         expected
     );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn symbolic_units_propagate_dimensions_through_expressions_in_both_backends() {
+    // Kinetic energy has dimension Length^2*Mass*Time^-2 and its derivative with respect to v is
+    // m*v; the pendulum period 2*pi*sqrt(L/g) comes out as Time (the square root halves the
+    // exponents); adding Mass and Length/Time, taking sin of a length and a dimensional exponent
+    // are reported as typed errors; E / E simplifies to the dimensionless 1.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_units.ostrin"),
+        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*(L*g^(-1))^(1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
+    );
+    let path = example_path("symbolic_units.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let exe = temp_artifact("symbolic_units_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "leaked: {}",

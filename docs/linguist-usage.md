@@ -17,7 +17,7 @@ reconozca `.ostrin` como lenguaje.
 | Distribución entre repositorios y usuarios | Pendiente de revisión manual |
 | Propuesta upstream | **No lista para abrirse** |
 
-Los **363** archivos `.ostrin` rastreados en el repositorio propio (**323** bajo `examples/`)
+Los **364** archivos `.ostrin` rastreados en el repositorio propio (**324** bajo `examples/`)
 son muestras de sintaxis y capacidad del lenguaje. No se suman a esta evidencia de uso público. Mientras el
 contador sea 0 no se debe abrir un PR en Linguist ni presentar el mapa de lenguajes
 como si ya incluyera Ostrin.

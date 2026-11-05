@@ -133,6 +133,10 @@ const programs = [
     source: "examples/bigint_rational.ostrin",
     args: ["bigint_rational.wasm"],
     expected: "H30 = 9304682830147/2329089562800\nH60 = 15117092380124150817026911/3230237388259077233637600\nH100 = 14466636279520351160221518043104131447711/2788815009188499086581352357412492142272\ntrue\n1/18\n1/6\ntrue\nfalse\ntrue\n-3/4\n2\n6\n1371742100137174210013717421/109739369\n0.3333333333333333\nzero denominator: rational with a zero denominator\ndivision by zero: rational division by zero\nreciprocal of zero: rational reciprocal of zero\n",
+    name: "symbolic_units",
+    source: "examples/symbolic_units.ostrin",
+    args: ["symbolic_units.wasm"],
+    expected: "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*(L*g^(-1))^(1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n",
     leakCheck: true,
   },
   {
