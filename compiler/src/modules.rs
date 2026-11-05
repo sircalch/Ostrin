@@ -167,6 +167,7 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("bigint", include_str!("../std/bigint.ostrin")),
     ("arrays", include_str!("../std/arrays.ostrin")),
     ("polynomial", include_str!("../std/polynomial.ostrin")),
+    ("solve", include_str!("../std/solve.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {

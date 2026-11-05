@@ -1,0 +1,113 @@
+# solve-oracle: exact equation solving (independent BigInt oracle for std.solve)
+# line format: id | op | inputs | result
+# ops: linear, quadratic, rational_roots. See scripts/solve-oracle.mjs header for result rules.
+# cases: 109 (69 hand-picked, then 40 Park-Miller seed 7)
+C001 | linear | a=0,b=0 | all reals
+C002 | linear | a=0,b=5 | no solution
+C003 | linear | a=0,b=-1 | no solution
+C004 | linear | a=3,b=-6 | 2/1
+C005 | linear | a=-4,b=6 | 3/2
+C006 | linear | a=6,b=-4 | 2/3
+C007 | linear | a=-7,b=21 | 3/1
+C008 | linear | a=1,b=0 | 0/1
+C009 | linear | a=10000,b=-9999 | 9999/10000
+C010 | linear | a=-10000,b=3 | 3/10000
+C011 | linear | a=7,b=10000 | -10000/7
+C012 | linear | a=-3,b=0 | 0/1
+C013 | quadratic | a=0,b=0,c=0 | all reals
+C014 | quadratic | a=0,b=0,c=4 | no solution
+C015 | quadratic | a=0,b=2,c=-6 | 3/1
+C016 | quadratic | a=1,b=-5,c=6 | 2/1, 3/1
+C017 | quadratic | a=1,b=2,c=1 | -1/1
+C018 | quadratic | a=2,b=0,c=-8 | -2/1, 2/1
+C019 | quadratic | a=1,b=0,c=1 | no real roots
+C020 | quadratic | a=3,b=2,c=5 | no real roots
+C021 | quadratic | a=1,b=0,c=-2 | (0 - sqrt(2))/1, (0 + sqrt(2))/1
+C022 | quadratic | a=1,b=0,c=-3 | (0 - sqrt(3))/1, (0 + sqrt(3))/1
+C023 | quadratic | a=1,b=-2,c=-2 | (1 - sqrt(3))/1, (1 + sqrt(3))/1
+C024 | quadratic | a=2,b=-4,c=-2 | (1 - sqrt(2))/1, (1 + sqrt(2))/1
+C025 | quadratic | a=1,b=7,c=1 | (-7 - 3*sqrt(5))/2, (-7 + 3*sqrt(5))/2
+C026 | quadratic | a=-1,b=7,c=-1 | (7 - 3*sqrt(5))/2, (7 + 3*sqrt(5))/2
+C027 | quadratic | a=1,b=2,c=-17 | (-1 - 3*sqrt(2))/1, (-1 + 3*sqrt(2))/1
+C028 | quadratic | a=1,b=0,c=-5 | (0 - sqrt(5))/1, (0 + sqrt(5))/1
+C029 | quadratic | a=-2,b=-4,c=6 | -3/1, 1/1
+C030 | quadratic | a=-3,b=1,c=2 | -2/3, 1/1
+C031 | quadratic | a=10000,b=10000,c=-10000 | (-1 - sqrt(5))/2, (-1 + sqrt(5))/2
+C032 | quadratic | a=5000,b=-10000,c=5000 | 1/1
+C033 | quadratic | a=7,b=-70,c=175 | 5/1
+C034 | quadratic | a=1,b=-1,c=-1 | (1 - sqrt(5))/2, (1 + sqrt(5))/2
+C035 | quadratic | a=4,b=0,c=-45 | (0 - 3*sqrt(5))/2, (0 + 3*sqrt(5))/2
+C036 | quadratic | a=9999,b=-10000,c=1 | 1/9999, 1/1
+C037 | quadratic | a=1,b=10000,c=1 | (-5000 - sqrt(24999999))/1, (-5000 + sqrt(24999999))/1
+C038 | quadratic | a=-10000,b=10000,c=10000 | (1 - sqrt(5))/2, (1 + sqrt(5))/2
+C039 | quadratic | a=1,b=-7,c=12 | 3/1, 4/1
+C040 | quadratic | a=2,b=3,c=-2 | -2/1, 1/2
+C041 | quadratic | a=3,b=0,c=0 | 0/1
+C042 | rational_roots | c=[] | error: zero polynomial
+C043 | rational_roots | c=[0,0,0] | error: zero polynomial
+C044 | rational_roots | c=[5] | none
+C045 | rational_roots | c=[0,1] | 0/1
+C046 | rational_roots | c=[-2,0,1] | none
+C047 | rational_roots | c=[-6,1,1] | -3/1, 2/1
+C048 | rational_roots | c=[-1,0,1] | -1/1, 1/1
+C049 | rational_roots | c=[0,0,1] | 0/1
+C050 | rational_roots | c=[0,-1,0,1] | -1/1, 0/1, 1/1
+C051 | rational_roots | c=[6,-5,1] | 2/1, 3/1
+C052 | rational_roots | c=[4,-4,1] | 2/1
+C053 | rational_roots | c=[-1,3,-3,1] | 1/1
+C054 | rational_roots | c=[-1,2] | 1/2
+C055 | rational_roots | c=[3,-2] | 3/2
+C056 | rational_roots | c=[-2,1,6] | -2/3, 1/2
+C057 | rational_roots | c=[0,0,-2,1] | 0/1, 2/1
+C058 | rational_roots | c=[-10000,0,0,0,1] | -10/1, 10/1
+C059 | rational_roots | c=[-10000,9999,1] | -10000/1, 1/1
+C060 | rational_roots | c=[-6,11,-6,1] | 1/1, 2/1, 3/1
+C061 | rational_roots | c=[-1,0,4] | -1/2, 1/2
+C062 | rational_roots | c=[-9,0,4] | -3/2, 3/2
+C063 | rational_roots | c=[-8,0,0,1] | 2/1
+C064 | rational_roots | c=[-10000,0,1] | -100/1, 100/1
+C065 | rational_roots | c=[0,0,0,7] | 0/1
+C066 | rational_roots | c=[7] | none
+C067 | rational_roots | c=[1,0,0,0,0,0,1] | none
+C068 | rational_roots | c=[-1,0,0,0,0,0,1] | -1/1, 1/1
+C069 | rational_roots | c=[12,-7,1] | 3/1, 4/1
+C070 | linear | a=11,b=1 | -1/11
+C071 | quadratic | a=-10,b=4,c=21 | (2 - sqrt(214))/10, (2 + sqrt(214))/10
+C072 | rational_roots | c=[7,14,-15,-2] | none
+C073 | linear | a=18,b=22 | -11/9
+C074 | quadratic | a=-27,b=-20,c=-9 | no real roots
+C075 | rational_roots | c=[-28,-9,-23,10] | none
+C076 | linear | a=0,b=-29 | no solution
+C077 | quadratic | a=-16,b=15,c=30 | (15 - sqrt(2145))/32, (15 + sqrt(2145))/32
+C078 | rational_roots | c=[30,1,-12,1] | none
+C079 | linear | a=-9,b=-14 | -14/9
+C080 | quadratic | a=-19,b=4,c=1 | (2 - sqrt(23))/19, (2 + sqrt(23))/19
+C081 | rational_roots | c=[-3,-22,20,-10] | none
+C082 | linear | a=0,b=24 | no solution
+C083 | quadratic | a=-29,b=-17,c=0 | -17/29, 0/1
+C084 | rational_roots | c=[0,-9,-2,14] | 0/1
+C085 | linear | a=-2,b=-16 | -8/1
+C086 | quadratic | a=12,b=-1,c=3 | no real roots
+C087 | rational_roots | c=[10,-27,30,8] | none
+C088 | linear | a=28,b=30 | -15/14
+C089 | quadratic | a=-12,b=13,c=28 | (13 - sqrt(1513))/24, (13 + sqrt(1513))/24
+C090 | rational_roots | c=[10,-6,-2,-23] | none
+C091 | linear | a=-17,b=4 | 4/17
+C092 | quadratic | a=-24,b=3,c=8 | (3 - sqrt(777))/48, (3 + sqrt(777))/48
+C093 | rational_roots | c=[24,9,-21,-26] | none
+C094 | linear | a=4,b=-3 | 3/4
+C095 | quadratic | a=-27,b=29,c=0 | 0/1, 29/27
+C096 | rational_roots | c=[19,-1,-2,-18] | none
+C097 | linear | a=-21,b=-25 | -25/21
+C098 | quadratic | a=-6,b=13,c=18 | (13 - sqrt(601))/12, (13 + sqrt(601))/12
+C099 | rational_roots | c=[-4,5,12,-2] | none
+C100 | linear | a=1,b=28 | -28/1
+C101 | quadratic | a=9,b=-14,c=-1 | (7 - sqrt(58))/9, (7 + sqrt(58))/9
+C102 | rational_roots | c=[-26,-27,12,-23] | none
+C103 | linear | a=-10,b=18 | 9/5
+C104 | quadratic | a=-12,b=-24,c=19 | (-6 - sqrt(93))/6, (-6 + sqrt(93))/6
+C105 | rational_roots | c=[27,16,-5,29] | none
+C106 | linear | a=-20,b=21 | 21/20
+C107 | quadratic | a=-17,b=-24,c=23 | (-12 - sqrt(535))/17, (-12 + sqrt(535))/17
+C108 | rational_roots | c=[25,-17,23,30] | none
+C109 | linear | a=-12,b=22 | 11/6
