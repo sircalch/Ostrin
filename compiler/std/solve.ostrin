@@ -28,8 +28,9 @@ fn gcd_int(a: Int, b: Int) -> Int {
     x
 }
 
+// Compared without negating, so Int::MIN is rejected instead of overflowing.
 fn within_limit(n: Int) -> Bool {
-    abs_int(n) <= 1000000
+    n <= 1000000 and n >= 0 - 1000000
 }
 
 /// n/d as canonical text: lowest terms, d > 0, zero is "0/1". d must not be zero.
