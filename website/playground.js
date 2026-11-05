@@ -71,6 +71,204 @@ fn test_negative() -> Void {
     }
 }
 `,
+  "Symbolic derivatives": `// std.symbolic: exact numbers, canonical expressions, assumptions, differentiation, substitution
+// and numeric evaluation on a hash-consed store.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    y = symbolic.symbol(s, "y")
+    two = symbolic.number(s, 2)
+    half = symbolic.number(s, 1, 2)
+
+    // canonical form: commutativity, like terms and exact rationals
+    print(symbolic.show(symbolic.add(x, x)))
+    print(symbolic.show(symbolic.add(symbolic.mul(two, x), symbolic.mul(half, x))))
+    print(symbolic.same(symbolic.add(x, y), symbolic.add(y, x)))
+    print(symbolic.show(symbolic.mul(x, x)))
+    print(symbolic.show(symbolic.sub(x, x)))
+
+    // assumptions gate unsound simplifications
+    print(symbolic.show(symbolic.div(x, x)))
+    p = symbolic.symbol(s, "p", "positive")
+    print(symbolic.show(symbolic.div(p, p)))
+
+    // derivatives
+    cube = symbolic.power(x, symbolic.number(s, 3))
+    print("d(x^3)/dx = " + symbolic.diff_text(cube, x))
+    print("d(x*sin(x))/dx = " + symbolic.diff_text(symbolic.mul(x, symbolic.call("sin", x)), x))
+    print("d(exp(2x))/dx = " + symbolic.diff_text(symbolic.call("exp", symbolic.mul(two, x)), x))
+    print("d(ln(x^2))/dx = " + symbolic.diff_text(symbolic.call("ln", symbolic.power(x, two)), x))
+    print("d(x^x)/dx = " + symbolic.diff_text(symbolic.power(x, x), x))
+    print("d(x^p)/dx = " + symbolic.diff_text(symbolic.power(p, p), p))
+    print("d(y)/dx = " + symbolic.diff_text(y, x))
+
+    // substitution and numeric evaluation
+    poly = symbolic.add(symbolic.mul(symbolic.number(s, 3), symbolic.power(x, two)), symbolic.add(x, symbolic.number(s, 1)))
+    print(symbolic.show(poly))
+    print(symbolic.show(symbolic.subs(poly, x, symbolic.number(s, 2))))
+    print(symbolic.eval_text(poly, ["x"], [2.0]))
+    print(symbolic.eval_text(poly, ["z"], [2.0]))
+    print(symbolic.show(symbolic.expand(symbolic.power(symbolic.add(x, y), two))))
+}
+`,
+  "Symbolic model to figure": `// Symbolic modelling to a figure: a damped oscillator x(t) = A exp(-g t) cos(w t) is built as an
+// expression, differentiated twice for velocity and acceleration, checked against the ODE
+// x'' + 2 g x' + (g^2 + w^2) x = 0 at sampled times, and plotted from numeric evaluation of the
+// symbolic results.
+import std.symbolic
+import std.viz
+
+fn main() -> Void {
+    s = symbolic.store()
+    t = symbolic.symbol(s, "t")
+    amp = symbolic.symbol(s, "A")
+    g = symbolic.symbol(s, "g", "positive")
+    w = symbolic.symbol(s, "w", "positive")
+    decay = symbolic.call("exp", symbolic.neg(symbolic.mul(g, t)))
+    x = symbolic.mul(amp, symbolic.mul(decay, symbolic.call("cos", symbolic.mul(w, t))))
+    print("x(t) = " + symbolic.show(x))
+    v = symbolic.diff(x, t).unwrap()
+    a = symbolic.diff(v, t).unwrap()
+    print("v(t) = " + symbolic.show(v))
+    print("a(t) = " + symbolic.show(a))
+
+    names = ["t", "A", "g", "w"]
+    n = 240
+    times = linspace(0.0, 12.0, n)
+    mut position = zeros([n])
+    mut velocity = zeros([n])
+    mut worst = 0.0
+    for i in 0 until n {
+        values = [times[i], 1.0, 0.2, 2.0]
+        xi = symbolic.eval_or(x, names, values, 0.0 / 0.0)
+        vi = symbolic.eval_or(v, names, values, 0.0 / 0.0)
+        ai = symbolic.eval_or(a, names, values, 0.0 / 0.0)
+        position.set(i, xi)
+        velocity.set(i, vi)
+        residual = abs(ai + 2.0 * 0.2 * vi + (0.2 * 0.2 + 2.0 * 2.0) * xi)
+        if residual > worst {
+            worst = residual
+        }
+    }
+    print("ODE residual below 1e-12: " + (worst < 1e-12).to_string())
+    print("samples: " + n.to_string())
+    fig = viz.figure("Damped oscillator from a symbolic model")
+        .describe("x(t) = A exp(-g t) cos(w t) with A = 1, g = 0.2, w = 2, and its symbolic derivative")
+        .labels("time t", "x and dx/dt")
+        .line(times, position, label: "x(t)")
+        .line(times, velocity, label: "dx/dt", dash: "6 4")
+        .hline(0.0)
+    svg = fig.svg()
+    print("figure is svg: " + svg.starts_with("<svg").to_string())
+    print(svg)
+}
+`,
+  "Exact rationals (BigInt)": `// Typed exact rationals over BigInt: harmonic numbers beyond 64 bits, field identities, ordering,
+// parsing and the typed errors for a zero denominator. The harmonic numbers H30, H60 and H100 and
+// the other values were reproduced with an external BigInt.
+import std.bigint
+
+fn harmonic(n: Int) -> String {
+    mut total = bigint.fraction_whole(0)
+    for k in 1 to n {
+        total = total + bigint.fraction_from_ints(1, k).unwrap()
+    }
+    bigint.fraction_to_string(total)
+}
+
+fn main() -> Void {
+    print("H30 = " + harmonic(30))
+    print("H60 = " + harmonic(60))
+    print("H100 = " + harmonic(100))
+
+    third = bigint.fraction_from_ints(1, 3).unwrap()
+    sixth = bigint.fraction_from_ints(1, 6).unwrap()
+    half = bigint.fraction_from_ints(1, 2).unwrap()
+    print(third + sixth == half)
+    print(bigint.fraction_to_string(third * sixth))
+    print(bigint.fraction_to_string(half - third))
+    print(third < half)
+    print(half <= third)
+    print(sixth != third)
+    print(bigint.fraction_to_string(bigint.fraction_from_ints(6, 0 - 8).unwrap()))
+    print(bigint.fraction_to_string(bigint.fraction_div(third, sixth).unwrap()))
+    print(bigint.fraction_to_string(bigint.fraction_reciprocal(sixth).unwrap()))
+    print(bigint.fraction_to_string(bigint.fraction_parse("123456789012345678901234567890/9876543210").unwrap()))
+    print(bigint.fraction_to_float(third))
+
+    match bigint.fraction_from_ints(1, 0) {
+        Ok(r) => print("zero denominator accepted"),
+        Err(message) => print("zero denominator: " + message),
+    }
+    match bigint.fraction_div(third, bigint.fraction_whole(0)) {
+        Ok(r) => print("division by zero accepted"),
+        Err(message) => print("division by zero: " + message),
+    }
+    match bigint.fraction_reciprocal(bigint.fraction_whole(0)) {
+        Ok(r) => print("reciprocal of zero accepted"),
+        Err(message) => print("reciprocal of zero: " + message),
+    }
+}
+`,
+  "Array operations": `// std.arrays: slicing, joining, axis reductions, argmax/argmin and meshgrid on Float arrays, with typed
+// errors for ranges, shapes and empty or NaN input. Every value was reproduced with an independent
+// implementation (see the integration test).
+import std.arrays
+
+fn show(label: String, result: Result<Array<Float>, String>) -> Void {
+    match result {
+        Ok(values) => print(label + ": " + values.to_string()),
+        Err(message) => print(label + ": error " + message),
+    }
+}
+
+fn main() -> Void {
+    v = array([4.0, 8.0, 15.0, 16.0, 23.0, 42.0])
+    m = array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 10.0]])
+    show("slice 1..4", arrays.slice(v, 1, 4))
+    show("slice empty", arrays.slice(v, 2, 2))
+    show("take nothing", arrays.take(v, []))
+    show("slice outside", arrays.slice(v, 4, 9))
+    show("slice2 rows 0..2 cols 1..3", arrays.slice2(m, 0, 2, 1, 3))
+    show("slice2 outside", arrays.slice2(m, 0, 4, 0, 1))
+    show("take", arrays.take(v, [5, 0, 0, 3]))
+    show("take outside", arrays.take(v, [1, 6]))
+    show("concat", arrays.concat(v, array([0.5, 1.5])))
+    show("vstack", arrays.vstack(m, array([[0.0, 0.0, 1.0]])))
+    show("vstack mismatch", arrays.vstack(m, array([[1.0, 2.0]])))
+    show("hstack", arrays.hstack(m, array([[9.0], [9.0], [9.0]])))
+    show("hstack mismatch", arrays.hstack(m, array([[1.0, 2.0]])))
+    show("sum axis 0", arrays.sum_axis(m, 0))
+    show("sum axis 1", arrays.sum_axis(m, 1))
+    show("mean axis 0", arrays.mean_axis(m, 0))
+    show("mean axis 1", arrays.mean_axis(m, 1))
+    show("min axis 0", arrays.min_axis(m, 0))
+    show("max axis 1", arrays.max_axis(m, 1))
+    show("bad axis", arrays.sum_axis(m, 2))
+    show("axis on a vector", arrays.sum_axis(v, 0))
+    match arrays.argmax(v) {
+        Ok(i) => print("argmax: " + i.to_string()),
+        Err(message) => print("argmax: error " + message),
+    }
+    match arrays.argmin(array([3.0, 1.0, 2.0, 1.0])) {
+        Ok(i) => print("argmin (first of ties): " + i.to_string()),
+        Err(message) => print("argmin: error " + message),
+    }
+    match arrays.argmax(array([1.0, sqrt(0.0 - 1.0)])) {
+        Ok(i) => print("argmax with NaN: " + i.to_string()),
+        Err(message) => print("argmax with NaN: error " + message),
+    }
+    match arrays.meshgrid(array([1.0, 2.0, 3.0]), array([10.0, 20.0])) {
+        Ok(grid) => {
+            print("meshgrid x: " + grid.x.to_string())
+            print("meshgrid y: " + grid.y.to_string())
+        },
+        Err(message) => print("meshgrid: error " + message),
+    }
+}
+`,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -80,6 +278,72 @@ const output = $("output");
 const status = $("status");
 const buttons = ["run", "check", "test", "format"].map($).filter(Boolean);
 const shareButton = $("share");
+const saveButton = $("save");
+const openButton = $("open");
+const resetButton = $("reset");
+const openInput = $("open-file");
+const DRAFT_KEY = "ostrin.playground.draft";
+const MAX_OPEN_BYTES = 512 * 1024;
+const figureStore = new WeakMap();
+
+// Browser storage can be missing or throw (private windows, blocked site data); the page must work
+// without it, so every access is wrapped.
+function readDraft() {
+  try {
+    return localStorage.getItem(DRAFT_KEY);
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeDraft(text) {
+  try {
+    localStorage.setItem(DRAFT_KEY, text);
+  } catch (_) {
+    // Persistence is a convenience only.
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch (_) {
+    // Nothing to clear.
+  }
+}
+
+function download(filename, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// A program that prints one standalone SVG document (std.viz figures do) is shown as an image, with the
+// remaining text kept as output and the SVG source available to download. The image is loaded through a
+// data URL, so scripts inside an SVG never run in the page.
+function extractFigure(lines) {
+  const text = lines.filter(([kind]) => kind === "out").map(([, line]) => line).join("\n");
+  const start = text.indexOf("<svg");
+  const close = text.lastIndexOf("</svg>");
+  if (start < 0 || close < start) return null;
+  const end = close + "</svg>".length;
+  const svg = text.slice(start, end);
+  if (svg.length > 5 * 1024 * 1024) return null;
+  return { svg, before: text.slice(0, start).trim(), after: text.slice(end).trim() };
+}
+
+function figureHtml(figure) {
+  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(figure.svg);
+  const text = [figure.before, figure.after].filter(Boolean).map(escapeHtml).join("\n");
+  return (text ? `<span>${text}</span>\n` : "") +
+    `<span class="figure-preview"><img alt="Figure produced by the program" src="${url}"></span>\n` +
+    `<span class="figure-actions"><button type="button" class="button-quiet" data-download-svg>Download SVG</button></span>`;
+}
 
 const loadModule = loadCompiler;
 
@@ -159,6 +423,14 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     const { code, lines } = await invoke(sourceNode.value, flags);
     const diagnostics = lines.map(([, text]) => parseDiagnostic(text)).filter(Boolean);
     let html = lines.map(renderLine).join("\n");
+    const figure = flag === "--run" && code === 0 ? extractFigure(lines) : null;
+    if (figure) {
+      const errors = lines.filter(([kind]) => kind !== "out").map(renderLine).join("\n");
+      html = (errors ? errors + "\n" : "") + figureHtml(figure);
+      figureStore.set(outputNode, figure.svg);
+    } else {
+      figureStore.delete(outputNode);
+    }
     if (flag === "--fmt" && code === 0) {
       // --fmt prints the formatted source: put it back in the editor.
       sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
@@ -186,6 +458,7 @@ if (select && source) {
   for (const name of Object.keys(EXAMPLES)) select.append(new Option(name, name));
   select.addEventListener("change", () => {
     source.value = EXAMPLES[select.value];
+    clearDraft();
     if (output) output.textContent = "";
     if (status) status.textContent = "";
     clearSourceDiagnostic(source, sourceStatus);
@@ -195,11 +468,54 @@ if (select && source) {
     source.value = sharedCode;
     if (output) output.textContent = "Shared source loaded. Press Run (Ctrl + Enter).";
   } else {
-    source.value = EXAMPLES[select.value];
+    const draft = readDraft();
+    if (draft) {
+      source.value = draft;
+      if (output) output.textContent = "Restored your last draft. Press Reset to return to the selected example.";
+    } else {
+      source.value = EXAMPLES[select.value];
+    }
   }
   clearSourceDiagnostic(source, sourceStatus);
 }
 
+output?.addEventListener("click", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-download-svg]")) {
+    const svg = figureStore.get(output);
+    if (svg) download("figure.svg", svg, "image/svg+xml");
+  }
+});
+saveButton?.addEventListener("click", () => {
+  if (source) download("main.ostrin", source.value, "text/plain");
+});
+openButton?.addEventListener("click", () => openInput?.click());
+openInput?.addEventListener("change", async () => {
+  const file = openInput.files?.[0];
+  openInput.value = "";
+  if (!file || !source) return;
+  if (file.size > MAX_OPEN_BYTES) {
+    status.textContent = "file too large (512 KB limit)";
+    return;
+  }
+  source.value = await file.text();
+  writeDraft(source.value);
+  if (output) output.textContent = "Opened " + file.name + ". Press Run (Ctrl + Enter).";
+  status.textContent = "";
+  clearSourceDiagnostic(source, sourceStatus);
+});
+resetButton?.addEventListener("click", () => {
+  if (!source || !select) return;
+  source.value = EXAMPLES[select.value];
+  clearDraft();
+  if (output) output.textContent = "";
+  status.textContent = "";
+  clearSourceDiagnostic(source, sourceStatus);
+});
+let draftTimer = 0;
+source?.addEventListener("input", () => {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => writeDraft(source.value), 400);
+});
 $("run")?.addEventListener("click", () => execute("--run"));
 $("check")?.addEventListener("click", () => execute("--check"));
 $("test")?.addEventListener("click", () => execute("--test"));

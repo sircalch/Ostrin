@@ -1112,3 +1112,28 @@ test("public status dashboard exposes separate evidence dimensions", async ({ pa
   await expect(page.locator("[data-status-numeric] .status-metric").nth(2)).toHaveClass(/ready/);
   await expect(page.locator("[data-status-numeric] .status-metric").nth(2)).toContainText("FFT references");
 });
+
+test("Playground shows printed SVG figures and keeps a local draft", async ({ page }) => {
+  await page.goto("./playground.html", { waitUntil: "domcontentloaded" });
+  const runButton = page.locator("#run");
+  await expect(runButton).toBeEnabled({ timeout: 45_000 });
+
+  await page.locator("select").selectOption("Symbolic model to figure");
+  await runButton.click();
+  const image = page.locator(".figure-preview img");
+  await expect(image).toBeVisible({ timeout: 60_000 });
+  expect(await image.evaluate((node) => node.naturalWidth)).toBeGreaterThan(100);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("[data-download-svg]").click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("figure.svg");
+
+  const source = page.getByLabel("Ostrin source");
+  await source.fill("fn main() -> Void {\n    print(42)\n}\n");
+  await page.waitForTimeout(700);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(source).toHaveValue(/print\(42\)/);
+  await page.locator("#reset").click();
+  await expect(source).not.toHaveValue(/print\(42\)/);
+});
