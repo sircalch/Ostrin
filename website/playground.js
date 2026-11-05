@@ -328,6 +328,8 @@ function download(filename, text, type) {
 // data URL, so scripts inside an SVG never run in the page.
 function extractFigure(lines) {
   const text = lines.filter(([kind]) => kind === "out").map(([, line]) => line).join("\n");
+  // Several figures (or stray markup) cannot be one image; keep the ordinary text output instead.
+  if (text.split("<svg").length !== 2 || text.split("</svg>").length !== 2) return null;
   const start = text.indexOf("<svg");
   const close = text.lastIndexOf("</svg>");
   if (start < 0 || close < start) return null;
