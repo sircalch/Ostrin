@@ -21526,6 +21526,30 @@ fn std_bigint_rationals_match_an_external_oracle_in_both_backends() {
 }
 
 #[test]
+fn std_polynomial_core_matches_node_oracle_in_both_backends() {
+    // 40 generated integer polynomials put through every std.polynomial operation, plus edge cases.
+    // The golden file is the output of scripts/polynomial-oracle.mjs (BigInt rationals, no shared
+    // code with the module); the interpreter and native binary must reproduce it exactly.
+    let expected = fs::read_to_string(fixture_path("polynomial_core_oracle.txt"))
+        .unwrap()
+        .replace("\r\n", "\n");
+    assert_eq!(
+        interpreter_and_native_agree("polynomial_core.ostrin"),
+        expected
+    );
+    let path = example_path("polynomial_core.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn record_unary_minus_and_int_reflected_operators_lower_through_ir_without_leaks() {
     // `-a` calls the record's `neg`; `2 + a`, `3 - a`, `4 * a` and `100 / a` call `radd`, `rsub`, `rmul`
     // and `rdiv`. The IR backend used to lower reflected operators only for a Float on the left and

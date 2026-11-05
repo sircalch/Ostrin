@@ -1,0 +1,635 @@
+// std.polynomial — exact univariate polynomials with rational coefficients.
+//
+// A `Poly` lists its coefficients in ascending degree: `coeffs[i]` is the coefficient of x^i. Each
+// coefficient is a rational in the canonical text form of std.bigint ("N" or "N/D", lowest terms,
+// D > 1, sign on N), so equal polynomials have equal records. The zero polynomial has no
+// coefficients and every polynomial has a nonzero leading coefficient. Every arithmetic step is
+// exact: coefficients are arbitrary-precision rationals (std.bigint.Rational, reached through its
+// text form because other std modules cannot name `bigint.Rational` in a signature), so there is no
+// overflow and no rounding. The cost is that every coefficient operation parses and prints its
+// operands, which is fine for the small degrees and coefficients this module is meant for.
+//
+// Failures never abort. Division by the zero polynomial, a non-rational coefficient text, and root
+// searches whose constant or leading coefficient exceeds the limit below return `Err`.
+//
+// Limit: `poly_roots_rational` finds roots by the rational root theorem, which trial-divides the
+// constant and leading coefficients of the integer-cleared polynomial. Both must have absolute value
+// at most 10^12 (about 10^6 steps each), and the denominators cleared to reach integers must have an
+// lcm of at most 10^12.
+
+import std.bigint
+
+/// A polynomial with rational coefficients, lowest degree first.
+pub record Poly {
+    coeffs: List<String>
+}
+
+/// Quotient and remainder of a polynomial division.
+pub record Division {
+    quotient: Poly
+    remainder: Poly
+}
+
+/// Linear factors (x - r), one per root found with multiplicity, and the leftover cofactor. The
+/// original polynomial equals cofactor times the product of the factors.
+pub record Factorization {
+    factors: List<Poly>
+    cofactor: Poly
+}
+
+// ---------------------------------------------------------------- rational coefficient text
+
+fn q_norm(text: String) -> Result<String, String> {
+    match bigint.fraction_parse(text) {
+        Ok(r) => Ok(bigint.fraction_to_string(r)),
+        Err(message) => Err(message),
+    }
+}
+
+fn q_add(a: String, b: String) -> Result<String, String> {
+    x = bigint.fraction_parse(a)
+    y = bigint.fraction_parse(b)
+    match x {
+        Err(message) => Err(message),
+        Ok(p) => match y {
+            Err(message) => Err(message),
+            Ok(q) => Ok(bigint.fraction_to_string(bigint.fraction_add(p, q))),
+        },
+    }
+}
+
+fn q_sub(a: String, b: String) -> Result<String, String> {
+    x = bigint.fraction_parse(a)
+    y = bigint.fraction_parse(b)
+    match x {
+        Err(message) => Err(message),
+        Ok(p) => match y {
+            Err(message) => Err(message),
+            Ok(q) => Ok(bigint.fraction_to_string(bigint.fraction_sub(p, q))),
+        },
+    }
+}
+
+fn q_mul(a: String, b: String) -> Result<String, String> {
+    x = bigint.fraction_parse(a)
+    y = bigint.fraction_parse(b)
+    match x {
+        Err(message) => Err(message),
+        Ok(p) => match y {
+            Err(message) => Err(message),
+            Ok(q) => Ok(bigint.fraction_to_string(bigint.fraction_mul(p, q))),
+        },
+    }
+}
+
+fn q_div(a: String, b: String) -> Result<String, String> {
+    x = bigint.fraction_parse(a)
+    y = bigint.fraction_parse(b)
+    match x {
+        Err(message) => Err(message),
+        Ok(p) => match y {
+            Err(message) => Err(message),
+            Ok(q) => match bigint.fraction_div(p, q) {
+                Ok(r) => Ok(bigint.fraction_to_string(r)),
+                Err(message) => Err(message),
+            },
+        },
+    }
+}
+
+/// acc + x * y
+fn q_fma(acc: String, x: String, y: String) -> Result<String, String> {
+    match q_mul(x, y) {
+        Ok(t) => q_add(acc, t),
+        Err(message) => Err(message),
+    }
+}
+
+/// -1, 0 or 1 comparing a with b.
+fn q_cmp(a: String, b: String) -> Result<Int, String> {
+    x = bigint.fraction_parse(a)
+    y = bigint.fraction_parse(b)
+    match x {
+        Err(message) => Err(message),
+        Ok(p) => match y {
+            Err(message) => Err(message),
+            Ok(q) => Ok(bigint.fraction_compare(p, q)),
+        },
+    }
+}
+
+/// True when the canonical rational text has denominator 1.
+fn is_integer_text(text: String) -> Bool {
+    mut whole = true
+    for i in 0 until text.length() {
+        if text.slice(i, i + 1) == "/" {
+            whole = false
+        }
+    }
+    whole
+}
+
+// ---------------------------------------------------------------- construction and text
+
+/// Drop trailing zero coefficients (the input is already canonical text).
+fn trim(items: List<String>) -> Poly {
+    mut last = 0 - 1
+    for i in 0 until items.length() {
+        if items[i] != "0" {
+            last = i
+        }
+    }
+    mut out: List<String> = []
+    for i in 0 until last + 1 {
+        out.push(items[i])
+    }
+    Poly { coeffs: out }
+}
+
+fn coef(p: Poly, i: Int) -> String {
+    if i < p.coeffs.length() {
+        p.coeffs[i]
+    } else {
+        "0"
+    }
+}
+
+/// The polynomial with the given integer coefficients, lowest degree first.
+pub fn poly_from_ints(values: List<Int>) -> Poly {
+    mut texts: List<String> = []
+    for i in 0 until values.length() {
+        texts.push(values[i].to_string())
+    }
+    trim(texts)
+}
+
+/// The polynomial with the given rational coefficients, each as "N" or "N/D", lowest degree first.
+pub fn poly_from_texts(values: List<String>) -> Result<Poly, String> {
+    mut out: List<String> = []
+    for i in 0 until values.length() {
+        match q_norm(values[i]) {
+            Ok(text) => {
+                out.push(text)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(trim(out))
+}
+
+/// The degree, or -1 for the zero polynomial.
+pub fn poly_degree(p: Poly) -> Int {
+    p.coeffs.length() - 1
+}
+
+/// Coefficients in ascending order, for example "[1, 0, -3/2]"; the zero polynomial is "0".
+pub fn poly_to_string(p: Poly) -> String {
+    if p.coeffs.length() == 0 {
+        return "0"
+    }
+    mut text = "["
+    for i in 0 until p.coeffs.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + p.coeffs[i]
+    }
+    text + "]"
+}
+
+// ---------------------------------------------------------------- arithmetic
+
+/// a + b
+pub fn poly_add(a: Poly, b: Poly) -> Result<Poly, String> {
+    la = a.coeffs.length()
+    lb = b.coeffs.length()
+    n = if la > lb { la } else { lb }
+    mut out: List<String> = []
+    for i in 0 until n {
+        match q_add(coef(a, i), coef(b, i)) {
+            Ok(t) => {
+                out.push(t)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(trim(out))
+}
+
+/// a - b
+pub fn poly_sub(a: Poly, b: Poly) -> Result<Poly, String> {
+    la = a.coeffs.length()
+    lb = b.coeffs.length()
+    n = if la > lb { la } else { lb }
+    mut out: List<String> = []
+    for i in 0 until n {
+        match q_sub(coef(a, i), coef(b, i)) {
+            Ok(t) => {
+                out.push(t)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(trim(out))
+}
+
+/// a * b
+pub fn poly_mul(a: Poly, b: Poly) -> Result<Poly, String> {
+    la = a.coeffs.length()
+    lb = b.coeffs.length()
+    if la == 0 or lb == 0 {
+        return Ok(Poly { coeffs: [] })
+    }
+    mut out: List<String> = []
+    for k in 0 until la + lb - 1 {
+        mut acc = "0"
+        for i in 0 until la {
+            j = k - i
+            if j >= 0 and j < lb {
+                match q_fma(acc, a.coeffs[i], b.coeffs[j]) {
+                    Ok(u) => {
+                        acc = u
+                    },
+                    Err(message) => {
+                        return Err(message)
+                    },
+                }
+            }
+        }
+        out.push(acc)
+    }
+    Ok(trim(out))
+}
+
+/// r - c * x^shift * b, as a coefficient list of the same length as r.
+fn reduce_step(r: List<String>, b: List<String>, shift: Int, c: String) -> Result<List<String>, String> {
+    match q_mul(c, "-1") {
+        Err(message) => Err(message),
+        Ok(negc) => {
+            mut next: List<String> = []
+            for i in 0 until r.length() {
+                if i >= shift and i < shift + b.length() {
+                    match q_fma(r[i], negc, b[i - shift]) {
+                        Ok(u) => {
+                            next.push(u)
+                        },
+                        Err(message) => {
+                            return Err(message)
+                        },
+                    }
+                } else {
+                    next.push(r[i])
+                }
+            }
+            Ok(next)
+        },
+    }
+}
+
+/// Quotient and remainder of a divided by b over the rationals (b must not be zero).
+pub fn poly_divmod(a: Poly, b: Poly) -> Result<Division, String> {
+    lb = b.coeffs.length()
+    if lb == 0 {
+        return Err("polynomial division by the zero polynomial")
+    }
+    la = a.coeffs.length()
+    if la < lb {
+        return Ok(Division { quotient: Poly { coeffs: [] }, remainder: a })
+    }
+    lead = b.coeffs[lb - 1]
+    mut r: List<String> = a.coeffs
+    mut desc: List<String> = []
+    mut k = la - lb
+    while k >= 0 {
+        match q_div(r[k + lb - 1], lead) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(c) => {
+                match reduce_step(r, b.coeffs, k, c) {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(next) => {
+                        r = next
+                        desc.push(c)
+                    },
+                }
+            },
+        }
+        k = k - 1
+    }
+    mut quot: List<String> = []
+    for i in 0 until desc.length() {
+        quot.push(desc[desc.length() - 1 - i])
+    }
+    mut rem: List<String> = []
+    for i in 0 until lb - 1 {
+        rem.push(r[i])
+    }
+    Ok(Division { quotient: trim(quot), remainder: trim(rem) })
+}
+
+fn make_monic(p: Poly) -> Result<Poly, String> {
+    n = p.coeffs.length()
+    if n == 0 {
+        return Ok(p)
+    }
+    lead = p.coeffs[n - 1]
+    mut out: List<String> = []
+    for i in 0 until n {
+        match q_div(p.coeffs[i], lead) {
+            Ok(t) => {
+                out.push(t)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(trim(out))
+}
+
+/// The monic greatest common divisor of a and b (the zero polynomial when both are zero).
+pub fn poly_gcd(a: Poly, b: Poly) -> Result<Poly, String> {
+    mut x = a
+    mut y = b
+    while y.coeffs.length() > 0 {
+        match poly_divmod(x, y) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(d) => {
+                x = y
+                y = d.remainder
+            },
+        }
+    }
+    make_monic(x)
+}
+
+/// p(x) for a rational x, by Horner's rule.
+pub fn poly_eval(p: Poly, x: String) -> Result<String, String> {
+    mut acc = "0"
+    mut i = p.coeffs.length() - 1
+    while i >= 0 {
+        match q_fma(p.coeffs[i], acc, x) {
+            Ok(u) => {
+                acc = u
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+        i = i - 1
+    }
+    Ok(acc)
+}
+
+/// The formal derivative p'(x).
+pub fn poly_derivative(p: Poly) -> Result<Poly, String> {
+    n = p.coeffs.length()
+    mut out: List<String> = []
+    for i in 1 until n {
+        match q_mul(p.coeffs[i], i.to_string()) {
+            Ok(t) => {
+                out.push(t)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(trim(out))
+}
+
+// ---------------------------------------------------------------- rational roots
+
+fn abs_int(n: Int) -> Int {
+    if n < 0 { 0 - n } else { n }
+}
+
+fn gcd_int(a: Int, b: Int) -> Int {
+    mut x = abs_int(a)
+    mut y = abs_int(b)
+    while y != 0 {
+        r = x % y
+        x = y
+        y = r
+    }
+    x
+}
+
+/// The positive divisors of n >= 1, by trial division up to sqrt(n).
+fn divisors(n: Int) -> List<Int> {
+    mut small: List<Int> = []
+    mut large: List<Int> = []
+    mut d = 1
+    while d * d <= n {
+        if n % d == 0 {
+            small.push(d)
+            if d * d != n {
+                large.push(n / d)
+            }
+        }
+        d = d + 1
+    }
+    mut out: List<Int> = []
+    for i in 0 until small.length() {
+        out.push(small[i])
+    }
+    for i in 0 until large.length() {
+        out.push(large[large.length() - 1 - i])
+    }
+    out
+}
+
+/// Multiply by the lcm of the denominators, giving a polynomial with integer coefficients and the
+/// same roots.
+fn clear_denominators(p: Poly) -> Result<Poly, String> {
+    mut lcm = 1
+    for i in 0 until p.coeffs.length() {
+        text = p.coeffs[i]
+        if not is_integer_text(text) {
+            if not bigint.rational_fits_int(text) {
+                return Err("rational coefficient too large for a root search")
+            }
+            d = abs_int(bigint.rational_denominator_int(text))
+            lcm = lcm / gcd_int(lcm, d) * d
+            if lcm > 1000000000000 {
+                return Err("coefficient denominators too large for a root search (lcm above 10^12)")
+            }
+        }
+    }
+    mut out: List<String> = []
+    for i in 0 until p.coeffs.length() {
+        match q_mul(p.coeffs[i], lcm.to_string()) {
+            Ok(t) => {
+                out.push(t)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(trim(out))
+}
+
+/// Insert value into the ascending list items.
+fn insert_sorted(items: List<String>, value: String) -> Result<List<String>, String> {
+    mut out: List<String> = []
+    mut placed = false
+    for i in 0 until items.length() {
+        match q_cmp(value, items[i]) {
+            Ok(c) => {
+                if c < 0 and placed == false {
+                    out.push(value)
+                    placed = true
+                }
+                out.push(items[i])
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    if placed == false {
+        out.push(value)
+    }
+    Ok(out)
+}
+
+/// Rational roots of a polynomial whose coefficients are integers.
+fn roots_of_integer_poly(p: Poly) -> Result<List<String>, String> {
+    n = p.coeffs.length()
+    mut lowest = n
+    for i in 0 until n {
+        if p.coeffs[i] != "0" and lowest == n {
+            lowest = i
+        }
+    }
+    mut roots: List<String> = []
+    if lowest > 0 {
+        match insert_sorted(roots, "0") {
+            Ok(list) => {
+                roots = list
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    // Divide out x^lowest: the remaining polynomial has a nonzero constant term.
+    mut reduced: List<String> = []
+    for i in lowest until n {
+        reduced.push(p.coeffs[i])
+    }
+    m = reduced.length()
+    if m < 2 {
+        return Ok(roots)
+    }
+    limit = 1000000000000
+    if not bigint.rational_fits_int(reduced[0]) or not bigint.rational_fits_int(reduced[m - 1]) {
+        return Err("constant or leading coefficient too large for a root search (above 10^12)")
+    }
+    a0 = bigint.rational_numerator_int(reduced[0])
+    an = bigint.rational_numerator_int(reduced[m - 1])
+    if abs_int(a0) > limit or abs_int(an) > limit {
+        return Err("constant or leading coefficient too large for a root search (above 10^12)")
+    }
+    poly = Poly { coeffs: reduced }
+    ps = divisors(abs_int(a0))
+    qs = divisors(abs_int(an))
+    for i in 0 until ps.length() {
+        for j in 0 until qs.length() {
+            if gcd_int(ps[i], qs[j]) == 1 {
+                for s in 0 until 2 {
+                    num = if s == 0 { ps[i] } else { 0 - ps[i] }
+                    match bigint.rational_make(num.to_string(), qs[j].to_string()) {
+                        Err(message) => {
+                            return Err(message)
+                        },
+                        Ok(candidate) => {
+                            match poly_eval(poly, candidate) {
+                                Err(message) => {
+                                    return Err(message)
+                                },
+                                Ok(value) => {
+                                    if value == "0" {
+                                        match insert_sorted(roots, candidate) {
+                                            Ok(list) => {
+                                                roots = list
+                                            },
+                                            Err(message) => {
+                                                return Err(message)
+                                            },
+                                        }
+                                    }
+                                },
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+    Ok(roots)
+}
+
+/// The distinct rational roots of p in ascending order. Rational coefficients are allowed (they are
+/// cleared to integers first); the zero polynomial is an error.
+pub fn poly_roots_rational(p: Poly) -> Result<List<String>, String> {
+    if p.coeffs.length() == 0 {
+        return Err("the zero polynomial has every rational root")
+    }
+    match clear_denominators(p) {
+        Err(message) => Err(message),
+        Ok(integer_poly) => roots_of_integer_poly(integer_poly),
+    }
+}
+
+/// Divide out every rational root found by poly_roots_rational, each as many times as it divides.
+/// The factors are (x - r) in ascending order of r; the cofactor carries the leading coefficient
+/// and any irrational or complex part.
+pub fn poly_factor_linear(p: Poly) -> Result<Factorization, String> {
+    match poly_roots_rational(p) {
+        Err(message) => Err(message),
+        Ok(roots) => {
+            mut factors: List<Poly> = []
+            mut rest = p
+            for i in 0 until roots.length() {
+                match q_mul(roots[i], "-1") {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(negr) => {
+                        linear = Poly { coeffs: [negr, "1"] }
+                        mut again = true
+                        while again {
+                            match poly_divmod(rest, linear) {
+                                Err(message) => {
+                                    return Err(message)
+                                },
+                                Ok(d) => {
+                                    if d.remainder.coeffs.length() == 0 {
+                                        factors.push(linear)
+                                        rest = d.quotient
+                                    } else {
+                                        again = false
+                                    }
+                                },
+                            }
+                        }
+                    },
+                }
+            }
+            Ok(Factorization { factors: factors, cofactor: rest })
+        },
+    }
+}
