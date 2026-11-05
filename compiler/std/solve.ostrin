@@ -1,0 +1,214 @@
+// std.solve: exact solutions of linear, quadratic and rational-root polynomial equations.
+//
+// Every root is returned as text so it stays exact. A rational root is "n/d" in lowest terms with
+// d > 0 (zero is "0/1"). An irrational quadratic root is "(p + sqrt(q))/d" with q squarefree, or
+// "(p + k*sqrt(q))/d" when the coefficient k of the square root is not 1, with d > 0 and
+// gcd(p, k, d) = 1. The "- " form is used when the square-root term is negative.
+//
+// The quadratic path uses Int arithmetic only. Coefficients are limited to |coeff| <= 10^6, so the
+// discriminant b*b - 4*a*c stays below 5*10^12 and cannot overflow.
+//
+// Failures never abort: a negative discriminant, coefficients above the limit, a linear equation
+// with no or every solution, and the zero polynomial all return Err or the documented text.
+
+import std.polynomial
+
+fn abs_int(n: Int) -> Int {
+    if n < 0 { 0 - n } else { n }
+}
+
+fn gcd_int(a: Int, b: Int) -> Int {
+    mut x = abs_int(a)
+    mut y = abs_int(b)
+    while y != 0 {
+        r = x % y
+        x = y
+        y = r
+    }
+    x
+}
+
+fn within_limit(n: Int) -> Bool {
+    abs_int(n) <= 1000000
+}
+
+/// n/d as canonical text: lowest terms, d > 0, zero is "0/1". d must not be zero.
+fn fraction_text(n: Int, d: Int) -> String {
+    mut num = n
+    mut den = d
+    if den < 0 {
+        num = 0 - num
+        den = 0 - den
+    }
+    g = gcd_int(num, den)
+    top = num / g
+    bottom = den / g
+    top.to_string() + "/" + bottom.to_string()
+}
+
+/// (p + k*sqrt(q))/d as canonical text. k is nonzero and d is positive; the common factor of p, k
+/// and d is removed first.
+fn surd_text(p: Int, k: Int, q: Int, d: Int) -> String {
+    g = gcd_int(gcd_int(p, k), d)
+    pp = p / g
+    kk = k / g
+    dd = d / g
+    mut mag = kk
+    if kk < 0 {
+        mag = 0 - kk
+    }
+    mut coef = ""
+    if mag != 1 {
+        coef = mag.to_string() + "*"
+    }
+    sign = if kk < 0 { " - " } else { " + " }
+    "(" + pp.to_string() + sign + coef + "sqrt(" + q.to_string() + "))/" + dd.to_string()
+}
+
+/// A rational root from polynomial.poly_roots_rational as "n/d": integers gain "/1".
+fn as_fraction(text: String) -> String {
+    mut whole = true
+    for i in 0 until text.length() {
+        if text.slice(i, i + 1) == "/" {
+            whole = false
+        }
+    }
+    if whole {
+        text + "/1"
+    } else {
+        text
+    }
+}
+
+/// Joins strings as "[a, b, c]".
+fn bracket(items: List<String>) -> String {
+    mut text = "["
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + items[i]
+    }
+    text + "]"
+}
+
+// ---------------------------------------------------------------- linear
+
+/// The solution of a*x + b = 0 as "n/d" in lowest terms. When a = 0 the result is "all reals" if
+/// b = 0 and "no solution" otherwise. Coefficients must satisfy |coeff| <= 10^6.
+pub fn solve_linear(a: Int, b: Int) -> Result<String, String> {
+    if not within_limit(a) or not within_limit(b) {
+        return Err("solve_linear: coefficients must satisfy |coeff| <= 1000000")
+    }
+    if a == 0 {
+        if b == 0 {
+            return Ok("all reals")
+        }
+        return Ok("no solution")
+    }
+    Ok(fraction_text(0 - b, a))
+}
+
+// ---------------------------------------------------------------- quadratic
+
+/// The roots of b*x + c = 0 as a list, for a = 0 in solve_quadratic. "all reals" and "no solution"
+/// become errors with the same text.
+fn linear_roots(b: Int, c: Int) -> Result<List<String>, String> {
+    match solve_linear(b, c) {
+        Ok(text) => {
+            if text == "all reals" or text == "no solution" {
+                Err(text)
+            } else {
+                Ok([text])
+            }
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// The exact real roots of a*x^2 + b*x + c = 0, sorted ascending and distinct.
+///
+/// Rational roots are "n/d". When the discriminant is not a perfect square the roots are
+/// "(p + sqrt(q))/d" and "(p - sqrt(q))/d" with q squarefree. A negative discriminant has no real
+/// roots and returns Err. When a = 0 the equation is linear and the result is one root, or Err for
+/// "all reals" and "no solution". Coefficients must satisfy |coeff| <= 10^6.
+pub fn solve_quadratic(a: Int, b: Int, c: Int) -> Result<List<String>, String> {
+    if not within_limit(a) or not within_limit(b) or not within_limit(c) {
+        return Err("solve_quadratic: coefficients must satisfy |coeff| <= 1000000")
+    }
+    if a == 0 {
+        return linear_roots(b, c)
+    }
+    disc = b * b - 4 * a * c
+    if disc < 0 {
+        return Err("solve_quadratic: no real roots (negative discriminant)")
+    }
+    if disc == 0 {
+        mut single: List<String> = []
+        single.push(fraction_text(0 - b, 2 * a))
+        return Ok(single)
+    }
+    // disc = f*f*q with q squarefree; q == 1 exactly when disc is a perfect square.
+    mut q = disc
+    mut f = 1
+    mut p = 2
+    while p * p <= q {
+        while q % (p * p) == 0 {
+            q = q / (p * p)
+            f = f * p
+        }
+        p = p + 1
+    }
+    mut roots: List<String> = []
+    if q == 1 {
+        // Both roots are rational: (-b - f)/(2a) and (-b + f)/(2a).
+        if a > 0 {
+            roots.push(fraction_text(0 - b - f, 2 * a))
+            roots.push(fraction_text(0 - b + f, 2 * a))
+        } else {
+            roots.push(fraction_text(0 - b + f, 2 * a))
+            roots.push(fraction_text(0 - b - f, 2 * a))
+        }
+        return Ok(roots)
+    }
+    // Irrational: x = (-b + sigma*f*sqrt(q)) / (2a). Multiplying top and bottom by s = sign(a)
+    // gives the positive denominator 2|a| and the numerator coefficient s*(-b) for the rational part.
+    mut s = 1
+    if a < 0 {
+        s = 0 - 1
+    }
+    rational_part = if a < 0 { b } else { 0 - b }
+    dd = 2 * abs_int(a)
+    sf = s * f
+    minus_root = surd_text(rational_part, 0 - sf, q, dd)
+    plus_root = surd_text(rational_part, sf, q, dd)
+    if a > 0 {
+        roots.push(minus_root)
+        roots.push(plus_root)
+    } else {
+        roots.push(plus_root)
+        roots.push(minus_root)
+    }
+    Ok(roots)
+}
+
+// ---------------------------------------------------------------- rational roots
+
+/// All rational roots of the polynomial sum coeffs[i] * x^i, as "n/d" sorted ascending. Uses
+/// std.polynomial.poly_roots_rational, so its size limits apply. The zero polynomial is an error.
+pub fn solve_rational_roots(coeffs: List<Int>) -> Result<List<String>, String> {
+    p = polynomial.poly_from_ints(coeffs)
+    if polynomial.poly_degree(p) < 0 {
+        return Err("solve_rational_roots: the zero polynomial has every rational root")
+    }
+    match polynomial.poly_roots_rational(p) {
+        Ok(texts) => {
+            mut out: List<String> = []
+            for i in 0 until texts.length() {
+                out.push(as_fraction(texts[i]))
+            }
+            Ok(out)
+        },
+        Err(message) => Err(message),
+    }
+}

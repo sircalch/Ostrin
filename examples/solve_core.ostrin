@@ -1,0 +1,89 @@
+// std.solve over fixed cases: linear, quadratic and rational-root equations, including the edge
+// cases (a = 0, b = 0, negative discriminant, perfect-square discriminant, repeated root, zero
+// polynomial, and a degree-3 polynomial with rational roots). Every line prints the computed value,
+// and [ok] or [MISMATCH] against the value worked out by hand, so the example checks itself.
+import std.solve
+
+fn bracket(items: List<String>) -> String {
+    mut text = "["
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + items[i]
+    }
+    text + "]"
+}
+
+fn show_text(r: Result<String, String>) -> String {
+    match r {
+        Ok(t) => t,
+        Err(m) => "Err: " + m,
+    }
+}
+
+fn show_list(r: Result<List<String>, String>) -> String {
+    match r {
+        Ok(items) => bracket(items),
+        Err(m) => "Err: " + m,
+    }
+}
+
+/// Prints one case and returns 1 when it disagrees with the expected text, 0 otherwise.
+fn report(label: String, got: String, want: String) -> Int {
+    if got == want {
+        print(label + " = " + got + "  [ok]")
+        0
+    } else {
+        print(label + " = " + got + "  [MISMATCH, expected " + want + "]")
+        1
+    }
+}
+
+fn main() -> Void {
+    mut bad = 0
+
+    // solve_linear: a*x + b = 0
+    bad = bad + report("linear 2x+4", show_text(solve.solve_linear(2, 4)), "-2/1")
+    bad = bad + report("linear 3x-6", show_text(solve.solve_linear(3, 0 - 6)), "2/1")
+    bad = bad + report("linear -4x+6", show_text(solve.solve_linear(0 - 4, 6)), "3/2")
+    bad = bad + report("linear 6x+9", show_text(solve.solve_linear(6, 9)), "-3/2")
+    bad = bad + report("linear 5x+0", show_text(solve.solve_linear(5, 0)), "0/1")
+    bad = bad + report("linear 0x+0", show_text(solve.solve_linear(0, 0)), "all reals")
+    bad = bad + report("linear 0x+5", show_text(solve.solve_linear(0, 5)), "no solution")
+
+    // solve_quadratic: a*x^2 + b*x + c = 0
+    bad = bad + report("quad x^2-3x+2", show_list(solve.solve_quadratic(1, 0 - 3, 2)), "[1/1, 2/1]")
+    bad = bad + report("quad x^2+2x+1 (repeated)", show_list(solve.solve_quadratic(1, 2, 1)), "[-1/1]")
+    bad = bad + report("quad x^2+1 (negative disc)", show_list(solve.solve_quadratic(1, 0, 1)), "Err: solve_quadratic: no real roots (negative discriminant)")
+    bad = bad + report("quad 2x^2-8", show_list(solve.solve_quadratic(2, 0, 0 - 8)), "[-2/1, 2/1]")
+    bad = bad + report("quad x^2-2 (surd)", show_list(solve.solve_quadratic(1, 0, 0 - 2)), "[(0 - sqrt(2))/1, (0 + sqrt(2))/1]")
+    bad = bad + report("quad 2x^2-4x+1", show_list(solve.solve_quadratic(2, 0 - 4, 1)), "[(2 - sqrt(2))/2, (2 + sqrt(2))/2]")
+    bad = bad + report("quad 3x^2+6x-6", show_list(solve.solve_quadratic(3, 6, 0 - 6)), "[(-1 - sqrt(3))/1, (-1 + sqrt(3))/1]")
+    bad = bad + report("quad x^2-8 (k=2)", show_list(solve.solve_quadratic(1, 0, 0 - 8)), "[(0 - 2*sqrt(2))/1, (0 + 2*sqrt(2))/1]")
+    bad = bad + report("quad x^2-2x-2", show_list(solve.solve_quadratic(1, 0 - 2, 0 - 2)), "[(1 - sqrt(3))/1, (1 + sqrt(3))/1]")
+    bad = bad + report("quad x^2-4x+4 (repeated 2)", show_list(solve.solve_quadratic(1, 0 - 4, 4)), "[2/1]")
+    bad = bad + report("quad 4x^2-4x+1 (repeated 1/2)", show_list(solve.solve_quadratic(4, 0 - 4, 1)), "[1/2]")
+    bad = bad + report("quad -x^2+4 (negative a)", show_list(solve.solve_quadratic(0 - 1, 0, 4)), "[-2/1, 2/1]")
+    bad = bad + report("quad -x^2+2 (negative a surd)", show_list(solve.solve_quadratic(0 - 1, 0, 2)), "[(0 - sqrt(2))/1, (0 + sqrt(2))/1]")
+    bad = bad + report("quad x^2+0x+0 (zero root)", show_list(solve.solve_quadratic(1, 0, 0)), "[0/1]")
+    bad = bad + report("quad 1e6 x^2 - 1e6 x", show_list(solve.solve_quadratic(1000000, 0 - 1000000, 0)), "[0/1, 1/1]")
+    bad = bad + report("quad 2x^2 (a=2,b=0,c=-1)", show_list(solve.solve_quadratic(2, 0, 0 - 1)), "[(0 - sqrt(2))/2, (0 + sqrt(2))/2]")
+    bad = bad + report("quad a=0 linear 2x-4", show_list(solve.solve_quadratic(0, 2, 0 - 4)), "[2/1]")
+    bad = bad + report("quad a=0 b=0 c=5", show_list(solve.solve_quadratic(0, 0, 5)), "Err: no solution")
+    bad = bad + report("quad a=0 b=0 c=0", show_list(solve.solve_quadratic(0, 0, 0)), "Err: all reals")
+    bad = bad + report("quad coefficient over limit", show_list(solve.solve_quadratic(1000001, 0, 0)), "Err: solve_quadratic: coefficients must satisfy |coeff| <= 1000000")
+
+    // solve_rational_roots: coefficients from degree 0 upward
+    bad = bad + report("poly (x-1)(x-2)(x-3)", show_list(solve.solve_rational_roots([0 - 6, 11, 0 - 6, 1])), "[1/1, 2/1, 3/1]")
+    bad = bad + report("poly (x-1)^2", show_list(solve.solve_rational_roots([1, 0 - 2, 1])), "[1/1]")
+    bad = bad + report("poly 2x-1", show_list(solve.solve_rational_roots([0 - 1, 2])), "[1/2]")
+    bad = bad + report("poly (3x-1)(2x+1)", show_list(solve.solve_rational_roots([0 - 1, 1, 6])), "[-1/2, 1/3]")
+    bad = bad + report("poly (x-1)(x-2)(x+2)", show_list(solve.solve_rational_roots([4, 0 - 4, 0 - 1, 1])), "[-2/1, 1/1, 2/1]")
+    bad = bad + report("poly x^2-2 (no rational root)", show_list(solve.solve_rational_roots([0 - 2, 0, 1])), "[]")
+    bad = bad + report("poly 5 (constant)", show_list(solve.solve_rational_roots([5])), "[]")
+    bad = bad + report("poly x (root zero)", show_list(solve.solve_rational_roots([0, 1])), "[0/1]")
+    bad = bad + report("poly zero polynomial", show_list(solve.solve_rational_roots([0, 0])), "Err: solve_rational_roots: the zero polynomial has every rational root")
+
+    print("mismatches: " + bad.to_string())
+}
