@@ -1,0 +1,16 @@
+// A record's operator method fixes the type of the right operand: `add` takes a Money, so adding an
+// Int is rejected when the program is checked, not at run time or in the generated C.
+record Money {
+    cents: Int
+}
+
+impl Add for Money {
+    fn add(self, other: Money) -> Money {
+        Money { cents: self.cents + other.cents }
+    }
+}
+
+fn main() -> Void {
+    a = Money { cents: 25 }
+    print((a + 3).cents)
+}

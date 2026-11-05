@@ -1,0 +1,43 @@
+// User records with unary minus and Int-left reflected operators lower through IR (no AST fallback)
+// and release their temporaries: -a calls neg, 2 + a calls radd, 3 - a calls rsub, 4 * a calls rmul
+// and 100 / a calls rdiv.
+record Money {
+    cents: Int
+}
+
+impl Money {
+    fn neg(self) -> Money { Money { cents: 0 - self.cents } }
+    fn radd(self, k: Int) -> Money { Money { cents: k + self.cents } }
+    fn rsub(self, k: Int) -> Money { Money { cents: k - self.cents } }
+    fn rmul(self, k: Int) -> Money { Money { cents: k * self.cents } }
+    fn rdiv(self, k: Int) -> Money { Money { cents: k / self.cents } }
+}
+
+impl Add for Money {
+    fn add(self, other: Money) -> Money { Money { cents: self.cents + other.cents } }
+}
+
+impl Sub for Money {
+    fn sub(self, other: Money) -> Money { Money { cents: self.cents - other.cents } }
+}
+
+fn total(amounts: List<Money>) -> Money {
+    mut sum = Money { cents: 0 }
+    for amount in amounts {
+        sum = sum + amount
+    }
+    sum
+}
+
+fn main() -> Void {
+    a = Money { cents: 25 }
+    b = Money { cents: 4 }
+    print((-a).cents)
+    print((2 + a).cents)
+    print((3 - a).cents)
+    print((4 * a).cents)
+    print((100 / b).cents)
+    print((-(a - b)).cents)
+    print((10 * (a + b) - b).cents)
+    print(total([a, b, -a, 2 * b]).cents)
+}

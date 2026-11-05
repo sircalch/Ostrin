@@ -3204,11 +3204,45 @@ impl Checker {
             };
             if let (Ty::Named(_), false) = (&lt, lt == rt) {
                 if let Some(ret) = self.operator_method_return(&lt, name) {
+                    // The right operand must fit the parameter the operator method declares: without
+                    // this `x + 1` on a type whose `add` takes its own type passed the checker and only
+                    // failed at run time or in the generated C.
+                    if let Some(param) = self.operator_method_param(&lt, name) {
+                        if !operand_fits(&param, &rt) {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "The '{}' operator on '{}' expects a right operand of type '{}', got '{}'.",
+                                    operator_symbol(op),
+                                    lt.describe(),
+                                    param.describe(),
+                                    rt.describe()
+                                ),
+                            );
+                            return Ty::Unknown;
+                        }
+                    }
                     return ret;
                 }
             }
             if let (true, Ty::Named(_)) = (lt.is_numeric_scalar(), &rt) {
-                if let Some(ret) = self.operator_method_return(&rt, &format!("r{name}")) {
+                let reflected = format!("r{name}");
+                if let Some(ret) = self.operator_method_return(&rt, &reflected) {
+                    if let Some(param) = self.operator_method_param(&rt, &reflected) {
+                        if !operand_fits(&param, &lt) {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "The reflected '{}' operator on '{}' expects a left operand of type '{}', got '{}'.",
+                                    operator_symbol(op),
+                                    rt.describe(),
+                                    param.describe(),
+                                    lt.describe()
+                                ),
+                            );
+                            return Ty::Unknown;
+                        }
+                    }
                     return ret;
                 }
             }
@@ -4716,6 +4750,17 @@ impl Checker {
     }
 
     /// The result type of `receiver.method(..)` for an operator method of a user type.
+    /// The declared type of the first parameter after `self` of an operator method, with `Self` read as
+    /// the receiver type.
+    fn operator_method_param(&self, receiver: &Ty, method: &str) -> Option<Ty> {
+        let found = self.concrete_method_candidate(receiver, method)?;
+        let param = found.params.iter().find(|param| param.name != "self")?;
+        Some(match &param.ty {
+            Type::Named(n, a) if n == "Self" && a.is_empty() => receiver.clone(),
+            other => resolve_type(other),
+        })
+    }
+
     fn operator_method_return(&self, receiver: &Ty, method: &str) -> Option<Ty> {
         let found = self.concrete_method_candidate(receiver, method)?;
         Some(match &found.return_type {
@@ -6816,6 +6861,25 @@ fn refine_expected_type(actual: &Ty, expected: &Ty) -> Ty {
             )
         }
         _ => actual.clone(),
+    }
+}
+
+/// Whether an operand of type `actual` may be passed to an operator method parameter of type
+/// `expected`: the types are compatible, an integer literal may stand for a Float, and a generic or
+/// unresolved parameter is not second-guessed.
+fn operand_fits(expected: &Ty, actual: &Ty) -> bool {
+    matches!(expected, Ty::Generic(_) | Ty::Unknown)
+        || compatible(expected, actual)
+        || (*expected == Ty::Float && *actual == Ty::Int)
+}
+
+fn operator_symbol(op: BinOp) -> &'static str {
+    match op {
+        BinOp::Add => "+",
+        BinOp::Sub => "-",
+        BinOp::Mul => "*",
+        BinOp::Div => "/",
+        _ => "?",
     }
 }
 

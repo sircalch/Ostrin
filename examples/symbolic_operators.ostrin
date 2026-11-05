@@ -1,0 +1,47 @@
+// std.symbolic operators: expressions are built with +, -, *, / and unary minus, an Int on the left is an
+// exact number, and canonical forms make identities checkable by equality. The product, quotient and
+// chain rules are verified symbolically on concrete expressions, and the assumption-gated rules show
+// when a ratio simplifies.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    y = symbolic.symbol(s, "y")
+    p = symbolic.symbol(s, "p", "positive")
+    q = symbolic.symbol(s, "q", "nonzero")
+
+    print(symbolic.show(x + y))
+    print(symbolic.show(2 * x + 3 * x))
+    print(symbolic.show(1 - x))
+    print(symbolic.show(-x))
+    print(symbolic.show(x * y - y * x))
+    print(symbolic.show((x + y) * (x - y)))
+    print(symbolic.show(symbolic.expand((x + y) * (x - y))))
+
+    // gated simplification: only a nonzero (or positive) denominator cancels
+    print(symbolic.show(x / x))
+    print(symbolic.show(q / q))
+    print(symbolic.show(p * y / p))
+
+    // calculus identities, each checked by structural equality of canonical forms
+    f = x * x * x + 2 * x
+    five = symbolic.number(s, 5)
+    g = x * x - five
+    df = symbolic.diff(f, x).unwrap()
+    dg = symbolic.diff(g, x).unwrap()
+    product = symbolic.diff(f * g, x).unwrap()
+    print("product rule: " + symbolic.same(symbolic.expand(product), symbolic.expand(df * g + f * dg)).to_string())
+    sum_rule = symbolic.diff(f + g, x).unwrap()
+    print("sum rule: " + symbolic.same(sum_rule, df + dg).to_string())
+    print("d(x^3 + 2x) = " + symbolic.show(df))
+    print("d(f g) = " + symbolic.show(symbolic.expand(product)))
+    composite = symbolic.call("exp", f)
+    print("chain rule: " + symbolic.same(symbolic.diff(composite, x).unwrap(), composite * df).to_string())
+    quotient = symbolic.diff(f / g, x)
+    match quotient {
+        Ok(d) => print("quotient rule evaluates: " + symbolic.eval_text(d, ["x"], [3.0])),
+        Err(message) => print("quotient: " + message),
+    }
+    print("numeric check: " + symbolic.eval_text(df * g + f * dg - product, ["x"], [1.5]))
+}

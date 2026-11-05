@@ -1,0 +1,9 @@
+// The right operand of a symbolic operator must be an Expr; an Int belongs on the left (`5 + x`) or
+// must be built with symbolic.number. `x * x - 5` is rejected at check time.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    print(symbolic.show(x * x - 5))
+}
