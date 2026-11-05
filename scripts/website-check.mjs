@@ -61,7 +61,7 @@ if (existsSync(socialCardAbsolutePath)) {
   check(headerLogo.length < 16 * 1024, "website/assets/ostrin-logo-72.png must stay under 16 KiB");
   for (const file of readdirSync(websiteRoot).filter((name) => name.endsWith(".html") && name !== "404.html")) {
     const html = read("website/" + file);
-    check(!html.includes('<img src="assets/ostrin-logo.png" alt="" width="36"'), file + ": the 36 px header logo must use assets/ostrin-logo-72.png");
+    check(!html.includes('<img src="assets/ostrin-logo.png" alt="" width="36"') && !html.includes('<img src="assets/ostrin-logo.png" alt="" width="30"'), file + ": small logos must use assets/ostrin-logo-72.png");
   }
 }
 const logoPaths = ["assets/ostrin-logo.png", "website/assets/ostrin-logo.png"];
@@ -373,6 +373,21 @@ for (const key of ["quantities", "standard", "records", "concurrency", "temperat
 }
 
 const playgroundScript = read("website/playground.js").replaceAll("\r\n", "\n");
+for (const [name, sourceFile] of [
+  ["Symbolic derivatives", "examples/symbolic_core.ostrin"],
+  ["Symbolic model to figure", "examples/symbolic_workflow.ostrin"],
+  ["Exact rationals (BigInt)", "examples/bigint_rational.ostrin"],
+  ["Array operations", "examples/array_operations.ostrin"],
+]) {
+  const source = read(sourceFile).replaceAll("\r\n", "\n").trim();
+  check(playgroundScript.includes(JSON.stringify(name)) && playgroundScript.includes(source), `playground.js: example "${name}" drifted from ${sourceFile}`);
+}
+for (const marker of ["extractFigure", "data-download-svg", "DRAFT_KEY", "figureStore"]) {
+  check(playgroundScript.includes(marker), `playground.js: missing playground feature marker ${marker}`);
+}
+for (const id of ["open", "save", "reset", "open-file"]) {
+  check(read("website/playground.html").includes(`id="${id}"`), `playground.html: missing control #${id}`);
+}
 for (const marker of ["[flag, \"--json\"]", "parseDiagnostic", "diagnostic-location"]) {
   check(playgroundScript.includes(marker), `playground.js: missing structured diagnostics marker ${marker}`);
 }
