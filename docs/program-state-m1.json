@@ -43,10 +43,10 @@
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 414,
+      "integrationTests": 415,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 326,
+      "examples": 328,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
@@ -71,7 +71,7 @@
       "M2-E": "CI artifact of main 2c5efc43 verified and all 30 bundles replayed independently (validation/m2e-ci-artifact-replay-2c5efc43.json); R3 maturity stays 0; open: cross-platform replay comparison and the full R3 definition",
       "M2-F": "Adaptive Simpson quadrature, Brent root finder (#251) and least-squares polyfit by QR in the scaled variable with typed error cases; NaN comparisons follow IEEE in the interpreter; open: relative tolerance mode, weighted/uncertainty-aware fits, exact-rational reference harness",
       "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling",
-      "H3": "std.symbolic merged (#254, #258, #261) with exact numbers beyond 64 bits and physical dimensions; operators + - * / and unary minus on Expr; IR backend now lowers unary minus and Int-left reflected operators on user records (no AST fallback, no leak); open: factoring, equation solving, integration, code generation, unit conversion; the checker still accepts Record op Int without an impl (fails at run time)",
+      "H3": "std.symbolic merged (#254, #258, #261) with exact numbers beyond 64 bits and physical dimensions; operators + - * / and unary minus on Expr; the IR backend lowers unary minus and Int-left reflected operators on user records (no AST fallback, no leak); the checker now validates operator operand types against the method parameter (E1041); open: factoring, equation solving, integration, code generation, unit conversion",
       "H-exit-status": "main return type sets the process exit status (Int, Result<_, String>) in interpreter, native and WASI; docs/design/04; open: an exit(code) function for nested code",
       "H2": "std.bigint with operators and a typed Rational merged (#257, #262; H30/H60/H100 exact, validated against JavaScript BigInt); std.symbolic switches to arbitrary precision on overflow; open: BigFloat, / and % operators, subquadratic algorithms",
       "M2-H": "Recursive algebraic data types compile in the native C backend and WASI: a payload naming its own enum (directly, through mutual recursion, inside Option/Result, or in a generic instance) is a ref-counted heap box owned by the parent variant; open: Option/Result payloads of non-recursive enums, AST-fallback ownership of enum payloads",
@@ -143,7 +143,7 @@
     "Whole-process timing on Windows cannot resolve the pendulum phases (an empty main costs more than the whole run); in-process timing is needed.",
     "37 worktrees with unmerged or uncommitted work and list_phi_probe.ostrin are protected; nothing there may be deleted, reset or edited."
   ],
-  "nextAction": "Merge the Expr operators PR (#263) and the proposed checker task (record operator operand types); then H1 array views/strides/broadcasting audit, an exit(code) function, H5 reverse-mode autodiff and optimization, H6 data frames, H7/H8/H9 visualization, notebook and studio, H12 packages, H13 FFI; refresh this checkpoint with each merge.",
+  "nextAction": "Merge the Expr operators PR (#263); then H1 array views/strides/broadcasting audit, an exit(code) function, H5 reverse-mode autodiff and optimization, H6 data frames, H7/H8/H9 visualization, notebook and studio, H12 packages, H13 FFI; refresh this checkpoint with each merge.",
   "historicalEvidence": {
     "note": "Earlier detailed history remains in git log -- docs/program-state-m1.json. Everything below was the M1 checkpoint and is retained for provenance; it is not the current state.",
     "m1": {

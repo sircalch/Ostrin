@@ -21594,3 +21594,39 @@ fn symbolic_operators_build_expressions_and_verify_calculus_identities_natively(
         String::from_utf8_lossy(&native.stderr)
     );
 }
+
+#[test]
+fn operator_operand_types_are_checked_against_the_operator_method_parameter() {
+    // `Money + 3` (impl Add takes a Money) and the symbolic `x * x - 5` (the right operand of a symbolic
+    // operator must be an Expr) used to pass the checker and fail at run time or in the generated C.
+    // They are now rejected at check time with E1041 naming the operator and both types, while
+    // reflected operators with a matching scalar on the left keep type-checking.
+    for (file, expected) in [
+        (
+            "record_operator_operand_error.ostrin",
+            "The '+' operator on 'Money' expects a right operand of type 'Money', got 'Int'.",
+        ),
+        (
+            "symbolic_operator_operand_error.ostrin",
+            "The '-' operator on 'std.symbolic::Expr' expects a right operand of type 'std.symbolic::Expr', got 'Int'.",
+        ),
+    ] {
+        let path = example_path(file);
+        let checked = run(&["--check", &path]);
+        assert!(!checked.status.success(), "{file} should be rejected");
+        let diagnostics = format!("{}{}", stdout(&checked), stderr(&checked));
+        assert!(diagnostics.contains("OSTRIN-E1041"), "{file}: {diagnostics}");
+        assert!(diagnostics.contains(expected), "{file}: {diagnostics}");
+    }
+    for file in [
+        "native_record_unary_reflected.ostrin",
+        "symbolic_operators.ostrin",
+    ] {
+        let checked = run(&["--check", &example_path(file)]);
+        assert!(
+            checked.status.success(),
+            "{file} must keep type-checking: {}",
+            stderr(&checked)
+        );
+    }
+}
