@@ -1129,7 +1129,7 @@ test("Playground shows printed SVG figures and keeps a local draft", async ({ pa
   ]);
   expect(download.suggestedFilename()).toBe("figure.svg");
 
-  const source = page.getByLabel("Ostrin source");
+  const source = page.getByLabel("Ostrin source", { exact: true });
   await source.fill("fn main() -> Void {\n    print(42)\n}\n");
   await page.waitForTimeout(700);
   await page.reload({ waitUntil: "domcontentloaded" });
