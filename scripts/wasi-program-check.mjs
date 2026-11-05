@@ -140,6 +140,13 @@ const programs = [
     leakCheck: true,
   },
   {
+    name: "array_operations",
+    source: "examples/array_operations.ostrin",
+    args: ["array_operations.wasm"],
+    expected: "slice 1..4: [8, 15, 16]\nslice empty: error slice range 2..2 is empty or outside 0..6\ntake nothing: error take needs at least one index\nslice outside: error slice range 4..9 is empty or outside 0..6\nslice2 rows 0..2 cols 1..3: [[2, 3], [5, 6]]\nslice2 outside: error slice2 range is empty or outside 3x3\ntake: [42, 4, 4, 16]\ntake outside: error take index 6 is outside 0..6\nconcat: [4, 8, 15, 16, 23, 42, 0.5, 1.5]\nvstack: [[1, 2, 3], [4, 5, 6], [7, 8, 10], [0, 0, 1]]\nvstack mismatch: error vstack needs the same number of columns\nhstack: [[1, 2, 3, 9], [4, 5, 6, 9], [7, 8, 10, 9]]\nhstack mismatch: error hstack needs the same number of rows\nsum axis 0: [12, 15, 19]\nsum axis 1: [6, 15, 25]\nmean axis 0: [4, 5, 6.333333333333333]\nmean axis 1: [2, 5, 8.333333333333334]\nmin axis 0: [1, 2, 3]\nmax axis 1: [3, 6, 10]\nbad axis: error axis must be 0 (down the rows) or 1 (along the columns)\naxis on a vector: error axis reductions need a two-dimensional array\nargmax: 5\nargmin (first of ties): 1\nargmax with NaN: error argmax and argmin need an array without NaN\nmeshgrid x: [[1, 2, 3], [1, 2, 3]]\nmeshgrid y: [[10, 10, 10], [20, 20, 20]]\n",
+    leakCheck: true,
+  },
+  {
     name: "temperature_point_conversion_overflow",
     source: "compiler/tests/fixtures/temperature_point_conversion_overflow.ostrin",
     args: ["temperature_point_conversion_overflow.wasm"],

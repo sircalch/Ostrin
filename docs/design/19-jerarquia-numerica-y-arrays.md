@@ -52,6 +52,26 @@ Tensor<T, D1..Dk>   = Array<T, (D1..Dk)>
   *Implementado (2026-09-24)* como `Array<Quantity<D>>` con una unidad común por array; ver documento 01
   §3.6. `dot`/`matmul` sobre cantidades siguen pendientes.
 
+### 5.1 Estado medido de las operaciones (2026-11-04)
+
+Cada fila se probó en el intérprete y en el backend nativo. "Paridad" significa salida idéntica.
+
+| Operación | Estado |
+| --- | --- |
+| `row`, `col`, `transpose`, `reshape`, máscara booleana `a[a > 0]`, `where`, difusión, `@`, `cumsum`, `sort`, `get`/`set` 2D, `linspace` | existen, con paridad |
+| Cortes por rango `a[1..4]`, `a[0, 1..3]`, `a[:, 0]` (sintaxis) | **no existen** (error de análisis); el diseño de arriba los describe |
+| Indexación con lista de enteros `a[[0, 2]]` | el verificador la acepta; falla en ejecución (intérprete) o lee un índice inválido (nativo, detectado por la comprobación de límites) |
+| Reducciones por eje, `argmax`/`argmin`, `concat`/`stack`, `meshgrid` | no existían como funciones ni métodos |
+| Vistas sin copia (`strides`) | no existen: `transpose`, `row` y `col` copian |
+| Arrays vacíos | no se pueden crear (`zeros([0])` es un error del lenguaje) |
+
+`std.arrays` cierra las lagunas de biblioteca con funciones escritas en Ostrin sobre las primitivas del array
+(misma salida en intérprete, nativo y WASI): `slice`, `slice2`, `take`, `concat`, `vstack`, `hstack`, `sum_axis`,
+`mean_axis`, `min_axis`, `max_axis`, `argmax`, `argmin` y `meshgrid`, con errores tipados para rangos, formas, entradas
+vacías y NaN. Validado contra una implementación independiente (17 resultados numéricos), `ir=17`, sin fallbacks al AST
+ni fugas. **Siguen abiertos**: la sintaxis de cortes, las vistas con `strides` sin copia, los arrays de más de dos
+dimensiones en estas funciones y el soporte de `Array<Quantity>`.
+
 ## 6. Implementación por fases
 
 1. **Tipos enteros de ancho fijo** (checker → intérprete → nativo con `stdint`), con literales y conversiones. Es el cambio más contenido y desbloquea el resto.
