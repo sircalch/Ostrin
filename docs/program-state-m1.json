@@ -9,7 +9,7 @@
     "releaseCommit": "29c24c0bd607822dbc2609a54bfcce545ca563f6"
   },
   "currentVerifiedState": {
-    "mainRevision": "7a1c4753eb587a2d76f37266df11542925577cc0",
+    "mainRevision": "b5792bf863a137e06dddb57b49153348bd06dcac",
     "mergedPullRequests": [
       235,
       236,
@@ -36,15 +36,16 @@
       257,
       258,
       259,
-      260
+      260,
+      261
     ],
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 410,
+      "integrationTests": 412,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 322,
+      "examples": 324,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
@@ -69,7 +70,7 @@
       "M2-E": "CI artifact of main 2c5efc43 verified and all 30 bundles replayed independently (validation/m2e-ci-artifact-replay-2c5efc43.json); R3 maturity stays 0; open: cross-platform replay comparison and the full R3 definition",
       "M2-F": "Adaptive Simpson quadrature, Brent root finder (#251) and least-squares polyfit by QR in the scaled variable with typed error cases; NaN comparisons follow IEEE in the interpreter; open: relative tolerance mode, weighted/uncertainty-aware fits, exact-rational reference harness",
       "M2-G": "Live browser examples for absolute temperatures and numerical methods merged (#252); open: playground diagnostics polish and editor tooling",
-      "H3": "std.symbolic merged (#254) with exact numbers beyond 64 bits; open: factoring, equation solving, integration, units in expressions (H4), code generation",
+      "H3": "std.symbolic merged (#254, #258, #261) with exact numbers beyond 64 bits and physical dimensions; operators + - * / and unary minus on Expr; IR backend now lowers unary minus and Int-left reflected operators on user records (no AST fallback, no leak); open: factoring, equation solving, integration, code generation, unit conversion; the checker still accepts Record op Int without an impl (fails at run time)",
       "H-exit-status": "main return type sets the process exit status (Int, Result<_, String>) in interpreter, native and WASI; docs/design/04; open: an exit(code) function for nested code",
       "H2": "std.bigint merged (#257); std.symbolic now switches its exact rationals to arbitrary precision on overflow (H60, 2^200 and 2^62*4 exact, validated against JavaScript BigInt); text-based rational API in std.bigint; open: typed Rational, BigFloat, operator overloads, subquadratic algorithms",
       "M2-H": "Recursive algebraic data types compile in the native C backend and WASI: a payload naming its own enum (directly, through mutual recursion, inside Option/Result, or in a generic instance) is a ref-counted heap box owned by the parent variant; open: Option/Result payloads of non-recursive enums, AST-fallback ownership of enum payloads",

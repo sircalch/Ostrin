@@ -67,6 +67,13 @@ valor, `ln` de un no positivo, base negativa con exponente no entero, división 
 interpretación del DAG, no código generado: **la compilación de expresiones a funciones nativas no
 está implementada**.
 
+## 6a. Operadores
+
+`+`, `-`, `*` y `/` construyen expresiones directamente, `-x` las niega y un `Int` a la izquierda se lee como un número
+exacto (`2 * x`, `1 - x`); el operando derecho debe ser una `Expr` (`x + symbolic.number(s, 1)`), y las potencias siguen
+siendo explícitas (`power`). Con formas canónicas, las identidades del cálculo se comprueban por igualdad
+estructural: la regla del producto, de la suma y de la cadena sobre expresiones concretas.
+
 ## 6b. Dimensiones físicas
 
 Un símbolo puede declararse con una dimensión (`unit_symbol(s, "v", "Length/Time")`). Las dimensiones son
@@ -94,6 +101,6 @@ coherentes. Aún no se conectan estas dimensiones con `Quantity<D>` del sistema 
 
 ## 8. Límites actuales
 
-No hay factorización, resolución de ecuaciones, integración simbólica, matrices simbólicas, generación de código ni operadores sobrecargados (`+`, `*`). La
+No hay factorización, resolución de ecuaciones, integración simbólica, matrices simbólicas ni generación de código. La
 validación contra un motor externo (por ejemplo SymPy) no se ha ejecutado. El almacén plano se mantiene; un enum recursivo nativo (`enum Expr { Num(Int) Add(Expr, Expr) }`, ver
 `examples/recursive_enum.ostrin`) ya compila y es una representación alternativa para código simbólico futuro.

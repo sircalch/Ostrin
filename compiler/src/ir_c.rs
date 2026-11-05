@@ -2262,6 +2262,23 @@ fn emit_instruction(
                 out.push_str(&format!("    {} = {result};\n", value_name(*dst)));
                 return Ok(());
             }
+            // `-x` on a user record calls its `neg` method (the same concrete symbol the AST emitter
+            // uses), so unary minus on records no longer forces the whole function to the AST fallback.
+            if *op == UnaryOp::Neg {
+                if let Some(record) = record_name(ty, records) {
+                    if value_ty(values, *operand)? == *ty {
+                        if let Some(c_name) = methods.get(&(record, "neg".to_string())) {
+                            out.push_str(&format!(
+                                "    {} = {c_name}({});
+",
+                                value_name(*dst),
+                                value_code(values, *operand)?
+                            ));
+                            return Ok(());
+                        }
+                    }
+                }
+            }
             if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
                 return Err(());
             }
@@ -2408,7 +2425,7 @@ fn emit_instruction(
                 out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
                 return Ok(());
             }
-            // Reflected scalar operators use the same concrete method symbols
+            // Reflected scalar operators (a Float or Int on the left) use the same concrete method symbols
             // as the AST/HIR emitters. The receiver stays on the right and
             // the scalar argument stays second, preserving the method ABI for
             // expressions such as `2.0 - z` (`z.rsub(2.0)`).
@@ -2422,7 +2439,7 @@ fn emit_instruction(
                 };
                 if let Some(method) = method {
                     if let Some(c_name) = methods.get(&(record, method.to_string())) {
-                        if left_ty == Ty::Float && *ty == right_ty {
+                        if (left_ty == Ty::Float || left_ty == Ty::Int) && *ty == right_ty {
                             let call = format!(
                                 "{c_name}({}, {})",
                                 value_code(values, *right)?,

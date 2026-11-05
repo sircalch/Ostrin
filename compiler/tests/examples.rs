@@ -21054,7 +21054,7 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        symbolic_source.contains("ir=79")
+        symbolic_source.contains("ir=94")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -21453,6 +21453,76 @@ fn symbolic_units_propagate_dimensions_through_expressions_in_both_backends() {
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn record_unary_minus_and_int_reflected_operators_lower_through_ir_without_leaks() {
+    // `-a` calls the record's `neg`; `2 + a`, `3 - a`, `4 * a` and `100 / a` call `radd`, `rsub`, `rmul`
+    // and `rdiv`. The IR backend used to lower reflected operators only for a Float on the left and
+    // not unary minus on records at all, which sent the whole function to the AST fallback (and, for
+    // `-a`, leaked its temporaries).
+    assert_eq!(
+        interpreter_and_native_agree("native_record_unary_reflected.ostrin"),
+        "-25\n27\n-22\n100\n25\n-21\n286\n12\n"
+    );
+    let path = example_path("native_record_unary_reflected.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("native_record_unary_reflected_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "record operators leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn symbolic_operators_build_expressions_and_verify_calculus_identities_natively() {
+    // x + y, 2*x + 3*x = 5*x, -x, (x+y)(x-y) expanding to x^2 - y^2, assumption-gated ratios, and the
+    // product, sum and chain rules verified by structural equality of canonical forms.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_operators.ostrin"),
+        "x + y\n5*x\n1 - x\n-x\n0\n(x + y)*(x - y)\nx^2 - y^2\nx^0\n1\ny\nproduct rule: true\nsum rule: true\nd(x^3 + 2x) = 2 + 3*x^2\nd(f g) = -10 + 5*x^4 - 9*x^2\nchain rule: true\nquotient rule evaluates: -5.125\nnumeric check: 0\n"
+    );
+    let path = example_path("symbolic_operators.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_operators_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "symbolic operators leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
 }
