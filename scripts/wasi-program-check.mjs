@@ -140,6 +140,20 @@ const programs = [
     leakCheck: true,
   },
   {
+    name: "native_record_unary_reflected",
+    source: "examples/native_record_unary_reflected.ostrin",
+    args: ["native_record_unary_reflected.wasm"],
+    expected: "-25\n27\n-22\n100\n25\n-21\n286\n12\n",
+    leakCheck: true,
+  },
+  {
+    name: "symbolic_operators",
+    source: "examples/symbolic_operators.ostrin",
+    args: ["symbolic_operators.wasm"],
+    expected: "x + y\n5*x\n1 - x\n-x\n0\n(x + y)*(x - y)\nx^2 - y^2\nx^0\n1\ny\nproduct rule: true\nsum rule: true\nd(x^3 + 2x) = 2 + 3*x^2\nd(f g) = -10 + 5*x^4 - 9*x^2\nchain rule: true\nquotient rule evaluates: -5.125\nnumeric check: 0\n",
+    leakCheck: true,
+  },
+  {
     name: "array_operations",
     source: "examples/array_operations.ostrin",
     args: ["array_operations.wasm"],

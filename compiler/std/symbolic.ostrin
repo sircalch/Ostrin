@@ -1432,3 +1432,65 @@ pub fn dimension_text(a: Expr) -> String {
         Err(message) => "error: " + message,
     }
 }
+
+// ---------------------------------------------------------------- operators
+//
+// `+`, `-`, `*` and `/` build expressions directly, `-x` negates, and an Int on the left of an
+// operator is read as an exact number (`2 * x`, `1 - x`). The right operand of an operator must be an
+// Expr: write `x + symbolic.number(s, 1)`, or put the Int on the left. Powers stay explicit (`power`).
+
+fn plus_expr(a: Expr, b: Expr) -> Expr {
+    add(a, b)
+}
+
+fn minus_expr(a: Expr, b: Expr) -> Expr {
+    sub(a, b)
+}
+
+fn times_expr(a: Expr, b: Expr) -> Expr {
+    mul(a, b)
+}
+
+fn over_expr(a: Expr, b: Expr) -> Expr {
+    div(a, b)
+}
+
+fn negate_expr(a: Expr) -> Expr {
+    neg(a)
+}
+
+fn literal(a: Expr, k: Int) -> Expr {
+    number(a.store, k)
+}
+
+impl Expr {
+    fn neg(self) -> Expr { negate_expr(self) }
+    fn radd(self, k: Int) -> Expr { plus_expr(literal(self, k), self) }
+    fn rsub(self, k: Int) -> Expr { minus_expr(literal(self, k), self) }
+    fn rmul(self, k: Int) -> Expr { times_expr(literal(self, k), self) }
+    fn rdiv(self, k: Int) -> Expr { over_expr(literal(self, k), self) }
+}
+
+impl Add for Expr {
+    fn add(self, other: Expr) -> Expr {
+        plus_expr(self, other)
+    }
+}
+
+impl Sub for Expr {
+    fn sub(self, other: Expr) -> Expr {
+        minus_expr(self, other)
+    }
+}
+
+impl Mul for Expr {
+    fn mul(self, other: Expr) -> Expr {
+        times_expr(self, other)
+    }
+}
+
+impl Div for Expr {
+    fn div(self, other: Expr) -> Expr {
+        over_expr(self, other)
+    }
+}

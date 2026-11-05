@@ -913,6 +913,14 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
             ty: Ty::Quantity(_),
             ..
         } => true,
+        // `-x` on a user record calls its `neg` method, which borrows its receiver and returns a
+        // fresh or retained value exactly like any other method call (the IR emitter only lowers
+        // this when the type has a `neg` method; otherwise the function falls back as before).
+        IrInstr::Unary {
+            op: UnaryOp::Neg,
+            ty: Ty::Named(_),
+            ..
+        } => true,
         IrInstr::Unary { .. } if safe_unary_array(instruction) => true,
         IrInstr::StoreLocal { .. }
         | IrInstr::Spawn { .. }
