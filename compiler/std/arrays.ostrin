@@ -1,0 +1,253 @@
+// std.arrays — slicing, joining, axis reductions and grids for one- and two-dimensional Float arrays.
+//
+// These operations are written in Ostrin over the built-in Array primitives (`shape`, `get`, `set`,
+// `zeros`), so the interpreter, native code and WASI return identical results. Every function that can
+// be given an out-of-range index, a mismatched shape or an empty input returns a Result with a typed
+// message instead of reading out of bounds. Indices are zero-based and ranges are half-open
+// (`slice(a, 1, 4)` is elements 1, 2 and 3); there are no negative indices. Arrays cannot be empty in
+// Ostrin, so an empty range or an empty index list is an error.
+
+pub record Grid {
+    x: Array<Float>
+    y: Array<Float>
+}
+
+fn rank(a: Array<Float>) -> Int {
+    a.shape().length()
+}
+
+/// Elements start..stop of a one-dimensional array.
+pub fn slice(a: Array<Float>, start: Int, stop: Int) -> Result<Array<Float>, String> {
+    if rank(a) != 1 {
+        return Err("slice needs a one-dimensional array")
+    }
+    n = a.shape()[0]
+    if start < 0 or stop > n or start >= stop {
+        return Err("slice range " + start.to_string() + ".." + stop.to_string() + " is empty or outside 0.." + n.to_string())
+    }
+    mut out = zeros([stop - start])
+    for i in 0 until stop - start {
+        out.set(i, a[start + i])
+    }
+    Ok(out)
+}
+
+/// Rows r0..r1 and columns c0..c1 of a two-dimensional array.
+pub fn slice2(a: Array<Float>, r0: Int, r1: Int, c0: Int, c1: Int) -> Result<Array<Float>, String> {
+    if rank(a) != 2 {
+        return Err("slice2 needs a two-dimensional array")
+    }
+    rows = a.shape()[0]
+    cols = a.shape()[1]
+    if r0 < 0 or r1 > rows or r0 >= r1 or c0 < 0 or c1 > cols or c0 >= c1 {
+        return Err("slice2 range is empty or outside " + rows.to_string() + "x" + cols.to_string())
+    }
+    mut out = zeros([r1 - r0, c1 - c0])
+    for i in 0 until r1 - r0 {
+        for j in 0 until c1 - c0 {
+            out.set(i, j, a.get(r0 + i, c0 + j))
+        }
+    }
+    Ok(out)
+}
+
+/// The elements of a one-dimensional array at the given indices, in that order (repeats allowed).
+pub fn take(a: Array<Float>, indices: List<Int>) -> Result<Array<Float>, String> {
+    if rank(a) != 1 {
+        return Err("take needs a one-dimensional array")
+    }
+    n = a.shape()[0]
+    if indices.length() == 0 {
+        return Err("take needs at least one index")
+    }
+    mut out = zeros([indices.length()])
+    for k in 0 until indices.length() {
+        i = indices[k]
+        if i < 0 or i >= n {
+            return Err("take index " + i.to_string() + " is outside 0.." + n.to_string())
+        }
+        out.set(k, a[i])
+    }
+    Ok(out)
+}
+
+/// One-dimensional arrays joined end to end.
+pub fn concat(a: Array<Float>, b: Array<Float>) -> Result<Array<Float>, String> {
+    if rank(a) != 1 or rank(b) != 1 {
+        return Err("concat needs one-dimensional arrays")
+    }
+    na = a.shape()[0]
+    nb = b.shape()[0]
+    mut out = zeros([na + nb])
+    for i in 0 until na {
+        out.set(i, a[i])
+    }
+    for i in 0 until nb {
+        out.set(na + i, b[i])
+    }
+    Ok(out)
+}
+
+/// Two matrices with the same number of columns, one above the other.
+pub fn vstack(a: Array<Float>, b: Array<Float>) -> Result<Array<Float>, String> {
+    if rank(a) != 2 or rank(b) != 2 {
+        return Err("vstack needs two-dimensional arrays")
+    }
+    cols = a.shape()[1]
+    if b.shape()[1] != cols {
+        return Err("vstack needs the same number of columns")
+    }
+    ra = a.shape()[0]
+    rb = b.shape()[0]
+    mut out = zeros([ra + rb, cols])
+    for i in 0 until ra {
+        for j in 0 until cols {
+            out.set(i, j, a.get(i, j))
+        }
+    }
+    for i in 0 until rb {
+        for j in 0 until cols {
+            out.set(ra + i, j, b.get(i, j))
+        }
+    }
+    Ok(out)
+}
+
+/// Two matrices with the same number of rows, side by side.
+pub fn hstack(a: Array<Float>, b: Array<Float>) -> Result<Array<Float>, String> {
+    if rank(a) != 2 or rank(b) != 2 {
+        return Err("hstack needs two-dimensional arrays")
+    }
+    rows = a.shape()[0]
+    if b.shape()[0] != rows {
+        return Err("hstack needs the same number of rows")
+    }
+    ca = a.shape()[1]
+    cb = b.shape()[1]
+    mut out = zeros([rows, ca + cb])
+    for i in 0 until rows {
+        for j in 0 until ca {
+            out.set(i, j, a.get(i, j))
+        }
+        for j in 0 until cb {
+            out.set(i, ca + j, b.get(i, j))
+        }
+    }
+    Ok(out)
+}
+
+/// 0 = sum, 1 = mean, 2 = minimum, 3 = maximum of one lane of a matrix.
+fn reduce_lane(a: Array<Float>, axis: Int, lane: Int, kind: Int) -> Float {
+    rows = a.shape()[0]
+    cols = a.shape()[1]
+    count = if axis == 0 { rows } else { cols }
+    mut total = 0.0
+    mut best = 0.0
+    for k in 0 until count {
+        value = if axis == 0 { a.get(k, lane) } else { a.get(lane, k) }
+        total = total + value
+        if k == 0 {
+            best = value
+        } else if kind == 2 and value < best {
+            best = value
+        } else if kind == 3 and value > best {
+            best = value
+        }
+    }
+    if kind == 0 {
+        return total
+    }
+    if kind == 1 {
+        return total / (count as Float)
+    }
+    best
+}
+
+fn reduce_axis(a: Array<Float>, axis: Int, kind: Int) -> Result<Array<Float>, String> {
+    if rank(a) != 2 {
+        return Err("axis reductions need a two-dimensional array")
+    }
+    if axis != 0 and axis != 1 {
+        return Err("axis must be 0 (down the rows) or 1 (along the columns)")
+    }
+    rows = a.shape()[0]
+    cols = a.shape()[1]
+    if rows == 0 or cols == 0 {
+        return Err("axis reductions need a non-empty array")
+    }
+    lanes = if axis == 0 { cols } else { rows }
+    mut out = zeros([lanes])
+    for lane in 0 until lanes {
+        out.set(lane, reduce_lane(a, axis, lane, kind))
+    }
+    Ok(out)
+}
+
+/// Sums down the rows (axis 0, one value per column) or along the columns (axis 1, one per row).
+pub fn sum_axis(a: Array<Float>, axis: Int) -> Result<Array<Float>, String> {
+    reduce_axis(a, axis, 0)
+}
+
+pub fn mean_axis(a: Array<Float>, axis: Int) -> Result<Array<Float>, String> {
+    reduce_axis(a, axis, 1)
+}
+
+pub fn min_axis(a: Array<Float>, axis: Int) -> Result<Array<Float>, String> {
+    reduce_axis(a, axis, 2)
+}
+
+pub fn max_axis(a: Array<Float>, axis: Int) -> Result<Array<Float>, String> {
+    reduce_axis(a, axis, 3)
+}
+
+fn arg_extreme(a: Array<Float>, want_max: Bool) -> Result<Int, String> {
+    if rank(a) != 1 {
+        return Err("argmax and argmin need a one-dimensional array")
+    }
+    n = a.shape()[0]
+    if n == 0 {
+        return Err("argmax and argmin need a non-empty array")
+    }
+    mut best = 0
+    for i in 0 until n {
+        if a[i] != a[i] {
+            return Err("argmax and argmin need an array without NaN")
+        }
+        if want_max and a[i] > a[best] {
+            best = i
+        }
+        if not want_max and a[i] < a[best] {
+            best = i
+        }
+    }
+    Ok(best)
+}
+
+/// The index of the first largest element.
+pub fn argmax(a: Array<Float>) -> Result<Int, String> {
+    arg_extreme(a, true)
+}
+
+/// The index of the first smallest element.
+pub fn argmin(a: Array<Float>) -> Result<Int, String> {
+    arg_extreme(a, false)
+}
+
+/// Coordinate matrices for a grid: both have shape (len(y), len(x)); `x` varies along the columns
+/// and `y` down the rows.
+pub fn meshgrid(x: Array<Float>, y: Array<Float>) -> Result<Grid, String> {
+    if rank(x) != 1 or rank(y) != 1 {
+        return Err("meshgrid needs one-dimensional arrays")
+    }
+    nx = x.shape()[0]
+    ny = y.shape()[0]
+    mut gx = zeros([ny, nx])
+    mut gy = zeros([ny, nx])
+    for i in 0 until ny {
+        for j in 0 until nx {
+            gx.set(i, j, x[j])
+            gy.set(i, j, y[i])
+        }
+    }
+    Ok(Grid { x: gx, y: gy })
+}

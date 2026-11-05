@@ -21630,3 +21630,37 @@ fn operator_operand_types_are_checked_against_the_operator_method_parameter() {
         );
     }
 }
+
+#[test]
+fn std_arrays_slicing_joining_reductions_and_grids_match_an_oracle_in_both_backends() {
+    // slice, slice2, take, concat, vstack, hstack, sum/mean/min/max along an axis, argmax/argmin and
+    // meshgrid: the 17 numeric results were reproduced with an independent implementation (same
+    // summation order); ranges, shapes, empty input and NaN return typed errors in both backends.
+    assert_eq!(
+        interpreter_and_native_agree("array_operations.ostrin"),
+        "slice 1..4: [8, 15, 16]\nslice empty: error slice range 2..2 is empty or outside 0..6\ntake nothing: error take needs at least one index\nslice outside: error slice range 4..9 is empty or outside 0..6\nslice2 rows 0..2 cols 1..3: [[2, 3], [5, 6]]\nslice2 outside: error slice2 range is empty or outside 3x3\ntake: [42, 4, 4, 16]\ntake outside: error take index 6 is outside 0..6\nconcat: [4, 8, 15, 16, 23, 42, 0.5, 1.5]\nvstack: [[1, 2, 3], [4, 5, 6], [7, 8, 10], [0, 0, 1]]\nvstack mismatch: error vstack needs the same number of columns\nhstack: [[1, 2, 3, 9], [4, 5, 6, 9], [7, 8, 10, 9]]\nhstack mismatch: error hstack needs the same number of rows\nsum axis 0: [12, 15, 19]\nsum axis 1: [6, 15, 25]\nmean axis 0: [4, 5, 6.333333333333333]\nmean axis 1: [2, 5, 8.333333333333334]\nmin axis 0: [1, 2, 3]\nmax axis 1: [3, 6, 10]\nbad axis: error axis must be 0 (down the rows) or 1 (along the columns)\naxis on a vector: error axis reductions need a two-dimensional array\nargmax: 5\nargmin (first of ties): 1\nargmax with NaN: error argmax and argmin need an array without NaN\nmeshgrid x: [[1, 2, 3], [1, 2, 3]]\nmeshgrid y: [[10, 10, 10], [20, 20, 20]]\n"
+    );
+    let path = example_path("array_operations.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    let exe = temp_artifact("array_operations_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}

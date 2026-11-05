@@ -165,6 +165,7 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("measurements", include_str!("../std/measurements.ostrin")),
     ("symbolic", include_str!("../std/symbolic.ostrin")),
     ("bigint", include_str!("../std/bigint.ostrin")),
+    ("arrays", include_str!("../std/arrays.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {

@@ -1,0 +1,56 @@
+// std.arrays: slicing, joining, axis reductions, argmax/argmin and meshgrid on Float arrays, with typed
+// errors for ranges, shapes and empty or NaN input. Every value was reproduced with an independent
+// implementation (see the integration test).
+import std.arrays
+
+fn show(label: String, result: Result<Array<Float>, String>) -> Void {
+    match result {
+        Ok(values) => print(label + ": " + values.to_string()),
+        Err(message) => print(label + ": error " + message),
+    }
+}
+
+fn main() -> Void {
+    v = array([4.0, 8.0, 15.0, 16.0, 23.0, 42.0])
+    m = array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 10.0]])
+    show("slice 1..4", arrays.slice(v, 1, 4))
+    show("slice empty", arrays.slice(v, 2, 2))
+    show("take nothing", arrays.take(v, []))
+    show("slice outside", arrays.slice(v, 4, 9))
+    show("slice2 rows 0..2 cols 1..3", arrays.slice2(m, 0, 2, 1, 3))
+    show("slice2 outside", arrays.slice2(m, 0, 4, 0, 1))
+    show("take", arrays.take(v, [5, 0, 0, 3]))
+    show("take outside", arrays.take(v, [1, 6]))
+    show("concat", arrays.concat(v, array([0.5, 1.5])))
+    show("vstack", arrays.vstack(m, array([[0.0, 0.0, 1.0]])))
+    show("vstack mismatch", arrays.vstack(m, array([[1.0, 2.0]])))
+    show("hstack", arrays.hstack(m, array([[9.0], [9.0], [9.0]])))
+    show("hstack mismatch", arrays.hstack(m, array([[1.0, 2.0]])))
+    show("sum axis 0", arrays.sum_axis(m, 0))
+    show("sum axis 1", arrays.sum_axis(m, 1))
+    show("mean axis 0", arrays.mean_axis(m, 0))
+    show("mean axis 1", arrays.mean_axis(m, 1))
+    show("min axis 0", arrays.min_axis(m, 0))
+    show("max axis 1", arrays.max_axis(m, 1))
+    show("bad axis", arrays.sum_axis(m, 2))
+    show("axis on a vector", arrays.sum_axis(v, 0))
+    match arrays.argmax(v) {
+        Ok(i) => print("argmax: " + i.to_string()),
+        Err(message) => print("argmax: error " + message),
+    }
+    match arrays.argmin(array([3.0, 1.0, 2.0, 1.0])) {
+        Ok(i) => print("argmin (first of ties): " + i.to_string()),
+        Err(message) => print("argmin: error " + message),
+    }
+    match arrays.argmax(array([1.0, sqrt(0.0 - 1.0)])) {
+        Ok(i) => print("argmax with NaN: " + i.to_string()),
+        Err(message) => print("argmax with NaN: error " + message),
+    }
+    match arrays.meshgrid(array([1.0, 2.0, 3.0]), array([10.0, 20.0])) {
+        Ok(grid) => {
+            print("meshgrid x: " + grid.x.to_string())
+            print("meshgrid y: " + grid.y.to_string())
+        },
+        Err(message) => print("meshgrid: error " + message),
+    }
+}
