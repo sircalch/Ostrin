@@ -269,6 +269,389 @@ fn main() -> Void {
     }
 }
 `,
+  "Polynomials (exact)": `// std.polynomial over exact rationals: 40 generated integer polynomials, each put through every public
+// operation, plus fixed edge cases. The inputs come from a 31-bit linear congruential generator so
+// scripts/polynomial-oracle.mjs can regenerate the same cases in BigInt arithmetic and print the same
+// rows; the two outputs are compared line by line.
+import std.polynomial
+
+fn next_state(s: Int) -> Int {
+    (s * 1103515245 + 12345) % 2147483648
+}
+
+/// A value in lo..=hi from a generator state.
+fn draw(s: Int, lo: Int, hi: Int) -> Int {
+    lo + s % (hi - lo + 1)
+}
+
+fn int_mul(a: List<Int>, b: List<Int>) -> List<Int> {
+    mut out: List<Int> = []
+    for k in 0 until a.length() + b.length() - 1 {
+        mut acc = 0
+        for i in 0 until a.length() {
+            j = k - i
+            if j >= 0 and j < b.length() {
+                acc = acc + a[i] * b[j]
+            }
+        }
+        out.push(acc)
+    }
+    out
+}
+
+fn row(idx: Int, label: String, text: String) -> Void {
+    print("case " + idx.to_string() + " " + label + " " + text)
+}
+
+fn join(items: List<String>) -> String {
+    mut text = "["
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + items[i]
+    }
+    text + "]"
+}
+
+fn main() -> Void {
+    mut state = 20260417
+    for idx in 0 until 40 {
+        // shared linear factor (fq x - fr)
+        state = next_state(state)
+        fq = draw(state, 1, 3)
+        state = next_state(state)
+        fr = draw(state, 0 - 4, 4)
+        shared = [0 - fr, fq]
+
+        // p: shared times a constant and one or two more linear factors, or shared times a quadratic
+        state = next_state(state)
+        mode = draw(state, 0, 2)
+        mut p_list = shared
+        if mode == 2 {
+            state = next_state(state)
+            qa = draw(state, 0 - 3, 3)
+            state = next_state(state)
+            qb = draw(state, 0 - 3, 3)
+            p_list = int_mul(shared, [qb, qa, 1])
+        } else {
+            state = next_state(state)
+            mut c = draw(state, 0 - 3, 3)
+            if c == 0 {
+                c = 2
+            }
+            p_list = int_mul(shared, [c])
+            state = next_state(state)
+            l1q = draw(state, 1, 3)
+            state = next_state(state)
+            l1r = draw(state, 0 - 4, 4)
+            p_list = int_mul(p_list, [0 - l1r, l1q])
+            if mode == 1 {
+                state = next_state(state)
+                l2q = draw(state, 1, 3)
+                state = next_state(state)
+                l2r = draw(state, 0 - 4, 4)
+                p_list = int_mul(p_list, [0 - l2r, l2q])
+            }
+        }
+
+        // q: a fresh linear factor, shared times a fresh linear factor, or a general quadratic
+        state = next_state(state)
+        qmode = draw(state, 0, 2)
+        mut q_list = shared
+        if qmode == 2 {
+            state = next_state(state)
+            a0 = draw(state, 0 - 4, 4)
+            state = next_state(state)
+            a1 = draw(state, 0 - 4, 4)
+            state = next_state(state)
+            mut a2 = draw(state, 0 - 4, 4)
+            if a2 == 0 {
+                a2 = 1
+            }
+            q_list = [a0, a1, a2]
+        } else {
+            state = next_state(state)
+            l3q = draw(state, 1, 3)
+            state = next_state(state)
+            l3r = draw(state, 0 - 4, 4)
+            q_list = [0 - l3r, l3q]
+            if qmode == 1 {
+                q_list = int_mul(shared, q_list)
+            }
+        }
+
+        // evaluation point en/ed
+        state = next_state(state)
+        en = draw(state, 0 - 3, 3)
+        state = next_state(state)
+        ed = draw(state, 1, 3)
+        xtext = en.to_string() + "/" + ed.to_string()
+
+        p = polynomial.poly_from_ints(p_list)
+        q = polynomial.poly_from_ints(q_list)
+        row(idx, "p", polynomial.poly_to_string(p))
+        row(idx, "q", polynomial.poly_to_string(q))
+        row(idx, "add", polynomial.poly_to_string(polynomial.poly_add(p, q).unwrap()))
+        row(idx, "sub", polynomial.poly_to_string(polynomial.poly_sub(p, q).unwrap()))
+        row(idx, "mul", polynomial.poly_to_string(polynomial.poly_mul(p, q).unwrap()))
+        d = polynomial.poly_divmod(p, q).unwrap()
+        row(idx, "quotient", polynomial.poly_to_string(d.quotient))
+        row(idx, "remainder", polynomial.poly_to_string(d.remainder))
+        row(idx, "gcd", polynomial.poly_to_string(polynomial.poly_gcd(p, q).unwrap()))
+        row(idx, "eval " + xtext, polynomial.poly_eval(p, xtext).unwrap())
+        row(idx, "derivative", polynomial.poly_to_string(polynomial.poly_derivative(p).unwrap()))
+        roots = polynomial.poly_roots_rational(p).unwrap()
+        row(idx, "roots", join(roots))
+        f = polynomial.poly_factor_linear(p).unwrap()
+        mut factor_text = ""
+        mut prod = f.cofactor
+        for i in 0 until f.factors.length() {
+            factor_text = factor_text + polynomial.poly_to_string(f.factors[i]) + " "
+            prod = polynomial.poly_mul(prod, f.factors[i]).unwrap()
+        }
+        row(idx, "factors", factor_text + "cofactor " + polynomial.poly_to_string(f.cofactor))
+        if polynomial.poly_to_string(prod) == polynomial.poly_to_string(p) {
+            row(idx, "check", "ok")
+        } else {
+            row(idx, "check", "FAIL")
+        }
+        match polynomial.poly_divmod(p, polynomial.poly_from_ints([])) {
+            Ok(x) => row(idx, "divzero", "accepted"),
+            Err(message) => row(idx, "divzero", "error " + message),
+        }
+    }
+
+    // Fixed edge cases.
+    half_third = polynomial.poly_from_texts(["2/3", "1/3"]).unwrap()
+    row(0 - 1, "rational-roots", join(polynomial.poly_roots_rational(half_third).unwrap()))
+    match polynomial.poly_from_texts(["1/0"]) {
+        Ok(x) => row(0 - 1, "bad-text", "accepted"),
+        Err(message) => row(0 - 1, "bad-text", "error " + message),
+    }
+    huge = polynomial.poly_from_ints([10000000000000, 1])
+    match polynomial.poly_roots_rational(huge) {
+        Ok(x) => row(0 - 1, "huge-constant", join(x)),
+        Err(message) => row(0 - 1, "huge-constant", "error " + message),
+    }
+    match polynomial.poly_roots_rational(polynomial.poly_from_ints([])) {
+        Ok(x) => row(0 - 1, "zero-roots", join(x)),
+        Err(message) => row(0 - 1, "zero-roots", "error " + message),
+    }
+    row(0 - 1, "constant-derivative", polynomial.poly_to_string(polynomial.poly_derivative(polynomial.poly_from_ints([5])).unwrap()))
+    gcd_a = polynomial.poly_from_ints([1, 2])
+    gcd_b = polynomial.poly_from_texts(["1/2", "1"]).unwrap()
+    row(0 - 1, "gcd-rational", polynomial.poly_to_string(polynomial.poly_gcd(gcd_a, gcd_b).unwrap()))
+}
+`,
+  "Exact equations": `// std.solve over the 109 cases of scripts/solve-oracle.mjs: 69 hand-picked cases, then 40 generated
+// with the Park-Miller generator (seed 7). Each line is "id | op | inputs | result", the same format
+// the oracle prints, and the interpreter and native binary must reproduce tests/fixtures/solve_core_oracle.txt
+// exactly. The module's Err texts "all reals", "no solution" and "no real roots" are results in the
+// oracle, so they are printed as results; other Err texts print with an "error: " prefix.
+import std.solve
+
+fn next(s: Int) -> Int {
+    16807 * s % 2147483647
+}
+
+/// A coefficient in -30..30 from a generator state.
+fn coef(s: Int) -> Int {
+    s % 61 - 30
+}
+
+fn join(items: List<String>) -> String {
+    mut text = ""
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + items[i]
+    }
+    text
+}
+
+fn join_ints(values: List<Int>) -> String {
+    mut text = ""
+    for i in 0 until values.length() {
+        if i > 0 {
+            text = text + ","
+        }
+        text = text + values[i].to_string()
+    }
+    text
+}
+
+fn id_of(n: Int) -> String {
+    if n < 10 {
+        "C00" + n.to_string()
+    } else if n < 100 {
+        "C0" + n.to_string()
+    } else {
+        "C" + n.to_string()
+    }
+}
+
+fn emit(n: Int, op: String, inputs: String, result: String) -> Void {
+    print(id_of(n) + " | " + op + " | " + inputs + " | " + result)
+}
+
+fn linear_text(r: Result<String, String>) -> String {
+    match r {
+        Ok(t) => t,
+        Err(m) => "error: " + m,
+    }
+}
+
+fn quadratic_text(r: Result<List<String>, String>) -> String {
+    match r {
+        Ok(items) => join(items),
+        Err(m) => {
+            if m == "all reals" or m == "no solution" or m == "no real roots" {
+                m
+            } else {
+                "error: " + m
+            }
+        },
+    }
+}
+
+fn rational_text(r: Result<List<String>, String>) -> String {
+    match r {
+        Ok(items) => {
+            if items.length() == 0 {
+                "none"
+            } else {
+                join(items)
+            }
+        },
+        Err(m) => "error: " + m,
+    }
+}
+
+fn lin(n: Int, a: Int, b: Int) -> Void {
+    emit(n, "linear", "a=" + a.to_string() + ",b=" + b.to_string(), linear_text(solve.solve_linear(a, b)))
+}
+
+fn quad(n: Int, a: Int, b: Int, c: Int) -> Void {
+    inputs = "a=" + a.to_string() + ",b=" + b.to_string() + ",c=" + c.to_string()
+    emit(n, "quadratic", inputs, quadratic_text(solve.solve_quadratic(a, b, c)))
+}
+
+fn rat(n: Int, c: List<Int>) -> Void {
+    emit(n, "rational_roots", "c=[" + join_ints(c) + "]", rational_text(solve.solve_rational_roots(c)))
+}
+
+fn main() -> Void {
+    print("# solve-oracle: exact equation solving (independent BigInt oracle for std.solve)")
+    print("# line format: id | op | inputs | result")
+    print("# ops: linear, quadratic, rational_roots. See scripts/solve-oracle.mjs header for result rules.")
+    print("# cases: 109 (69 hand-picked, then 40 Park-Miller seed 7)")
+
+    lin(1, 0, 0)
+    lin(2, 0, 5)
+    lin(3, 0, 0 - 1)
+    lin(4, 3, 0 - 6)
+    lin(5, 0 - 4, 6)
+    lin(6, 6, 0 - 4)
+    lin(7, 0 - 7, 21)
+    lin(8, 1, 0)
+    lin(9, 10000, 0 - 9999)
+    lin(10, 0 - 10000, 3)
+    lin(11, 7, 10000)
+    lin(12, 0 - 3, 0)
+
+    quad(13, 0, 0, 0)
+    quad(14, 0, 0, 4)
+    quad(15, 0, 2, 0 - 6)
+    quad(16, 1, 0 - 5, 6)
+    quad(17, 1, 2, 1)
+    quad(18, 2, 0, 0 - 8)
+    quad(19, 1, 0, 1)
+    quad(20, 3, 2, 5)
+    quad(21, 1, 0, 0 - 2)
+    quad(22, 1, 0, 0 - 3)
+    quad(23, 1, 0 - 2, 0 - 2)
+    quad(24, 2, 0 - 4, 0 - 2)
+    quad(25, 1, 7, 1)
+    quad(26, 0 - 1, 7, 0 - 1)
+    quad(27, 1, 2, 0 - 17)
+    quad(28, 1, 0, 0 - 5)
+    quad(29, 0 - 2, 0 - 4, 6)
+    quad(30, 0 - 3, 1, 2)
+    quad(31, 10000, 10000, 0 - 10000)
+    quad(32, 5000, 0 - 10000, 5000)
+    quad(33, 7, 0 - 70, 175)
+    quad(34, 1, 0 - 1, 0 - 1)
+    quad(35, 4, 0, 0 - 45)
+    quad(36, 9999, 0 - 10000, 1)
+    quad(37, 1, 10000, 1)
+    quad(38, 0 - 10000, 10000, 10000)
+    quad(39, 1, 0 - 7, 12)
+    quad(40, 2, 3, 0 - 2)
+    quad(41, 3, 0, 0)
+
+    rat(42, [])
+    rat(43, [0, 0, 0])
+    rat(44, [5])
+    rat(45, [0, 1])
+    rat(46, [0 - 2, 0, 1])
+    rat(47, [0 - 6, 1, 1])
+    rat(48, [0 - 1, 0, 1])
+    rat(49, [0, 0, 1])
+    rat(50, [0, 0 - 1, 0, 1])
+    rat(51, [6, 0 - 5, 1])
+    rat(52, [4, 0 - 4, 1])
+    rat(53, [0 - 1, 3, 0 - 3, 1])
+    rat(54, [0 - 1, 2])
+    rat(55, [3, 0 - 2])
+    rat(56, [0 - 2, 1, 6])
+    rat(57, [0, 0, 0 - 2, 1])
+    rat(58, [0 - 10000, 0, 0, 0, 1])
+    rat(59, [0 - 10000, 9999, 1])
+    rat(60, [0 - 6, 11, 0 - 6, 1])
+    rat(61, [0 - 1, 0, 4])
+    rat(62, [0 - 9, 0, 4])
+    rat(63, [0 - 8, 0, 0, 1])
+    rat(64, [0 - 10000, 0, 1])
+    rat(65, [0, 0, 0, 7])
+    rat(66, [7])
+    rat(67, [1, 0, 0, 0, 0, 0, 1])
+    rat(68, [0 - 1, 0, 0, 0, 0, 0, 1])
+    rat(69, [12, 0 - 7, 1])
+
+    // Generated cases 70..109: op = i mod 3, draws in the order the oracle uses.
+    mut st = 7
+    for i in 0 until 40 {
+        op = i % 3
+        if op == 0 {
+            st = next(st)
+            a = coef(st)
+            st = next(st)
+            b = coef(st)
+            lin(70 + i, a, b)
+        } else if op == 1 {
+            st = next(st)
+            a = coef(st)
+            st = next(st)
+            b = coef(st)
+            st = next(st)
+            c = coef(st)
+            quad(70 + i, a, b, c)
+        } else {
+            st = next(st)
+            c0 = coef(st)
+            st = next(st)
+            c1 = coef(st)
+            st = next(st)
+            c2 = coef(st)
+            st = next(st)
+            c3 = coef(st)
+            rat(70 + i, [c0, c1, c2, c3])
+        }
+    }
+}
+`,
 };
 
 const $ = (id) => document.getElementById(id);

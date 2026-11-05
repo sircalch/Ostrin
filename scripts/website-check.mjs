@@ -378,6 +378,8 @@ for (const [name, sourceFile] of [
   ["Symbolic model to figure", "examples/symbolic_workflow.ostrin"],
   ["Exact rationals (BigInt)", "examples/bigint_rational.ostrin"],
   ["Array operations", "examples/array_operations.ostrin"],
+  ["Polynomials (exact)", "examples/polynomial_core.ostrin"],
+  ["Exact equations", "examples/solve_core.ostrin"],
 ]) {
   const source = read(sourceFile).replaceAll("\r\n", "\n").trim();
   check(playgroundScript.includes(JSON.stringify(name)) && playgroundScript.includes(source), `playground.js: example "${name}" drifted from ${sourceFile}`);
