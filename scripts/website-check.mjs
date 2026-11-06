@@ -380,6 +380,7 @@ for (const [name, sourceFile] of [
   ["Array operations", "examples/array_operations.ostrin"],
   ["Polynomials (exact)", "examples/polynomial_core.ostrin"],
   ["Exact equations", "examples/solve_core.ostrin"],
+  ["Reverse-mode gradients", "examples/autodiff_reverse.ostrin"],
 ]) {
   const source = read(sourceFile).replaceAll("\r\n", "\n").trim();
   check(playgroundScript.includes(JSON.stringify(name)) && playgroundScript.includes(source), `playground.js: example "${name}" drifted from ${sourceFile}`);
