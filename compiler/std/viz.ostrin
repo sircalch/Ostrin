@@ -132,6 +132,10 @@ pub record Figure {
     mut seed: String
     mut compiler: String
     mut bindings: List<String>
+    mut polish: Bool
+    mut caption: String
+    mut label_size: Int
+    mut animated: Bool
 }
 
 pub record Scene3D {
@@ -437,7 +441,11 @@ pub fn figure(title: String) -> Figure {
         data_hash: "",
         seed: "",
         compiler: "",
-        bindings: []
+        bindings: [],
+        polish: false,
+        caption: "",
+        label_size: 11,
+        animated: false
     }
 }
 
@@ -773,6 +781,19 @@ impl Figure {
         self.add(series("scatter", array(xv), array(yv), label, color))
     }
 
+    /// Opt-in polished style: soft grid, framed axes, a gradient curve over a
+    /// light area down to the zero line, haloed markers with labels and a
+    /// caption. `animate: true` adds SMIL motion: a pulse on every scatter
+    /// marker and a single draw-in of each line. Figures that never call this
+    /// render exactly as before.
+    fn polished(mut self, caption: String = "", label_size: Int = 12, animate: Bool = false) -> Figure {
+        self.polish = true
+        self.caption = caption
+        self.label_size = label_size
+        self.animated = animate
+        self
+    }
+
     fn svg(self) -> String {
         render(self)
     }
@@ -912,9 +933,12 @@ fn render(fig: Figure) -> String {
     sx = (right - left) / (x1 - x0)
     sy = (bottom - top) / (y1 - y0)
     clip = uid("clip", fig.title + fig.xlabel + fig.ylabel + fig.series.length().to_string())
+    polish_id = uid("polish", clip)
 
     root = if has_motion {
         header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg data-ostrin-motion=\"true\"" + binding_attr(fig.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")
+    } else if fig.polish and fig.animated {
+        header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg data-ostrin-polish=\"true\"" + binding_attr(fig.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")
     } else {
         header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg" + binding_attr(fig.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")
     }
@@ -926,6 +950,9 @@ fn render(fig: Figure) -> String {
     if has_motion {
         out.push("<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>")
     }
+    if fig.polish and fig.animated {
+        out.push("<style>@media (prefers-reduced-motion:reduce){[data-ostrin-polish] animate{display:none!important}}</style>")
+    }
     out.push(text_at(left, 26.0, fig.title, "start", 16, theme.text, attr("font-weight", "600")))
     if fig.subtitle != "" {
         out.push(text_at(left, 45.0, fig.subtitle, "start", 12, theme.muted, ""))
@@ -936,6 +963,8 @@ fn render(fig: Figure) -> String {
     // Grid and ticks.
     xstep = nice_step(x0, x1, 8)
     ystep = nice_step(y0, y1, 6)
+    // The polished style draws a dashed, low-contrast grid; the default has none of this.
+    soft = if fig.polish { attr("stroke-dasharray", "2 4") + attr("stroke-opacity", "0.8") } else { "" }
     // No ticks on a stage without axes.
     mut xticks: List<Float> = []
     mut yticks: List<Float> = []
@@ -946,7 +975,7 @@ fn render(fig: Figure) -> String {
     for v in xticks {
         x = left + (v - x0) * sx
         if fig.gridlines and not has_grid {
-            out.push(seg(x, top, x, bottom, theme.grid, 1.0, ""))
+            out.push(seg(x, top, x, bottom, theme.grid, 1.0, soft))
         }
         out.push(seg(x, bottom, x, bottom + 5.0, theme.axis, 1.0, ""))
         out.push(text_at(x, bottom + 18.0, tick_label(v, xstep), "middle", 11, theme.muted, ""))
@@ -954,7 +983,7 @@ fn render(fig: Figure) -> String {
     for v in yticks {
         y = bottom - (v - y0) * sy
         if fig.gridlines and not has_grid {
-            out.push(seg(left, y, right, y, theme.grid, 1.0, ""))
+            out.push(seg(left, y, right, y, theme.grid, 1.0, soft))
         }
         out.push(seg(left - 5.0, y, left, y, theme.axis, 1.0, ""))
         out.push(text_at(left - 8.0, y + 4.0, tick_label(v, ystep), "end", 11, theme.muted, ""))
@@ -973,6 +1002,10 @@ fn render(fig: Figure) -> String {
         mut drawn = ""
         if is_motion(s.kind) {
             drawn = draw_motion(s, color, fig.duration, left, bottom, x0, y0, sx, sy, theme)
+        } else if fig.polish and s.kind == "line" {
+            drawn = draw_polish_line(s, color, polish_id, left, right, bottom, x0, y0, sx, sy, theme, fig.animated)
+        } else if fig.polish and s.kind == "scatter" {
+            drawn = draw_polish_markers(s, color, left, bottom, x0, y0, sx, sy, theme, fig.animated)
         } else {
             drawn = draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right, violin_gap)
         }
@@ -980,14 +1013,24 @@ fn render(fig: Figure) -> String {
         series_id = series_id + 1
     }
     for n in fig.notes {
-        out.push(text_at(left + (n.x - x0) * sx, bottom - (n.y - y0) * sy, n.text, "start", 11, theme.text, ""))
+        if fig.polish {
+            out.push(text_at(left + (n.x - x0) * sx, bottom - (n.y - y0) * sy, n.text, "middle", fig.label_size, theme.text, attr("font-weight", "600")))
+        } else {
+            out.push(text_at(left + (n.x - x0) * sx, bottom - (n.y - y0) * sy, n.text, "start", 11, theme.text, ""))
+        }
     }
     out.push("</g>")
 
     // Frame and axis titles.
-    if fig.axes {
+    if fig.axes and fig.polish {
+        out.push("<rect" + attr("x", num(left)) + attr("y", num(top)) + attr("width", num(right - left)) + attr("height", num(bottom - top)) +
+            attr("fill", "none") + attr("stroke", theme.axis) + attr("stroke-width", "1") + "/>")
+    } else if fig.axes {
         out.push(seg(left, bottom, right, bottom, theme.axis, 1.0, ""))
         out.push(seg(left, top, left, bottom, theme.axis, 1.0, ""))
+    }
+    if fig.polish and fig.caption != "" {
+        out.push(text_at(left, h - 12.0, fig.caption, "start", 11, theme.muted, attr("font-style", "italic")))
     }
     xt = axis_title(fig.xlabel, fig.xunit)
     yt = axis_title(fig.ylabel, fig.yunit)
@@ -1483,6 +1526,54 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
         out = out + item + text_at(x + 28.0, cy + 4.0, labels[i], "start", 11, theme.text, "") + "</g>"
     }
     out + "</g>"
+}
+
+// ---------------------------------------------------------------- polish
+
+// Polished line: a light area down to the zero line, a stroke that runs from
+// the series colour to the theme's fourth palette colour, and (when animated)
+// one SMIL draw-in. pathLength=1 makes the dash pattern independent of the
+// curve's length; offset 0 is the full curve, so static renderers show it whole.
+fn draw_polish_line(s: Series, color: String, id: String, left: Float, right: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme, animated: Bool) -> String {
+    n = s.xs.length()
+    line = path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)
+    zero = bottom - (0.0 - y0) * sy
+    area = line + " L" + num(left + (s.xs[n - 1] - x0) * sx) + " " + num(zero) + " L" + num(left + (s.xs[0] - x0) * sx) + " " + num(zero) + " Z"
+    gradient = "<defs><linearGradient" + attr("id", id) + attr("gradientUnits", "userSpaceOnUse") + attr("x1", num(left)) + attr("y1", "0") +
+        attr("x2", num(right)) + attr("y2", "0") + "><stop" + attr("offset", "0") + attr("stop-color", color) + "/><stop" +
+        attr("offset", "1") + attr("stop-color", theme.palette[4]) + "/></linearGradient></defs>"
+    shade = "<path" + attr("d", area) + attr("fill", color) + attr("fill-opacity", "0.12") + "/>"
+    stroke = attr("d", line) + attr("fill", "none") + attr("stroke", "url(#" + id + ")") + attr("stroke-width", num(s.width)) +
+        attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + attr("pathLength", "1") +
+        attr("stroke-dasharray", "1 1") + attr("stroke-dashoffset", "0")
+    curve = if animated {
+        "<path" + stroke + "><animate" + attr("attributeName", "stroke-dashoffset") + attr("from", "1") + attr("to", "0") +
+            attr("dur", "1.2s") + attr("fill", "freeze") + "/></path>"
+    } else {
+        "<path" + stroke + "/>"
+    }
+    body = gradient + shade + curve
+    if s.label == "" { body } else { "<g class=\"series\">" + tip(s.label) + body + "</g>" }
+}
+
+// Polished markers: each point gets a static halo and a marker whose radius
+// pulses from its size to size + 3 and back every 2 seconds when animated.
+fn draw_polish_markers(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme, animated: Bool) -> String {
+    mut parts: List<String> = []
+    for i in 0 until s.xs.length() {
+        cx = num(left + (s.xs[i] - x0) * sx)
+        cy = num(bottom - (s.ys[i] - y0) * sy)
+        mut pulse = ""
+        if animated {
+            pulse = "<animate" + attr("attributeName", "r") + attr("values", num(s.size) + ";" + num(s.size + 3.0) + ";" + num(s.size)) +
+                attr("dur", "2s") + attr("repeatCount", "indefinite") + "/>"
+        }
+        parts.push("<g class=\"root\">" + "<circle" + attr("cx", cx) + attr("cy", cy) + attr("r", num(s.size + 4.0)) + attr("fill", color) +
+            attr("fill-opacity", "0.18") + "/>" + "<circle class=\"pt\"" + attr("data-viz-index", i.to_string()) + attr("cx", cx) + attr("cy", cy) +
+            attr("r", num(s.size)) + attr("fill", color) + attr("stroke", theme.background) + attr("stroke-width", "1.2") + ">" +
+            tip(named(s.label) + "(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ")") + pulse + "</circle></g>")
+    }
+    parts.join("")
 }
 
 // ---------------------------------------------------------------- motion

@@ -18508,7 +18508,7 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=147 hir=0 ast=0"),
+        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=150 hir=0 ast=0"),
         "histogram did not use the visualization IR path: {}",
         stdout(&report)
     );
@@ -18720,7 +18720,7 @@ fn viz_violins_render_kde_shapes_and_medians() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=147 hir=0 ast=0"),
+        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=150 hir=0 ast=0"),
         "violin did not use the visualization IR path: {}",
         stdout(&report)
     );
@@ -21586,6 +21586,49 @@ fn std_viz_polynomial_roots_matches_both_backends() {
         3,
         "{svg}"
     );
+    let path = example_path("viz_polynomial_roots.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
+fn std_viz_polish_matches_both_backends() {
+    // The polished style with SMIL animation: one <animate> pulses each of the three root markers and
+    // one draws the curve in. Both backends must produce the same bytes, and the static frame keeps
+    // every element (the curve path is present with its full dash offset of 0 in the final state).
+    let svg = interpreter_and_native_agree("viz_polynomial_roots.ostrin");
+    assert_eq!(svg.matches("<svg").count(), 1, "{svg}");
+    assert_eq!(svg.matches("</svg>").count(), 1, "{svg}");
+    assert!(svg.contains("data-ostrin-polish=\"true\""), "{svg}");
+    assert_eq!(svg.matches("<animate").count(), 4, "{svg}");
+    assert_eq!(
+        svg.matches(
+            "<animate attributeName=\"r\" values=\"5;8;5\" dur=\"2s\" repeatCount=\"indefinite\"/>"
+        )
+        .count(),
+        3,
+        "{svg}"
+    );
+    assert_eq!(
+        svg.matches("<animate attributeName=\"stroke-dashoffset\" from=\"1\" to=\"0\" dur=\"1.2s\" fill=\"freeze\"/>")
+            .count(),
+        1,
+        "{svg}"
+    );
+    assert_eq!(
+        svg.matches("<circle class=\"pt\" data-viz-index=").count(),
+        3,
+        "{svg}"
+    );
+    assert!(svg.contains("<linearGradient"), "{svg}");
+    assert!(svg.contains("expanded: p(x)"), "{svg}");
     let path = example_path("viz_polynomial_roots.ostrin");
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
