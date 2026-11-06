@@ -1,0 +1,331 @@
+// std.autodiff — reverse-mode automatic differentiation for scalar Float functions.
+//
+// A `Tape` is a list of nodes in evaluation order. Each node stores its operation tag, the indices of
+// its parent nodes, and the local partial derivatives of its value with respect to those parents.
+// `tape_backward` walks the tape once from the output node back to the first node and accumulates
+// the adjoints, so one backward pass gives the gradient with respect to every input.
+//
+// Operations (binary, on two tape nodes): "add", "sub", "mul", "div".
+// Operations (unary, on one tape node): "neg", "sin", "cos", "exp", "ln", "pow" (a constant Float
+// exponent), "addk" (plus a constant) and "mulk" (times a constant).
+//
+// Limits: there is no closure or function-value tracing in Ostrin, so reverse mode cannot be applied
+// to an arbitrary user function. `reverse_grad_2` differentiates the fixed expressions defined in this
+// module (see `expr_value`), and the generic tape API is for building other expressions by hand.
+// Only first derivatives are provided.
+//
+// Failures never abort. A non-finite input or a non-finite node value (NaN, infinity) marks the tape
+// with an error message; every later operation keeps the message and `tape_backward` returns `Err`.
+
+/// One tape node: its operation tag, its value, its parent indices and the local partials
+/// (partials[k] is d value / d parent k).
+pub record Node {
+    op: String
+    value: Float
+    parents: List<Int>
+    partials: List<Float>
+}
+
+/// A tape in evaluation order. `error` is "" while every node is finite; otherwise it holds the
+/// first problem found.
+pub record Tape {
+    nodes: List<Node>
+    error: String
+}
+
+fn is_finite_value(x: Float) -> Bool {
+    x == x and abs(x) <= 1.7976931348623157e308
+}
+
+/// An empty tape.
+pub fn tape_new() -> Tape {
+    mut empty: List<Node> = []
+    Tape { nodes: empty, error: "" }
+}
+
+/// Number of nodes on the tape.
+pub fn tape_len(t: Tape) -> Int {
+    t.nodes.length()
+}
+
+/// Index of the most recently added node (-1 for an empty tape).
+pub fn tape_last(t: Tape) -> Int {
+    t.nodes.length() - 1
+}
+
+// Appends `node` and records the first problem: an earlier error, a non-finite value or partial,
+// or a bad operand index.
+fn push_node(t: Tape, node: Node, bad_index: Bool) -> Tape {
+    mut out: List<Node> = []
+    for item in t.nodes {
+        out.push(item)
+    }
+    mut finite = is_finite_value(node.value)
+    for p in node.partials {
+        if not is_finite_value(p) {
+            finite = false
+        }
+    }
+    index = out.length()
+    out.push(node)
+    mut err = t.error
+    if err == "" {
+        if bad_index {
+            err = "autodiff: operand index out of range"
+        } else if not finite {
+            err = "autodiff: non-finite value or partial at node " + index.to_string()
+        }
+    }
+    Tape { nodes: out, error: err }
+}
+
+/// Adds an input variable with value `x` (a leaf with no parents).
+pub fn tape_var(t: Tape, x: Float) -> Tape {
+    mut parents: List<Int> = []
+    mut partials: List<Float> = []
+    node = Node { op: "var", value: x, parents: parents, partials: partials }
+    push_node(t, node, false)
+}
+
+/// Adds a node computed from two earlier nodes `i` and `j`. `op` is "add", "sub", "mul" or "div".
+pub fn tape_op2(t: Tape, op: String, i: Int, j: Int) -> Tape {
+    n = t.nodes.length()
+    if i < 0 or i >= n or j < 0 or j >= n {
+        return push_node(t, Node { op: op, value: 0.0, parents: [], partials: [] }, true)
+    }
+    a = t.nodes[i].value
+    b = t.nodes[j].value
+    mut value = 0.0
+    mut d_left = 0.0
+    mut d_right = 0.0
+    mut known = true
+    if op == "add" {
+        value = a + b
+        d_left = 1.0
+        d_right = 1.0
+    } else if op == "sub" {
+        value = a - b
+        d_left = 1.0
+        d_right = -1.0
+    } else if op == "mul" {
+        value = a * b
+        d_left = b
+        d_right = a
+    } else if op == "div" {
+        value = a / b
+        d_left = 1.0 / b
+        d_right = -a / (b * b)
+    } else {
+        known = false
+    }
+    if not known {
+        return push_node(t, Node { op: op, value: 0.0, parents: [], partials: [] }, true)
+    }
+    parents: List<Int> = [i, j]
+    partials: List<Float> = [d_left, d_right]
+    push_node(t, Node { op: op, value: value, parents: parents, partials: partials }, false)
+}
+
+/// Adds a node computed from one earlier node `i`. `k` is the constant used by "pow" (the exponent),
+/// "addk" (the addend) and "mulk" (the factor); the other operations ignore it. `op` is "neg", "sin",
+/// "cos", "exp", "ln", "pow", "addk" or "mulk".
+pub fn tape_op1(t: Tape, op: String, i: Int, k: Float) -> Tape {
+    n = t.nodes.length()
+    if i < 0 or i >= n {
+        return push_node(t, Node { op: op, value: 0.0, parents: [], partials: [] }, true)
+    }
+    a = t.nodes[i].value
+    mut value = 0.0
+    mut d = 0.0
+    mut known = true
+    if op == "neg" {
+        value = 0.0 - a
+        d = -1.0
+    } else if op == "sin" {
+        value = sin(a)
+        d = cos(a)
+    } else if op == "cos" {
+        value = cos(a)
+        d = 0.0 - sin(a)
+    } else if op == "exp" {
+        value = exp(a)
+        d = value
+    } else if op == "ln" {
+        value = ln(a)
+        d = 1.0 / a
+    } else if op == "pow" {
+        value = pow(a, k)
+        d = k * pow(a, k - 1.0)
+    } else if op == "addk" {
+        value = a + k
+        d = 1.0
+    } else if op == "mulk" {
+        value = k * a
+        d = k
+    } else {
+        known = false
+    }
+    if not known {
+        return push_node(t, Node { op: op, value: 0.0, parents: [], partials: [] }, true)
+    }
+    parents: List<Int> = [i]
+    partials: List<Float> = [d]
+    push_node(t, Node { op: op, value: value, parents: parents, partials: partials }, false)
+}
+
+/// Value of node `i`. Check `t.error` (or go through `tape_backward`) before trusting it.
+pub fn tape_value(t: Tape, i: Int) -> Float {
+    t.nodes[i].value
+}
+
+/// Adjoints d out / d node for every node, from one backward pass seeded at node `out`.
+pub fn tape_backward(t: Tape, out: Int) -> Result<List<Float>, String> {
+    if t.error != "" {
+        return Err(t.error)
+    }
+    n = t.nodes.length()
+    if out < 0 or out >= n {
+        return Err("tape_backward: output index out of range")
+    }
+    mut adj = zeros([n])
+    adj.set(out, 1.0)
+    mut i = out
+    while i >= 0 {
+        a = adj[i]
+        node = t.nodes[i]
+        for k in 0 until node.parents.length() {
+            p = node.parents[k]
+            adj.set(p, adj[p] + a * node.partials[k])
+        }
+        i = i - 1
+    }
+    mut result: List<Float> = []
+    for j in 0 until n {
+        result.push(adj[j])
+    }
+    Ok(result)
+}
+
+/// Gradient of node `out` with respect to the nodes listed in `vars` (for example the input variables).
+pub fn tape_grad(t: Tape, out: Int, vars: List<Int>) -> Result<List<Float>, String> {
+    match tape_backward(t, out) {
+        Err(message) => Err(message),
+        Ok(adj) => {
+            mut g: List<Float> = []
+            for v in vars {
+                if v < 0 or v >= adj.length() {
+                    return Err("tape_grad: variable index out of range")
+                }
+                g.push(adj[v])
+            }
+            Ok(g)
+        },
+    }
+}
+
+// ---------------------------------------------------------------- fixed test expressions
+
+/// Number of fixed expressions that `reverse_grad_2` and `expr_value` accept (kinds 0 to 3).
+pub fn expr_count() -> Int {
+    4
+}
+
+/// Name of fixed expression `kind`.
+pub fn expr_name(kind: Int) -> String {
+    if kind == 0 {
+        "x*y + sin(x)"
+    } else if kind == 1 {
+        "exp(x)*ln(y) - 2*(y/x)"
+    } else if kind == 2 {
+        "(x-y)^3 + cos(y)*x"
+    } else if kind == 3 {
+        "-(x*x + 1)/(y*y + 2)"
+    } else {
+        "unknown"
+    }
+}
+
+fn cube(d: Float) -> Float {
+    d * d * d
+}
+
+/// Value of fixed expression `kind` at (x, y), computed directly with Float arithmetic (no tape).
+/// Used as the reference for finite differences. Unknown kinds give Err.
+pub fn expr_value(kind: Int, x: Float, y: Float) -> Result<Float, String> {
+    if kind == 0 {
+        return Ok(x * y + sin(x))
+    }
+    if kind == 1 {
+        return Ok(exp(x) * ln(y) - 2.0 * (y / x))
+    }
+    if kind == 2 {
+        return Ok(cube(x - y) + cos(y) * x)
+    }
+    if kind == 3 {
+        return Ok(0.0 - (x * x + 1.0) / (y * y + 2.0))
+    }
+    Err("reverse_grad_2: unknown expression kind")
+}
+
+// Builds fixed expression `kind` on a tape that already holds x at index 0 and y at index 1.
+fn build_expr(kind: Int, t: Tape) -> Tape {
+    if kind == 0 {
+        t1 = tape_op2(t, "mul", 0, 1)
+        t2 = tape_op1(t1, "sin", 0, 0.0)
+        tape_op2(t2, "add", tape_last(t1), tape_last(t2))
+    } else if kind == 1 {
+        t1 = tape_op1(t, "exp", 0, 0.0)
+        t2 = tape_op1(t1, "ln", 1, 0.0)
+        t3 = tape_op2(t2, "mul", tape_last(t1), tape_last(t2))
+        t4 = tape_op2(t3, "div", 1, 0)
+        t5 = tape_op1(t4, "mulk", tape_last(t4), 2.0)
+        tape_op2(t5, "sub", tape_last(t3), tape_last(t5))
+    } else if kind == 2 {
+        t1 = tape_op2(t, "sub", 0, 1)
+        t2 = tape_op1(t1, "pow", tape_last(t1), 3.0)
+        t3 = tape_op1(t2, "cos", 1, 0.0)
+        t4 = tape_op2(t3, "mul", tape_last(t3), 0)
+        tape_op2(t4, "add", tape_last(t2), tape_last(t4))
+    } else {
+        t1 = tape_op2(t, "mul", 0, 0)
+        t2 = tape_op1(t1, "addk", tape_last(t1), 1.0)
+        t3 = tape_op2(t2, "mul", 1, 1)
+        t4 = tape_op1(t3, "addk", tape_last(t3), 2.0)
+        t5 = tape_op2(t4, "div", tape_last(t2), tape_last(t4))
+        tape_op1(t5, "neg", tape_last(t5), 0.0)
+    }
+}
+
+/// Gradient (d f / d x, d f / d y) of fixed expression `kind` at (x, y), by reverse mode. Kinds 0 to 3
+/// are the expressions named by `expr_name`. Non-finite x or y, an unknown kind, or a non-finite
+/// intermediate value (for example ln(0)) gives Err.
+pub fn reverse_grad_2(kind: Int, x: Float, y: Float) -> Result<List<Float>, String> {
+    if not (is_finite_value(x) and is_finite_value(y)) {
+        return Err("reverse_grad_2 needs finite inputs")
+    }
+    if kind < 0 or kind >= expr_count() {
+        return Err("reverse_grad_2: unknown expression kind")
+    }
+    t0 = tape_var(tape_new(), x)
+    t1 = tape_var(t0, y)
+    t2 = build_expr(kind, t1)
+    vars: List<Int> = [0, 1]
+    tape_grad(t2, tape_last(t2), vars)
+}
+
+/// Value of fixed expression `kind` at (x, y), taken from the tape (checks the forward pass).
+pub fn reverse_value_2(kind: Int, x: Float, y: Float) -> Result<Float, String> {
+    if not (is_finite_value(x) and is_finite_value(y)) {
+        return Err("reverse_value_2 needs finite inputs")
+    }
+    if kind < 0 or kind >= expr_count() {
+        return Err("reverse_grad_2: unknown expression kind")
+    }
+    t0 = tape_var(tape_new(), x)
+    t1 = tape_var(t0, y)
+    t2 = build_expr(kind, t1)
+    if t2.error != "" {
+        return Err(t2.error)
+    }
+    Ok(tape_value(t2, tape_last(t2)))
+}
