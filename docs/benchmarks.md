@@ -209,7 +209,7 @@ Comandos (desde `compiler/`, luego desde el directorio temporal):
 
 ```
 cargo build --release
-ostrinc.exe --compile <TEMP>/ostrin-bench/bench_poly_solve.ostrin --out <TEMP>/ostrin-bench/bench_native.exe
+compiler/target/release/ostrinc.exe --compile <TEMP>/ostrin-bench/bench_poly_solve.ostrin --out <TEMP>/ostrin-bench/bench_native.exe
 node expected.mjs > expected.txt
 bench_native.exe > native_out.txt
 diff --strip-trailing-cr expected.txt native_out.txt
