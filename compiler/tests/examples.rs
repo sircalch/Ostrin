@@ -21575,6 +21575,30 @@ fn std_polynomial_factor_matches_oracle_in_both_backends() {
 }
 
 #[test]
+fn std_viz_polynomial_roots_matches_both_backends() {
+    // p(x) = (x-1)(x+2)(2x-3) over [-3, 3]; the three rational roots from std.polynomial are marked
+    // with scatter points, which the viz module renders as <circle class="pt" data-viz-index="i">.
+    let svg = interpreter_and_native_agree("viz_polynomial_roots.ostrin");
+    assert_eq!(svg.matches("<svg").count(), 1, "{svg}");
+    assert_eq!(svg.matches("</svg>").count(), 1, "{svg}");
+    assert_eq!(
+        svg.matches("<circle class=\"pt\" data-viz-index=").count(),
+        3,
+        "{svg}"
+    );
+    let path = example_path("viz_polynomial_roots.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn std_solve_core_matches_oracle_in_both_backends() {
     // Linear, quadratic and rational-root solving over fixed cases, including the edge cases. The
     // golden file is the output of scripts/solve-oracle.mjs (no shared code with the module); the
