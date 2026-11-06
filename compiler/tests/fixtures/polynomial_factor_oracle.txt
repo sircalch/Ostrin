@@ -1,0 +1,171 @@
+case 0 p [100, 180, -79, -144, 64]
+case 0 content 1
+case 0 primitive [100, 180, -79, -144, 64]
+case 0 squarefree [-10, -9, 8]
+case 1 p [64, -192, 144]
+case 1 content 16
+case 1 primitive [4, -12, 9]
+case 1 squarefree [-2, 3]
+case 2 p [-7, 2, 0, -5]
+case 2 content 1
+case 2 primitive [7, -2, 0, 5]
+case 2 squarefree [7, -2, 0, 5]
+case 3 p [49, -140, 30, 100, 25]
+case 3 content 1
+case 3 primitive [49, -140, 30, 100, 25]
+case 3 squarefree [-7, 10, 5]
+case 4 p [25, -50, 35, -10, 1]
+case 4 content 1
+case 4 primitive [25, -50, 35, -10, 1]
+case 4 squarefree [5, -5, 1]
+case 5 p [-8, 1, -6, 10]
+case 5 content 1
+case 5 primitive [-8, 1, -6, 10]
+case 5 squarefree [-8, 1, -6, 10]
+case 6 p [0, 0, 9, -60, 94, 20, 1]
+case 6 content 1
+case 6 primitive [0, 0, 9, -60, 94, 20, 1]
+case 6 squarefree [0, -3, 10, 1]
+case 7 p [6, 6, 10, 7, 8, -6, 8]
+case 7 content 1
+case 7 primitive [6, 6, 10, 7, 8, -6, 8]
+case 7 squarefree [6, 6, 10, 7, 8, -6, 8]
+case 8 p [3, 2, -2, 11]
+case 8 content 1
+case 8 primitive [3, 2, -2, 11]
+case 8 squarefree [3, 2, -2, 11]
+case 9 p [-5, 6, -8, -4, -2, -4, 7]
+case 9 content 1
+case 9 primitive [-5, 6, -8, -4, -2, -4, 7]
+case 9 squarefree [-5, 6, -8, -4, -2, -4, 7]
+case 10 p [11, 4, 11, -9, 1, 1]
+case 10 content 1
+case 10 primitive [11, 4, 11, -9, 1, 1]
+case 10 squarefree [11, 4, 11, -9, 1, 1]
+case 11 p [81, -126, 49]
+case 11 content 1
+case 11 primitive [81, -126, 49]
+case 11 squarefree [-9, 7]
+case 12 p [7, 11, 9, 12, -4, 5]
+case 12 content 1
+case 12 primitive [7, 11, 9, 12, -4, 5]
+case 12 squarefree [7, 11, 9, 12, -4, 5]
+case 13 p [-5, 2, 1, -8, 3]
+case 13 content 1
+case 13 primitive [-5, 2, 1, -8, 3]
+case 13 squarefree [-5, 2, 1, -8, 3]
+case 14 p [144, 24, 1]
+case 14 content 1
+case 14 primitive [144, 24, 1]
+case 14 squarefree [12, 1]
+case 15 p [3, -9, 1, -3, 12]
+case 15 content 1
+case 15 primitive [3, -9, 1, -3, 12]
+case 15 squarefree [3, -9, 1, -3, 12]
+case 16 p [25, -30, 19, -6, 1]
+case 16 content 1
+case 16 primitive [25, -30, 19, -6, 1]
+case 16 squarefree [5, -3, 1]
+case 17 p [9, 5, 12, -3, -8, 3]
+case 17 content 1
+case 17 primitive [9, 5, 12, -3, -8, 3]
+case 17 squarefree [9, 5, 12, -3, -8, 3]
+case 18 p [-9, -7]
+case 18 content 1
+case 18 primitive [9, 7]
+case 18 squarefree [9, 7]
+case 19 p [7, -2, 1, -1, -3]
+case 19 content 1
+case 19 primitive [-7, 2, -1, 1, 3]
+case 19 squarefree [-7, 2, -1, 1, 3]
+case 20 p [7, 11, -1, 7, 4, 2, -1]
+case 20 content 1
+case 20 primitive [-7, -11, 1, -7, -4, -2, 1]
+case 20 squarefree [-7, -11, 1, -7, -4, -2, 1]
+case 21 p [12, 6, -2]
+case 21 content 2
+case 21 primitive [-6, -3, 1]
+case 21 squarefree [-6, -3, 1]
+case 22 p [1, -4, 9, -1, -7]
+case 22 content 1
+case 22 primitive [-1, 4, -9, 1, 7]
+case 22 squarefree [-1, 4, -9, 1, 7]
+case 23 p [6, 1]
+case 23 content 1
+case 23 primitive [6, 1]
+case 23 squarefree [6, 1]
+case 24 p [25, 40, 16]
+case 24 content 1
+case 24 primitive [25, 40, 16]
+case 24 squarefree [5, 4]
+case 25 p [81, -162, 171, -90, 25]
+case 25 content 1
+case 25 primitive [81, -162, 171, -90, 25]
+case 25 squarefree [9, -9, 5]
+case 26 p [-2, -3, -6, -7, -11, 6, -1]
+case 26 content 1
+case 26 primitive [2, 3, 6, 7, 11, -6, 1]
+case 26 squarefree [2, 3, 6, 7, 11, -6, 1]
+case 27 p [36, 12, 1]
+case 27 content 1
+case 27 primitive [36, 12, 1]
+case 27 squarefree [6, 1]
+case 28 p [9, 9, -3, -10, -6]
+case 28 content 1
+case 28 primitive [-9, -9, 3, 10, 6]
+case 28 squarefree [-9, -9, 3, 10, 6]
+case 29 p [25, -70, 49]
+case 29 content 1
+case 29 primitive [25, -70, 49]
+case 29 squarefree [-5, 7]
+case 30 p [-3, 1, 4, -10]
+case 30 content 1
+case 30 primitive [3, -1, -4, 10]
+case 30 squarefree [3, -1, -4, 10]
+case 31 p [100, 240, 144]
+case 31 content 4
+case 31 primitive [25, 60, 36]
+case 31 squarefree [5, 6]
+case 32 p [4, 48, 152, 68, 124, 20, 25]
+case 32 content 1
+case 32 primitive [4, 48, 152, 68, 124, 20, 25]
+case 32 squarefree [2, 12, 2, 5]
+case 33 p [12, -7, 4, -9, -1, 2, 12]
+case 33 content 1
+case 33 primitive [12, -7, 4, -9, -1, 2, 12]
+case 33 squarefree [12, -7, 4, -9, -1, 2, 12]
+case 34 p [0, -8, -11, 7]
+case 34 content 1
+case 34 primitive [0, -8, -11, 7]
+case 34 squarefree [0, -8, -11, 7]
+case 35 p [-3, 5, 0, 6]
+case 35 content 1
+case 35 primitive [-3, 5, 0, 6]
+case 35 squarefree [-3, 5, 0, 6]
+case 36 p [0, 1, -2, -1, -4]
+case 36 content 1
+case 36 primitive [0, -1, 2, 1, 4]
+case 36 squarefree [0, -1, 2, 1, 4]
+case 37 p [0, 10, 4]
+case 37 content 2
+case 37 primitive [0, 5, 2]
+case 37 squarefree [0, 5, 2]
+case 38 p [144, -240, 220, -100, 25]
+case 38 content 1
+case 38 primitive [144, -240, 220, -100, 25]
+case 38 squarefree [12, -10, 5]
+case 39 p [100, 100, 25]
+case 39 content 25
+case 39 primitive [4, 4, 1]
+case 39 squarefree [2, 1]
+case -1 zero-content 0
+case -1 zero-primitive error the zero polynomial has no primitive part
+case -1 zero-squarefree error the zero polynomial has no squarefree part
+case -1 rational-content error content needs integer coefficients
+case -1 rational-primitive error content needs integer coefficients
+case -1 rational-squarefree [1, 2]
+case -1 negative-primitive [2, 3]
+case -1 constant-squarefree [1]
+case -1 huge-content 123456789012345678901234567890
+case -1 huge-primitive [1, 1000]
+case -1 cubic-squarefree [-2, 1, 1]

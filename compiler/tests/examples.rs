@@ -21550,6 +21550,31 @@ fn std_polynomial_core_matches_node_oracle_in_both_backends() {
 }
 
 #[test]
+fn std_polynomial_factor_matches_oracle_in_both_backends() {
+    // 40 generated integer polynomials (some with repeated factors) put through poly_content,
+    // poly_primitive and poly_squarefree, plus edge cases. The golden file is the output of
+    // scripts/polynomial-factor-oracle.mjs (BigInt, a different squarefree route than the module);
+    // the interpreter and native binary must reproduce it exactly.
+    let expected = fs::read_to_string(fixture_path("polynomial_factor_oracle.txt"))
+        .unwrap()
+        .replace("\r\n", "\n");
+    assert_eq!(
+        interpreter_and_native_agree("polynomial_factor.ostrin"),
+        expected
+    );
+    let path = example_path("polynomial_factor.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn std_solve_core_matches_oracle_in_both_backends() {
     // Linear, quadratic and rational-root solving over fixed cases, including the edge cases. The
     // golden file is the output of scripts/solve-oracle.mjs (no shared code with the module); the

@@ -16,6 +16,12 @@
 // constant and leading coefficients of the integer-cleared polynomial. Both must have absolute value
 // at most 10^12 (about 10^6 steps each), and the denominators cleared to reach integers must have an
 // lcm of at most 10^12.
+//
+// Content and squarefree parts have no such limit. `poly_content` is the non-negative gcd of the
+// integer coefficients (exact bigint gcd, "0" for the zero polynomial) and requires integer
+// coefficients. `poly_primitive` divides out that content and makes the leading coefficient
+// positive. `poly_squarefree` returns p / gcd(p, p') over the rationals, scaled to a primitive
+// integer polynomial, so it accepts rational input.
 
 import std.bigint
 
@@ -630,6 +636,149 @@ pub fn poly_factor_linear(p: Poly) -> Result<Factorization, String> {
                 }
             }
             Ok(Factorization { factors: factors, cofactor: rest })
+        },
+    }
+}
+
+// ---------------------------------------------------------------- content and squarefree
+
+/// The non-negative gcd of two integer texts ("0" when both are zero).
+fn int_gcd_text(a: String, b: String) -> Result<String, String> {
+    match bigint.parse(a) {
+        Err(message) => Err(message),
+        Ok(x) => match bigint.parse(b) {
+            Err(message) => Err(message),
+            Ok(y) => Ok(bigint.to_string(bigint.gcd(x, y))),
+        },
+    }
+}
+
+/// The lcm of two positive integer texts.
+fn int_lcm_text(a: String, b: String) -> Result<String, String> {
+    match int_gcd_text(a, b) {
+        Err(message) => Err(message),
+        Ok(g) => match q_div(a, g) {
+            Err(message) => Err(message),
+            Ok(t) => q_mul(t, b),
+        },
+    }
+}
+
+/// The denominator of a canonical rational text ("1" when the text has no slash).
+fn denominator_text(text: String) -> String {
+    for i in 0 until text.length() {
+        if text.slice(i, i + 1) == "/" {
+            return text.slice(i + 1, text.length())
+        }
+    }
+    "1"
+}
+
+/// The non-negative gcd of the coefficients; every coefficient must be an integer.
+fn integer_content(p: Poly) -> Result<String, String> {
+    mut g = "0"
+    for i in 0 until p.coeffs.length() {
+        if not is_integer_text(p.coeffs[i]) {
+            return Err("content needs integer coefficients")
+        }
+        match int_gcd_text(g, p.coeffs[i]) {
+            Ok(t) => {
+                g = t
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(g)
+}
+
+/// The content of an integer polynomial: the non-negative gcd of its coefficients, as text ("0" for
+/// the zero polynomial). Every coefficient must be an integer.
+pub fn poly_content(p: Poly) -> Result<String, String> {
+    integer_content(p)
+}
+
+/// p divided by its content, with a positive leading coefficient. Assumes integer coefficients and
+/// a nonzero polynomial.
+fn primitive_of_integers(p: Poly) -> Result<Poly, String> {
+    match integer_content(p) {
+        Err(message) => Err(message),
+        Ok(c) => {
+            n = p.coeffs.length()
+            mut scale = c
+            if bigint.rational_sign(p.coeffs[n - 1]) < 0 {
+                scale = "-" + c
+            }
+            mut out: List<String> = []
+            for i in 0 until n {
+                match q_div(p.coeffs[i], scale) {
+                    Ok(t) => {
+                        out.push(t)
+                    },
+                    Err(message) => {
+                        return Err(message)
+                    },
+                }
+            }
+            Ok(Poly { coeffs: out })
+        },
+    }
+}
+
+/// p divided by its content, with a positive leading coefficient. The coefficients must be integers,
+/// and the zero polynomial has no primitive part.
+pub fn poly_primitive(p: Poly) -> Result<Poly, String> {
+    if p.coeffs.length() == 0 {
+        return Err("the zero polynomial has no primitive part")
+    }
+    primitive_of_integers(p)
+}
+
+/// The polynomial times the lcm of its coefficient denominators, so every coefficient is an integer.
+fn clear_all_denominators(p: Poly) -> Result<Poly, String> {
+    mut lcm = "1"
+    for i in 0 until p.coeffs.length() {
+        match int_lcm_text(lcm, denominator_text(p.coeffs[i])) {
+            Ok(t) => {
+                lcm = t
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    mut out: List<String> = []
+    for i in 0 until p.coeffs.length() {
+        match q_mul(p.coeffs[i], lcm) {
+            Ok(t) => {
+                out.push(t)
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(Poly { coeffs: out })
+}
+
+/// The squarefree part p / gcd(p, p') over the rationals, normalized as a primitive integer
+/// polynomial with a positive leading coefficient. The zero polynomial is an error.
+pub fn poly_squarefree(p: Poly) -> Result<Poly, String> {
+    if p.coeffs.length() == 0 {
+        return Err("the zero polynomial has no squarefree part")
+    }
+    match poly_derivative(p) {
+        Err(message) => Err(message),
+        Ok(dp) => match poly_gcd(p, dp) {
+            Err(message) => Err(message),
+            Ok(g) => match poly_divmod(p, g) {
+                Err(message) => Err(message),
+                Ok(d) => match clear_all_denominators(d.quotient) {
+                    Err(message) => Err(message),
+                    Ok(whole) => primitive_of_integers(whole),
+                },
+            },
         },
     }
 }
