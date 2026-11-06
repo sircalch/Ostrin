@@ -187,3 +187,49 @@ y pedía 10 400 261 bytes con una mediana de 54 ms; ahora hace 200 010 asignacio
 vivas. Quedan unas cuatro asignaciones por operación (la lista de fuentes nueva, el registro de la fuente
 combinada y la medición). El tiempo incluye el arranque del proceso (~13 ms aquí) y es específico de esta
 máquina; la columna fiable es la de memoria.
+
+## std.polynomial y std.solve nativos (2026-11-05)
+
+Medición nativa única de `poly_mul`, `poly_gcd` y `solve_quadratic`. Solo tiempos del binario
+compilado; el intérprete no se midió porque fue demasiado lento para esta carga. Estos son números
+de una sola máquina, sin ninguna afirmación estadística.
+
+- Fecha: 2026-11-05.
+- Máquina: AMD Ryzen 7 5700X 8-Core Processor (Windows 11 Pro 10.0.26200).
+- Compilador: `compiler/target/release/ostrinc.exe` (`cargo build --release`), backend C con el gcc
+  de Strawberry Perl (`/c/Strawberry/c/bin/gcc`).
+- Programa: `bench_poly_solve.ostrin` fuera del repositorio (no se versiona). Carga: `poly_mul` de dos
+  polinomios de grado 10 repetido 200 veces; `poly_gcd` de dos polinomios de grado 8 (ambos múltiplos de un
+  factor común de grado 3) repetido 100 veces; `solve_quadratic` sobre 300 ternas con `a` distinto de cero y
+  coeficientes en -50..50. Las entradas salen del mismo LCG de 31 bits que `examples/polynomial_core.ostrin`.
+- Referencia: script BigInt de Node en el mismo directorio temporal (`expected.mjs`), con los
+  auxiliares de `scripts/solve-oracle.mjs` para la fórmula cuadrática.
+
+Comandos (desde `compiler/`, luego desde el directorio temporal):
+
+```
+cargo build --release
+ostrinc.exe --compile <TEMP>/ostrin-bench/bench_poly_solve.ostrin --out <TEMP>/ostrin-bench/bench_native.exe
+node expected.mjs > expected.txt
+bench_native.exe > native_out.txt
+diff --strip-trailing-cr expected.txt native_out.txt
+```
+
+Comprobación de salida: 600 líneas (200 `mul`, 100 `gcd`, 300 `quad`). Tras ignorar los fines de
+línea CRLF que escribe el ejecutable de Windows, la salida es idéntica a la referencia BigInt
+(`diff` sin diferencias). Las cinco ejecuciones cronometradas también coinciden con la referencia.
+
+Tiempos de pared, cinco ejecuciones nativas (`Start-Process` con `WaitForExit(60000)`, incluye el arranque del proceso):
+
+| Ejecución | Segundos |
+| --- | ---: |
+| 1 | 2,244 |
+| 2 | 2,091 |
+| 3 | 2,396 |
+| 4 | 2,195 |
+| 5 | 2,387 |
+
+Mínimo: 2,091 s. Mediana: 2,244 s. Ninguna ejecución alcanzó el límite de 60 s.
+
+Caveats: una sola máquina, cinco repeticiones y sin intervalos de confianza. Las repeticiones usan
+siempre las mismas entradas, así que el resultado no mide variación de datos.
