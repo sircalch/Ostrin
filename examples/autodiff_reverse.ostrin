@@ -1,0 +1,90 @@
+// Reverse-mode automatic differentiation (std.autodiff) over the four fixed test expressions.
+//
+// Each gradient comes from one backward pass over a tape. It is checked against a central difference
+// (step h = 1e-6) of the plain Float evaluation of the same expression, with the tolerance
+// |ad - fd| <= 1e-6 * max(1, |fd|). The forward value on the tape is also checked against the plain
+// evaluation. Every number is printed with 9 decimals. scripts/autodiff-oracle.mjs prints the same
+// lines (closed-form gradients, central differences), and tests/fixtures/autodiff_reverse_oracle.txt
+// holds that output. The interpreter and native binary must reproduce it exactly.
+import std.autodiff
+
+/// A Float with exactly 9 decimals, rounded half up on |v|; the sign is shown only when the rounded
+/// value is nonzero. Finite input only.
+fn fixed9(v: Float) -> String {
+    neg = v < 0.0
+    scaled = floor(abs(v) * 1000000000.0 + 0.5)
+    n = scaled as Int
+    whole = n / 1000000000
+    mut digits = (n % 1000000000).to_string()
+    while digits.length() < 9 {
+        digits = "0" + digits
+    }
+    sign = if neg and n != 0 { "-" } else { "" }
+    sign + whole.to_string() + "." + digits
+}
+
+/// |a - b| <= 1e-6 * max(1, |b|).
+fn close_enough(a: Float, b: Float) -> Bool {
+    scale = if abs(b) > 1.0 { abs(b) } else { 1.0 }
+    abs(a - b) <= 0.000001 * scale
+}
+
+fn plain_value(kind: Int, x: Float, y: Float) -> Float {
+    match autodiff.expr_value(kind, x, y) {
+        Ok(v) => v,
+        Err(_) => 0.0,
+    }
+}
+
+fn tape_value_of(kind: Int, x: Float, y: Float) -> Float {
+    match autodiff.reverse_value_2(kind, x, y) {
+        Ok(v) => v,
+        Err(_) => 0.0,
+    }
+}
+
+fn check(kind: Int, x: Float, y: Float) -> Void {
+    head = "f=" + autodiff.expr_name(kind) + " x=" + fixed9(x) + " y=" + fixed9(y)
+    match autodiff.reverse_grad_2(kind, x, y) {
+        Err(m) => print(head + " error: " + m),
+        Ok(g) => {
+            h = 1e-6
+            fdx = (plain_value(kind, x + h, y) - plain_value(kind, x - h, y)) / (2.0 * h)
+            fdy = (plain_value(kind, x, y + h) - plain_value(kind, x, y - h)) / (2.0 * h)
+            value_ok = close_enough(tape_value_of(kind, x, y), plain_value(kind, x, y))
+            ok = close_enough(g[0], fdx) and close_enough(g[1], fdy) and value_ok
+            status = if ok { "ok" } else { "MISMATCH" }
+            print(head + " grad=[" + fixed9(g[0]) + ", " + fixed9(g[1]) + "] " + status)
+        },
+    }
+}
+
+fn check_error(label: String, r: Result<List<Float>, String>) -> Void {
+    match r {
+        Err(m) => print("case=" + label + " error: " + m),
+        Ok(_) => print("case=" + label + " unexpected success"),
+    }
+}
+
+fn main() -> Void {
+    print("# autodiff_reverse: reverse-mode gradients (std.autodiff) checked against central differences")
+    print("# step h = 1e-6; tolerance |ad - fd| <= 1e-6 * max(1, |fd|); numbers have 9 decimals")
+    print("# expressions: 0 x*y + sin(x); 1 exp(x)*ln(y) - 2*(y/x); 2 (x-y)^3 + cos(y)*x; 3 -(x*x + 1)/(y*y + 2)")
+    check(0, 0.7, -1.3)
+    check(0, 2.0, 0.5)
+    check(0, -0.4, 1.1)
+    check(1, 0.9, 1.5)
+    check(1, 1.3, 0.25)
+    check(1, -0.6, 2.0)
+    check(2, 0.4, -0.9)
+    check(2, 1.5, 1.2)
+    check(2, -2.0, 0.3)
+    check(3, 0.8, -0.6)
+    check(3, -1.5, 2.5)
+    check(3, 0.0, 1.0)
+    print("# non-finite and invalid inputs return Err")
+    check_error("nan_input", autodiff.reverse_grad_2(0, sqrt(-1.0), 1.0))
+    check_error("inf_input", autodiff.reverse_grad_2(0, 1.0, 1.0 / 0.0))
+    check_error("ln_of_zero", autodiff.reverse_grad_2(1, 0.5, 0.0))
+    check_error("unknown_kind", autodiff.reverse_grad_2(9, 1.0, 1.0))
+}

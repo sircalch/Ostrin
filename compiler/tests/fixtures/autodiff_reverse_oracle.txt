@@ -1,0 +1,20 @@
+# autodiff_reverse: reverse-mode gradients (std.autodiff) checked against central differences
+# step h = 1e-6; tolerance |ad - fd| <= 1e-6 * max(1, |fd|); numbers have 9 decimals
+# expressions: 0 x*y + sin(x); 1 exp(x)*ln(y) - 2*(y/x); 2 (x-y)^3 + cos(y)*x; 3 -(x*x + 1)/(y*y + 2)
+f=x*y + sin(x) x=0.700000000 y=-1.300000000 grad=[-0.535157813, 0.700000000] ok
+f=x*y + sin(x) x=2.000000000 y=0.500000000 grad=[0.083853163, 2.000000000] ok
+f=x*y + sin(x) x=-0.400000000 y=1.100000000 grad=[2.021060994, -0.400000000] ok
+f=exp(x)*ln(y) - 2*(y/x) x=0.900000000 y=1.500000000 grad=[4.700986945, -0.582486815] ok
+f=exp(x)*ln(y) - 2*(y/x) x=1.300000000 y=0.250000000 grad=[-4.790867291, 13.138725132] ok
+f=exp(x)*ln(y) - 2*(y/x) x=-0.600000000 y=2.000000000 grad=[11.491518349, 3.607739151] ok
+f=(x-y)^3 + cos(y)*x x=0.400000000 y=-0.900000000 grad=[5.691609968, -4.756669236] ok
+f=(x-y)^3 + cos(y)*x x=1.500000000 y=1.200000000 grad=[0.632357754, -1.668058629] ok
+f=(x-y)^3 + cos(y)*x x=-2.000000000 y=0.300000000 grad=[16.825336489, -15.278959587] ok
+f=-(x*x + 1)/(y*y + 2) x=0.800000000 y=-0.600000000 grad=[-0.677966102, -0.353346739] ok
+f=-(x*x + 1)/(y*y + 2) x=-1.500000000 y=2.500000000 grad=[0.363636364, 0.238751148] ok
+f=-(x*x + 1)/(y*y + 2) x=0.000000000 y=1.000000000 grad=[0.000000000, 0.222222222] ok
+# non-finite and invalid inputs return Err
+case=nan_input error: reverse_grad_2 needs finite inputs
+case=inf_input error: reverse_grad_2 needs finite inputs
+case=ln_of_zero error: autodiff: non-finite value or partial at node 3
+case=unknown_kind error: reverse_grad_2: unknown expression kind

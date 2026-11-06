@@ -21571,6 +21571,31 @@ fn std_solve_core_matches_oracle_in_both_backends() {
 }
 
 #[test]
+fn std_autodiff_reverse_matches_oracle_in_both_backends() {
+    // Reverse-mode gradients of the four fixed expressions at 12 points, checked inside the example
+    // against central differences, plus the non-finite and invalid-input Err cases. The golden file is
+    // the output of scripts/autodiff-oracle.mjs (closed-form gradients, no shared code with the module);
+    // the interpreter and native binary must reproduce it exactly.
+    let expected = fs::read_to_string(fixture_path("autodiff_reverse_oracle.txt"))
+        .unwrap()
+        .replace("\r\n", "\n");
+    assert_eq!(
+        interpreter_and_native_agree("autodiff_reverse.ostrin"),
+        expected
+    );
+    let path = example_path("autodiff_reverse.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn record_unary_minus_and_int_reflected_operators_lower_through_ir_without_leaks() {
     // `-a` calls the record's `neg`; `2 + a`, `3 - a`, `4 * a` and `100 / a` call `radd`, `rsub`, `rmul`
     // and `rdiv`. The IR backend used to lower reflected operators only for a Float on the left and
