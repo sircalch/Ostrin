@@ -33,8 +33,8 @@ Una cinta (`Tape`) es una lista de nodos en orden de evaluación. Cada nodo (`No
 - `parents`: los índices (`List<Int>`) de sus nodos padre en la cinta. Un nodo de entrada no tiene padres.
 - `partials`: las derivadas locales (`List<Float>`), donde `partials[k]` es `d value / d parent k`.
 
-La cinta guarda además `error` (`String`): es `""` mientras todos los valores y derivadas locales son finitos, y
-guarda el primer problema encontrado en otro caso (§6).
+La cinta guarda además `error` (`String`): es `""` mientras todos los valores y derivadas locales son finitos y no hay operaciones
+desconocidas ni operandos fuera de rango; en cualquier otro caso guarda el primer problema encontrado (§6).
 
 Un solo recorrido hacia atrás basta para el gradiente completo. `tape_backward(t, out)` siembra el adjunto del nodo
 `out` con `1.0` y recorre los nodos desde `out` hasta el índice `0`. En cada nodo reparte `adj[i] * partials[k]` a cada
