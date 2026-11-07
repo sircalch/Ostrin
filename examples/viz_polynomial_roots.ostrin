@@ -42,6 +42,7 @@ fn main() -> Void {
         .describe("p(x) = (x-1)(x+2)(2x-3), roots marked exactly")
         .labels("x", "p(x)")
         .xlim(-3.0, 3.0)
+        .polished(caption: "expanded: p(x) = 2x^3 - x^2 - 7x + 6", label_size: 13, animate: true)
         .line(xs, ys, label: "p(x)")
         .hline(0.0)
         .scatter(array(rx), array(rx) * 0.0, label: "rational roots", color: "#d62728", size: 5.0)
