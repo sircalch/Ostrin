@@ -1003,7 +1003,7 @@ fn render(fig: Figure) -> String {
         if is_motion(s.kind) {
             drawn = draw_motion(s, color, fig.duration, left, bottom, x0, y0, sx, sy, theme)
         } else if fig.polish and s.kind == "line" {
-            drawn = draw_polish_line(s, color, polish_id, left, right, bottom, x0, y0, sx, sy, theme, fig.animated)
+            drawn = draw_polish_line(s, color, polish_id + (if series_id == 0 { "" } else { "-" + series_id.to_string() }), left, right, bottom, x0, y0, sx, sy, theme, fig.animated)
         } else if fig.polish and s.kind == "scatter" {
             drawn = draw_polish_markers(s, color, left, bottom, x0, y0, sx, sy, theme, fig.animated)
         } else {
@@ -1541,7 +1541,7 @@ fn draw_polish_line(s: Series, color: String, id: String, left: Float, right: Fl
     area = line + " L" + num(left + (s.xs[n - 1] - x0) * sx) + " " + num(zero) + " L" + num(left + (s.xs[0] - x0) * sx) + " " + num(zero) + " Z"
     gradient = "<defs><linearGradient" + attr("id", id) + attr("gradientUnits", "userSpaceOnUse") + attr("x1", num(left)) + attr("y1", "0") +
         attr("x2", num(right)) + attr("y2", "0") + "><stop" + attr("offset", "0") + attr("stop-color", color) + "/><stop" +
-        attr("offset", "1") + attr("stop-color", theme.palette[4]) + "/></linearGradient></defs>"
+        attr("offset", "1") + attr("stop-color", pick("", 4, theme)) + "/></linearGradient></defs>"
     shade = "<path" + attr("d", area) + attr("fill", color) + attr("fill-opacity", "0.12") + "/>"
     stroke = attr("d", line) + attr("fill", "none") + attr("stroke", "url(#" + id + ")") + attr("stroke-width", num(s.width)) +
         attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + attr("pathLength", "1") +
