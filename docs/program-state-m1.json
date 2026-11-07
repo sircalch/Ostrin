@@ -48,7 +48,7 @@
       "integrationTests": 426,
       "unitTests": 33,
       "differentialTests": 6,
-      "examples": 329,
+      "examples": 338,
       "hirIrFunctions": "8834 (8788 IR + 46 HIR), 0 AST fallback"
     },
     "evidence": [
