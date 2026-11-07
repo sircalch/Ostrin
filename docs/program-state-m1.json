@@ -45,7 +45,7 @@
     "activePullRequests": [],
     "validatedBy": "Each merged pull request had every required check green on its exact head and a head containing the then-current main before merging; the post-merge runs of the latest main are not recorded here.",
     "suites": {
-      "integrationTests": 421,
+      "integrationTests": 423,
       "unitTests": 33,
       "differentialTests": 6,
       "examples": 329,
