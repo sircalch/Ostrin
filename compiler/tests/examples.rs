@@ -21620,6 +21620,31 @@ fn std_solve_core_matches_oracle_in_both_backends() {
 }
 
 #[test]
+fn std_solve_systems_matches_oracle_in_both_backends() {
+    // Square linear systems solved by Cramer's rule (2x2) and exact Gaussian elimination (size 1 to
+    // 4), with the singular rule, hand-picked edge cases and seeded cases. The golden file is the
+    // output of scripts/system-oracle.mjs (no shared code with the module); the interpreter and
+    // native binary must reproduce it exactly.
+    let expected = fs::read_to_string(fixture_path("solve_systems_oracle.txt"))
+        .unwrap()
+        .replace("\r\n", "\n");
+    assert_eq!(
+        interpreter_and_native_agree("solve_systems.ostrin"),
+        expected
+    );
+    let path = example_path("solve_systems.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn std_autodiff_reverse_matches_oracle_in_both_backends() {
     // Reverse-mode gradients of the four fixed expressions at 12 points, checked inside the example
     // against central differences, plus the non-finite and invalid-input Err cases. The golden file is
