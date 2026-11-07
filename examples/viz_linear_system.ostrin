@@ -1,0 +1,35 @@
+// std.viz · figure: the 2x2 linear system 2x + y = 5, x - y = 1 over [-1, 4]. Both lines are drawn and
+// their exact intersection, from std.solve's solve_system_2, is marked and labelled. Prints one standalone SVG.
+import std.viz
+import std.solve
+import std.bigint
+
+// A solver entry such as "2/1" as the whole number text "2"; other fractions are kept as they are.
+fn whole(text: String) -> String {
+    parts = text.split("/")
+    if parts.length() == 2 and parts[1] == "1" {
+        parts[0]
+    } else {
+        text
+    }
+}
+
+fn main() -> Void {
+    // 2x + y = 5 and x - y = 1, so the unique solution is (2, 1).
+    sol = solve.solve_system_2(2, 1, 1, -1, 5, 1).unwrap()
+    px = bigint.rational_to_float(sol[0])
+    py = bigint.rational_to_float(sol[1])
+    xs = linspace(-1.0, 4.0, 51)
+    line_a = xs * -2.0 + 5.0
+    line_b = xs - 1.0
+    mut fig = viz.figure("Two lines and their intersection")
+        .describe("2x + y = 5 and x - y = 1, intersection marked exactly")
+        .labels("x", "y")
+        .xlim(-1.0, 4.0)
+        .polished(caption: "2x + y = 5, x - y = 1", label_size: 13, animate: true)
+        .line(xs, line_a, label: "2x + y = 5")
+        .line(xs, line_b, label: "x - y = 1")
+        .scatter(array([px]), array([py]), label: "intersection", color: "#d62728", size: 6.0)
+        .text(px + 0.2, py + 0.6, "x = " + whole(sol[0]) + ", y = " + whole(sol[1]))
+    print(fig.svg())
+}
