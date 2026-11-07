@@ -35,7 +35,7 @@ fn main() -> Void {
         .describe("f(x) and f'(x) on [0, 8]; f' from reverse-mode autodiff")
         .labels("x", "y")
         .xlim(0.0, 8.0)
-        .polished(caption: "f'(x) = e^(-x/4) (cos x - sin(x)/4), by reverse-mode autodiff", label_size: 13, animate: true)
+        .polished(caption: "f'(x) = e^(-x/4) (cos x - sin(x)/4)", label_size: 13, animate: true)
         .line(xs, array(ys), label: "f(x)")
         .line(xs, array(dys), label: "f'(x) (autodiff)", dash: "6 4")
         .hline(0.0)
