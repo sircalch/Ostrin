@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Examples
+
+- New figure example `examples/viz_polished_sine_fit.ostrin`: `y = sin(x)` over `[0, 2pi]`
+  on a fixed 41-point grid, overlaid with the samples as markers and a `.polished(...)`
+  caption. Covered by `std_viz_polished_sine_fit_matches_both_backends` in both backends.
+
 ### Correctness
 
 - Recursive enums (`enum Expr { Num(Int) Add(Expr, Expr) }`, mutual recursion,
@@ -139,7 +145,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 337-example, 425-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 338-example, 426-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 
