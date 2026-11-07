@@ -21642,6 +21642,34 @@ fn std_viz_polish_matches_both_backends() {
 }
 
 #[test]
+fn std_viz_linear_system_matches_both_backends() {
+    // 2x + y = 5 and x - y = 1 over [-1, 4]: both lines are drawn as series, and the exact solution
+    // (2, 1) from std.solve's solve_system_2 is marked with one highlighted point and its label.
+    let svg = interpreter_and_native_agree("viz_linear_system.ostrin");
+    assert_eq!(svg.matches("<svg").count(), 1, "{svg}");
+    assert_eq!(svg.matches("</svg>").count(), 1, "{svg}");
+    assert!(svg.contains("data-ostrin-polish=\"true\""), "{svg}");
+    assert_eq!(
+        svg.matches("<circle class=\"pt\" data-viz-index=").count(),
+        1,
+        "{svg}"
+    );
+    assert!(svg.contains("x = 2, y = 1"), "{svg}");
+    assert!(svg.contains("2x + y = 5"), "{svg}");
+    assert!(svg.contains("x - y = 1"), "{svg}");
+    let path = example_path("viz_linear_system.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn std_solve_core_matches_oracle_in_both_backends() {
     // Linear, quadratic and rational-root solving over fixed cases, including the edge cases. The
     // golden file is the output of scripts/solve-oracle.mjs (no shared code with the module); the
