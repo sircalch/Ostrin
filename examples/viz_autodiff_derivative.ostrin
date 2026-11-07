@@ -1,0 +1,43 @@
+// std.viz · figure: f(x) = sin(x) * exp(-x/4) over [0, 8] (81 samples), overlaid with its derivative
+// f'(x) from reverse-mode automatic differentiation (std.autodiff). Ostrin has no closures, so the
+// expression is built on a tape by hand for each sample: x -> -x/4 -> exp, and x -> sin, then the
+// product. One backward pass gives d f / d x. Prints one standalone SVG.
+import std.viz
+import std.autodiff
+
+// f(x) and f'(x) at x, as [value, derivative]. The tape holds x at node 0.
+fn value_and_slope(x: Float) -> List<Float> {
+    t0 = autodiff.tape_var(autodiff.tape_new(), x)
+    t1 = autodiff.tape_op1(t0, "mulk", 0, -0.25)
+    t2 = autodiff.tape_op1(t1, "exp", autodiff.tape_last(t1), 0.0)
+    t3 = autodiff.tape_op1(t2, "sin", 0, 0.0)
+    t4 = autodiff.tape_op2(t3, "mul", autodiff.tape_last(t3), autodiff.tape_last(t2))
+    out = autodiff.tape_last(t4)
+    value: Float = autodiff.tape_value(t4, out)
+    vars: List<Int> = [0]
+    match autodiff.tape_grad(t4, out, vars) {
+        Ok(g) => [value, g[0]],
+        Err(_) => [value, 0.0],
+    }
+}
+
+fn main() -> Void {
+    n = 81
+    xs = linspace(0.0, 8.0, n)
+    mut ys: List<Float> = []
+    mut dys: List<Float> = []
+    for i in 0 until n {
+        pair = value_and_slope(xs[i])
+        ys.push(pair[0])
+        dys.push(pair[1])
+    }
+    fig = viz.figure("f(x) = sin(x) e^(-x/4) and its autodiff derivative")
+        .describe("f(x) and f'(x) on [0, 8]; f' from reverse-mode autodiff")
+        .labels("x", "y")
+        .xlim(0.0, 8.0)
+        .polished(caption: "f'(x) = e^(-x/4) (cos x - sin(x)/4), by reverse-mode autodiff", label_size: 13, animate: true)
+        .line(xs, array(ys), label: "f(x)")
+        .line(xs, array(dys), label: "f'(x) (autodiff)", dash: "6 4")
+        .hline(0.0)
+    print(fig.svg())
+}
