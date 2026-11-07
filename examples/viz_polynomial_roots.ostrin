@@ -1,0 +1,52 @@
+// std.viz · figure: p(x) = (x-1)(x+2)(2x-3), expanded to integer coefficients, over [-3, 3] with
+// its exact rational roots from std.polynomial marked on the axis. Prints one standalone SVG.
+import std.viz
+import std.polynomial
+import std.bigint
+
+fn coefficient_floats(texts: List<String>) -> List<Float> {
+    mut out: List<Float> = []
+    for i in 0 until texts.length() {
+        out.push(bigint.rational_to_float(texts[i]))
+    }
+    out
+}
+
+fn root_floats(roots: List<String>) -> List<Float> {
+    mut out: List<Float> = []
+    for i in 0 until roots.length() {
+        out.push(bigint.rational_to_float(roots[i]))
+    }
+    out
+}
+
+// Horner's rule over an array of sample points; coeffs[i] is the coefficient of x^i.
+fn evaluate(coeffs: List<Float>, xs: Array<Float>) -> Array<Float> {
+    n = coeffs.length()
+    mut ys = xs * 0.0 + coeffs[n - 1]
+    for k in 0 until n - 1 {
+        i = n - 2 - k
+        ys = ys * xs + coeffs[i]
+    }
+    ys
+}
+
+fn main() -> Void {
+    // (x-1)(x+2)(2x-3) = 2x^3 - x^2 - 7x + 6
+    p = polynomial.poly_from_ints([6, -7, -1, 2])
+    roots = polynomial.poly_roots_rational(p).unwrap()
+    xs = linspace(-3.0, 3.0, 121)
+    ys = evaluate(coefficient_floats(p.coeffs), xs)
+    rx = root_floats(roots)
+    mut fig = viz.figure("Polynomial and its rational roots")
+        .describe("p(x) = (x-1)(x+2)(2x-3), roots marked exactly")
+        .labels("x", "p(x)")
+        .xlim(-3.0, 3.0)
+        .line(xs, ys, label: "p(x)")
+        .hline(0.0)
+        .scatter(array(rx), array(rx) * 0.0, label: "rational roots", color: "#d62728", size: 5.0)
+    for i in 0 until roots.length() {
+        fig = fig.text(rx[i], 4.0, "x = " + roots[i])
+    }
+    print(fig.svg())
+}
