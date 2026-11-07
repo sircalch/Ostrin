@@ -21670,6 +21670,34 @@ fn std_viz_linear_system_matches_both_backends() {
 }
 
 #[test]
+fn std_viz_autodiff_derivative_matches_both_backends() {
+    // f(x) = sin(x) * exp(-x/4) over 81 samples of [0, 8], overlaid with f'(x) from reverse-mode
+    // autodiff. Both backends must print the same single SVG document with two line series (the
+    // polished style draws each series as one gradient-stroked path), and the example must lower
+    // without an AST fallback.
+    let svg = interpreter_and_native_agree("viz_autodiff_derivative.ostrin");
+    assert_eq!(svg.matches("<svg").count(), 1, "{svg}");
+    assert_eq!(svg.matches("</svg>").count(), 1, "{svg}");
+    assert!(svg.contains("data-ostrin-polish=\"true\""), "{svg}");
+    assert_eq!(
+        svg.matches("fill=\"none\" stroke=\"url(#polish").count(),
+        2,
+        "{svg}"
+    );
+    assert!(svg.contains(">f'(x) (autodiff)<"), "{svg}");
+    let path = example_path("viz_autodiff_derivative.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        stdout(&report).contains("ast-fallback: 0"),
+        "{}",
+        stdout(&report)
+    );
+}
+
+#[test]
 fn std_solve_core_matches_oracle_in_both_backends() {
     // Linear, quadratic and rational-root solving over fixed cases, including the edge cases. The
     // golden file is the output of scripts/solve-oracle.mjs (no shared code with the module); the
