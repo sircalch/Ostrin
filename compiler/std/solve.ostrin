@@ -12,6 +12,7 @@
 // with no or every solution, and the zero polynomial all return Err or the documented text.
 
 import std.polynomial
+import std.bigint
 
 fn abs_int(n: Int) -> Int {
     if n < 0 { 0 - n } else { n }
@@ -212,4 +213,220 @@ pub fn solve_rational_roots(coeffs: List<Int>) -> Result<List<String>, String> {
         },
         Err(message) => Err(message),
     }
+}
+
+// ---------------------------------------------------------------- linear systems
+//
+// Both entry points solve A x = b exactly. A unique solution is one "n/d" per unknown, in order.
+// The singular rule, with rank(A) the rank of the coefficient matrix and rank(Ab) the rank of the
+// augmented matrix [A | b], for a square system of size n:
+//   det(A) != 0                      -> the unique solution
+//   rank(A) = rank(Ab) < n           -> Ok(["infinitely many"])
+//   rank(A) < rank(Ab)               -> Err("no solution")
+// A singular square system never has a unique solution, so every singular case falls into one of
+// the last two rows. The 2x2 test uses the minors instead of the rank: when det = 0 the rank of A is
+// 0 or 1. A zero matrix is consistent only with b = 0. Otherwise the system is consistent exactly
+// when both minors a11*b2 - a21*b1 and a12*b2 - a22*b1 vanish.
+//
+// Coefficients and right-hand sides must satisfy |value| <= 10^6. The 2x2 Cramer's rule uses Int
+// arithmetic only (products stay below 2*10^12). The n x n path uses exact rationals from std.bigint
+// in text form, so intermediate values cannot overflow.
+
+fn rat_sub(a: String, b: String) -> Result<String, String> {
+    match bigint.fraction_parse(a) {
+        Ok(x) => match bigint.fraction_parse(b) {
+            Ok(y) => Ok(bigint.fraction_to_string(bigint.fraction_sub(x, y))),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+fn rat_mul(a: String, b: String) -> Result<String, String> {
+    match bigint.fraction_parse(a) {
+        Ok(x) => match bigint.fraction_parse(b) {
+            Ok(y) => Ok(bigint.fraction_to_string(bigint.fraction_mul(x, y))),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// a / b for a nonzero b.
+fn rat_div(a: String, b: String) -> Result<String, String> {
+    match bigint.rational_reciprocal(b) {
+        Ok(inverse) => rat_mul(a, inverse),
+        Err(message) => Err(message),
+    }
+}
+
+/// The 2x2 system with det = 0. Every singular case is "infinitely many" or "no solution".
+fn singular_2(a11: Int, a12: Int, a21: Int, a22: Int, b1: Int, b2: Int) -> Result<List<String>, String> {
+    if a11 == 0 and a12 == 0 and a21 == 0 and a22 == 0 {
+        if b1 == 0 and b2 == 0 {
+            return Ok(["infinitely many"])
+        }
+        return Err("no solution")
+    }
+    if a11 * b2 - a21 * b1 == 0 and a12 * b2 - a22 * b1 == 0 {
+        return Ok(["infinitely many"])
+    }
+    Err("no solution")
+}
+
+/// Solves a11*x + a12*y = b1 and a21*x + a22*y = b2 by Cramer's rule. A unique solution is
+/// ["x", "y"] as "n/d". With det = 0 the singular rule in the section header applies.
+/// Coefficients and right-hand sides must satisfy |value| <= 10^6.
+pub fn solve_system_2(a11: Int, a12: Int, a21: Int, a22: Int, b1: Int, b2: Int) -> Result<List<String>, String> {
+    if not within_limit(a11) or not within_limit(a12) or not within_limit(a21) or not within_limit(a22) or not within_limit(b1) or not within_limit(b2) {
+        return Err("solve_system_2: coefficients must satisfy |coeff| <= 1000000")
+    }
+    det = a11 * a22 - a12 * a21
+    if det == 0 {
+        return singular_2(a11, a12, a21, a22, b1, b2)
+    }
+    x = b1 * a22 - a12 * b2
+    y = a11 * b2 - b1 * a21
+    Ok([fraction_text(x, det), fraction_text(y, det)])
+}
+
+/// pivot * target - factor * pivot_row, which clears column col of target without dividing.
+fn eliminate_row(target: List<String>, pivot_row: List<String>, col: Int, pivot: String) -> Result<List<String>, String> {
+    factor = target[col]
+    mut out: List<String> = []
+    for j in 0 until target.length() {
+        match rat_mul(pivot, target[j]) {
+            Ok(left) => {
+                match rat_mul(factor, pivot_row[j]) {
+                    Ok(right) => {
+                        match rat_sub(left, right) {
+                            Ok(value) => { out.push(value) },
+                            Err(message) => { return Err(message) },
+                        }
+                    },
+                    Err(message) => { return Err(message) },
+                }
+            },
+            Err(message) => { return Err(message) },
+        }
+    }
+    Ok(out)
+}
+
+/// Clears column col in every row except row k, which is the pivot row.
+fn eliminate_all(rows: List<List<String>>, k: Int, col: Int) -> Result<List<List<String>>, String> {
+    pivot_row = rows[k]
+    pivot = pivot_row[col]
+    mut out: List<List<String>> = []
+    for r in 0 until rows.length() {
+        if r == k {
+            out.push(pivot_row)
+        } else {
+            match eliminate_row(rows[r], pivot_row, col, pivot) {
+                Ok(line) => { out.push(line) },
+                Err(message) => { return Err(message) },
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn swap_rows(rows: List<List<String>>, a: Int, b: Int) -> List<List<String>> {
+    mut out: List<List<String>> = []
+    for i in 0 until rows.length() {
+        if i == a {
+            out.push(rows[b])
+        } else if i == b {
+            out.push(rows[a])
+        } else {
+            out.push(rows[i])
+        }
+    }
+    out
+}
+
+/// Gauss-Jordan elimination of the n x (n+1) augmented matrix over exact rationals. A pivot is any
+/// nonzero entry at or below the current pivot row. A unique solution is the right-hand side of
+/// each row divided by its diagonal entry. Otherwise the rows below the rank must have zero
+/// right-hand sides for the system to be consistent.
+fn reduce_system(rows: List<List<String>>, n: Int) -> Result<List<String>, String> {
+    mut cur = rows
+    mut k = 0
+    for col in 0 until n {
+        mut pivot = 0 - 1
+        for r in k until n {
+            row = cur[r]
+            if pivot < 0 and bigint.rational_sign(row[col]) != 0 {
+                pivot = r
+            }
+        }
+        if pivot >= 0 {
+            cur = swap_rows(cur, k, pivot)
+            match eliminate_all(cur, k, col) {
+                Ok(updated) => { cur = updated },
+                Err(message) => { return Err(message) },
+            }
+            k = k + 1
+        }
+    }
+    if k == n {
+        mut sols: List<String> = []
+        for i in 0 until n {
+            row = cur[i]
+            match rat_div(row[n], row[i]) {
+                Ok(value) => { sols.push(as_fraction(value)) },
+                Err(message) => { return Err(message) },
+            }
+        }
+        return Ok(sols)
+    }
+    for i in k until n {
+        row = cur[i]
+        if bigint.rational_sign(row[n]) != 0 {
+            return Err("no solution")
+        }
+    }
+    Ok(["infinitely many"])
+}
+
+fn augmented(matrix: List<List<Int>>, rhs: List<Int>) -> List<List<String>> {
+    mut rows: List<List<String>> = []
+    for i in 0 until rhs.length() {
+        source = matrix[i]
+        mut line: List<String> = []
+        for j in 0 until source.length() {
+            line.push(source[j].to_string())
+        }
+        line.push(rhs[i].to_string())
+        rows.push(line)
+    }
+    rows
+}
+
+/// Solves the square system A x = b for a matrix of size 1 to 4 with exact rational Gaussian
+/// elimination. A unique solution is one "n/d" per unknown, in order. The singular rule in the
+/// section header applies. Coefficients and right-hand sides must satisfy |value| <= 10^6.
+pub fn solve_system_n(matrix: List<List<Int>>, rhs: List<Int>) -> Result<List<String>, String> {
+    n = matrix.length()
+    if n < 1 or n > 4 {
+        return Err("solve_system_n: matrix must have 1 to 4 rows")
+    }
+    if rhs.length() != n {
+        return Err("solve_system_n: rhs length must equal the matrix size")
+    }
+    for i in 0 until n {
+        row = matrix[i]
+        if row.length() != n {
+            return Err("solve_system_n: matrix must be square")
+        }
+        for j in 0 until n {
+            if not within_limit(row[j]) {
+                return Err("solve_system_n: coefficients must satisfy |coeff| <= 1000000")
+            }
+        }
+        if not within_limit(rhs[i]) {
+            return Err("solve_system_n: coefficients must satisfy |coeff| <= 1000000")
+        }
+    }
+    reduce_system(augmented(matrix, rhs), n)
 }

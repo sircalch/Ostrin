@@ -1,0 +1,156 @@
+// std.solve linear systems: exact solutions of square systems A x = b over the rationals.
+//
+// Each line is "id | size | matrix | rhs | result", the format of scripts/system-oracle.mjs. Rows of
+// the matrix are separated by ";", entries by ",". A unique solution is one "n/d" per unknown,
+// separated by ",". "infinitely many" and "no solution" are the singular results. The output must
+// match compiler/tests/fixtures/solve_systems_oracle.txt byte for byte.
+//
+// H01..H22 are hand-picked. G01..G30 use the Park-Miller generator (seed 3): each coefficient is
+// (x mod 19) - 9, drawn row by row and then the rhs. Every fifth generated case (G05, G10, ...) is
+// made singular on purpose: its last row is a copy of its first row, and its last rhs entry is the
+// first rhs entry (consistent) or that value plus 1 (inconsistent), chosen by one more draw.
+import std.solve
+
+fn next(s: Int) -> Int {
+    16807 * s % 2147483647
+}
+
+/// A coefficient in -9..9 from a generator state.
+fn coef(s: Int) -> Int {
+    s % 19 - 9
+}
+
+fn join_comma(items: List<String>) -> String {
+    mut text = ""
+    for i in 0 until items.length() {
+        if i > 0 {
+            text = text + ","
+        }
+        text = text + items[i]
+    }
+    text
+}
+
+fn show_vector(values: List<Int>) -> String {
+    mut text = ""
+    for i in 0 until values.length() {
+        if i > 0 {
+            text = text + ","
+        }
+        text = text + values[i].to_string()
+    }
+    text
+}
+
+fn show_matrix(rows: List<List<Int>>) -> String {
+    mut text = ""
+    for i in 0 until rows.length() {
+        if i > 0 {
+            text = text + ";"
+        }
+        text = text + show_vector(rows[i])
+    }
+    text
+}
+
+fn pad2(n: Int) -> String {
+    if n < 10 {
+        "0" + n.to_string()
+    } else {
+        n.to_string()
+    }
+}
+
+fn result_text(r: Result<List<String>, String>) -> String {
+    match r {
+        Ok(items) => join_comma(items),
+        Err(m) => {
+            if m == "no solution" {
+                m
+            } else {
+                "error: " + m
+            }
+        },
+    }
+}
+
+/// Solves one case with solve_system_2 when it is 2x2 and with solve_system_n otherwise.
+fn run_case(id: String, matrix: List<List<Int>>, rhs: List<Int>) -> Void {
+    n = matrix.length()
+    mut result = ""
+    if n == 2 {
+        result = result_text(solve.solve_system_2(matrix[0][0], matrix[0][1], matrix[1][0], matrix[1][1], rhs[0], rhs[1]))
+    } else {
+        result = result_text(solve.solve_system_n(matrix, rhs))
+    }
+    print(id + " | " + n.to_string() + " | " + show_matrix(matrix) + " | " + show_vector(rhs) + " | " + result)
+}
+
+/// One generated case number g. Returns the generator state after its draws.
+fn generated(g: Int, start: Int) -> Int {
+    n = 2 + (g - 1) % 3
+    mut st = start
+    mut matrix: List<List<Int>> = []
+    mut rhs: List<Int> = []
+    for i in 0 until n {
+        mut row: List<Int> = []
+        for j in 0 until n {
+            st = next(st)
+            row.push(coef(st))
+        }
+        matrix.push(row)
+    }
+    for i in 0 until n {
+        st = next(st)
+        rhs.push(coef(st))
+    }
+    if g % 5 == 0 {
+        mut fixed: List<List<Int>> = []
+        mut fixed_rhs: List<Int> = []
+        for i in 0 until n - 1 {
+            fixed.push(matrix[i])
+            fixed_rhs.push(rhs[i])
+        }
+        fixed.push(matrix[0])
+        st = next(st)
+        if st % 2 == 0 {
+            fixed_rhs.push(rhs[0])
+        } else {
+            fixed_rhs.push(rhs[0] + 1)
+        }
+        matrix = fixed
+        rhs = fixed_rhs
+    }
+    run_case("G" + pad2(g), matrix, rhs)
+    st
+}
+
+fn main() -> Void {
+    run_case("H01", [[2]], [6])
+    run_case("H02", [[4]], [-2])
+    run_case("H03", [[0]], [5])
+    run_case("H04", [[1, 1], [1, -1]], [3, 1])
+    run_case("H05", [[2, 3], [4, 1]], [1, 5])
+    run_case("H06", [[3, 0], [0, -2]], [6, 4])
+    run_case("H07", [[-2, 1], [3, -1]], [1, 1])
+    run_case("H08", [[1, 2, 3], [2, -1, 3], [1, 2, -1]], [6, 9, 2])
+    run_case("H09", [[2, 0, 1], [0, 3, 1], [1, 1, 1]], [1, 2, 3])
+    run_case("H10", [[2, 1, 0], [1, 3, 1], [0, 1, 4]], [1, 2, 3])
+    run_case("H11", [[2, 1, 0, 0], [1, 2, 1, 0], [0, 1, 2, 1], [0, 0, 1, 2]], [1, 0, 0, 1])
+    run_case("H12", [[1, 2, 3, 4], [0, 1, 2, 3], [0, 0, 1, 2], [0, 0, 0, 2]], [1, 1, 1, 1])
+    run_case("H13", [[1, -1, 2, 0], [0, 3, -1, 4], [2, 0, 1, -2], [1, 1, 0, 3]], [3, -2, 0, 2])
+    run_case("H14", [[1, 2], [2, 4]], [3, 6])
+    run_case("H15", [[1, 2, 3], [4, 5, 6], [5, 7, 9]], [1, 2, 3])
+    run_case("H16", [[1, 2], [2, 4]], [3, 7])
+    run_case("H17", [[1, 2, 3], [4, 5, 6], [5, 7, 9]], [1, 2, 4])
+    run_case("H18", [[0, 0], [0, 0]], [0, 0])
+    run_case("H19", [[0, 0, 0], [0, 0, 0], [0, 0, 0]], [0, 0, 1])
+    run_case("H20", [[1, 0, 2, -1], [3, 1, 0, 2], [0, 2, -1, 3], [4, 1, 2, 1]], [1, 2, 5, 3])
+    run_case("H21", [[1, 0, 2, -1], [3, 1, 0, 2], [0, 2, -1, 3], [4, 1, 2, 1]], [1, 2, 5, 4])
+    run_case("H22", [[-3]], [4])
+
+    mut st = 3
+    for g in 1 until 31 {
+        st = generated(g, st)
+    }
+}
