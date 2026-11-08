@@ -21629,6 +21629,29 @@ fn std_viz_polish_matches_both_backends() {
     );
     assert!(svg.contains("<linearGradient"), "{svg}");
     assert!(svg.contains("expanded: p(x)"), "{svg}");
+    // Same title, labels and series count but a different plot box: the gradient ids must differ,
+    // otherwise the first figure's gradient would be used on the second page.
+    let source = fs::read_to_string(example_path("viz_polynomial_roots.ostrin")).unwrap();
+    let wide = source.replacen(".polished(", ".size(800, 500).polished(", 1);
+    assert_ne!(wide, source, "size insertion did not apply");
+    let wide_path = temp_source("viz_polynomial_roots_wide.ostrin", &wide);
+    let wide_run = run(&["--run", &wide_path]);
+    let _ = fs::remove_file(&wide_path);
+    assert!(wide_run.status.success(), "{}", stderr(&wide_run));
+    let wide_svg = stdout(&wide_run).replace("\r\n", "\n");
+    let polish_id = |s: &str| {
+        s.split("id=\"polish")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .unwrap_or("")
+            .to_string()
+    };
+    assert!(!polish_id(&svg).is_empty(), "{svg}");
+    assert_ne!(
+        polish_id(&svg),
+        polish_id(&wide_svg),
+        "figures of different size share a gradient id"
+    );
     let path = example_path("viz_polynomial_roots.ostrin");
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {

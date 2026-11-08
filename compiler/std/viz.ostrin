@@ -933,7 +933,17 @@ fn render(fig: Figure) -> String {
     sx = (right - left) / (x1 - x0)
     sy = (bottom - top) / (y1 - y0)
     clip = uid("clip", fig.title + fig.xlabel + fig.ylabel + fig.series.length().to_string())
-    polish_id = uid("polish", clip)
+    // The polished gradients depend on the plot box, the palette and each series' colour, so the id is
+    // derived from exactly those inputs. Two figures on one page then share an id only when their
+    // gradient definitions are identical. (The clip id is unchanged and is not covered by this fix.)
+    mut polish_key = clip + num(left) + num(right) + num(top) + num(bottom)
+    for pc in theme.palette {
+        polish_key = polish_key + pc
+    }
+    for ps in fig.series {
+        polish_key = polish_key + ps.kind + ps.color
+    }
+    polish_id = uid("polish", polish_key)
 
     root = if has_motion {
         header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg data-ostrin-motion=\"true\"" + binding_attr(fig.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")
