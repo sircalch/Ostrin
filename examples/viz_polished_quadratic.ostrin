@@ -1,0 +1,21 @@
+// std.viz · figure: y = x^2 - 2x - 3 = (x + 1)(x - 3) on a fixed grid of 41 points over [-2, 4].
+// The roots x = -1 and x = 3 are exact and hard-coded (they match std.solve.solve_quadratic(1, -2, -3)),
+// marked with dashed vertical lines and labels on the axis. Prints one standalone SVG.
+import std.viz
+
+fn main() -> Void {
+    // 41 samples: x_i = -2 + 0.15 * i for i in 0..=40.
+    xs = linspace(-2.0, 4.0, 41)
+    ys = xs * xs - xs * 2.0 - 3.0
+    mut fig = viz.figure("y = x^2 - 2x - 3 with its roots")
+        .describe("y = x^2 - 2x - 3 over [-2, 4], 41 sampled points, roots at x = -1 and x = 3")
+        .labels("x", "y")
+        .xlim(-2.0, 4.0)
+        .polished(caption: "y = x^2 - 2x - 3, roots at x = -1 and x = 3", label_size: 13, animate: true)
+        .line(xs, ys, label: "x^2 - 2x - 3")
+        .scatter(xs, ys, label: "samples", color: "#1f77b4", size: 3.0)
+        .hline(0.0)
+        .vline(-1.0, label: "root x = -1", color: "#d62728")
+        .vline(3.0, label: "root x = 3", color: "#d62728")
+    print(fig.svg())
+}
