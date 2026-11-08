@@ -1138,8 +1138,16 @@ fn compiler_dap_stops_on_entry_steps_and_disconnects_cleanly() {
 /// Path for a temporary native artifact, unique per test process so parallel
 /// `cargo test` runs never collide.
 fn temp_artifact(name: &str) -> String {
+    // Tests run in parallel inside one process and several of them compile the same example. A
+    // per-call counter keeps each artifact path unique, so no test can overwrite or delete another's
+    // executable while it runs.
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     std::env::temp_dir()
-        .join(format!("ostrin_native_test_{}_{name}", std::process::id()))
+        .join(format!(
+            "ostrin_native_test_{}_{id}_{name}",
+            std::process::id()
+        ))
         .display()
         .to_string()
 }
@@ -21708,6 +21716,10 @@ fn std_viz_autodiff_derivative_matches_both_backends() {
         "{svg}"
     );
     assert!(svg.contains(">f'(x) (autodiff)<"), "{svg}");
+    // The dashed series keeps its requested pattern in polished mode and is drawn whole, without the
+    // draw-in animation that only solid polished strokes carry.
+    assert_eq!(svg.matches("stroke-dasharray=\"6 4\"").count(), 2, "{svg}");
+    assert_eq!(svg.matches("stroke-dasharray=\"1 1\"").count(), 1, "{svg}");
     let path = example_path("viz_autodiff_derivative.ostrin");
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {

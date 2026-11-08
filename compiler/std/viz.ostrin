@@ -1553,10 +1553,18 @@ fn draw_polish_line(s: Series, color: String, id: String, left: Float, right: Fl
         attr("x2", num(right)) + attr("y2", "0") + "><stop" + attr("offset", "0") + attr("stop-color", color) + "/><stop" +
         attr("offset", "1") + attr("stop-color", pick("", 4, theme)) + "/></linearGradient></defs>"
     shade = "<path" + attr("d", area) + attr("fill", color) + attr("fill-opacity", "0.12") + "/>"
+    // A requested dash pattern is honoured as given. The draw-in trick (pathLength=1 with a 1 1 pattern
+    // animated through the offset) cannot carry a user pattern, so dashed series are drawn whole and
+    // are not animated.
+    dashed = s.dash != ""
+    pattern = if dashed {
+        attr("stroke-dasharray", s.dash)
+    } else {
+        attr("pathLength", "1") + attr("stroke-dasharray", "1 1") + attr("stroke-dashoffset", "0")
+    }
     stroke = attr("d", line) + attr("fill", "none") + attr("stroke", "url(#" + id + ")") + attr("stroke-width", num(s.width)) +
-        attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + attr("pathLength", "1") +
-        attr("stroke-dasharray", "1 1") + attr("stroke-dashoffset", "0")
-    curve = if animated {
+        attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + pattern
+    curve = if animated and dashed == false {
         "<path" + stroke + "><animate" + attr("attributeName", "stroke-dashoffset") + attr("from", "1") + attr("to", "0") +
             attr("dur", "1.2s") + attr("fill", "freeze") + "/></path>"
     } else {
