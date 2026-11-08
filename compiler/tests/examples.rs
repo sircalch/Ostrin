@@ -21726,6 +21726,20 @@ fn std_viz_polished_quadratic_matches_both_backends() {
 }
 
 #[test]
+fn std_viz_polished_normal_matches_both_backends() {
+    // f(x) = exp(-x^2/2) / sqrt(2*pi) on a fixed 41-point grid over [-4, 4]; the samples are drawn as
+    // scatter markers, which the viz module renders as <circle class="pt" data-viz-index="i">.
+    let svg = interpreter_and_native_agree("viz_polished_normal.ostrin");
+    assert_eq!(svg.matches("<svg").count(), 1, "{svg}");
+    assert_eq!(svg.matches("</svg>").count(), 1, "{svg}");
+    assert_eq!(
+        svg.matches("<circle class=\"pt\" data-viz-index=").count(),
+        41,
+        "{svg}"
+    );
+}
+
+#[test]
 fn std_solve_core_matches_oracle_in_both_backends() {
     // Linear, quadratic and rational-root solving over fixed cases, including the edge cases. The
     // golden file is the output of scripts/solve-oracle.mjs (no shared code with the module); the

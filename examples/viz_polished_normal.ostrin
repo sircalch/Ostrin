@@ -1,0 +1,22 @@
+// std.viz · figure: standard normal density f(x) = exp(-x^2/2) / sqrt(2*pi) on a fixed grid of 41 points over [-4, 4].
+// The normalizing constant 1 / sqrt(2*pi) is precomputed in Ostrin from the existing sqrt function and a
+// hard-coded value of 2*pi, because std.viz has no formula-constant helper. The samples are marked as scatter points.
+// Prints one standalone SVG.
+import std.viz
+
+fn main() -> Void {
+    // 41 samples: x_i = -4 + 0.2 * i for i in 0..=40.
+    xs = linspace(-4.0, 4.0, 41)
+    // 1 / sqrt(2*pi), precomputed: sqrt(6.283185307179586) = 2.5066282746310002.
+    norm_const = 1.0 / sqrt(6.283185307179586)
+    ys = exp((xs * xs) * (-0.5)) * norm_const
+    mut fig = viz.figure("standard normal density on a fixed 41-point grid")
+        .describe("f(x) = exp(-x^2/2)/sqrt(2*pi) over [-4, 4], 41 sampled points marked")
+        .labels("x", "f(x)")
+        .xlim(-4.0, 4.0)
+        .polished(caption: "f(x) = exp(-x^2/2) / sqrt(2*pi), 41 samples on [-4, 4]", label_size: 13, animate: true)
+        .line(xs, ys, label: "standard normal density")
+        .scatter(xs, ys, label: "samples", color: "#1f77b4", size: 3.0)
+        .hline(0.0)
+    print(fig.svg())
+}
