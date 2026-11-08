@@ -378,6 +378,7 @@ const playgroundScript = read("website/playground.js").replaceAll("\r\n", "\n");
 for (const [name, sourceFile] of [
   ["Symbolic derivatives", "examples/symbolic_core.ostrin"],
   ["Symbolic model to figure", "examples/symbolic_workflow.ostrin"],
+  ["Polished quadratic figure", "examples/viz_polished_quadratic.ostrin"],
   ["Exact rationals (BigInt)", "examples/bigint_rational.ostrin"],
   ["Array operations", "examples/array_operations.ostrin"],
   ["Polynomials (exact)", "examples/polynomial_core.ostrin"],
