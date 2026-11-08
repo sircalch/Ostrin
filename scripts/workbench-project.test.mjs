@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   LIMITS,
-  buildManifest,
+  buildRunManifest,
   createProject,
   filesForRun,
   parseProject,
@@ -18,8 +18,7 @@ import {
 test("a new project is valid and round-trips through serialization", () => {
   const project = createProject("  Orbit model  ");
   assert.deepEqual(validateProject(project), []);
-  const text = serializeProject(project);
-  const back = parseProject(text);
+  const back = parseProject(serializeProject(project));
   assert.equal(back.name, "Orbit model");
   assert.equal(back.entry, "main.ostrin");
   assert.deepEqual(back.files, project.files);
@@ -38,7 +37,7 @@ test("paths must be relative .ostrin files without traversal", () => {
   }
 });
 
-test("validation reports version, missing entry, binary-looking text and limits", () => {
+test("validation reports version, missing entry, empty name and limits", () => {
   const problems = validateProject({ format: "other", version: 2, name: "", entry: "missing.ostrin", files: { "main.ostrin": "x" } });
   assert.ok(problems.some((p) => p.includes("format must be")));
   assert.ok(problems.some((p) => p.includes("unsupported project version")));
@@ -54,9 +53,12 @@ test("validation reports version, missing entry, binary-looking text and limits"
   assert.ok(validateProject(tooMany).some((p) => p.includes("files; the limit is")));
 });
 
-test("parsing rejects malformed JSON and invalid documents with a clear message", () => {
+test("parsing rejects malformed JSON, invalid documents and oversized text", () => {
   assert.throws(() => parseProject("{not json"), /not valid JSON/);
-  assert.throws(() => parseProject(JSON.stringify({ format: "ostrin.project", version: 1, name: "p", entry: "a.ostrin", files: {} })), /invalid project/);
+  assert.throws(
+    () => parseProject(JSON.stringify({ format: "ostrin.project", version: 1, name: "p", entry: "a.ostrin", files: {} })),
+    /invalid project/,
+  );
   assert.throws(() => parseProject("x".repeat(LIMITS.maxProjectBytes + 1)), /larger than/);
 });
 
@@ -75,7 +77,7 @@ test("editing operations keep the project consistent", () => {
   assert.deepEqual(validateProject(p), []);
 });
 
-test("the run file map contains every project file, including imports", () => {
+test("the run file map contains every project file, including imports, as a copy", () => {
   let p = createProject();
   p = setFile(p, "helpers.ostrin", "pub fn square(x: Int) -> Int {\n    x * x\n}\n");
   const files = filesForRun(p);
@@ -84,21 +86,31 @@ test("the run file map contains every project file, including imports", () => {
   assert.notEqual(p.files["main.ostrin"], "changed", "the run map is a copy");
 });
 
-test("manifest hashes match the exact saved bytes and record the compiler and run", async () => {
+test("run manifest hashes exact bytes and marks an unknown compiler identity", async () => {
   const p = setFile(createProject("demo"), "helpers.ostrin", "pub fn one() -> Int {\n    1\n}\n");
-  const output = "49\n";
-  const svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>";
-  const manifest = await buildManifest({ project: p, compilerVersion: "0.2.0", command: "--run", exitCode: 0, figureSvg: svg, outputText: output });
-
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+  const manifest = await buildRunManifest({
+    project: p,
+    entry: "main.ostrin",
+    command: "--run",
+    exitCode: 0,
+    stdout: "49\n",
+    stderr: "",
+    figureSvg: svg,
+    compilerIdentity: "ostrinc 0.2.0",
+  });
   assert.equal(manifest.format, "ostrin.run-manifest");
-  assert.equal(manifest.run.compiler, "0.2.0");
+  assert.equal(manifest.run.compiler, "ostrinc 0.2.0");
   assert.equal(manifest.project.sources["main.ostrin"].sha256, await sha256Hex(p.files["main.ostrin"]));
-  assert.equal(manifest.project.sources["helpers.ostrin"].bytes, Buffer.byteLength(p.files["helpers.ostrin"]));
-  assert.equal(manifest.output.sha256, await sha256Hex(output));
-  assert.equal(manifest.figure.sha256, await sha256Hex(svg));
+  assert.equal(manifest.outputs.stdout.sha256, await sha256Hex("49\n"));
+  assert.equal(manifest.outputs.stderr.sha256, await sha256Hex(""));
+  assert.equal(manifest.outputs.figure.sha256, await sha256Hex(svg));
+  assert.equal(manifest.claims.reproducibility, "not assessed (no R3 claim)");
 
-  const withoutFigure = await buildManifest({ project: p, compilerVersion: "0.2.0", command: "--run", exitCode: 1, outputText: "" });
-  assert.equal("figure" in withoutFigure, false);
+  const unknown = await buildRunManifest({ project: p, entry: "main.ostrin", command: "--run", exitCode: 0 });
+  assert.equal(unknown.run.compiler, "unknown");
+  assert.equal(unknown.run.compilerSource, "not reported");
+  assert.equal("figure" in unknown.outputs, false);
 });
 
 test("sha256Hex matches the known digest of a fixed string", async () => {
