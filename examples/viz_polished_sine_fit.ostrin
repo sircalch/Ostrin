@@ -1,0 +1,20 @@
+// std.viz · figure: y = sin(x) over [0, 2pi], sampled on a fixed grid of 41 points and overlaid as markers.
+// The samples are exact-known values of sin, so the curve and the markers agree by construction.
+// Prints one standalone SVG.
+import std.viz
+
+fn main() -> Void {
+    // 41 samples: x_i = 2*pi*i/40 for i in 0..=40.
+    xs = linspace(0.0, 6.283185307179586, 41)
+    ys = sin(xs)
+    dense = linspace(0.0, 6.283185307179586, 201)
+    mut fig = viz.figure("y = sin(x) on a fixed 41-point grid")
+        .describe("y = sin(x) over [0, 2pi], 41 sampled points overlaid")
+        .labels("x", "y")
+        .xlim(0.0, 6.283185307179586)
+        .polished(caption: "y = sin(x), 41 samples on [0, 2pi]", label_size: 13, animate: true)
+        .line(dense, sin(dense), label: "sin(x)")
+        .scatter(xs, ys, label: "samples", color: "#1f77b4", size: 3.0)
+        .hline(0.0)
+    print(fig.svg())
+}
