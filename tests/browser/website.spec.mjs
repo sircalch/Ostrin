@@ -405,7 +405,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(30);
+  await expect(cards).toHaveCount(33);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
@@ -693,14 +693,14 @@ test("Viz gallery defers the compiler download until a live action", async ({ pa
     if (request.url().includes("/ostrinc.wasm")) wasmRequests.push(request.url());
   });
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-viz-gallery] .viz-card")).toHaveCount(30);
+  await expect(page.locator("[data-viz-gallery] .viz-card")).toHaveCount(33);
   await expect(page.locator(".viz-runtime-note")).toContainText("Recorded SVGs load immediately");
   expect(wasmRequests).toEqual([]);
 });
 
 test("Viz figure manifests preserve source and recorded provenance", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-viz-gallery] .viz-card")).toHaveCount(30);
+  await expect(page.locator("[data-viz-gallery] .viz-card")).toHaveCount(33);
   const manifestDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-manifest="provenance"]').click();
   const manifestDownload = await manifestDownloadPromise;
@@ -765,7 +765,7 @@ test("Viz capability filters are shareable and expose their gallery target", asy
   await expect(threeD).toHaveAttribute("aria-controls", "viz-gallery");
   await expect(page.locator("[data-viz-capability-status]")).toHaveText("7 3d scenes shown");
   await page.locator('[data-viz-capability="all"]').click();
-  await expect(activeCards).toHaveCount(30);
+  await expect(activeCards).toHaveCount(33);
   await expect(page).toHaveURL(/viz\.html$/);
 });
 
@@ -810,7 +810,7 @@ test("Viz figures expose scientific summaries and named explorer controls", asyn
   await expect(page.getByRole("main")).toBeVisible();
   await expect(page.locator("vite-error-overlay, .nextjs-portal, #webpack-dev-server-client-overlay")).toHaveCount(0);
   const figures = page.locator(".viz-card");
-  await expect(figures).toHaveCount(30);
+  await expect(figures).toHaveCount(33);
 
   const missingSummaries = await figures.evaluateAll((cards) => cards.flatMap((card) => {
     const title = card.querySelector("h3")?.textContent?.trim() ?? "";
@@ -1003,9 +1003,9 @@ test("Viz publishes structured data for its scientific source", async ({ page })
   expect(gallerySchema).toMatchObject({
     "@context": "https://schema.org",
     "@id": "https://sircalch.github.io/Ostrin/viz.html#gallery",
-    numberOfItems: 30,
+    numberOfItems: 33,
   });
-  expect(gallerySchema.itemListElement).toHaveLength(30);
+  expect(gallerySchema.itemListElement).toHaveLength(33);
   expect(gallerySchema.itemListElement[1]).toMatchObject({
     position: 2,
     item: {
