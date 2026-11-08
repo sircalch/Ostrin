@@ -77,7 +77,7 @@ de una constante y debe acompañarse de la actualización de las pruebas.
 
 Solo se anima cuando `animate` es verdadero. Hay dos tipos de movimiento, ambos SMIL:
 
-- **Trazo de la línea.** Cada `line` pulido recibe un `<animate attributeName="stroke-dashoffset" from="1" to="0"
+- **Trazo de la línea.** Cada `line` pulido sin `dash` recibe un `<animate attributeName="stroke-dashoffset" from="1" to="0"
   dur="1.2s" fill="freeze">`. El trazo usa `pathLength="1"` y `stroke-dasharray="1 1"`, así que el dibujo
   no depende de la longitud real de la curva. Con `fill="freeze"` el estado final es la curva completa, y un
   renderizador estático (por ejemplo una imagen) muestra la curva entera con el desplazamiento 0.
@@ -115,8 +115,9 @@ los tres ejemplos `viz_polished_*`.
 
 ## 8. Límites actuales
 
-- **`dash` se ignora en modo pulido.** `line(..., dash:)` guarda el valor, pero `draw_polish_line` no lo lee: el
-  trazo de la línea usa siempre `stroke-dasharray="1 1"`.
+- **`dash` en modo pulido.** Una línea con `dash:` conserva su patrón (`stroke-dasharray` con el valor pedido) y
+  se dibuja completa, sin la animación de trazado: el truco de `pathLength="1"` con patrón `1 1` no admite un
+  patrón del usuario. Las líneas sin `dash` no cambian. Lo verifica `std_viz_autodiff_derivative_matches_both_backends`.
 - **Las animaciones se comprueban por valores SVG, no fotograma a fotograma.** Las pruebas verifican los
   atributos `values`, `dur`, `from`, `to` y `fill` en la salida. No hay una comprobación visual de la
   interpolación en un navegador.

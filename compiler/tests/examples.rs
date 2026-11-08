@@ -21685,6 +21685,10 @@ fn std_viz_autodiff_derivative_matches_both_backends() {
         "{svg}"
     );
     assert!(svg.contains(">f'(x) (autodiff)<"), "{svg}");
+    // The dashed series keeps its requested pattern in polished mode and is drawn whole, without the
+    // draw-in animation that only solid polished strokes carry.
+    assert_eq!(svg.matches("stroke-dasharray=\"6 4\"").count(), 2, "{svg}");
+    assert_eq!(svg.matches("stroke-dasharray=\"1 1\"").count(), 1, "{svg}");
     let path = example_path("viz_autodiff_derivative.ostrin");
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
