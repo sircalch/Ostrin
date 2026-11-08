@@ -8,7 +8,7 @@
 <rect width="480" height="360" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Calibration observations</text>
-<defs><clipPath id="clip4283893086930582056"><rect x="66" y="44" width="394" height="264"/></clipPath></defs>
+<defs><clipPath id="clip3675295058813879979"><rect x="66" y="44" width="394" height="264"/></clipPath></defs>
 <line x1="73.58" y1="44" x2="73.58" y2="308" stroke="#e5e7eb" stroke-width="1"/>
 <line x1="73.58" y1="308" x2="73.58" y2="313" stroke="#9ca3af" stroke-width="1"/>
 <text x="73.58" y="326" text-anchor="middle" font-size="11" fill="#6b7280">1.0</text>
@@ -60,7 +60,7 @@
 <line x1="66" y1="62.15" x2="460" y2="62.15" stroke="#e5e7eb" stroke-width="1"/>
 <line x1="61" y1="62.15" x2="66" y2="62.15" stroke="#9ca3af" stroke-width="1"/>
 <text x="58" y="66.15" text-anchor="end" font-size="11" fill="#6b7280">5.0</text>
-<g clip-path="url(#clip4283893086930582056)">
+<g clip-path="url(#clip3675295058813879979)">
 <g class="viz-series" data-viz-series-id="0"><g fill="#7c3aed" fill-opacity="0.78" stroke="#ffffff" stroke-width="0.6"><circle class="pt" data-viz-index="0" cx="73.58" cy="296" r="5"><title>measurements: (1, 1.2)</title></circle><circle class="pt" data-viz-index="1" cx="168.29" cy="252.92" r="5"><title>measurements: (2, 1.9)</title></circle><circle class="pt" data-viz-index="2" cx="263" cy="166.77" r="5"><title>measurements: (3, 3.3)</title></circle><circle class="pt" data-viz-index="3" cx="357.71" cy="136" r="5"><title>measurements: (4, 3.8)</title></circle><circle class="pt" data-viz-index="4" cx="452.42" cy="56" r="5"><title>measurements: (5, 5.1)</title></circle></g></g>
 </g>
 <line x1="66" y1="308" x2="460" y2="308" stroke="#9ca3af" stroke-width="1"/>
