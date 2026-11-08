@@ -932,7 +932,12 @@ fn render(fig: Figure) -> String {
     bottom = h - 52.0
     sx = (right - left) / (x1 - x0)
     sy = (bottom - top) / (y1 - y0)
-    clip = uid("clip", fig.title + fig.xlabel + fig.ylabel + fig.series.length().to_string())
+    // The clip rectangle is the plot box, so the id covers that box as well as the text. Each text field
+    // is length-prefixed so that different splits of the same characters cannot produce the same key.
+    clip_key = fig.title.length().to_string() + ":" + fig.title + "|" + fig.xlabel.length().to_string() + ":" + fig.xlabel + "|" +
+        fig.ylabel.length().to_string() + ":" + fig.ylabel + "|" + fig.series.length().to_string() + "|" +
+        num(left) + "," + num(right) + "," + num(top) + "," + num(bottom)
+    clip = uid("clip", clip_key)
     // The polished gradients depend on the plot box, the palette and each series' colour, so the id is
     // derived from exactly those inputs. Two figures on one page then share an id only when their
     // gradient definitions are identical. (The clip id is unchanged and is not covered by this fix.)
