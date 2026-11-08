@@ -11,6 +11,10 @@
   41-point grid over `[-2, 4]`, with the roots `x = -1` and `x = 3` marked as reference lines,
   and a `.polished(...)` caption. Covered by `std_viz_polished_quadratic_matches_both_backends`
   in both backends.
+- New figure example `examples/viz_polished_normal.ostrin`: the standard normal density
+  `f(x) = exp(-x^2/2) / sqrt(2*pi)` on a fixed 41-point grid over `[-4, 4]`, with the samples
+  marked and a `.polished(...)` caption. The constant `1 / sqrt(2*pi)` is precomputed in Ostrin.
+  Covered by `std_viz_polished_normal_matches_both_backends` in both backends.
 
 ### Correctness
 
@@ -149,7 +153,7 @@
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
 - Added opt-in `--require-closed-effects` so automated checks fail on type errors and unresolved, indirect or symbolic effect boundaries. A closed report allows known effects and does not assert purity.
-- The current working branch has a 339-example, 427-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- The current working branch has a 340-example, 428-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 
