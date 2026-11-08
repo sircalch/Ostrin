@@ -46,11 +46,16 @@
           <button id="share" class="button-quiet" type="button">Share</button>
           <button id="open" class="button-quiet" type="button">Open</button>
           <button id="save" class="button-quiet" type="button">Save</button>
+          <button id="export-project" class="button-quiet" type="button" title="Download the whole project as .ostrin.project.json">Export project</button>
+          <button id="import-project" class="button-quiet" type="button" title="Open a .ostrin.project.json file">Import project</button>
+          <button id="download-manifest" class="button-quiet" type="button" title="Download the manifest of the last run" disabled>Manifest</button>
           <button id="reset" class="button-quiet" type="button">Reset</button>
-          <input id="open-file" type="file" accept=".ostrin,.txt,text/plain" hidden aria-label="Open an Ostrin source file">
+          <input id="open-file" type="file" accept=".ostrin,.txt,.json,text/plain,application/json" hidden aria-label="Open an Ostrin source file or project">
+          <input id="import-project-file" type="file" accept=".json,application/json" hidden aria-label="Import an Ostrin project file">
         </div>
         <div class="playground-panes">
-          <div class="pane"><div class="code-title"><span>main.ostrin</span><span id="source-status" class="source-status" aria-live="polite"></span></div><textarea id="source" spellcheck="false" autocomplete="off" aria-label="Ostrin source"></textarea></div>
+          <aside id="file-explorer" class="pane file-explorer" aria-label="Project files"></aside>
+          <div class="pane"><div class="code-title"><span id="active-file-name">main.ostrin</span><span id="source-status" class="source-status" aria-live="polite"></span></div><textarea id="source" spellcheck="false" autocomplete="off" aria-label="Ostrin source"></textarea></div>
           <div class="pane"><div class="code-title">output <span id="status" class="status"></span></div><div id="output" class="output" role="status" aria-live="polite">Loading the compiler…</div></div>
         </div>
         <p class="playground-note">Run executes the interpreter. Native C compilation needs a C toolchain, so it is not available in the browser. Programs see a single in-memory file and no network.</p>

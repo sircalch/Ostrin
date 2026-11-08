@@ -1,5 +1,24 @@
 // Playground and live examples on top of the real compiler (see ostrin-runtime.js).
 import { loadCompiler, runOstrinc } from "./ostrin-runtime.js";
+import { serializeProject, createProject, validPath } from "./workbench-project.js";
+import {
+  addFile,
+  commitEdit,
+  createWorkbench,
+  deleteFile,
+  dirtyFiles,
+  importProjectText,
+  isDirty,
+  manifestForLastRun,
+  markSaved,
+  projectFromSourceFile,
+  recordRun,
+  renameActive,
+  runInput,
+  selectFile,
+  setEntry,
+} from "./workbench-controller.js";
+import { renderExplorer } from "./workbench-explorer.js";
 
 const EXAMPLES = {
   "Hello, quantities": `fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
@@ -778,8 +797,194 @@ const openButton = $("open");
 const resetButton = $("reset");
 const openInput = $("open-file");
 const DRAFT_KEY = "ostrin.playground.draft";
-const MAX_OPEN_BYTES = 512 * 1024;
 const figureStore = new WeakMap();
+
+// Workbench project state. `source` is the editor for the active file; the model is updated from it
+// (commitEdit) before anything reads the project, so the textarea never holds the only copy.
+const PROJECT_DRAFT_KEY = "ostrin.workbench.draft";
+const explorer = $("file-explorer");
+const exportProjectButton = $("export-project");
+const importProjectButton = $("import-project");
+const manifestButton = $("download-manifest");
+const importProjectInput = $("import-project-file");
+let workbench = createWorkbench(projectFromSourceFile("main.ostrin", EXAMPLES[Object.keys(EXAMPLES)[0]]));
+let compilerIdentityPromise = null;
+
+function readProjectDraft() {
+  try {
+    return localStorage.getItem(PROJECT_DRAFT_KEY);
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeProjectDraft(text) {
+  try {
+    localStorage.setItem(PROJECT_DRAFT_KEY, text);
+  } catch (_) {
+    // The draft is a convenience only; saving the project file is the durable path.
+  }
+}
+
+function clearProjectDraft() {
+  try {
+    localStorage.removeItem(PROJECT_DRAFT_KEY);
+  } catch (_) {
+    // Nothing to clear.
+  }
+}
+
+// The identity line the same runtime prints for `--version`. Null when it cannot be read.
+function compilerIdentity() {
+  compilerIdentityPromise ??= runOstrinc({}, ["--version"])
+    .then(({ code, lines }) => {
+      const line = lines.find(([kind]) => kind === "out");
+      return code === 0 && line ? line[1].trim() : null;
+    })
+    .catch(() => null);
+  return compilerIdentityPromise;
+}
+
+function syncEditorFromModel() {
+  if (!source) return;
+  source.value = workbench.project.files[workbench.activePath] ?? "";
+  const label = $("active-file-name");
+  if (label) label.textContent = workbench.activePath;
+}
+
+function refreshExplorer() {
+  if (!explorer) return;
+  renderExplorer(explorer, workbench, {
+    onSelect: (path) => selectWorkbenchFile(path),
+    onFocus: (path) => explorer.querySelector(`[data-path="${CSS.escape(path)}"]`)?.focus(),
+    onNew: () => createWorkbenchFile(),
+    onRename: () => renameWorkbenchFile(),
+    onDelete: () => deleteWorkbenchFile(),
+    onEntry: () => setWorkbenchEntry(),
+  });
+  if (exportProjectButton) exportProjectButton.disabled = false;
+  if (manifestButton) manifestButton.disabled = workbench.lastRun === null;
+  if (status && isDirty(workbench)) status.textContent = `unsaved changes: ${dirtyFiles(workbench).join(", ")}`;
+}
+
+function persistProjectDraft() {
+  try {
+    writeProjectDraft(serializeProject(commitEdit(workbench, source.value).project));
+  } catch (_) {
+    // A project that is temporarily invalid (for example, an oversized file) is simply not drafted.
+  }
+}
+
+function reportError(message) {
+  if (status) status.textContent = message;
+}
+
+function selectWorkbenchFile(path) {
+  try {
+    workbench = selectFile(workbench, path, source.value);
+    syncEditorFromModel();
+    clearSourceDiagnostic(source, sourceStatus);
+    refreshExplorer();
+  } catch (error) {
+    reportError(String(error.message ?? error));
+  }
+}
+
+function createWorkbenchFile() {
+  const name = window.prompt("New file name (for example helpers.ostrin or lib/geometry.ostrin)", "helpers.ostrin");
+  if (name === null) return;
+  const path = name.trim();
+  try {
+    workbench = addFile(commitEdit(workbench, source.value), path, `pub fn value() -> Int {\n    0\n}\n`);
+    syncEditorFromModel();
+    refreshExplorer();
+    persistProjectDraft();
+  } catch (error) {
+    reportError(String(error.message ?? error));
+  }
+}
+
+function renameWorkbenchFile() {
+  const name = window.prompt("New name for the selected file", workbench.activePath);
+  if (name === null) return;
+  try {
+    workbench = renameActive(workbench, name.trim(), source.value);
+    refreshExplorer();
+    persistProjectDraft();
+  } catch (error) {
+    reportError(String(error.message ?? error));
+  }
+}
+
+function deleteWorkbenchFile() {
+  if (!window.confirm(`Delete ${workbench.activePath}? This cannot be undone.`)) return;
+  try {
+    workbench = deleteFile(commitEdit(workbench, source.value), workbench.activePath);
+    syncEditorFromModel();
+    refreshExplorer();
+    persistProjectDraft();
+  } catch (error) {
+    reportError(String(error.message ?? error));
+  }
+}
+
+function setWorkbenchEntry() {
+  try {
+    workbench = setEntry(commitEdit(workbench, source.value), workbench.activePath);
+    refreshExplorer();
+    persistProjectDraft();
+  } catch (error) {
+    reportError(String(error.message ?? error));
+  }
+}
+
+function downloadProject() {
+  try {
+    const text = serializeProject(commitEdit(workbench, source.value).project);
+    download(`${workbench.project.name.replace(/[^A-Za-z0-9_-]+/g, "-") || "project"}.ostrin.project.json`, text, "application/json");
+    workbench = markSaved(commitEdit(workbench, source.value));
+    refreshExplorer();
+    clearProjectDraft();
+  } catch (error) {
+    reportError(String(error.message ?? error));
+  }
+}
+
+async function importProjectFile(file) {
+  if (file.size > 2 * 1024 * 1024) {
+    reportError("project file too large (2 MB limit)");
+    return;
+  }
+  const text = await file.text();
+  let next;
+  try {
+    // A project document is recognised by its content (a JSON object), not by the file name: a renamed or
+    // temporary file must still import as a project. Anything else is one source file, as before.
+    next = /\.json$/i.test(file.name) || text.trimStart().startsWith("{")
+      ? importProjectText(workbench, text)
+      : createWorkbench(projectFromSourceFile(file.name, text));
+  } catch (error) {
+    // The current project stays as it was: nothing above replaced the state.
+    reportError(`Import refused: ${error.message ?? error}`);
+    return;
+  }
+  workbench = next;
+  syncEditorFromModel();
+  if (output) output.textContent = `Opened ${file.name}. Nothing has run yet; press Run to execute the entry.`;
+  clearSourceDiagnostic(source, sourceStatus);
+  refreshExplorer();
+  persistProjectDraft();
+}
+
+function downloadManifest() {
+  if (!workbench.lastRun) {
+    reportError("Run the project first; the manifest describes the last run.");
+    return;
+  }
+  manifestForLastRun(workbench)
+    .then((manifest) => download("run-manifest.json", JSON.stringify(manifest, null, 2) + "\n", "application/json"))
+    .catch((error) => reportError(String(error.message ?? error)));
+}
 
 // Browser storage can be missing or throw (private windows, blocked site data); the page must work
 // without it, so every access is wrapped.
@@ -917,7 +1122,21 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
   const started = performance.now();
   try {
     const flags = ["--check", "--run"].includes(flag) ? [flag, "--json"] : [flag];
-    const { code, lines } = await invoke(sourceNode.value, flags);
+    const isWorkbench = sourceNode === source;
+    let runInputSnapshot = null;
+    let command = null;
+    let code;
+    let lines;
+    if (isWorkbench) {
+      // Format works on the active file; every other command runs the project from its entry.
+      workbench = commitEdit(workbench, sourceNode.value);
+      runInputSnapshot = runInput(workbench);
+      const args = flag === "--fmt" ? [flag, workbench.activePath] : [...flags, runInputSnapshot.entry];
+      command = args.join(" ");
+      ({ code, lines } = await runOstrinc(runInputSnapshot.files, args));
+    } else {
+      ({ code, lines } = await invoke(sourceNode.value, flags));
+    }
     const diagnostics = lines.map(([, text]) => parseDiagnostic(text)).filter(Boolean);
     let html = lines.map(renderLine).join("\n");
     const figure = flag === "--run" && code === 0 ? extractFigure(lines) : null;
@@ -927,6 +1146,17 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       figureStore.set(outputNode, figure.svg);
     } else {
       figureStore.delete(outputNode);
+    }
+    if (isWorkbench && flag !== "--fmt") {
+      // Only checks and runs are evidence; the figure and output are tied to this run's input snapshot.
+      workbench = recordRun(workbench, runInputSnapshot, {
+        command,
+        code,
+        lines,
+        figureSvg: figure ? figure.svg : null,
+        compilerIdentity: await compilerIdentity(),
+      });
+      refreshExplorer();
     }
     if (flag === "--fmt" && code === 0) {
       // --fmt prints the formatted source: put it back in the editor.
@@ -954,26 +1184,52 @@ const select = $("example");
 if (select && source) {
   for (const name of Object.keys(EXAMPLES)) select.append(new Option(name, name));
   select.addEventListener("change", () => {
-    source.value = EXAMPLES[select.value];
+    loadExampleProject(select.value);
     clearDraft();
+    clearProjectDraft();
     if (output) output.textContent = "";
     if (status) status.textContent = "";
     clearSourceDiagnostic(source, sourceStatus);
   });
   const sharedCode = new URLSearchParams(location.search).get("code");
   if (sharedCode !== null) {
-    source.value = sharedCode;
+    workbench = createWorkbench(projectFromSourceFile("main.ostrin", sharedCode));
+    syncEditorFromModel();
     if (output) output.textContent = "Shared source loaded. Press Run (Ctrl + Enter).";
   } else {
-    const draft = readDraft();
-    if (draft) {
-      source.value = draft;
+    const projectDraft = readProjectDraft();
+    const legacyDraft = projectDraft === null ? readDraft() : null;
+    if (projectDraft !== null && restoreProjectDraft(projectDraft)) {
+      if (output) output.textContent = "Restored your unsaved project. Export it to keep a copy, or press Reset to return to the selected example.";
+    } else if (legacyDraft) {
+      workbench = createWorkbench(projectFromSourceFile("main.ostrin", legacyDraft));
+      syncEditorFromModel();
       if (output) output.textContent = "Restored your last draft. Press Reset to return to the selected example.";
     } else {
-      source.value = EXAMPLES[select.value];
+      loadExampleProject(select.value);
     }
   }
   clearSourceDiagnostic(source, sourceStatus);
+  refreshExplorer();
+}
+
+function loadExampleProject(name) {
+  workbench = createWorkbench({ ...projectFromSourceFile("main.ostrin", EXAMPLES[name]), name });
+  syncEditorFromModel();
+  refreshExplorer();
+}
+
+// A restored draft is shown as unsaved: its saved baseline is empty, so every file is marked.
+function restoreProjectDraft(text) {
+  try {
+    const restored = importProjectText(workbench, text);
+    workbench = { ...restored, saved: { name: "", entry: "", files: {} } };
+    syncEditorFromModel();
+    return true;
+  } catch (_) {
+    clearProjectDraft();
+    return false;
+  }
 }
 
 output?.addEventListener("click", (event) => {
@@ -983,35 +1239,38 @@ output?.addEventListener("click", (event) => {
   }
 });
 saveButton?.addEventListener("click", () => {
-  if (source) download("main.ostrin", source.value, "text/plain");
+  if (!source) return;
+  // Saves the active file as a single .ostrin file, as before; the project is saved from its own button.
+  download(workbench.activePath, commitEdit(workbench, source.value).project.files[workbench.activePath], "text/plain");
 });
 openButton?.addEventListener("click", () => openInput?.click());
 openInput?.addEventListener("change", async () => {
   const file = openInput.files?.[0];
   openInput.value = "";
   if (!file || !source) return;
-  if (file.size > MAX_OPEN_BYTES) {
-    status.textContent = "file too large (512 KB limit)";
-    return;
-  }
-  source.value = await file.text();
-  writeDraft(source.value);
-  if (output) output.textContent = "Opened " + file.name + ". Press Run (Ctrl + Enter).";
-  status.textContent = "";
-  clearSourceDiagnostic(source, sourceStatus);
+  await importProjectFile(file);
 });
 resetButton?.addEventListener("click", () => {
   if (!source || !select) return;
-  source.value = EXAMPLES[select.value];
+  loadExampleProject(select.value);
   clearDraft();
+  clearProjectDraft();
   if (output) output.textContent = "";
   status.textContent = "";
   clearSourceDiagnostic(source, sourceStatus);
 });
+exportProjectButton?.addEventListener("click", downloadProject);
+importProjectButton?.addEventListener("click", () => importProjectInput?.click());
+importProjectInput?.addEventListener("change", async () => {
+  const file = importProjectInput.files?.[0];
+  importProjectInput.value = "";
+  if (file) await importProjectFile(file);
+});
+manifestButton?.addEventListener("click", downloadManifest);
 let draftTimer = 0;
 source?.addEventListener("input", () => {
   clearTimeout(draftTimer);
-  draftTimer = setTimeout(() => writeDraft(source.value), 400);
+  draftTimer = setTimeout(persistProjectDraft, 400);
 });
 $("run")?.addEventListener("click", () => execute("--run"));
 $("check")?.addEventListener("click", () => execute("--check"));
