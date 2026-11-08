@@ -87,7 +87,7 @@ screen-reader pass, and any comparison of the redesign candidates; these remain 
 
 - **340** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
-- **33** Markdown design documents under `docs/design/`.
+- **34** Markdown design documents under `docs/design/`.
 - Compiler suite: **428 integration**, **6 differential** and **33 unit** tests.
 - WASI release smoke matrix: **23 program modules** passed in run [38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359) with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
