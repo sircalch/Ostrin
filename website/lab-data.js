@@ -1734,6 +1734,57 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "printed": [
         ""
       ]
+    },
+    {
+      "id": "polished-normal",
+      "title": "Normal density, polished",
+      "file": "examples/viz_polished_normal.ostrin",
+      "blurb": "The standard normal density sampled on 41 fixed points over [-4, 4], with the samples marked as scatter points.",
+      "source": "examples/viz_polished_normal.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_polished_normal.ostrin",
+      "code": "// std.viz · figure: standard normal density f(x) = exp(-x^2/2) / sqrt(2*pi) on a fixed grid of 41 points over [-4, 4].\n// The normalizing constant 1 / sqrt(2*pi) is precomputed in Ostrin from the existing sqrt function and a\n// hard-coded value of 2*pi, because std.viz has no formula-constant helper. The samples are marked as scatter points.\n// Prints one standalone SVG.\nimport std.viz\n\nfn main() -> Void {\n    // 41 samples: x_i = -4 + 0.2 * i for i in 0..=40.\n    xs = linspace(-4.0, 4.0, 41)\n    // 1 / sqrt(2*pi), precomputed: sqrt(6.283185307179586) = 2.5066282746310002.\n    norm_const = 1.0 / sqrt(6.283185307179586)\n    ys = exp((xs * xs) * (-0.5)) * norm_const\n    mut fig = viz.figure(\"standard normal density on a fixed 41-point grid\")\n        .describe(\"f(x) = exp(-x^2/2)/sqrt(2*pi) over [-4, 4], 41 sampled points marked\")\n        .labels(\"x\", \"f(x)\")\n        .xlim(-4.0, 4.0)\n        .polished(caption: \"f(x) = exp(-x^2/2) / sqrt(2*pi), 41 samples on [-4, 4]\", label_size: 13, animate: true)\n        .line(xs, ys, label: \"standard normal density\")\n        .scatter(xs, ys, label: \"samples\", color: \"#1f77b4\", size: 3.0)\n        .hline(0.0)\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/polished-normal.svg",
+      "capabilities": [
+        "2d"
+      ],
+      "provenance": {},
+      "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "polished-quadratic",
+      "title": "Quadratic with its roots",
+      "file": "examples/viz_polished_quadratic.ostrin",
+      "blurb": "y = x² − 2x − 3 over [-2, 4] with its exact roots x = -1 and x = 3 marked on the axis.",
+      "source": "examples/viz_polished_quadratic.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_polished_quadratic.ostrin",
+      "code": "// std.viz · figure: y = x^2 - 2x - 3 = (x + 1)(x - 3) on a fixed grid of 41 points over [-2, 4].\n// The roots x = -1 and x = 3 are exact and hard-coded (they match std.solve.solve_quadratic(1, -2, -3)),\n// marked with dashed vertical lines and labels on the axis. Prints one standalone SVG.\nimport std.viz\n\nfn main() -> Void {\n    // 41 samples: x_i = -2 + 0.15 * i for i in 0..=40.\n    xs = linspace(-2.0, 4.0, 41)\n    ys = xs * xs - xs * 2.0 - 3.0\n    mut fig = viz.figure(\"y = x^2 - 2x - 3 with its roots\")\n        .describe(\"y = x^2 - 2x - 3 over [-2, 4], 41 sampled points, roots at x = -1 and x = 3\")\n        .labels(\"x\", \"y\")\n        .xlim(-2.0, 4.0)\n        .polished(caption: \"y = x^2 - 2x - 3, roots at x = -1 and x = 3\", label_size: 13, animate: true)\n        .line(xs, ys, label: \"x^2 - 2x - 3\")\n        .scatter(xs, ys, label: \"samples\", color: \"#1f77b4\", size: 3.0)\n        .hline(0.0)\n        .vline(-1.0, label: \"root x = -1\", color: \"#d62728\")\n        .vline(3.0, label: \"root x = 3\", color: \"#d62728\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/polished-quadratic.svg",
+      "capabilities": [
+        "2d"
+      ],
+      "provenance": {},
+      "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "polished-sine-fit",
+      "title": "Sine sampled and overlaid",
+      "file": "examples/viz_polished_sine_fit.ostrin",
+      "blurb": "y = sin(x) over [0, 2π] sampled on a fixed 41-point grid and overlaid on the exact curve.",
+      "source": "examples/viz_polished_sine_fit.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_polished_sine_fit.ostrin",
+      "code": "// std.viz · figure: y = sin(x) over [0, 2pi], sampled on a fixed grid of 41 points and overlaid as markers.\n// The samples are exact-known values of sin, so the curve and the markers agree by construction.\n// Prints one standalone SVG.\nimport std.viz\n\nfn main() -> Void {\n    // 41 samples: x_i = 2*pi*i/40 for i in 0..=40.\n    xs = linspace(0.0, 6.283185307179586, 41)\n    ys = sin(xs)\n    dense = linspace(0.0, 6.283185307179586, 201)\n    mut fig = viz.figure(\"y = sin(x) on a fixed 41-point grid\")\n        .describe(\"y = sin(x) over [0, 2pi], 41 sampled points overlaid\")\n        .labels(\"x\", \"y\")\n        .xlim(0.0, 6.283185307179586)\n        .polished(caption: \"y = sin(x), 41 samples on [0, 2pi]\", label_size: 13, animate: true)\n        .line(dense, sin(dense), label: \"sin(x)\")\n        .scatter(xs, ys, label: \"samples\", color: \"#1f77b4\", size: 3.0)\n        .hline(0.0)\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/polished-sine-fit.svg",
+      "capabilities": [
+        "2d"
+      ],
+      "provenance": {},
+      "printed": [
+        ""
+      ]
     }
   ],
   "workflows": [

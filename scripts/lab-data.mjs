@@ -215,6 +215,9 @@ export const GALLERY = [
   { id: "table", title: "Data table", file: "examples/viz_table.ostrin", blurb: "A formatted ODE solver comparison rendered as a tooltip-rich SVG table.", bundle: "assets/experiments/table.ostrin-experiment.json" },
   { id: "linked-data", title: "Linked data selection", file: "examples/viz_linked_data.ostrin", blurb: "The same Ostrin samples feed a scatter plot and a table; click either side to select the matching row.", bundle: "assets/experiments/linked-data.ostrin-experiment.json" },
   { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "A seeded four-panel composition of 2D and 3D figures assembled with viz.grid into one SVG.", bundle: "assets/experiments/dashboard.ostrin-experiment.json" },
+  { id: "polished-normal", title: "Normal density, polished", file: "examples/viz_polished_normal.ostrin", blurb: "The standard normal density sampled on 41 fixed points over [-4, 4], with the samples marked as scatter points." },
+  { id: "polished-quadratic", title: "Quadratic with its roots", file: "examples/viz_polished_quadratic.ostrin", blurb: "y = x² − 2x − 3 over [-2, 4] with its exact roots x = -1 and x = 3 marked on the axis." },
+  { id: "polished-sine-fit", title: "Sine sampled and overlaid", file: "examples/viz_polished_sine_fit.ostrin", blurb: "y = sin(x) over [0, 2π] sampled on a fixed 41-point grid and overlaid on the exact curve." },
 ];
 
 // Curated paths through the gallery. These are discovery metadata only: every step points to
