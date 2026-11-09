@@ -79,7 +79,7 @@ export function createExecutor({ createWorker, onChange = () => {}, setTimer = s
       if (active.run.state === "loading") {
         active.run = transition(active.run, "running");
       }
-      const current = finish("completed", { result: { code: reply.code, stdout: reply.stdout, stderr: reply.stderr } });
+      const current = finish("completed", { result: { code: reply.code, stdout: reply.stdout, stderr: reply.stderr, ordered: reply.ordered } });
       keepWorker(current);
       settle(current, { state: "completed", result: current.run.result, id: current.run.id });
     }

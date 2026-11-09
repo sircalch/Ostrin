@@ -20,6 +20,7 @@ import {
 } from "./workbench-controller.js";
 import { renderExplorer } from "./workbench-explorer.js";
 import { createExecutor } from "./workbench-execution.js";
+import { orderedLines } from "./workbench-protocol.js";
 
 const EXAMPLES = {
   "Hello, quantities": `fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
@@ -823,8 +824,9 @@ function renderRunState(run) {
   if (status && run.state in runStateMessages) status.textContent = runStateMessages[run.state];
   if (cancelRunButton) cancelRunButton.disabled = !["loading", "running"].includes(run.state);
 }
-// Splits the exact captured bytes into [stream, line] pairs for rendering. The bytes are not changed.
-function linesFromBytes(stdout, stderr) {
+// [stream, line] pairs for rendering, in the order the program wrote them. The captured bytes are not changed.
+function linesFromBytes(stdout, stderr, ordered) {
+  if (Array.isArray(ordered)) return orderedLines(ordered);
   const split = (bytes, kind) => {
     const text = outputDecoder.decode(bytes);
     if (text === "") return [];
@@ -1180,7 +1182,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
         return;
       }
       code = outcome.result.code;
-      lines = linesFromBytes(outcome.result.stdout, outcome.result.stderr);
+      lines = linesFromBytes(outcome.result.stdout, outcome.result.stderr, outcome.result.ordered);
       rawRun = outcome.result;
     } else {
       ({ code, lines } = await invoke(sourceNode.value, flags));

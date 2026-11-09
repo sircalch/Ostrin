@@ -46,10 +46,20 @@ function concat(chunks) {
 async function execute(id, command, files) {
   const stdout = [];
   const stderr = [];
+  // The same chunks in the order the program wrote them, each tagged with its stream.
+  const ordered = [];
   const fds = [
     new OpenFile(new File([])),
-    new ConsoleStdout((bytes) => stdout.push(bytes.slice())),
-    new ConsoleStdout((bytes) => stderr.push(bytes.slice())),
+    new ConsoleStdout((bytes) => {
+      const copy = bytes.slice();
+      stdout.push(copy);
+      ordered.push({ stream: "out", bytes: copy });
+    }),
+    new ConsoleStdout((bytes) => {
+      const copy = bytes.slice();
+      stderr.push(copy);
+      ordered.push({ stream: "err", bytes: copy });
+    }),
     new PreopenDirectory(".", directoryContents(files)),
   ];
   const wasi = new WASI(["ostrinc", ...command], [], fds);
@@ -64,7 +74,8 @@ async function execute(id, command, files) {
   }
   const out = concat(stdout);
   const err = concat(stderr);
-  self.postMessage({ type: "result", id, code, stdout: out, stderr: err }, [out.buffer, err.buffer]);
+  const transfer = [out.buffer, err.buffer, ...ordered.map((chunk) => chunk.bytes.buffer)];
+  self.postMessage({ type: "result", id, code, stdout: out, stderr: err, ordered }, transfer);
 }
 
 self.onmessage = (event) => {

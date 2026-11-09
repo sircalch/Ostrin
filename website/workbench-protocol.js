@@ -99,6 +99,9 @@ export function parseWorkerReply(message) {
     if (!(message.stdout instanceof Uint8Array) || !(message.stderr instanceof Uint8Array)) {
       throw new Error("result stdout and stderr must be byte arrays");
     }
+    if (!Array.isArray(message.ordered) || message.ordered.some((chunk) => !chunk || (chunk.stream !== "out" && chunk.stream !== "err") || !(chunk.bytes instanceof Uint8Array))) {
+      throw new Error("result must carry the ordered output as tagged byte chunks");
+    }
     return message;
   }
   if (message.type === "runtime-error") {
@@ -106,6 +109,29 @@ export function parseWorkerReply(message) {
     return message;
   }
   throw new Error(`unknown worker reply type ${JSON.stringify(message.type)}`);
+}
+
+// Rebuilds [stream, line] pairs in the order the program wrote them. Each stream keeps its own partial
+// line until a newline arrives, so a line split across writes is still one line, and stdout and stderr
+// interleave exactly as emitted. Bytes are decoded only for display; the chunks are not changed.
+export function orderedLines(chunks) {
+  // One decoder per stream: a multi-byte character split across writes of the same stream decodes correctly,
+  // and bytes of the other stream never enter it.
+  const decoders = { out: new TextDecoder("utf-8", { fatal: false }), err: new TextDecoder("utf-8", { fatal: false }) };
+  const pending = { out: "", err: "" };
+  const lines = [];
+  for (const chunk of chunks) {
+    const text = pending[chunk.stream] + decoders[chunk.stream].decode(chunk.bytes, { stream: true });
+    const parts = text.split("\n");
+    pending[chunk.stream] = parts.pop();
+    for (const line of parts) lines.push([chunk.stream, line]);
+  }
+  for (const stream of ["out", "err"]) {
+    const rest = pending[stream] + decoders[stream].decode();
+    pending[stream] = "";
+    if (rest !== "") lines.push([stream, rest]);
+  }
+  return lines;
 }
 
 export function canTransition(from, to) {

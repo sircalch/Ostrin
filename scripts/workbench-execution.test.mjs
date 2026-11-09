@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createExecutor } from "../website/workbench-execution.js";
-import { createRun, parseWorkerReply, transition, validateRunRequest, acceptsReply, LIMITS } from "../website/workbench-protocol.js";
+import { createRun, orderedLines, parseWorkerReply, transition, validateRunRequest, acceptsReply, LIMITS } from "../website/workbench-protocol.js";
 
 // A Worker stand-in: records what the page sends, lets the test deliver replies, and counts terminations.
 class FakeWorker {
@@ -66,7 +66,7 @@ test("a run completes with raw stdout and stderr bytes and the Worker is kept fo
   assert.equal(worker.sent.length, 1);
   const id = worker.sent[0].id;
   worker.deliver({ type: "started", id });
-  worker.deliver({ type: "result", id, code: 0, stdout: bytes("49\n"), stderr: bytes("") });
+  worker.deliver({ type: "result", id, code: 0, stdout: bytes("49\n"), stderr: bytes(""), ordered: [] });
   const outcome = await promise;
   assert.equal(outcome.state, "completed");
   assert.equal(new TextDecoder().decode(outcome.result.stdout), "49\n", "stdout keeps its exact bytes, including the final newline");
@@ -76,7 +76,7 @@ test("a run completes with raw stdout and stderr bytes and the Worker is kept fo
 
   const second = executor.run(request());
   assert.equal(workers.length, 1, "the next run reuses the idle Worker instead of creating another");
-  worker.deliver({ type: "result", id: worker.sent[1].id, code: 0, stdout: bytes(""), stderr: bytes("") });
+  worker.deliver({ type: "result", id: worker.sent[1].id, code: 0, stdout: bytes(""), stderr: bytes(""), ordered: [] });
   assert.equal((await second).state, "completed");
 });
 
@@ -84,11 +84,30 @@ test("a compiler error is a completed run with a non-zero code, not a runtime fa
   const { executor, workers } = harness();
   const promise = executor.run(request());
   const id = workers[0].sent[0].id;
-  workers[0].deliver({ type: "result", id, code: 1, stdout: bytes(""), stderr: bytes("error: boom\n") });
+  workers[0].deliver({ type: "result", id, code: 1, stdout: bytes(""), stderr: bytes("error: boom\n"), ordered: [] });
   const outcome = await promise;
   assert.equal(outcome.state, "completed");
   assert.equal(outcome.result.code, 1);
   assert.equal(new TextDecoder().decode(outcome.result.stderr), "error: boom\n");
+});
+
+test("the ordered output keeps stdout and stderr interleaved as the program wrote them", async () => {
+  const { executor, workers } = harness();
+  const promise = executor.run(request());
+  const worker = workers[0];
+  const id = worker.sent[0].id;
+  const chunk = (stream, text) => ({ stream, bytes: bytes(text) });
+  worker.deliver({
+    type: "result",
+    id,
+    code: 1,
+    stdout: bytes("first\nthird\n"),
+    stderr: bytes("second\n"),
+    ordered: [chunk("out", "first\n"), chunk("err", "second\n"), chunk("out", "third\n")],
+  });
+  const outcome = await promise;
+  assert.equal(outcome.state, "completed");
+  assert.deepEqual(orderedLines(outcome.result.ordered), [["out", "first"], ["err", "second"], ["out", "third"]]);
 });
 
 test("cancel terminates the Worker and a late reply from it is never published", async () => {
@@ -102,7 +121,7 @@ test("cancel terminates the Worker and a late reply from it is never published",
   assert.equal(worker.terminated, true, "the Worker is terminated, which is the only way to stop synchronous WASM");
   const outcome = await promise;
   assert.equal(outcome.state, "cancelled");
-  worker.deliver({ type: "result", id, code: 0, stdout: bytes("late"), stderr: bytes("") });
+  worker.deliver({ type: "result", id, code: 0, stdout: bytes("late"), stderr: bytes(""), ordered: [] });
   assert.deepEqual(changes, ["loading", "running", "cancelled"], "no state change after cancellation");
   assert.equal(executor.activeRun, null);
 });
@@ -125,8 +144,8 @@ test("a second run replaces the active one: the first is cancelled and cannot pu
   const secondId = secondWorker.sent[0].id;
   assert.notEqual(secondId, firstId);
 
-  firstWorker.deliver({ type: "result", id: firstId, code: 0, stdout: bytes("old"), stderr: bytes("") });
-  secondWorker.deliver({ type: "result", id: secondId, code: 0, stdout: bytes("new\n"), stderr: bytes("") });
+  firstWorker.deliver({ type: "result", id: firstId, code: 0, stdout: bytes("old"), stderr: bytes(""), ordered: [] });
+  secondWorker.deliver({ type: "result", id: secondId, code: 0, stdout: bytes("new\n"), stderr: bytes(""), ordered: [] });
   const outcome = await second;
   assert.equal(outcome.state, "completed");
   assert.equal(new TextDecoder().decode(outcome.result.stdout), "new\n", "only the newer run's result is published");
@@ -137,9 +156,9 @@ test("a reply that names another run id is ignored", async () => {
   const promise = executor.run(request());
   const worker = workers[0];
   const id = worker.sent[0].id;
-  worker.deliver({ type: "result", id: "some-other-run", code: 0, stdout: bytes("x"), stderr: bytes("") });
+  worker.deliver({ type: "result", id: "some-other-run", code: 0, stdout: bytes("x"), stderr: bytes(""), ordered: [] });
   assert.equal(executor.activeRun.state, "loading", "the foreign reply changed nothing");
-  worker.deliver({ type: "result", id, code: 0, stdout: bytes("49\n"), stderr: bytes("") });
+  worker.deliver({ type: "result", id, code: 0, stdout: bytes("49\n"), stderr: bytes(""), ordered: [] });
   assert.equal((await promise).state, "completed");
 });
 
@@ -160,7 +179,7 @@ test("a finished run clears its timer, so a late timeout cannot fire", async () 
   const { executor, workers, timers } = harness();
   const promise = executor.run(request());
   const id = workers[0].sent[0].id;
-  workers[0].deliver({ type: "result", id, code: 0, stdout: bytes(""), stderr: bytes("") });
+  workers[0].deliver({ type: "result", id, code: 0, stdout: bytes(""), stderr: bytes(""), ordered: [] });
   await promise;
   assert.equal(timers[0].cleared, true);
 });
@@ -189,7 +208,7 @@ test("a Worker that crashes is reported as terminated unexpectedly", async () =>
 test("a malformed reply fails the run instead of being trusted", async () => {
   const { executor, workers } = harness();
   const promise = executor.run(request());
-  workers[0].deliver({ type: "result", id: workers[0].sent[0].id, code: "zero", stdout: "text", stderr: bytes("") });
+  workers[0].deliver({ type: "result", id: workers[0].sent[0].id, code: "zero", stdout: "text", stderr: bytes(""), ordered: [] });
   const outcome = await promise;
   assert.equal(outcome.state, "failed");
   assert.match(outcome.error.message, /invalid worker reply/);
@@ -205,7 +224,7 @@ test("an invalid request throws before any Worker is created", () => {
 test("dispose terminates the active and the idle Worker", async () => {
   const { executor, workers } = harness();
   const first = executor.run(request());
-  workers[0].deliver({ type: "result", id: workers[0].sent[0].id, code: 0, stdout: bytes(""), stderr: bytes("") });
+  workers[0].deliver({ type: "result", id: workers[0].sent[0].id, code: 0, stdout: bytes(""), stderr: bytes(""), ordered: [] });
   await first;
   assert.equal(executor.hasIdleWorker, true);
   executor.dispose();
@@ -216,8 +235,8 @@ test("dispose terminates the active and the idle Worker", async () => {
 test("protocol: parseWorkerReply accepts only well-formed replies", () => {
   assert.equal(parseWorkerReply({ type: "ready", id: "init" }).type, "ready");
   assert.throws(() => parseWorkerReply({ type: "ready", id: "other" }), /must carry id init/);
-  assert.throws(() => parseWorkerReply({ type: "result", id: "bad id!", code: 0, stdout: bytes(""), stderr: bytes("") }), /invalid run id/);
-  assert.throws(() => parseWorkerReply({ type: "result", id: "a", code: 0.5, stdout: bytes(""), stderr: bytes("") }), /integer/);
+  assert.throws(() => parseWorkerReply({ type: "result", id: "bad id!", code: 0, stdout: bytes(""), stderr: bytes(""), ordered: [] }), /invalid run id/);
+  assert.throws(() => parseWorkerReply({ type: "result", id: "a", code: 0.5, stdout: bytes(""), stderr: bytes(""), ordered: [] }), /integer/);
   assert.throws(() => parseWorkerReply({ type: "surprise", id: "a" }), /unknown worker reply/);
 });
 
