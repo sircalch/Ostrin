@@ -1266,6 +1266,7 @@ openInput?.addEventListener("change", async () => {
 });
 resetButton?.addEventListener("click", () => {
   if (!source || !select) return;
+  if (!confirmDiscard()) return;
   loadExampleProject(select.value);
   clearDraft();
   clearProjectDraft();
