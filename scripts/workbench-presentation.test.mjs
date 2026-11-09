@@ -81,3 +81,34 @@ test("presentation guard: ending a ticket only ends that presentation", () => {
   guard.end(a); // a stale ticket cannot end the newer one
   assert.equal(guard.isCurrent(b), true);
 });
+
+// The three sequences the Playground must survive, expressed on the guard that decides every publication.
+test("sequence: A finishes while its identity is pending, B finishes, then A is released and publishes nothing", () => {
+  const guard = createPresentationGuard();
+  const a = guard.begin(); // A started
+  // A's run completes and it waits for the compiler identity. Meanwhile the user starts B.
+  const b = guard.begin();
+  assert.equal(guard.isCurrent(a), false, "A is stale as soon as B begins");
+  assert.equal(guard.isCurrent(b), true);
+  // B finishes and publishes; A's identity arrives afterwards.
+  guard.end(b);
+  assert.equal(guard.isCurrent(a), false, "A stays stale after B ends");
+  assert.equal(guard.generation, 0);
+});
+
+test("sequence: A fails late, after B already has valid results, and cannot change them", () => {
+  const guard = createPresentationGuard();
+  const a = guard.begin();
+  const b = guard.begin();
+  // B's result is current and published; A's late exception is checked against A's ticket only.
+  assert.equal(guard.isCurrent(b), true);
+  assert.equal(guard.isCurrent(a), false, "A's exception path is refused and cannot overwrite B");
+});
+
+test("sequence: A produces an SVG, B produces another, and only B may publish a figure", () => {
+  const guard = createPresentationGuard();
+  const a = guard.begin();
+  const b = guard.begin();
+  assert.equal(guard.isCurrent(a), false, "A may not publish its figure");
+  assert.equal(guard.isCurrent(b), true, "B is the only figure that can be published");
+});

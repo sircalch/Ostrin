@@ -1157,9 +1157,13 @@ function focusDiagnosticLine(sourceNode, diagnostic, locationNode = null) {
 
 async function execute(flag, sourceNode = source, outputNode = output, statusNode = status, controls = buttons) {
   if (!sourceNode || !outputNode || !statusNode) return;
-  // Only the newest Workbench run may write results, record evidence or re-enable the controls.
+  // Only the newest Workbench run may publish anything: output, figure, evidence, status or controls.
+  // Everything before publish() is computed into local values and touches no shared state.
   const ticket = sourceNode === source ? presentation.begin() : null;
   const current = () => ticket === null || presentation.isCurrent(ticket);
+  const publish = (action) => {
+    if (current()) action();
+  };
   controls.forEach((b) => (b.disabled = true));
   statusNode.textContent = "running…";
   const started = performance.now();
@@ -1178,17 +1182,19 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       const args = flag === "--fmt" ? [flag, workbench.activePath] : [...flags, runInputSnapshot.entry];
       command = args.join(" ");
       const outcome = await executor.run({ command: args, entry: runInputSnapshot.entry, files: runInputSnapshot.files });
-      // A result of a run that was replaced, or of a project that has since changed, is discarded untouched.
       if (!current()) return;
       if (outcome.state !== "completed") {
         // Cancelled, timed-out or failed runs show no results; the editor keeps its text.
-        outputNode.textContent = outcome.state === "cancelled"
+        const message = outcome.state === "cancelled"
           ? "Run cancelled. Your edits are kept."
           : outcome.state === "timed-out"
             ? "The run timed out: " + (outcome.error?.message ?? "")
             : "The run failed: " + (outcome.error?.message ?? "unknown error");
-        figureStore.delete(outputNode);
-        statusNode.textContent = runStateMessages[outcome.state] ?? outcome.state;
+        publish(() => {
+          figureStore.delete(outputNode);
+          outputNode.textContent = message;
+          statusNode.textContent = runStateMessages[outcome.state] ?? outcome.state;
+        });
         return;
       }
       code = outcome.result.code;
@@ -1197,52 +1203,56 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     } else {
       ({ code, lines } = await invoke(sourceNode.value, flags));
     }
+    // Prepared locally: none of this is visible until publish() runs.
     const diagnostics = lines.map(([, text]) => parseDiagnostic(text)).filter(Boolean);
     let html = lines.map(renderLine).join("\n");
     const figure = flag === "--run" && code === 0 ? extractFigure(lines) : null;
     if (figure) {
       const errors = lines.filter(([kind]) => kind !== "out").map(renderLine).join("\n");
       html = (errors ? errors + "\n" : "") + figureHtml(figure);
-      figureStore.set(outputNode, figure.svg);
-    } else {
-      figureStore.delete(outputNode);
-    }
-    if (isWorkbench && flag !== "--fmt") {
-      // Only checks and runs are evidence; the figure and output are tied to this run's input snapshot.
-      const identity = await compilerIdentity();
-      // The identity lookup is asynchronous: the project may have changed while it was pending.
-      if (!current()) {
-        // The figure of this stale run was attached before the wait; it must not stay downloadable.
-        figureStore.delete(outputNode);
-        return;
-      }
-      workbench = recordRun(workbench, runInputSnapshot, {
-        command,
-        code,
-        lines,
-        raw: rawRun,
-        figureSvg: figure ? figure.svg : null,
-        compilerIdentity: identity,
-      });
-      refreshExplorer();
     }
     if (flag === "--fmt" && code === 0) {
       // --fmt prints the formatted source: put it back in the editor.
-      sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
       html = '<span class="ok">formatted</span>';
     } else if (code === 0 && !html && flag === "--check") {
       html = '<span class="ok">no errors</span>';
     }
-    outputNode.innerHTML = html || '<span class="dim">(no output)</span>';
+    // Only checks and runs are evidence. The identity lookup is the only await left, so the ticket is checked
+    // again after it, before anything is published.
+    const identity = isWorkbench && flag !== "--fmt" ? await compilerIdentity() : null;
+    if (!current()) return;
     const elapsed = Math.round(performance.now() - started);
     const summary = diagnostics.length ? diagnosticSummary(diagnostics) : (code === 0 ? "ok" : "exit " + code);
-    statusNode.textContent = `${summary} · ${elapsed} ms`;
-    if (diagnostics.length) focusDiagnosticLine(sourceNode, diagnostics[0], sourceNode === source ? sourceStatus : null);
-    else clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
+    publish(() => {
+      if (figure) figureStore.set(outputNode, figure.svg);
+      else figureStore.delete(outputNode);
+      if (isWorkbench && flag !== "--fmt") {
+        workbench = recordRun(workbench, runInputSnapshot, {
+          command,
+          code,
+          lines,
+          raw: rawRun,
+          figureSvg: figure ? figure.svg : null,
+          compilerIdentity: identity,
+        });
+        refreshExplorer();
+      }
+      if (flag === "--fmt" && code === 0) {
+        sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
+      }
+      outputNode.innerHTML = html || '<span class="dim">(no output)</span>';
+      statusNode.textContent = `${summary} · ${elapsed} ms`;
+      if (diagnostics.length) focusDiagnosticLine(sourceNode, diagnostics[0], sourceNode === source ? sourceStatus : null);
+      else clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
+    });
   } catch (error) {
-    outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
-    statusNode.textContent = "failed to start";
-    clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
+    // An exception from a stale run must not replace the output or status of a newer one.
+    publish(() => {
+      figureStore.delete(outputNode);
+      outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
+      statusNode.textContent = "failed to start";
+      clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
+    });
   } finally {
     // A stale run must not re-enable controls while a newer run is active. When no run is active (for example
     // after a project change cancelled this one), nothing else would re-enable them, so this run does.
