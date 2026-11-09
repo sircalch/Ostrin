@@ -117,21 +117,36 @@ export function parseWorkerReply(message) {
 export function orderedLines(chunks) {
   // One decoder per stream: a multi-byte character split across writes of the same stream decodes correctly,
   // and bytes of the other stream never enter it.
+  //
+  // Ordering contract: a line is placed where its newline arrives (its completion). A final line without a
+  // newline is placed where its first byte was written (its start), so unterminated tails of the two streams
+  // keep their emission order instead of being grouped by stream. Empty output yields no lines.
   const decoders = { out: new TextDecoder("utf-8", { fatal: false }), err: new TextDecoder("utf-8", { fatal: false }) };
-  const pending = { out: "", err: "" };
-  const lines = [];
-  for (const chunk of chunks) {
-    const text = pending[chunk.stream] + decoders[chunk.stream].decode(chunk.bytes, { stream: true });
+  const pending = { out: { text: "", start: -1 }, err: { text: "", start: -1 } };
+  const items = [];
+  // `order` is the creation sequence; it breaks ties between items placed at the same chunk.
+  const add = (stream, line, at) => items.push({ stream, line, at, order: items.length });
+  chunks.forEach((chunk, index) => {
+    const state = pending[chunk.stream];
+    const decoded = decoders[chunk.stream].decode(chunk.bytes, { stream: true });
+    if (decoded === "") return;
+    const text = state.text + decoded;
+    const start = state.text === "" ? index : state.start;
     const parts = text.split("\n");
-    pending[chunk.stream] = parts.pop();
-    for (const line of parts) lines.push([chunk.stream, line]);
-  }
+    const tail = parts.pop();
+    for (const line of parts) add(chunk.stream, line, index);
+    state.text = tail;
+    state.start = tail === "" ? -1 : start;
+  });
   for (const stream of ["out", "err"]) {
-    const rest = pending[stream] + decoders[stream].decode();
-    pending[stream] = "";
-    if (rest !== "") lines.push([stream, rest]);
+    const state = pending[stream];
+    const rest = state.text + decoders[stream].decode();
+    if (rest !== "") add(stream, rest, state.start);
   }
-  return lines;
+  // A line sits at its completion chunk, an unterminated tail at its start chunk. Sorting by that position
+  // reproduces the emission order across both streams.
+  items.sort((a, b) => a.at - b.at || a.order - b.order);
+  return items.map(({ stream, line }) => [stream, line]);
 }
 
 export function canTransition(from, to) {

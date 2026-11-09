@@ -21,6 +21,7 @@ import {
 import { renderExplorer } from "./workbench-explorer.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
+import { createPresentationGuard } from "./workbench-presentation.js";
 
 const EXAMPLES = {
   "Hello, quantities": `fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
@@ -819,6 +820,8 @@ const executor = createExecutor({
   onChange: renderRunState,
 });
 window.addEventListener("pagehide", () => executor.dispose());
+// Interface-level validity: a result only reaches the screen while its ticket is the current one.
+const presentation = createPresentationGuard();
 const runStateMessages = { loading: "loading compiler…", running: "running…", cancelled: "cancelled", "timed-out": "timed out", failed: "failed" };
 function renderRunState(run) {
   if (status && run.state in runStateMessages) status.textContent = runStateMessages[run.state];
@@ -985,7 +988,6 @@ function confirmDiscard() {
 
 async function importProjectFile(file) {
   if (!confirmDiscard()) return;
-  executor.cancel();
   if (file.size > 2 * 1024 * 1024) {
     reportError("project file too large (2 MB limit)");
     return;
@@ -1003,6 +1005,9 @@ async function importProjectFile(file) {
     reportError(`Import refused: ${error.message ?? error}`);
     return;
   }
+  // Only a successful import replaces the project, so only then does a running program become stale.
+  executor.cancel();
+  presentation.changeProject();
   workbench = next;
   syncEditorFromModel();
   if (output) output.textContent = `Opened ${file.name}. Nothing has run yet; press Run to execute the entry.`;
@@ -1152,6 +1157,9 @@ function focusDiagnosticLine(sourceNode, diagnostic, locationNode = null) {
 
 async function execute(flag, sourceNode = source, outputNode = output, statusNode = status, controls = buttons) {
   if (!sourceNode || !outputNode || !statusNode) return;
+  // Only the newest Workbench run may write results, record evidence or re-enable the controls.
+  const ticket = sourceNode === source ? presentation.begin() : null;
+  const current = () => ticket === null || presentation.isCurrent(ticket);
   controls.forEach((b) => (b.disabled = true));
   statusNode.textContent = "running…";
   const started = performance.now();
@@ -1170,6 +1178,8 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       const args = flag === "--fmt" ? [flag, workbench.activePath] : [...flags, runInputSnapshot.entry];
       command = args.join(" ");
       const outcome = await executor.run({ command: args, entry: runInputSnapshot.entry, files: runInputSnapshot.files });
+      // A result of a run that was replaced, or of a project that has since changed, is discarded untouched.
+      if (!current()) return;
       if (outcome.state !== "completed") {
         // Cancelled, timed-out or failed runs show no results; the editor keeps its text.
         outputNode.textContent = outcome.state === "cancelled"
@@ -1199,13 +1209,20 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     }
     if (isWorkbench && flag !== "--fmt") {
       // Only checks and runs are evidence; the figure and output are tied to this run's input snapshot.
+      const identity = await compilerIdentity();
+      // The identity lookup is asynchronous: the project may have changed while it was pending.
+      if (!current()) {
+        // The figure of this stale run was attached before the wait; it must not stay downloadable.
+        figureStore.delete(outputNode);
+        return;
+      }
       workbench = recordRun(workbench, runInputSnapshot, {
         command,
         code,
         lines,
         raw: rawRun,
         figureSvg: figure ? figure.svg : null,
-        compilerIdentity: await compilerIdentity(),
+        compilerIdentity: identity,
       });
       refreshExplorer();
     }
@@ -1227,7 +1244,10 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     statusNode.textContent = "failed to start";
     clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
   } finally {
-    controls.forEach((b) => (b.disabled = false));
+    // A stale run must not re-enable controls while a newer run is active. When no run is active (for example
+    // after a project change cancelled this one), nothing else would re-enable them, so this run does.
+    if (current() || executor.activeRun === null) controls.forEach((b) => (b.disabled = false));
+    if (ticket !== null) presentation.end(ticket);
   }
 }
 
@@ -1272,6 +1292,7 @@ if (select && source) {
 
 function loadExampleProject(name) {
   executor.cancel();
+  presentation.changeProject();
   workbench = createWorkbench({ ...projectFromSourceFile("main.ostrin", EXAMPLES[name]), name });
   syncEditorFromModel();
   refreshExplorer();
@@ -1336,6 +1357,7 @@ $("demo-project")?.addEventListener("click", async () => {
     const response = await fetch("workbench-demos/cubic-root.ostrin.project.json", { cache: "no-cache" });
     if (!response.ok) throw new Error("HTTP " + response.status);
     executor.cancel();
+    presentation.changeProject();
     workbench = importProjectText(workbench, await response.text());
     syncEditorFromModel();
     clearSourceDiagnostic(source, sourceStatus);

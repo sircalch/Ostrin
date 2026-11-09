@@ -254,3 +254,57 @@ test("protocol: illegal transitions throw and terminal runs accept no replies", 
   assert.equal(acceptsReply(done, { id: "r1" }), false, "a completed run accepts no further replies");
   assert.equal(acceptsReply(transition(run, "loading"), { id: "other" }), false);
 });
+
+test("a Worker that cannot be created fails the run and clears its timer and references", async () => {
+  const timers = [];
+  const executor = createExecutor({
+    createWorker: () => {
+      throw new Error("Worker is not supported here");
+    },
+    setTimer: (callback, ms) => {
+      const timer = { callback, ms, cleared: false };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimer: (timer) => {
+      if (timer) timer.cleared = true;
+    },
+  });
+  const outcome = await executor.run(request());
+  assert.equal(outcome.state, "failed");
+  assert.equal(outcome.error.kind, "worker-start");
+  assert.match(outcome.error.message, /not supported/);
+  assert.equal(timers[0].cleared, true, "the timeout is cleared");
+  assert.equal(executor.activeRun, null, "no active run remains");
+  assert.equal(executor.hasIdleWorker, false);
+});
+
+test("a Worker that rejects the request is terminated and the run fails", async () => {
+  const workers = [];
+  const executor = createExecutor({
+    createWorker: () => {
+      const worker = new FakeWorker();
+      worker.postMessage = () => {
+        throw new Error("DataCloneError");
+      };
+      workers.push(worker);
+      return worker;
+    },
+    setTimer: () => ({ cleared: false }),
+    clearTimer: () => {},
+  });
+  const outcome = await executor.run(request());
+  assert.equal(outcome.state, "failed");
+  assert.equal(workers[0].terminated, true);
+  assert.equal(executor.activeRun, null);
+});
+
+test("a Worker that ends before it reports started fails the run without a started transition", async () => {
+  const { executor, workers, changes } = harness();
+  const promise = executor.run(request());
+  workers[0].crash("terminated before started");
+  const outcome = await promise;
+  assert.equal(outcome.state, "failed");
+  assert.equal(outcome.error.kind, "worker-terminated");
+  assert.deepEqual(changes, ["loading", "failed"]);
+});

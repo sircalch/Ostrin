@@ -144,11 +144,21 @@ export function createExecutor({ createWorker, onChange = () => {}, setTimer = s
             settle(timedOut, { state: "timed-out", id: timedOut.run.id, error: timedOut.run.error });
           }
         }, timeoutMs);
-        const worker = startWorker(run);
-        worker.onmessage = (event) => onWorkerMessage(run, event);
-        worker.onerror = (event) => onWorkerError(run, event);
-        current.worker = worker;
-        worker.postMessage({ type: "run", id, command, entry, files });
+        // A Worker that cannot be created or cannot accept the request ends the run as failed, with its timer
+        // cleared and no active reference left behind.
+        let worker;
+        try {
+          worker = startWorker(run);
+          worker.onmessage = (event) => onWorkerMessage(run, event);
+          worker.onerror = (event) => onWorkerError(run, event);
+          current.worker = worker;
+          worker.postMessage({ type: "run", id, command, entry, files });
+        } catch (error) {
+          if (worker) stopWorker(worker);
+          if (idleWorker === worker) idleWorker = null;
+          const failed = finish("failed", { error: { kind: "worker-start", message: String(error?.message ?? error) } });
+          if (failed) settle(failed, { state: "failed", id: failed.run.id, error: failed.run.error });
+        }
       });
     },
 

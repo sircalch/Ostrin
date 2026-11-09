@@ -96,3 +96,36 @@ test("a program that exceeds the time limit is reported as timed out", async ({ 
   await expect(page.locator("#status")).toHaveText("timed out");
   await expect(page.locator("#cancel-run")).toBeDisabled();
 });
+
+test("cancelling run A and starting B at once: only B's result is shown and the controls end in a consistent state", async ({ page }) => {
+  test.setTimeout(90_000);
+  await openPlayground(page);
+  await importLoop(page);
+  await page.locator("#run").click();
+  await expect(page.locator("#cancel-run")).toBeEnabled({ timeout: 15_000 });
+  await page.locator("#cancel-run").click();
+  await page.locator("#demo-project").click();
+  await expect(page.locator("#file-explorer")).toContainText("4 files");
+  await page.locator("#run").click();
+  await expect(page.locator("#output")).toContainText("all checks passed", { timeout: 60_000 });
+  await expect(page.locator("#output")).not.toContainText("Run cancelled");
+  await expect(page.locator("#run")).toBeEnabled();
+  await expect(page.locator("#cancel-run")).toBeDisabled();
+  await expect(page.locator("#download-manifest")).toBeEnabled();
+});
+
+test("loading another project while run A is active: A's result never reaches the new project", async ({ page }) => {
+  test.setTimeout(90_000);
+  await openPlayground(page);
+  await importLoop(page);
+  await page.locator("#run").click();
+  await expect(page.locator("#cancel-run")).toBeEnabled({ timeout: 15_000 });
+  await page.locator("#demo-project").click();
+  await expect(page.locator("#output")).toContainText("Loaded the cubic root demonstration", { timeout: 15_000 });
+  // Give run A time to finish its cancellation; it must not overwrite the loaded project's message or evidence.
+  await page.waitForTimeout(1500);
+  await expect(page.locator("#output")).toContainText("Loaded the cubic root demonstration");
+  await expect(page.locator("#output")).not.toContainText("Run cancelled");
+  await expect(page.locator("#run")).toBeEnabled();
+  await expect(page.locator("#download-manifest")).toBeDisabled();
+});
