@@ -1,8 +1,21 @@
-// The model function f(x) = x^3 - 2x - 5 and its analytic derivative.
+// The numerical model: the single definition of f(x) = x^3 - 2x - 5 and its analytic derivative.
+// Other modules use these functions; they never repeat the equation.
+
 pub fn f(x: Float) -> Float {
     x * x * x - 2.0 * x - 5.0
 }
 
 pub fn df(x: Float) -> Float {
     3.0 * x * x - 2.0
+}
+
+// f evaluated at every sample, one call to f per point.
+pub fn samples(xs: Array<Float>) -> Array<Float> {
+    mut values: List<Float> = []
+    mut i = 0
+    while i < xs.length() {
+        values.push(f(xs[i]))
+        i = i + 1
+    }
+    array(values)
 }

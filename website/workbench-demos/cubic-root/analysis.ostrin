@@ -1,10 +1,12 @@
 // Symbolic, automatic and numerical derivatives of the model, and the root with its residual.
+// The symbolic and autodiff representations are written out here so that main.ostrin can compare them
+// with the numerical model at reference points. A mismatch is reported as a failed check.
 import std.symbolic
 import std.numeric
 import std.autodiff
 import model
 
-// The model as a symbolic expression x^3 - 2x - 5, in canonical form.
+// The symbolic model as an expression, in canonical form.
 pub fn symbolic_form() -> String {
     s = symbolic.store()
     x = symbolic.symbol(s, "x")
@@ -12,7 +14,15 @@ pub fn symbolic_form() -> String {
     symbolic.show(expr)
 }
 
-// The symbolic derivative 3x^2 - 2 evaluated at x, or an error text.
+// The symbolic model evaluated at x.
+pub fn symbolic_value(at: Float) -> Result<Float, String> {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    expr = symbolic.sub(symbolic.sub(symbolic.power(x, symbolic.number(s, 3)), symbolic.mul(symbolic.number(s, 2), x)), symbolic.number(s, 5))
+    symbolic.eval(expr, ["x"], [at])
+}
+
+// The symbolic derivative evaluated at x.
 pub fn symbolic_derivative(at: Float) -> Result<Float, String> {
     s = symbolic.store()
     x = symbolic.symbol(s, "x")
@@ -23,16 +33,8 @@ pub fn symbolic_derivative(at: Float) -> Result<Float, String> {
     }
 }
 
-// The symbolic model evaluated at x, to compare with the plain function.
-pub fn symbolic_value(at: Float) -> Result<Float, String> {
-    s = symbolic.store()
-    x = symbolic.symbol(s, "x")
-    expr = symbolic.sub(symbolic.sub(symbolic.power(x, symbolic.number(s, 3)), symbolic.mul(symbolic.number(s, 2), x)), symbolic.number(s, 5))
-    symbolic.eval(expr, ["x"], [at])
-}
-
-// Derivative of x^3 - 2x - 5 by reverse-mode autodiff. The tape is built by hand: node 0 is x,
-// node 1 is x^3, node 2 is -2x, node 3 is their sum and node 4 is the constant shift.
+// The derivative by reverse-mode autodiff on a hand-built tape: node 0 is x, node 1 is x^3,
+// node 2 is -2x, node 3 their sum and node 4 the constant shift.
 pub fn autodiff_derivative(at: Float) -> Result<Float, String> {
     mut t = autodiff.tape_var(autodiff.tape_new(), at)
     t = autodiff.tape_op1(t, "pow", 0, 3.0)
@@ -45,7 +47,7 @@ pub fn autodiff_derivative(at: Float) -> Result<Float, String> {
     }
 }
 
-// Central finite-difference derivative of the plain model; an approximation, not an exact value.
+// Central finite-difference derivative of the numerical model; an approximation.
 pub fn numerical_derivative(at: Float) -> Float {
     numeric.derivative(model.f, at)
 }
