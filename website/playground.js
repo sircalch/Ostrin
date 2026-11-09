@@ -19,6 +19,7 @@ import {
   setEntry,
 } from "./workbench-controller.js";
 import { renderExplorer } from "./workbench-explorer.js";
+import { createExecutor } from "./workbench-execution.js";
 
 const EXAMPLES = {
   "Hello, quantities": `fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
@@ -809,6 +810,29 @@ const manifestButton = $("download-manifest");
 const importProjectInput = $("import-project-file");
 let workbench = createWorkbench(projectFromSourceFile("main.ostrin", EXAMPLES[Object.keys(EXAMPLES)[0]]));
 let compilerIdentityPromise = null;
+const cancelRunButton = $("cancel-run");
+const outputDecoder = new TextDecoder();
+// Runs of the project execute in a Worker, so the page stays responsive. One run is active at a time.
+const executor = createExecutor({
+  createWorker: () => new Worker(new URL("./workbench-worker.js", import.meta.url), { type: "module" }),
+  onChange: renderRunState,
+});
+window.addEventListener("pagehide", () => executor.dispose());
+const runStateMessages = { loading: "loading compiler…", running: "running…", cancelled: "cancelled", "timed-out": "timed out", failed: "failed" };
+function renderRunState(run) {
+  if (status && run.state in runStateMessages) status.textContent = runStateMessages[run.state];
+  if (cancelRunButton) cancelRunButton.disabled = !["loading", "running"].includes(run.state);
+}
+// Splits the exact captured bytes into [stream, line] pairs for rendering. The bytes are not changed.
+function linesFromBytes(stdout, stderr) {
+  const split = (bytes, kind) => {
+    const text = outputDecoder.decode(bytes);
+    if (text === "") return [];
+    const parts = text.endsWith("\n") ? text.slice(0, -1).split("\n") : text.split("\n");
+    return parts.map((line) => [kind, line]);
+  };
+  return [...split(stdout, "out"), ...split(stderr, "err")];
+}
 
 function readProjectDraft() {
   try {
@@ -959,6 +983,7 @@ function confirmDiscard() {
 
 async function importProjectFile(file) {
   if (!confirmDiscard()) return;
+  executor.cancel();
   if (file.size > 2 * 1024 * 1024) {
     reportError("project file too large (2 MB limit)");
     return;
@@ -1132,6 +1157,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     const flags = ["--check", "--run"].includes(flag) ? [flag, "--json"] : [flag];
     const isWorkbench = sourceNode === source;
     let runInputSnapshot = null;
+    let rawRun = null;
     let command = null;
     let code;
     let lines;
@@ -1141,7 +1167,21 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       runInputSnapshot = runInput(workbench);
       const args = flag === "--fmt" ? [flag, workbench.activePath] : [...flags, runInputSnapshot.entry];
       command = args.join(" ");
-      ({ code, lines } = await runOstrinc(runInputSnapshot.files, args));
+      const outcome = await executor.run({ command: args, entry: runInputSnapshot.entry, files: runInputSnapshot.files });
+      if (outcome.state !== "completed") {
+        // Cancelled, timed-out or failed runs show no results; the editor keeps its text.
+        outputNode.textContent = outcome.state === "cancelled"
+          ? "Run cancelled. Your edits are kept."
+          : outcome.state === "timed-out"
+            ? "The run timed out: " + (outcome.error?.message ?? "")
+            : "The run failed: " + (outcome.error?.message ?? "unknown error");
+        figureStore.delete(outputNode);
+        statusNode.textContent = runStateMessages[outcome.state] ?? outcome.state;
+        return;
+      }
+      code = outcome.result.code;
+      lines = linesFromBytes(outcome.result.stdout, outcome.result.stderr);
+      rawRun = outcome.result;
     } else {
       ({ code, lines } = await invoke(sourceNode.value, flags));
     }
@@ -1161,6 +1201,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
         command,
         code,
         lines,
+        raw: rawRun,
         figureSvg: figure ? figure.svg : null,
         compilerIdentity: await compilerIdentity(),
       });
@@ -1228,6 +1269,7 @@ if (select && source) {
 }
 
 function loadExampleProject(name) {
+  executor.cancel();
   workbench = createWorkbench({ ...projectFromSourceFile("main.ostrin", EXAMPLES[name]), name });
   syncEditorFromModel();
   refreshExplorer();
@@ -1274,6 +1316,10 @@ resetButton?.addEventListener("click", () => {
   status.textContent = "";
   clearSourceDiagnostic(source, sourceStatus);
 });
+cancelRunButton?.addEventListener("click", () => {
+  // Terminates the active Worker. The run's result is then reported as cancelled; no late result is shown.
+  executor.cancel();
+});
 exportProjectButton?.addEventListener("click", downloadProject);
 importProjectButton?.addEventListener("click", () => importProjectInput?.click());
 importProjectInput?.addEventListener("change", async () => {
@@ -1287,6 +1333,7 @@ $("demo-project")?.addEventListener("click", async () => {
   try {
     const response = await fetch("workbench-demos/cubic-root.ostrin.project.json", { cache: "no-cache" });
     if (!response.ok) throw new Error("HTTP " + response.status);
+    executor.cancel();
     workbench = importProjectText(workbench, await response.text());
     syncEditorFromModel();
     clearSourceDiagnostic(source, sourceStatus);

@@ -142,6 +142,9 @@ export function recordRun(state, input, result) {
       exitCode: result.code,
       stdout: stdout.join("\n") + (stdout.length ? "\n" : ""),
       stderr: stderr.join("\n") + (stderr.length ? "\n" : ""),
+      // Exact bytes from the runtime when available; the text above is only a rendering.
+      stdoutBytes: result.raw?.stdout ?? null,
+      stderrBytes: result.raw?.stderr ?? null,
       figureSvg: result.figureSvg ?? null,
       compilerIdentity: result.compilerIdentity ?? null,
     },
@@ -160,6 +163,8 @@ export async function manifestForLastRun(state) {
     exitCode: run.exitCode,
     stdout: run.stdout,
     stderr: run.stderr,
+    stdoutBytes: run.stdoutBytes,
+    stderrBytes: run.stderrBytes,
     figureSvg: run.figureSvg,
     compilerIdentity: run.compilerIdentity,
   });

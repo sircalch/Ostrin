@@ -131,7 +131,8 @@ export function removeFile(project, path) {
 
 // SHA-256 of a UTF-8 string as lowercase hex. Uses Web Crypto, present in browsers and Node 18+.
 export async function sha256Hex(text) {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", encoder.encode(text));
+  const bytes = typeof text === "string" ? encoder.encode(text) : text;
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -139,7 +140,7 @@ export async function sha256Hex(text) {
 // Fields that the runtime cannot verify are reported explicitly as unknown instead of being invented.
 //   - compiler: the identity line printed by `ostrinc --version` in the same runtime, or null.
 //   - reproducibility: never claimed. Integrity of recorded bytes is not replayability.
-export async function buildRunManifest({ project, entry, command, exitCode, stdout = "", stderr = "", figureSvg = null, compilerIdentity = null }) {
+export async function buildRunManifest({ project, entry, command, exitCode, stdout = "", stderr = "", stdoutBytes = null, stderrBytes = null, figureSvg = null, compilerIdentity = null }) {
   const sources = {};
   for (const path of Object.keys(project.files).sort()) {
     sources[path] = { sha256: await sha256Hex(project.files[path]), bytes: byteLength(project.files[path]) };
@@ -156,8 +157,13 @@ export async function buildRunManifest({ project, entry, command, exitCode, stdo
       compilerSource: compilerIdentity ? "reported by the runtime (--version)" : "not reported",
     },
     outputs: {
-      stdout: { sha256: await sha256Hex(stdout), bytes: byteLength(stdout) },
-      stderr: { sha256: await sha256Hex(stderr), bytes: byteLength(stderr) },
+      // Hashes are over the exact runtime bytes when they were captured; otherwise over the text rendering.
+      stdout: stdoutBytes
+        ? { sha256: await sha256Hex(stdoutBytes), bytes: stdoutBytes.byteLength, source: "raw runtime bytes" }
+        : { sha256: await sha256Hex(stdout), bytes: byteLength(stdout), source: "normalized text" },
+      stderr: stderrBytes
+        ? { sha256: await sha256Hex(stderrBytes), bytes: stderrBytes.byteLength, source: "raw runtime bytes" }
+        : { sha256: await sha256Hex(stderr), bytes: byteLength(stderr), source: "normalized text" },
     },
     claims: {
       integrity: "SHA-256 of the exact source, stdout, stderr and figure bytes recorded for this run",

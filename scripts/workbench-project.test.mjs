@@ -116,3 +116,24 @@ test("run manifest hashes exact bytes and marks an unknown compiler identity", a
 test("sha256Hex matches the known digest of a fixed string", async () => {
   assert.equal(await sha256Hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
 });
+
+test("the manifest hashes the exact captured bytes, including CRLF and the final newline", async () => {
+  const project = createProject("bytes");
+  const raw = new Uint8Array([49, 52, 57, 13, 10]); // "49\r\n" exactly as captured
+  const manifest = await buildRunManifest({
+    project,
+    entry: "main.ostrin",
+    command: "--run main.ostrin",
+    exitCode: 0,
+    stdout: "49\n",
+    stdoutBytes: raw,
+    stderr: "",
+    stderrBytes: new Uint8Array(0),
+    compilerIdentity: "ostrinc 0.2.0",
+  });
+  assert.equal(manifest.outputs.stdout.sha256, await sha256Hex(raw), "hash is over the raw bytes");
+  assert.notEqual(manifest.outputs.stdout.sha256, await sha256Hex("49\n"), "not over the normalized text");
+  assert.equal(manifest.outputs.stdout.bytes, 5);
+  assert.equal(manifest.outputs.stdout.source, "raw runtime bytes");
+  assert.equal(manifest.outputs.stderr.source, "raw runtime bytes");
+});
