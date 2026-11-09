@@ -1,0 +1,20 @@
+// The figure of the model over [-2.5, 3.5], with its root and the tangent line at the root.
+import std.viz
+import model
+
+pub fn figure(root: Float) -> String {
+    xs = linspace(-2.5, 3.5, 121)
+    ys = xs * xs * xs - xs * 2.0 - 5.0
+    slope = model.df(root)
+    tangent = (xs - root) * slope + model.f(root)
+    mut fig = viz.figure("x^3 - 2x - 5 and its root")
+        .describe("f(x) = x^3 - 2x - 5 with its root and the tangent at the root")
+        .labels("x", "y")
+        .xlim(-2.5, 3.5)
+        .polished(caption: "f(x) = x^3 - 2x - 5; root x = " + root.to_string(), label_size: 13, animate: false)
+        .line(xs, ys, label: "f(x)")
+        .line(xs, tangent, label: "tangent at the root", dash: "6 4")
+        .scatter(array([root]), array([0.0]), label: "root", color: "#d1495b", size: 6.0)
+        .hline(0.0)
+    fig.svg()
+}

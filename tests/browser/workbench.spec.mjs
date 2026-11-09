@@ -98,6 +98,8 @@ test("export, reload, import and rerun reproduce the same output and manifest ha
 
 test("a project file with an invalid path is refused and the current project is kept", async ({ page }) => {
   await buildTwoFileProject(page);
+  // Importing replaces unsaved edits, so the page asks first; these tests accept that prompt to reach validation.
+  page.on("dialog", (dialog) => dialog.accept());
   const invalid = JSON.stringify({ format: "ostrin.project", version: 1, name: "bad", entry: "main.ostrin", files: { "../escape.ostrin": "x", "main.ostrin": "x" } });
   await page.locator("#import-project-file").setInputFiles({ name: "bad.ostrin.project.json", mimeType: "application/json", buffer: Buffer.from(invalid) });
   await expect(page.locator("#status")).toContainText("Import refused");
@@ -107,6 +109,8 @@ test("a project file with an invalid path is refused and the current project is 
 
 test("malformed JSON and oversized projects are refused without changing the project", async ({ page }) => {
   await buildTwoFileProject(page);
+  // Importing replaces unsaved edits, so the page asks first; these tests accept that prompt to reach validation.
+  page.on("dialog", (dialog) => dialog.accept());
   await page.locator("#import-project-file").setInputFiles({ name: "broken.json", mimeType: "application/json", buffer: Buffer.from("{not json") });
   await expect(page.locator("#status")).toContainText("Import refused");
   await expect(page.locator("#file-explorer")).toContainText("2 files");

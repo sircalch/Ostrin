@@ -1,0 +1,56 @@
+// Symbolic, automatic and numerical derivatives of the model, and the root with its residual.
+import std.symbolic
+import std.numeric
+import std.autodiff
+import model
+
+// The model as a symbolic expression x^3 - 2x - 5, in canonical form.
+pub fn symbolic_form() -> String {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    expr = symbolic.sub(symbolic.sub(symbolic.power(x, symbolic.number(s, 3)), symbolic.mul(symbolic.number(s, 2), x)), symbolic.number(s, 5))
+    symbolic.show(expr)
+}
+
+// The symbolic derivative 3x^2 - 2 evaluated at x, or an error text.
+pub fn symbolic_derivative(at: Float) -> Result<Float, String> {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    expr = symbolic.sub(symbolic.sub(symbolic.power(x, symbolic.number(s, 3)), symbolic.mul(symbolic.number(s, 2), x)), symbolic.number(s, 5))
+    match symbolic.diff(expr, x) {
+        Ok(d) => symbolic.eval(d, ["x"], [at]),
+        Err(message) => Err(message),
+    }
+}
+
+// The symbolic model evaluated at x, to compare with the plain function.
+pub fn symbolic_value(at: Float) -> Result<Float, String> {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    expr = symbolic.sub(symbolic.sub(symbolic.power(x, symbolic.number(s, 3)), symbolic.mul(symbolic.number(s, 2), x)), symbolic.number(s, 5))
+    symbolic.eval(expr, ["x"], [at])
+}
+
+// Derivative of x^3 - 2x - 5 by reverse-mode autodiff. The tape is built by hand: node 0 is x,
+// node 1 is x^3, node 2 is -2x, node 3 is their sum and node 4 is the constant shift.
+pub fn autodiff_derivative(at: Float) -> Result<Float, String> {
+    mut t = autodiff.tape_var(autodiff.tape_new(), at)
+    t = autodiff.tape_op1(t, "pow", 0, 3.0)
+    t = autodiff.tape_op1(t, "mulk", 0, -2.0)
+    t = autodiff.tape_op2(t, "add", 1, 2)
+    t = autodiff.tape_op1(t, "addk", 3, -5.0)
+    match autodiff.tape_grad(t, 4, [0]) {
+        Ok(grads) => Ok(grads[0]),
+        Err(message) => Err(message),
+    }
+}
+
+// Central finite-difference derivative of the plain model; an approximation, not an exact value.
+pub fn numerical_derivative(at: Float) -> Float {
+    numeric.derivative(model.f, at)
+}
+
+// The root of the model in [a, b] by Brent's method, or the method's error.
+pub fn root_in(a: Float, b: Float) -> Result<Float, String> {
+    numeric.brent(model.f, a, b)
+}

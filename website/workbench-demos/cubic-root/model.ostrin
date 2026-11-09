@@ -1,0 +1,8 @@
+// The model function f(x) = x^3 - 2x - 5 and its analytic derivative.
+pub fn f(x: Float) -> Float {
+    x * x * x - 2.0 * x - 5.0
+}
+
+pub fn df(x: Float) -> Float {
+    3.0 * x * x - 2.0
+}
