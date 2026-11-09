@@ -950,7 +950,15 @@ function downloadProject() {
   }
 }
 
+// Unsaved edits are not silently replaced: the user confirms before any other project is loaded.
+function confirmDiscard() {
+  // The editor text is part of the unsaved state until it is committed to the model.
+  workbench = commitEdit(workbench, source.value);
+  return !isDirty(workbench) || window.confirm("Discard the unsaved changes in this project?");
+}
+
 async function importProjectFile(file) {
+  if (!confirmDiscard()) return;
   if (file.size > 2 * 1024 * 1024) {
     reportError("project file too large (2 MB limit)");
     return;
@@ -1183,7 +1191,13 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
 const select = $("example");
 if (select && source) {
   for (const name of Object.keys(EXAMPLES)) select.append(new Option(name, name));
+  let currentExample = select.value;
   select.addEventListener("change", () => {
+    if (!confirmDiscard()) {
+      select.value = currentExample;
+      return;
+    }
+    currentExample = select.value;
     loadExampleProject(select.value);
     clearDraft();
     clearProjectDraft();
@@ -1252,6 +1266,7 @@ openInput?.addEventListener("change", async () => {
 });
 resetButton?.addEventListener("click", () => {
   if (!source || !select) return;
+  if (!confirmDiscard()) return;
   loadExampleProject(select.value);
   clearDraft();
   clearProjectDraft();
@@ -1267,6 +1282,21 @@ importProjectInput?.addEventListener("change", async () => {
   if (file) await importProjectFile(file);
 });
 manifestButton?.addEventListener("click", downloadManifest);
+$("demo-project")?.addEventListener("click", async () => {
+  if (!confirmDiscard()) return;
+  try {
+    const response = await fetch("workbench-demos/cubic-root.ostrin.project.json", { cache: "no-cache" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    workbench = importProjectText(workbench, await response.text());
+    syncEditorFromModel();
+    clearSourceDiagnostic(source, sourceStatus);
+    if (output) output.textContent = "Loaded the cubic root demonstration. Nothing has run yet: press Run to execute main.ostrin.";
+    refreshExplorer();
+    persistProjectDraft();
+  } catch (error) {
+    reportError("Demo not loaded: " + (error.message ?? error));
+  }
+});
 let draftTimer = 0;
 source?.addEventListener("input", () => {
   clearTimeout(draftTimer);

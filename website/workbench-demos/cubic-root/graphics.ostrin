@@ -1,0 +1,19 @@
+// The figure of the numerical model, sampled from model.samples, with its root and the tangent at the root.
+import std.viz
+import model
+
+pub fn figure(root: Float) -> String {
+    xs = linspace(-2.5, 3.5, 121)
+    ys = model.samples(xs)
+    tangent = (xs - root) * model.df(root) + model.f(root)
+    mut fig = viz.figure("model f(x) and its root")
+        .describe("the numerical model sampled on 121 points, its root and the tangent at the root")
+        .labels("x", "y")
+        .xlim(-2.5, 3.5)
+        .polished(caption: "f(x) from model.ostrin; root x = " + root.to_string(), label_size: 13, animate: false)
+        .line(xs, ys, label: "f(x)")
+        .line(xs, tangent, label: "tangent at the root", dash: "6 4")
+        .scatter(array([root]), array([0.0]), label: "root", color: "#d1495b", size: 6.0)
+        .hline(0.0)
+    fig.svg()
+}

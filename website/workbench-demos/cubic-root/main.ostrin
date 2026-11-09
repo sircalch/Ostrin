@@ -1,0 +1,121 @@
+// Workbench demonstration: x^3 - 2x - 5, its root and three derivatives, checked against the model.
+// Every comparison counts as a failure unless it is true, so NaN and infinities always fail.
+import model
+import analysis
+import graphics
+
+// True only when |value - reference| <= tol. NaN and infinities make the comparison false.
+fn close_to(value: Float, reference: Float, tol: Float) -> Bool {
+    abs(value - reference) <= tol
+}
+
+fn main() -> Int {
+    print("symbolic model: " + analysis.symbolic_form())
+    mut failures = 0
+
+    // The symbolic representations must describe the same function as the numerical model.
+    points = array([-2.0, -0.5, 0.0, 1.0, 2.5])
+    mut i = 0
+    while i < points.length() {
+        x = points[i]
+        match analysis.symbolic_value(x) {
+            Ok(symbolic) => {
+                if not close_to(symbolic, model.f(x), 1e-12) {
+                    print("FAIL symbolic value differs from model.f at x = " + x.to_string())
+                    failures = failures + 1
+                }
+            },
+            Err(message) => {
+                print("FAIL symbolic value: " + message)
+                failures = failures + 1
+            },
+        }
+        match analysis.symbolic_derivative(x) {
+            Ok(symbolic) => {
+                if not close_to(symbolic, model.df(x), 1e-12) {
+                    print("FAIL symbolic derivative differs from model.df at x = " + x.to_string())
+                    failures = failures + 1
+                }
+            },
+            Err(message) => {
+                print("FAIL symbolic derivative: " + message)
+                failures = failures + 1
+            },
+        }
+        i = i + 1
+    }
+
+    match analysis.root_in(1.0, 3.0) {
+        Ok(root) => {
+            print("root: " + root.to_string())
+            if not close_to(root, root, 1e300) {
+                print("FAIL root is not finite")
+                failures = failures + 1
+            }
+            analytic = model.df(root)
+            residual = model.f(root)
+            // Brent stops when the bracket is below 1e-12 in x, so |f(root)| <= |f'(root)| * 1e-12 up to a
+            // safety factor of 10 (a bound on the x error multiplied by the slope).
+            residual_bound = 10.0 * abs(analytic) * 1e-12
+            print("residual |f(root)|: " + abs(residual).to_string())
+            if not close_to(residual, 0.0, residual_bound) {
+                print("FAIL residual exceeds the bound |f'(root)| * 1e-11")
+                failures = failures + 1
+            }
+            match analysis.symbolic_derivative(root) {
+                Ok(symbolic) => {
+                    print("symbolic derivative: " + symbolic.to_string())
+                    if not close_to(symbolic, analytic, 1e-12) {
+                        print("FAIL symbolic derivative differs from model.df")
+                        failures = failures + 1
+                    }
+                },
+                Err(message) => {
+                    print("FAIL symbolic derivative: " + message)
+                    failures = failures + 1
+                },
+            }
+            match analysis.autodiff_derivative(root) {
+                Ok(automatic) => {
+                    print("autodiff derivative: " + automatic.to_string())
+                    if not close_to(automatic, analytic, 1e-12) {
+                        print("FAIL autodiff derivative differs from model.df")
+                        failures = failures + 1
+                    }
+                },
+                Err(message) => {
+                    print("FAIL autodiff derivative: " + message)
+                    failures = failures + 1
+                },
+            }
+            numerical = analysis.numerical_derivative(root)
+            print("finite-difference derivative: " + numerical.to_string())
+            if not close_to(numerical, analytic, 1e-5) {
+                print("FAIL finite difference differs from model.df by more than 1e-5")
+                failures = failures + 1
+            }
+            print(graphics.figure(root))
+        },
+        Err(message) => {
+            print("FAIL root: " + message)
+            failures = failures + 1
+        },
+    }
+
+    // [0, 1] has no sign change, so the method must return an error. An Ok here is a failed check.
+    match analysis.root_in(0.0, 1.0) {
+        Ok(root) => {
+            print("FAIL unexpected root in [0, 1]: " + root.to_string())
+            failures = failures + 1
+        },
+        Err(message) => print("expected error for [0, 1]: " + message),
+    }
+
+    if failures == 0 {
+        print("all checks passed")
+        0
+    } else {
+        print("checks failed: " + failures.to_string())
+        1
+    }
+}

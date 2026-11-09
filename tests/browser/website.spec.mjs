@@ -1134,6 +1134,8 @@ test("Playground shows printed SVG figures and keeps a local draft", async ({ pa
   await page.waitForTimeout(700);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(source).toHaveValue(/print\(42\)/);
+  // Reset discards unsaved edits, so the page asks first; this test accepts that prompt.
+  page.once("dialog", (dialog) => dialog.accept());
   await page.locator("#reset").click();
   await expect(source).not.toHaveValue(/print\(42\)/);
 });
