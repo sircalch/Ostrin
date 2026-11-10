@@ -1,0 +1,197 @@
+{
+  "schema": "ostrin.benchmark/v1",
+  "subject": "Workbench Delta: Worker execution, cold/warm start, cancellation, editor responsiveness",
+  "methodology": {
+    "cold": "5 runs, each in a new browser context (no HTTP cache); each loads the page, then runs the parameter sweep once in a new Worker",
+    "warm": "10 runs in one page after one warm-up run; the Worker is reused",
+    "cancel": "5 cancellations of an endless program; each followed by a sweep run",
+    "responsiveness": "time of a synchronous editor update dispatched while a program runs",
+    "notes": "compileMs is the Worker's own download and compile of ostrinc.wasm (0 when cached). The ping message does not compile and is not reported as preparation time. Times are wall-clock in the browser; values are not compared with other machines."
+  },
+  "environment": {
+    "os": "Windows_NT 10.0.26200 x64",
+    "cpus": "AMD Ryzen 7 5700X 8-Core Processor             ",
+    "cpuCount": 16,
+    "browser": "chromium 153.0.8010.12",
+    "commit": "119675ed2bdbf14414dde91b1e00ab5e94217b88",
+    "measuredAt": "2026-11-10T23:07:50.480Z"
+  },
+  "cold": {
+    "loadMs": {
+      "n": 5,
+      "median": 183,
+      "min": 157,
+      "max": 196,
+      "mean": 176,
+      "sd": 17.175564037317667,
+      "q1": 159,
+      "q3": 185
+    },
+    "compileMs": {
+      "n": 5,
+      "median": 25.59999990463257,
+      "min": 23.799999952316284,
+      "max": 27.40000009536743,
+      "mean": 25.659999990463255,
+      "sd": 1.2876335387743474,
+      "q1": 25.5,
+      "q3": 26
+    },
+    "instantiateMs": {
+      "n": 5,
+      "median": 0.5,
+      "min": 0.5,
+      "max": 0.8999998569488525,
+      "mean": 0.6199999809265136,
+      "sd": 0.17888538755357636,
+      "q1": 0.5,
+      "q3": 0.7000000476837158
+    },
+    "runMs": {
+      "n": 5,
+      "median": 252.79999995231628,
+      "min": 244,
+      "max": 257.30000019073486,
+      "mean": 250.4,
+      "sd": 5.9148120029269124,
+      "q1": 244.39999985694885,
+      "q3": 253.5
+    },
+    "transferMs": {
+      "n": 5,
+      "median": 0.2998046875,
+      "min": 0.2001953125,
+      "max": 0.399658203125,
+      "mean": 0.29990234375,
+      "sd": 0.0705208552335614,
+      "q1": 0.2998046875,
+      "q3": 0.300048828125
+    },
+    "totalMs": {
+      "n": 5,
+      "median": 294.2000000476837,
+      "min": 283.39999985694885,
+      "max": 298.40000009536743,
+      "mean": 291.0400000572205,
+      "sd": 6.9219217735070755,
+      "q1": 283.90000009536743,
+      "q3": 295.30000019073486
+    },
+    "workerCreateMs": {
+      "n": 5,
+      "median": 0.20000004768371582,
+      "min": 0.10000014305114746,
+      "max": 0.20000004768371582,
+      "mean": 0.16000008583068848,
+      "sd": 0.05477220351562305,
+      "q1": 0.10000014305114746,
+      "q3": 0.20000004768371582
+    },
+    "wallMs": {
+      "n": 5,
+      "median": 299,
+      "min": 288.5,
+      "max": 303.39999985694885,
+      "mean": 296.3999999523163,
+      "sd": 6.689917772269581,
+      "q1": 290.09999990463257,
+      "q3": 301
+    }
+  },
+  "warm": {
+    "compileMs": {
+      "n": 10,
+      "median": 0,
+      "min": 0,
+      "max": 0,
+      "mean": 0,
+      "sd": 0,
+      "q1": 0,
+      "q3": 0
+    },
+    "instantiateMs": {
+      "n": 10,
+      "median": 0.5,
+      "min": 0.2999999523162842,
+      "max": 0.7000000476837158,
+      "mean": 0.48000004291534426,
+      "sd": 0.1316561571586847,
+      "q1": 0.40000009536743164,
+      "q3": 0.5750001072883606
+    },
+    "runMs": {
+      "n": 10,
+      "median": 149.9999998807907,
+      "min": 126.79999995231628,
+      "max": 174.20000004768372,
+      "mean": 147.89999997615814,
+      "sd": 13.91058750418088,
+      "q1": 137.80000001192093,
+      "q3": 154.05000001192093
+    },
+    "transferMs": {
+      "n": 10,
+      "median": 0.2001953125,
+      "min": 0.10009765625,
+      "max": 0.39990234375,
+      "mean": 0.2400634765625,
+      "sd": 0.08427470097352492,
+      "q1": 0.20001220703125,
+      "q3": 0.300048828125
+    },
+    "totalMs": {
+      "n": 10,
+      "median": 150.95000004768372,
+      "min": 127.89999985694885,
+      "max": 175.60000014305115,
+      "mean": 148.95000002384185,
+      "sd": 14.014774006355081,
+      "q1": 138.57500010728836,
+      "q3": 155.30000001192093
+    },
+    "wallMs": {
+      "n": 10,
+      "median": 152.55000007152557,
+      "min": 129.29999995231628,
+      "max": 177.70000004768372,
+      "mean": 150.85999999046325,
+      "sd": 14.24696460781695,
+      "q1": 140.22499990463257,
+      "q3": 157.7249999642372
+    }
+  },
+  "cancel": {
+    "cancelToIdleMs": {
+      "n": 5,
+      "median": 33,
+      "min": 31,
+      "max": 49,
+      "mean": 35.6,
+      "sd": 7.536577472566709,
+      "q1": 32,
+      "q3": 33
+    },
+    "recoveryRunMs": {
+      "n": 5,
+      "median": 215,
+      "min": 203.70000004768372,
+      "max": 299.2000000476837,
+      "mean": 231.5199999809265,
+      "sd": 40.046934980069956,
+      "q1": 203.79999995231628,
+      "q3": 235.89999985694885
+    }
+  },
+  "responsiveness": {
+    "editorUpdateMs": {
+      "n": 5,
+      "median": 0.09999990463256836,
+      "min": 0,
+      "max": 0.20000004768371582,
+      "mean": 0.09999995231628418,
+      "sd": 0.07071069497742431,
+      "q1": 0.09999990463256836,
+      "q3": 0.09999990463256836
+    }
+  }
+}
