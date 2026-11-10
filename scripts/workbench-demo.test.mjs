@@ -121,3 +121,56 @@ test("the expected error case is reported by the method, not hidden", () => {
   const out = runProject().stdout;
   assert.match(out, /expected error for \[0, 1\]: /);
 });
+
+// ---- parameter sweep (Delta) -----------------------------------------------------------------------------
+import { parseResults } from "../website/workbench-results.js";
+
+function runDemo(id, edits = {}) {
+  const project = demoProject(id);
+  for (const [name, [from, to]] of Object.entries(edits)) {
+    assert.ok(project.files[name].includes(from), `edit target not found in ${name}: ${from}`);
+    project.files[name] = project.files[name].replace(from, to);
+  }
+  const dir = mkdtempSync(path.join(os.tmpdir(), "ostrin-sweep-"));
+  try {
+    for (const [name, text] of Object.entries(filesForRun(project))) writeFileSync(path.join(dir, name), text);
+    return spawnSync(compiler, ["--run", project.entry], { cwd: dir, encoding: "utf8" });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const linesOf = (stdout) => stdout.split("\n").filter((l) => l.length > 0).map((text) => ["out", text]);
+
+test("parameter sweep: four scenarios through the real compiler, each converged and passing its checks", () => {
+  const result = runDemo("parameter-sweep");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const parsed = parseResults(linesOf(result.stdout));
+  assert.equal(parsed.ok, true, parsed.reason);
+  const rows = parsed.document.rows;
+  assert.deepEqual(rows.map((r) => r.c), [1, 3, 5, 7]);
+  for (const r of rows) {
+    assert.equal(r.status, "converged", `c = ${r.c}`);
+    assert.equal(r.passed, true, `c = ${r.c}`);
+    assert.ok(Math.abs(r.residual) <= r.residual_bound, `residual within its bound for c = ${r.c}`);
+    assert.ok(Math.abs(r.numeric_derivative - r.analytic_derivative) <= 1e-5, `finite difference for c = ${r.c}`);
+  }
+  // Reference roots: c = 1 has the golden ratio (1 + sqrt 5)/2; c = 5 is the cubic root used by the other demo.
+  assert.ok(Math.abs(rows[0].root - (1 + Math.sqrt(5)) / 2) <= 1e-12, `root for c = 1: ${rows[0].root}`);
+  assert.ok(Math.abs(rows[2].root - 2.0945514815423265) <= 1e-12, `root for c = 5: ${rows[2].root}`);
+  // The roots increase with c on this bracket.
+  assert.ok(rows.every((r, i) => i === 0 || r.root > rows[i - 1].root));
+  assert.match(result.stdout, /expected error for \[0, 1\]/);
+  assert.equal(result.stdout.split("<svg").length - 1, 1, "one comparative figure");
+});
+
+test("parameter sweep: a wrapper that disagrees with its parameter fails that scenario and the run", () => {
+  // g5 now fixes c = 6 while the scenario reports c = 5: the residual is not zero and the check must fail.
+  const result = runDemo("parameter-sweep", { "model.ostrin": ["    f(x, 5.0)", "    f(x, 6.0)"] });
+  assert.equal(result.status, 1, "a failed scenario ends the run with a failing status");
+  const parsed = parseResults(linesOf(result.stdout));
+  assert.equal(parsed.ok, true, parsed.reason);
+  const failed = parsed.document.rows.find((r) => r.c === 5);
+  assert.equal(failed.passed, false, "the c = 5 scenario is marked failed");
+  assert.match(result.stdout, /FAIL c = 5/);
+});

@@ -1,0 +1,19 @@
+// Comparative figure: f(x; c) for every scenario, with each root marked.
+import std.viz
+import model
+
+pub fn figure(c1: Float, c3: Float, c5: Float, c7: Float, r1: Float, r3: Float, r5: Float, r7: Float) -> String {
+    xs = linspace(-2.5, 3.5, 121)
+    mut fig = viz.figure("f(x; c) = x^3 - 2x - c, roots for c = 1, 3, 5, 7")
+        .describe("the family sampled on 121 points; each scenario's root is marked on the axis")
+        .labels("x", "f(x; c)")
+        .xlim(-2.5, 3.5)
+        .polished(caption: "roots by std.numeric.brent on [1, 3] for c = 1, 3, 5, 7", label_size: 13, animate: false)
+        .line(xs, model.samples(xs, c1), label: "c = 1")
+        .line(xs, model.samples(xs, c3), label: "c = 3")
+        .line(xs, model.samples(xs, c5), label: "c = 5")
+        .line(xs, model.samples(xs, c7), label: "c = 7")
+        .scatter(array([r1, r3, r5, r7]), array([0.0, 0.0, 0.0, 0.0]), label: "roots", color: "#d1495b", size: 6.0)
+        .hline(0.0)
+    fig.svg()
+}
