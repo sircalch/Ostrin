@@ -831,15 +831,30 @@ function renderRunState(run) {
 // The structured results of the last run, when it printed a valid RESULTS line; used by the export button.
 let lastResultsDocument = null;
 
-// Renders the RESULTS table of a run at the top of the output panel. Only DOM APIs are used, so program text
-// is never interpreted as HTML. Runs without valid structured results leave the export disabled.
-function renderResultsTable(outputNode, lines) {
+// Results become exportable only while they are the ones on screen. Every path that replaces the project, starts a
+// run, or ends a run without valid results calls this first.
+function clearResultsExport() {
   lastResultsDocument = null;
   const button = $("download-results");
   if (button) button.disabled = true;
+}
+
+// Renders the RESULTS table of a run at the top of the output panel. Only DOM APIs are used, so program text
+// is never interpreted as HTML. A RESULTS line that is rejected is kept in the log and its reason is shown.
+function renderResultsTable(outputNode, lines) {
+  clearResultsExport();
   if (!lines || lines.length === 0) return;
   const parsed = parseResults(lines);
-  if (!parsed.ok) return;
+  if (!parsed.ok) {
+    if (parsed.reason !== "no structured results in this run") {
+      const note = document.createElement("p");
+      note.className = "results-rejected";
+      note.textContent = "Structured results were rejected: " + parsed.reason;
+      outputNode.prepend(note);
+    }
+    return;
+  }
+  const button = $("download-results");
   const table = resultsTable(parsed.document);
   const wrap = document.createElement("div");
   wrap.className = "results-table";
@@ -1055,6 +1070,7 @@ async function importProjectFile(file) {
   executor.cancel();
   presentation.changeProject();
   workbench = next;
+  clearResultsExport();
   syncEditorFromModel();
   if (output) output.textContent = `Opened ${file.name}. Nothing has run yet; press Run to execute the entry.`;
   clearSourceDiagnostic(source, sourceStatus);
@@ -1227,6 +1243,8 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       runInputSnapshot = runInput(workbench);
       const args = flag === "--fmt" ? [flag, workbench.activePath] : [...flags, runInputSnapshot.entry];
       command = args.join(" ");
+      // The previous results are no longer the ones on screen once a new run starts.
+      clearResultsExport();
       const outcome = await executor.run({ command: args, entry: runInputSnapshot.entry, files: runInputSnapshot.files });
       if (!current()) return;
       if (outcome.state !== "completed") {
@@ -1238,6 +1256,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
             : "The run failed: " + (outcome.error?.message ?? "unknown error");
         publish(() => {
           figureStore.delete(outputNode);
+          clearResultsExport();
           outputNode.textContent = message;
           statusNode.textContent = runStateMessages[outcome.state] ?? outcome.state;
         });
@@ -1252,7 +1271,9 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     // Prepared locally: none of this is visible until publish() runs.
     const diagnostics = lines.map(([, text]) => parseDiagnostic(text)).filter(Boolean);
     // The structured RESULTS line is not part of the log; it is rendered as a table. Its bytes stay in the run.
-    const logLines = lines.filter(([kind, text]) => !(kind === "out" && text.startsWith(RESULTS_PREFIX)));
+    // Only a valid RESULTS line leaves the log; a rejected one stays visible with its reason.
+    const structuredOk = parseResults(lines).ok;
+    const logLines = lines.filter(([kind, text]) => !(structuredOk && kind === "out" && text.startsWith(RESULTS_PREFIX)));
     let html = logLines.map(renderLine).join("\n");
     // The figure's surrounding text comes from the log lines only, never from the structured RESULTS line.
     const figure = flag === "--run" && code === 0 ? extractFigure(logLines) : null;
@@ -1301,6 +1322,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     // An exception from a stale run must not replace the output or status of a newer one.
     publish(() => {
       figureStore.delete(outputNode);
+      clearResultsExport();
       outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
       statusNode.textContent = "failed to start";
       clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
@@ -1354,6 +1376,7 @@ if (select && source) {
 
 function loadExampleProject(name) {
   executor.cancel();
+  clearResultsExport();
   presentation.changeProject();
   workbench = createWorkbench({ ...projectFromSourceFile("main.ostrin", EXAMPLES[name]), name });
   syncEditorFromModel();
@@ -1420,6 +1443,7 @@ async function loadDemo(documentPath, label) {
     if (!response.ok) throw new Error("HTTP " + response.status);
     executor.cancel();
     presentation.changeProject();
+    clearResultsExport();
     workbench = importProjectText(workbench, await response.text());
     syncEditorFromModel();
     clearSourceDiagnostic(source, sourceStatus);

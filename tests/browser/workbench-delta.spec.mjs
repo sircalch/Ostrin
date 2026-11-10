@@ -75,3 +75,35 @@ test("export, reload, import and rerun give the same structured results", async 
   const secondResults = JSON.parse(await readFile(await secondDownload.path(), "utf8"));
   expect(secondResults).toEqual(firstResults);
 });
+
+test("loading another demo disables the previous run's results export", async ({ page }) => {
+  test.setTimeout(120_000);
+  await openSweep(page);
+  await page.locator("#run").click();
+  await expect(page.locator("#output")).toContainText("all checks passed", { timeout: 90_000 });
+  await expect(page.locator("#download-results")).toBeEnabled();
+  await page.locator("#demo-project").click();
+  await expect(page.locator("#output")).toContainText("Loaded the cubic root demonstration");
+  await expect(page.locator("#download-results")).toBeDisabled();
+});
+
+test("a malformed RESULTS line is kept in the log with the reason, and no table is shown", async ({ page }) => {
+  test.setTimeout(120_000);
+  const bad = JSON.stringify({
+    format: "ostrin.project",
+    version: 1,
+    name: "bad results",
+    entry: "main.ostrin",
+    files: { "main.ostrin": "fn main() -> Void {\n    print(\"RESULTS {not json\")\n}\n" },
+  });
+  await page.goto("./playground.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#run")).toBeEnabled({ timeout: 45_000 });
+  await page.locator("#import-project-file").setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from(bad) });
+  await expect(page.locator("#file-explorer")).toContainText("1 file");
+  await page.locator("#run").click();
+  const output = page.locator("#output");
+  await expect(output).toContainText("Structured results were rejected", { timeout: 60_000 });
+  await expect(output).toContainText("RESULTS {not json");
+  await expect(page.locator(".results-table")).toHaveCount(0);
+  await expect(page.locator("#download-results")).toBeDisabled();
+});
