@@ -99,6 +99,9 @@ export function parseWorkerReply(message) {
     if (!(message.stdout instanceof Uint8Array) || !(message.stderr instanceof Uint8Array)) {
       throw new Error("result stdout and stderr must be byte arrays");
     }
+    if (message.timing !== undefined && (typeof message.timing !== "object" || message.timing === null)) {
+      throw new Error("result timing must be an object when present");
+    }
     if (!Array.isArray(message.ordered) || message.ordered.some((chunk) => !chunk || (chunk.stream !== "out" && chunk.stream !== "err") || !(chunk.bytes instanceof Uint8Array))) {
       throw new Error("result must carry the ordered output as tagged byte chunks");
     }

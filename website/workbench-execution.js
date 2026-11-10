@@ -79,7 +79,16 @@ export function createExecutor({ createWorker, onChange = () => {}, setTimer = s
       if (active.run.state === "loading") {
         active.run = transition(active.run, "running");
       }
-      const current = finish("completed", { result: { code: reply.code, stdout: reply.stdout, stderr: reply.stderr, ordered: reply.ordered } });
+      // Page-side measures: the time the reply took to arrive, the Worker's reuse and creation cost, and the total.
+      const receivedAt = performance.timeOrigin + performance.now();
+      const timing = {
+        ...(reply.timing ?? {}),
+        workerReused: active.start?.reused ?? false,
+        workerCreateMs: active.start?.createMs ?? 0,
+        transferMs: reply.timing ? receivedAt - reply.timing.repliedAt : null,
+        totalMs: performance.now() - active.startedAt,
+      };
+      const current = finish("completed", { result: { code: reply.code, stdout: reply.stdout, stderr: reply.stderr, ordered: reply.ordered, timing } });
       keepWorker(current);
       settle(current, { state: "completed", result: current.run.result, id: current.run.id });
     }
@@ -103,14 +112,21 @@ export function createExecutor({ createWorker, onChange = () => {}, setTimer = s
     settle(current, { state: "failed", error: current.run.error, id: current.run.id });
   }
 
+  // Returns the Worker for a run and records whether it was reused and what its creation cost.
+  // `createMs` is zero for a reused Worker; for a new one it is the synchronous cost of the constructor call.
   function startWorker(run) {
     if (idleWorker) {
       const worker = idleWorker;
       idleWorker = null;
+      lastStart = { reused: true, createMs: 0 };
       return worker;
     }
-    return createWorker();
+    const createStart = performance.now();
+    const worker = createWorker();
+    lastStart = { reused: false, createMs: performance.now() - createStart };
+    return worker;
   }
+  let lastStart = { reused: false, createMs: 0 };
 
 
   return {
@@ -132,7 +148,7 @@ export function createExecutor({ createWorker, onChange = () => {}, setTimer = s
       const id = nextId();
       const run = createRun(id, { timeoutMs });
       return new Promise((resolve) => {
-        const current = { run, worker: null, timer: null, resolve, request };
+        const current = { run, worker: null, timer: null, resolve, request, startedAt: performance.now(), start: null };
         active = current;
         current.run = transition(current.run, "loading");
         publish(current.run);
@@ -149,6 +165,7 @@ export function createExecutor({ createWorker, onChange = () => {}, setTimer = s
         let worker;
         try {
           worker = startWorker(run);
+          current.start = lastStart;
           worker.onmessage = (event) => onWorkerMessage(run, event);
           worker.onerror = (event) => onWorkerError(run, event);
           current.worker = worker;

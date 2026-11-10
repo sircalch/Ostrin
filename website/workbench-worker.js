@@ -43,7 +43,13 @@ function concat(chunks) {
   return out;
 }
 
+// Times are in milliseconds. `compileMs` is zero when the module was already compiled in this Worker, so it
+// measures only the work that actually happened in this run: the download and compilation of ostrinc.wasm.
+// `ping` does not compile anything; it only answers, and its time is not a compiler preparation time.
+const now = () => performance.now();
+
 async function execute(id, command, files) {
+  const received = now();
   const stdout = [];
   const stderr = [];
   // The same chunks in the order the program wrote them, each tagged with its stream.
@@ -63,11 +69,20 @@ async function execute(id, command, files) {
     new PreopenDirectory(".", directoryContents(files)),
   ];
   const wasi = new WASI(["ostrinc", ...command], [], fds);
+  const cached = modulePromise !== null;
   let code;
+  const timing = { cached, compileMs: 0, instantiateMs: 0, runMs: 0, receivedAt: performance.timeOrigin + received };
   try {
-    const instance = await WebAssembly.instantiate(await compiler(), { wasi_snapshot_preview1: wasi.wasiImport });
+    const compileStart = now();
+    const module = await compiler();
+    timing.compileMs = cached ? 0 : now() - compileStart;
+    const instantiateStart = now();
+    const instance = await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi.wasiImport });
+    timing.instantiateMs = now() - instantiateStart;
     self.postMessage({ type: "started", id });
+    const runStart = now();
     code = wasi.start(instance);
+    timing.runMs = now() - runStart;
   } catch (error) {
     self.postMessage({ type: "runtime-error", id, message: String(error?.message ?? error) });
     return;
@@ -75,7 +90,8 @@ async function execute(id, command, files) {
   const out = concat(stdout);
   const err = concat(stderr);
   const transfer = [out.buffer, err.buffer, ...ordered.map((chunk) => chunk.bytes.buffer)];
-  self.postMessage({ type: "result", id, code, stdout: out, stderr: err, ordered }, transfer);
+  timing.repliedAt = performance.timeOrigin + now();
+  self.postMessage({ type: "result", id, code, stdout: out, stderr: err, ordered, timing }, transfer);
 }
 
 self.onmessage = (event) => {
