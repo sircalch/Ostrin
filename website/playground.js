@@ -21,7 +21,7 @@ import {
 import { renderExplorer } from "./workbench-explorer.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
-import { parseResults, resultsTable, resultsJsonText, RESULTS_PREFIX } from "./workbench-results.js";
+import { parseResults, resultsTable, resultsExportText, RESULTS_PREFIX } from "./workbench-results.js";
 import { createPresentationGuard } from "./workbench-presentation.js";
 
 const EXAMPLES = {
@@ -884,7 +884,7 @@ function renderResultsTable(outputNode, lines) {
   element.append(head, body);
   wrap.append(caption, element);
   outputNode.prepend(wrap);
-  lastResultsDocument = parsed.document;
+  lastResultsDocument = parsed;
   if (button) button.disabled = false;
 }
 
@@ -1458,7 +1458,8 @@ $("demo-project")?.addEventListener("click", () => loadDemo("workbench-demos/cub
 $("demo-sweep")?.addEventListener("click", () => loadDemo("workbench-demos/parameter-sweep.ostrin.project.json", "the parameter sweep"));
 $("download-results")?.addEventListener("click", () => {
   if (!lastResultsDocument) return;
-  download("results.json", resultsJsonText(lastResultsDocument), "application/json");
+  // The file is the exact payload of the RESULTS line that was validated and shown.
+  download("results.json", resultsExportText(lastResultsDocument), "application/json");
 });
 let draftTimer = 0;
 source?.addEventListener("input", () => {

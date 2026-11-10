@@ -24,8 +24,12 @@ document. The Workbench reads only that line, validates it (schema, row fields, 
 shows it as a table. Free text is never interpreted as a table. Stderr never provides results. A run with
 no structured results, or with more than one such line, shows no table and says why.
 
-The table shows the program's own values, unrounded. The **Results JSON** button exports the document exactly as
-the program printed it.
+The table shows the program's own values, unrounded. Numbers must be finite: a value such as `1e999`, which JSON can
+spell but which parses to infinity, rejects the whole document. Nothing is converted silently to `null` or zero.
+
+The **Results JSON** button exports the exact text of the validated `RESULTS` payload. It does not re-serialize the
+document, so its bytes are the bytes printed on that line. This is a statement about that line only. The manifest
+hashes the whole captured stdout; the export file is not a separate byte-identical copy of stdout.
 
 ## Evidence
 

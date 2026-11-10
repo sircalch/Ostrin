@@ -28,7 +28,7 @@ export function parseResults(lines) {
   }
   const problems = validateResults(document);
   if (problems.length > 0) return { ok: false, reason: problems.join("; ") };
-  return { ok: true, document };
+  return { ok: true, document, payload: hits[0][1].slice(RESULTS_PREFIX.length) };
 }
 
 export function validateResults(document) {
@@ -50,7 +50,8 @@ export function validateResults(document) {
     }
     if (!STATUSES.includes(row.status)) problems.push(`row ${index} has an unknown status`);
     for (const key of ["c", "root", "residual", "residual_bound", "analytic_derivative", "numeric_derivative"]) {
-      if (key in row && typeof row[key] !== "number") problems.push(`row ${index} ${key} must be a number`);
+      // JSON can carry out-of-range exponents such as 1e999, which parse to Infinity: only finite numbers pass.
+      if (key in row && !(typeof row[key] === "number" && Number.isFinite(row[key]))) problems.push(`row ${index} ${key} must be a finite number`);
     }
     if (typeof row.passed !== "boolean") problems.push(`row ${index} passed must be a boolean`);
   });
@@ -73,8 +74,9 @@ export function resultsTable(document) {
   return { headers, rows };
 }
 
-// The exported text of the structured results: the document exactly as the program printed it, re-serialized
-// with stable key order. Numbers are never rounded.
-export function resultsJsonText(document) {
-  return JSON.stringify(document, null, 2) + "\n";
+// The exported text of a validated run: the exact payload text of its RESULTS line. It is not re-serialized, so
+// the bytes are the ones the program printed on that line. A re-serialized copy would not be the same bytes.
+export function resultsExportText(parsed) {
+  if (!parsed || !parsed.ok) throw new Error("only a validated RESULTS payload can be exported");
+  return parsed.payload;
 }
