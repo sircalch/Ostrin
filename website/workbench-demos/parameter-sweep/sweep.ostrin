@@ -1,0 +1,64 @@
+// One scenario per parameter value: the root by Brent's method on [1, 3], its residual, the analytic and the
+// finite-difference derivative, and the convergence status. Every check is strict: a comparison passes only
+// when it is true, so NaN and infinities fail.
+import std.numeric
+import model
+
+// Result of one scenario. `passed` is true only when the root converged and every check holds.
+pub record Row {
+    c: Float
+    status: String
+    root: Float
+    residual: Float
+    residual_bound: Float
+    analytic: Float
+    numeric: Float
+    passed: Bool
+    message: String
+}
+
+// |a - b| <= tol; NaN and infinities make the comparison false.
+pub fn close_to(a: Float, b: Float, tol: Float) -> Bool {
+    abs(a - b) <= tol
+}
+
+// The scenario for one parameter value c, using the wrapper g that fixes it.
+pub fn scenario(c: Float, g: fn(Float) -> Float) -> Row {
+    match numeric.brent(g, 1.0, 3.0) {
+        Ok(root) => {
+            residual = model.f(root, c)
+            analytic = model.df(root)
+            numerical = numeric.derivative(g, root)
+            bound = 10.0 * abs(analytic) * 1e-12
+            residual_ok = close_to(residual, 0.0, bound)
+            derivative_ok = close_to(numerical, analytic, 1e-5)
+            Row { c: c, status: "converged", root: root, residual: residual, residual_bound: bound, analytic: analytic, numeric: numerical, passed: residual_ok and derivative_ok, message: "" }
+        },
+        Err(message) => Row { c: c, status: "failed", root: 0.0, residual: 0.0, residual_bound: 0.0, analytic: 0.0, numeric: 0.0, passed: false, message: message },
+    }
+}
+
+// One row as a JSON object. Numbers use Ostrin's shortest round-trip text.
+pub fn row_json(r: Row) -> String {
+    passed = if r.passed { "true" } else { "false" }
+    "{\"c\":" + r.c.to_string() + ",\"status\":\"" + r.status + "\",\"root\":" + r.root.to_string() + ",\"residual\":" + r.residual.to_string() + ",\"residual_bound\":" + r.residual_bound.to_string() + ",\"analytic_derivative\":" + r.analytic.to_string() + ",\"numeric_derivative\":" + r.numeric.to_string() + ",\"passed\":" + passed + ",\"message\":\"" + r.message + "\"}"
+}
+
+// One human line for a scenario.
+pub fn report_line(r: Row) -> String {
+    "c = " + r.c.to_string() + ": status " + r.status + ", root " + r.root.to_string() + ", residual " + abs(r.residual).to_string() + ", passed " + row_passed_text(r)
+}
+
+pub fn row_passed_text(r: Row) -> String {
+    if r.passed { "true" } else { "false" }
+}
+
+// 1 when the scenario failed a check, 0 otherwise.
+pub fn failure_count(r: Row) -> Int {
+    if r.passed { 0 } else { 1 }
+}
+
+// The FAIL line for a failed scenario.
+pub fn fail_line(r: Row) -> String {
+    "FAIL c = " + r.c.to_string() + " " + r.status + " " + r.message
+}

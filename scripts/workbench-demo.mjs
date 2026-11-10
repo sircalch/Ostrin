@@ -1,40 +1,59 @@
-// Builds the Workbench demonstration project from its .ostrin sources, or checks that the committed
-// project document still matches them.
+// Builds the Workbench demonstration projects from their .ostrin sources, or checks that the committed
+// project documents still match them.
 //   node scripts/workbench-demo.mjs          check (exit 1 on drift)
-//   node scripts/workbench-demo.mjs --write  regenerate the project document
+//   node scripts/workbench-demo.mjs --write  regenerate the project documents
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createProject, serializeProject, validateProject } from "../website/workbench-project.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const sourceDir = path.join(root, "website", "workbench-demos", "cubic-root");
-const outputPath = path.join(root, "website", "workbench-demos", "cubic-root.ostrin.project.json");
+const demosDir = path.join(root, "website", "workbench-demos");
 
-export function demoProject() {
+// Every demonstration project: its source folder, its document, and its display name.
+export const DEMOS = Object.freeze([
+  { id: "cubic-root", name: "Cubic root: x^3 - 2x - 5" },
+  { id: "parameter-sweep", name: "Parameter sweep: x^3 - 2x - c for c = 1, 3, 5, 7" },
+]);
+
+export function demoProject(id = "cubic-root") {
+  const demo = DEMOS.find((d) => d.id === id);
+  if (!demo) throw new Error(`unknown demo ${JSON.stringify(id)}`);
+  const sourceDir = path.join(demosDir, demo.id);
   const files = {};
   for (const name of readdirSync(sourceDir).filter((n) => n.endsWith(".ostrin")).sort()) {
     files[name] = readFileSync(path.join(sourceDir, name), "utf8").replace(/\r\n/g, "\n");
   }
-  const project = { ...createProject("Cubic root: x^3 - 2x - 5"), files, entry: "main.ostrin" };
+  const project = { ...createProject(demo.name), files, entry: "main.ostrin" };
   const problems = validateProject(project);
-  if (problems.length > 0) throw new Error(`demo project is invalid: ${problems.join("; ")}`);
+  if (problems.length > 0) throw new Error(`demo project ${id} is invalid: ${problems.join("; ")}`);
   return project;
 }
 
+export function documentPath(id) {
+  return path.join(demosDir, `${id}.ostrin.project.json`);
+}
+
 function main() {
-  const text = serializeProject(demoProject());
-  if (process.argv.includes("--write")) {
-    writeFileSync(outputPath, text);
-    console.log(`workbench-demo: wrote ${path.relative(root, outputPath)}`);
-    return;
+  const write = process.argv.includes("--write");
+  let drift = false;
+  for (const { id } of DEMOS) {
+    const text = serializeProject(demoProject(id));
+    if (write) {
+      writeFileSync(documentPath(id), text);
+      console.log(`workbench-demo: wrote ${path.relative(root, documentPath(id))}`);
+      continue;
+    }
+    const committed = readFileSync(documentPath(id), "utf8").replace(/\r\n/g, "\n");
+    if (committed !== text) {
+      console.error(`workbench-demo: ${id} document is stale; run node scripts/workbench-demo.mjs --write`);
+      drift = true;
+    }
   }
-  const committed = readFileSync(outputPath, "utf8").replace(/\r\n/g, "\n");
-  if (committed !== text) {
-    console.error("workbench-demo: the project document is stale; run node scripts/workbench-demo.mjs --write");
-    process.exit(1);
+  if (!write) {
+    if (drift) process.exit(1);
+    console.log("workbench-demo: ok (project documents match their sources)");
   }
-  console.log("workbench-demo: ok (project document matches its sources)");
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) main();

@@ -308,3 +308,42 @@ test("a Worker that ends before it reports started fails the run without a start
   assert.equal(outcome.error.kind, "worker-terminated");
   assert.deepEqual(changes, ["loading", "failed"]);
 });
+
+test("instrumentation: a cold run creates a Worker, a reused run does not, and the transfer time comes from the Worker's clock", async () => {
+  const { executor, workers } = harness();
+  const first = executor.run(request());
+  const firstId = workers[0].sent[0].id;
+  workers[0].deliver({
+    type: "result",
+    id: firstId,
+    code: 0,
+    stdout: bytes("49\n"),
+    stderr: bytes(""),
+    ordered: [{ stream: "out", bytes: bytes("49\n") }],
+    timing: { cached: false, compileMs: 120, instantiateMs: 8, runMs: 15, repliedAt: performance.timeOrigin + performance.now() - 2 },
+  });
+  const coldOutcome = await first;
+  const cold = coldOutcome.result.timing;
+  assert.equal(cold.workerReused, false, "the first run creates its Worker");
+  assert.ok(cold.workerCreateMs >= 0);
+  assert.equal(cold.compileMs, 120, "compile time is the worker's own measurement, not the ping");
+  assert.ok(cold.transferMs >= 0, "transfer is measured on the page clock against the worker's reply time");
+  assert.ok(cold.totalMs >= 0);
+
+  const second = executor.run(request());
+  assert.equal(workers.length, 1, "the next run reuses the Worker");
+  const secondId = workers[0].sent[1].id;
+  workers[0].deliver({
+    type: "result",
+    id: secondId,
+    code: 0,
+    stdout: bytes(""),
+    stderr: bytes(""),
+    ordered: [],
+    timing: { cached: true, compileMs: 0, instantiateMs: 3, runMs: 9, repliedAt: performance.timeOrigin + performance.now() },
+  });
+  const warm = (await second).result.timing;
+  assert.equal(warm.workerReused, true);
+  assert.equal(warm.workerCreateMs, 0);
+  assert.equal(warm.compileMs, 0, "a cached module costs no compile time in this run");
+});

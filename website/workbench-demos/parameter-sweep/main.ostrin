@@ -1,0 +1,41 @@
+// Parameter sweep of f(x; c) = x^3 - 2x - c over c = 1, 3, 5, 7.
+// Prints one human line per scenario, one line starting with "RESULTS " carrying the structured document
+// (schema ostrin.results/v1), and the comparative SVG figure. Exit status 1 when a check fails.
+import std.numeric
+import model
+import sweep
+import graphics
+
+fn main() -> Int {
+    r1 = sweep.scenario(1.0, model.g1)
+    r3 = sweep.scenario(3.0, model.g3)
+    r5 = sweep.scenario(5.0, model.g5)
+    r7 = sweep.scenario(7.0, model.g7)
+    mut failures = sweep.failure_count(r1) + sweep.failure_count(r3) + sweep.failure_count(r5) + sweep.failure_count(r7)
+    print(sweep.report_line(r1))
+    print(sweep.report_line(r3))
+    print(sweep.report_line(r5))
+    print(sweep.report_line(r7))
+    if sweep.failure_count(r1) == 1 { print(sweep.fail_line(r1)) }
+    if sweep.failure_count(r3) == 1 { print(sweep.fail_line(r3)) }
+    if sweep.failure_count(r5) == 1 { print(sweep.fail_line(r5)) }
+    if sweep.failure_count(r7) == 1 { print(sweep.fail_line(r7)) }
+    // A bracket without a sign change must report the method's error; an Ok here is a failed check.
+    match numeric.brent(model.g1, 0.0, 1.0) {
+        Ok(root) => {
+            print("FAIL unexpected root in [0, 1]: " + root.to_string())
+            failures = failures + 1
+        },
+        Err(message) => print("expected error for [0, 1]: " + message),
+    }
+    document = "{\"schema\":\"ostrin.results/v1\",\"experiment\":\"cubic-parameter-sweep\",\"family\":\"x^3 - 2x - c\",\"bracket\":[1.0,3.0],\"rows\":[" + sweep.row_json(r1) + "," + sweep.row_json(r3) + "," + sweep.row_json(r5) + "," + sweep.row_json(r7) + "]}"
+    print("RESULTS " + document)
+    print(graphics.figure(1.0, 3.0, 5.0, 7.0, r1.root, r3.root, r5.root, r7.root))
+    if failures == 0 {
+        print("all checks passed")
+        0
+    } else {
+        print("checks failed: " + failures.to_string())
+        1
+    }
+}
