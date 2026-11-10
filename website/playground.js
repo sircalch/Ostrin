@@ -21,6 +21,7 @@ import {
 import { renderExplorer } from "./workbench-explorer.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
+import { parseResults, resultsTable, resultsJsonText, RESULTS_PREFIX } from "./workbench-results.js";
 import { createPresentationGuard } from "./workbench-presentation.js";
 
 const EXAMPLES = {
@@ -827,6 +828,51 @@ function renderRunState(run) {
   if (status && run.state in runStateMessages) status.textContent = runStateMessages[run.state];
   if (cancelRunButton) cancelRunButton.disabled = !["loading", "running"].includes(run.state);
 }
+// The structured results of the last run, when it printed a valid RESULTS line; used by the export button.
+let lastResultsDocument = null;
+
+// Renders the RESULTS table of a run at the top of the output panel. Only DOM APIs are used, so program text
+// is never interpreted as HTML. Runs without valid structured results leave the export disabled.
+function renderResultsTable(outputNode, lines) {
+  lastResultsDocument = null;
+  const button = $("download-results");
+  if (button) button.disabled = true;
+  if (!lines || lines.length === 0) return;
+  const parsed = parseResults(lines);
+  if (!parsed.ok) return;
+  const table = resultsTable(parsed.document);
+  const wrap = document.createElement("div");
+  wrap.className = "results-table";
+  const caption = document.createElement("p");
+  caption.className = "results-caption";
+  caption.textContent = "Structured results: " + parsed.document.experiment;
+  const element = document.createElement("table");
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const header of table.headers) {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = header;
+    headRow.append(th);
+  }
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  for (const cells of table.rows) {
+    const tr = document.createElement("tr");
+    for (const cell of cells) {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  element.append(head, body);
+  wrap.append(caption, element);
+  outputNode.prepend(wrap);
+  lastResultsDocument = parsed.document;
+  if (button) button.disabled = false;
+}
+
 // [stream, line] pairs for rendering, in the order the program wrote them. The captured bytes are not changed.
 function linesFromBytes(stdout, stderr, ordered) {
   if (Array.isArray(ordered)) return orderedLines(ordered);
@@ -1205,8 +1251,11 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     }
     // Prepared locally: none of this is visible until publish() runs.
     const diagnostics = lines.map(([, text]) => parseDiagnostic(text)).filter(Boolean);
-    let html = lines.map(renderLine).join("\n");
-    const figure = flag === "--run" && code === 0 ? extractFigure(lines) : null;
+    // The structured RESULTS line is not part of the log; it is rendered as a table. Its bytes stay in the run.
+    const logLines = lines.filter(([kind, text]) => !(kind === "out" && text.startsWith(RESULTS_PREFIX)));
+    let html = logLines.map(renderLine).join("\n");
+    // The figure's surrounding text comes from the log lines only, never from the structured RESULTS line.
+    const figure = flag === "--run" && code === 0 ? extractFigure(logLines) : null;
     if (figure) {
       const errors = lines.filter(([kind]) => kind !== "out").map(renderLine).join("\n");
       html = (errors ? errors + "\n" : "") + figureHtml(figure);
@@ -1241,6 +1290,9 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
         sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
       }
       outputNode.innerHTML = html || '<span class="dim">(no output)</span>';
+      renderResultsTable(outputNode, isWorkbench && flag === "--run" ? lines : []);
+      // Measurement hook for the benchmark harness: the timing of the last Workbench run, read-only for pages.
+      if (rawRun) window.__ostrinLastRun = { ...rawRun.timing, wallMs: performance.now() - started, command };
       statusNode.textContent = `${summary} · ${elapsed} ms`;
       if (diagnostics.length) focusDiagnosticLine(sourceNode, diagnostics[0], sourceNode === source ? sourceStatus : null);
       else clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
@@ -1361,22 +1413,28 @@ importProjectInput?.addEventListener("change", async () => {
   if (file) await importProjectFile(file);
 });
 manifestButton?.addEventListener("click", downloadManifest);
-$("demo-project")?.addEventListener("click", async () => {
+async function loadDemo(documentPath, label) {
   if (!confirmDiscard()) return;
   try {
-    const response = await fetch("workbench-demos/cubic-root.ostrin.project.json", { cache: "no-cache" });
+    const response = await fetch(documentPath, { cache: "no-cache" });
     if (!response.ok) throw new Error("HTTP " + response.status);
     executor.cancel();
     presentation.changeProject();
     workbench = importProjectText(workbench, await response.text());
     syncEditorFromModel();
     clearSourceDiagnostic(source, sourceStatus);
-    if (output) output.textContent = "Loaded the cubic root demonstration. Nothing has run yet: press Run to execute main.ostrin.";
+    if (output) output.textContent = "Loaded " + label + ". Nothing has run yet: press Run to execute main.ostrin.";
     refreshExplorer();
     persistProjectDraft();
   } catch (error) {
     reportError("Demo not loaded: " + (error.message ?? error));
   }
+}
+$("demo-project")?.addEventListener("click", () => loadDemo("workbench-demos/cubic-root.ostrin.project.json", "the cubic root demonstration"));
+$("demo-sweep")?.addEventListener("click", () => loadDemo("workbench-demos/parameter-sweep.ostrin.project.json", "the parameter sweep"));
+$("download-results")?.addEventListener("click", () => {
+  if (!lastResultsDocument) return;
+  download("results.json", resultsJsonText(lastResultsDocument), "application/json");
 });
 let draftTimer = 0;
 source?.addEventListener("input", () => {
