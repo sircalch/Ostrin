@@ -21,8 +21,15 @@ async function reload(page) {
   await openPage(page);
 }
 
+// Loading a demo is asynchronous and cancels any run in flight: wait for the demo's own message before running.
+const DEMO_LOADED = {
+  "#demo-sweep": "Loaded the parameter sweep. Nothing has run yet",
+  "#demo-sweep-even": "Loaded the parameter sweep for c = 2, 4, 6, 8. Nothing has run yet",
+};
+
 async function loadSweep(page, button = "#demo-sweep") {
   await page.locator(button).click();
+  await expect(page.locator("#output")).toContainText(DEMO_LOADED[button], { timeout: 45_000 });
   await expect(page.locator("#file-explorer")).toContainText("4 files");
 }
 
