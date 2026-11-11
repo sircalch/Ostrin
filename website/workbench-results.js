@@ -40,6 +40,7 @@ export function validateResults(document) {
     problems.push("rows must be a non-empty list");
     return problems;
   }
+  const seen = new Set();
   document.rows.forEach((row, index) => {
     if (!row || typeof row !== "object") {
       problems.push(`row ${index} is not an object`);
@@ -49,11 +50,17 @@ export function validateResults(document) {
       if (!(key in row)) problems.push(`row ${index} is missing ${key}`);
     }
     if (!STATUSES.includes(row.status)) problems.push(`row ${index} has an unknown status`);
+    if (typeof row.message !== "string") problems.push(`row ${index} message must be a string`);
     for (const key of ["c", "root", "residual", "residual_bound", "analytic_derivative", "numeric_derivative"]) {
       // JSON can carry out-of-range exponents such as 1e999, which parse to Infinity: only finite numbers pass.
       if (key in row && !(typeof row[key] === "number" && Number.isFinite(row[key]))) problems.push(`row ${index} ${key} must be a finite number`);
     }
     if (typeof row.passed !== "boolean") problems.push(`row ${index} passed must be a boolean`);
+    // A parameter value appears once: two rows for the same c would make a comparison silently keep one of them.
+    if (typeof row.c === "number" && Number.isFinite(row.c)) {
+      if (seen.has(row.c)) problems.push(`row ${index} repeats c = ${row.c}`);
+      seen.add(row.c);
+    }
   });
   return problems;
 }

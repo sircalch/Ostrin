@@ -11,6 +11,8 @@
 //   - Only a `completed` run that produced validated structured results carries `results`. Cancelled, timed-out and
 //     failed runs are recorded as `incomplete`: they carry no results and are never presented as validated.
 
+import { validateResults } from "./workbench-results.js";
+
 export const HISTORY_SCHEMA = "ostrin.history/v1";
 // The same states as the execution controller (workbench-execution.js) and its run lifecycle.
 export const STATUSES = Object.freeze(["completed", "failed", "cancelled", "timed-out"]);
@@ -74,7 +76,16 @@ export function runRecord({ id, projectId, projectName, revision = null, entry, 
     const problems = validateMetadata(results);
     if (problems.length > 0) throw new Error(`results metadata is invalid: ${problems.join("; ")}`);
     if (!Array.isArray(results.rows) || results.rows.length === 0) throw new Error("results have no rows");
+    // The rows are the numbers that comparisons subtract: they must pass the same contract as a live RESULTS line,
+    // whether they arrive from a run, from storage, or from an imported package.
+    const shape = validateResults(results);
+    if (shape.length > 0) throw new Error(`results are invalid: ${shape.join("; ")}`);
+    // The parameters shown for a run are the parameter values of its rows, in the same order, and nothing else.
+    if (parameters !== null && JSON.stringify(parameters) !== JSON.stringify({ c: results.rows.map((r) => r.c) })) {
+      throw new Error("parameters do not match the parameter values of the results rows");
+    }
   }
+  if (!validated && parameters !== null) throw new Error("incomplete evidence carries no parameters");
   return snapshot({
     id,
     projectId,

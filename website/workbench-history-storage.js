@@ -41,6 +41,9 @@ export function planImport(verified, existing, now) {
     const stored = existing.records.get(entry.id);
     if (stored === undefined) {
       newRuns.push({ id: entry.id, record: importRecord(entry, contentStatus, now) });
+    } else if (!stored || typeof stored.entry !== "object" || stored.entry === null) {
+      // A damaged record holds this id. It is quarantined on load and never overwritten by an import.
+      throw new StorageError(ERROR_CODES.conflict, `run ${entry.id} is stored as a damaged record; nothing was imported and the record was not changed`);
     } else if (canonicalJson(stored.entry) === canonicalJson(entry)) {
       identical.push(entry.id);
     } else {
@@ -73,7 +76,7 @@ function importRecord(entry, contentStatus, now) {
   const missing = referencesOf(entry)
     .filter((ref) => (ref.kind === "source" ? contentStatus.sources[ref.name] : contentStatus[ref.kind]) !== "included")
     .map((ref) => (ref.kind === "source" ? "source " + ref.name : ref.kind));
-  return { schema: RECORD_SCHEMA, entry: snapshot(entry), missing, storedAt: now, origin: "evidence package" };
+  return { schema: RECORD_SCHEMA, entry: snapshot(entry), missing, storedAt: now, origin: { kind: "imported", source: "evidence package", at: now } };
 }
 
 function sameBytes(a, b) {
@@ -224,7 +227,9 @@ export async function restoreRecords(rawRecords, rawContents, digestOf) {
         verification.figure = "altered";
       }
     }
-    entries.push({ entry, verification });
+    // Records written before imports existed carry no origin: they were run in this browser.
+    const origin = value.origin && value.origin.kind === "imported" ? { kind: "imported", source: String(value.origin.source), at: String(value.origin.at) } : { kind: "local" };
+    entries.push({ entry, verification, origin });
   }
   return { entries, figures, quarantined, altered: [...altered], damaged };
 }
@@ -238,7 +243,8 @@ export function mergeHistory(history, restored) {
   );
   const figures = { ...restored.figures, ...history.figures };
   const verification = Object.fromEntries(added.map(({ entry, verification: v }) => [entry.id, v]));
-  return { history: { ...history, entries, figures }, verification };
+  const origins = Object.fromEntries(added.map(({ entry, origin }) => [entry.id, origin]));
+  return { history: { ...history, entries, figures }, verification, origins };
 }
 
 // Serialises asynchronous tasks: each starts after the previous one has settled, whether it succeeded or not, so a

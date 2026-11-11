@@ -16,7 +16,7 @@ import {
   sealPackage,
   verifyPackage,
 } from "../website/workbench-evidence.js";
-import { planImport } from "../website/workbench-history-storage.js";
+import { planImport, restoreRecords } from "../website/workbench-history-storage.js";
 
 const TOL = "x: 1e-12 (Brent); residual <= 10*|f'(root)|*1e-12; derivative: |numeric - analytic| <= 1e-5";
 const encoder = new TextEncoder();
@@ -314,4 +314,65 @@ test("package file names are safe and bounded", () => {
 test("references list every digest a run carries, in the Run History order", async () => {
   const f = await fixtures();
   assert.deepEqual(referencesOf(f.complete).map((r) => r.kind), ["source", "stdout", "figure"]);
+});
+
+test("a package whose result rows are not finite numbers or booleans is refused, even when resealed", async () => {
+  const { text } = await packageText();
+  const bad = await edited(text, (pkg) => {
+    pkg.runs[0].entry.results.rows[0].root = "not a number";
+    pkg.runs[0].entry.results.rows[0].passed = "yes";
+  }, { reseal: true });
+  await rejects(bad, "inconsistent-run");
+});
+
+test("two result rows for the same parameter c are refused: a comparison would silently keep one of them", async () => {
+  const { text } = await packageText();
+  const bad = await edited(text, (pkg) => {
+    const rows = pkg.runs[0].entry.results.rows;
+    rows.push({ ...rows[0] });
+    pkg.runs[0].entry.parameters.c = [...pkg.runs[0].entry.parameters.c, rows[0].c];
+  }, { reseal: true });
+  await rejects(bad, "inconsistent-run");
+});
+
+test("a damaged stored record with the same id is named as such and never overwritten by an import", async () => {
+  const { text } = await packageText();
+  const verified = await verifyPackage(text, digestOf);
+  const damaged = { entry: undefined };
+  assert.throws(
+    () => planImport(verified, { records: new Map([["run-complete", damaged]]), contents: new Map() }, CREATED),
+    (e) => e.code === "conflict" && /damaged record/.test(e.message),
+  );
+});
+
+test("the origin of a restored run is kept: local runs and imported runs are told apart", async () => {
+  const { text } = await packageText();
+  const verified = await verifyPackage(text, digestOf);
+  const plan = planImport(verified, { records: new Map(), contents: new Map() }, CREATED);
+  const imported = plan.newRuns.find((r) => r.id === "run-cancelled").record;
+  const local = { schema: "ostrin.history-record/v1", entry: verified.runs[0].entry, missing: [], storedAt: CREATED };
+  const restored = await restoreRecords(
+    [{ key: "run-complete", value: local }, { key: "run-cancelled", value: imported }],
+    [],
+    digestOf,
+  );
+  const origins = Object.fromEntries(restored.entries.map((e) => [e.entry.id, e.origin]));
+  assert.deepEqual(origins["run-complete"], { kind: "local" }, "a record without an origin was run in this browser");
+  assert.deepEqual(origins["run-cancelled"], { kind: "imported", source: "evidence package", at: CREATED });
+});
+
+test("a package whose declared parameters disagree with its result rows is refused, even when resealed", async () => {
+  const { text } = await packageText();
+  const bad = await edited(text, (pkg) => {
+    pkg.runs[0].entry.parameters.c = [1, 3, 5];
+  }, { reseal: true });
+  await rejects(bad, "inconsistent-run");
+});
+
+test("incomplete evidence never carries parameters", async () => {
+  const { text } = await packageText();
+  const bad = await edited(text, (pkg) => {
+    pkg.runs[1].entry.parameters = { c: [1] };
+  }, { reseal: true });
+  await rejects(bad, "inconsistent-run");
 });
