@@ -71,13 +71,13 @@ Verified in this branch, each with a test that runs the Ostrin program (interpre
 
 What these blocks do not establish:
 
-- Visual quality of the figures was not inspected. The browser pane cannot show local SVG files, so the checks are numeric and structural.
+- Visual inspection: the four figures were rendered to PNG with the Playwright Chromium and read back: titles, subtitles, axis labels with units, legends, curves and residual values agree with the tables. Pixel snapshots are not stored as tests yet; the structural and numeric checks are the automated guard.
 - The log scales, histograms, heat maps and error bars of std.viz are not used by these figures and are not verified here.
 - Regression is polynomial only. Multiple regression and weighted fits are not implemented.
 - Missing-value handling is explicit but minimal: no imputation, and a numeric computation refuses a column with missing cells.
-- The CSV reader does not support quoted fields that span lines. It reports them as unsupported.
+- The CSV reader supports RFC 4180 quoted fields that span lines (fixed in fd29f169). Malformed quotes are refused with a line number.
 
-### Native backend defect found in this stage
+### Native backend defect (fixed in 2673a8c8)
 
 A `match` statement on a `Result<Void, String>` whose `Ok` binding is unused fails in the C code generator, while the same match with `Ok(_)` compiles.
 
@@ -92,7 +92,7 @@ fn main() -> Void {
 }
 ```
 
-Replacing `Ok(done)` with `Ok(_)` compiles and runs on both backends. The examples in this stage use `Ok(_)`. The defect is not fixed here; a fix belongs in the native code generator and needs its own test.
+Both the named binding and the constructor `Ok(announce())` with a Void payload are fixed in the C generator (`compiler/src/ir_c.rs`). The regression is `examples/native_void_binding.ostrin`, checked for interpreter and native agreement and for leaks. The `Ok(_)` workaround used in earlier examples is no longer needed.
 
 ### Not yet started
 
