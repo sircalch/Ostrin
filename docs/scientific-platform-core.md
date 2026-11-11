@@ -58,3 +58,45 @@ simplified to `sqrt(2)`; the simplifier does not factor perfect squares out of r
 - WASI and browser backends for the new solver functions: not run.
 - Firefox and WebKit: not applicable to the compiler.
 - Benchmarks: not run.
+
+## State after blocks 1 to 3 of this stage
+
+Verified in this branch, each with a test that runs the Ostrin program (interpreter and native where stated):
+
+| Block | Deliverable | Where | Verification |
+| --- | --- | --- | --- |
+| 1. Scientific data engine | `std.data`: explicit schema (int, float, text), explicit missing values (empty or NA), validating CSV/TSV reader with line-numbered errors, row operations (complete_rows, select_columns, filter_between, sort_by, group_summary), statistics (describe, covariance, correlation), polynomial regression through std.numeric.polyfit (QR), predictions, residuals, SSE, RMSE, R² (defined only when the response varies), coefficients in physical units, CSV/TSV and JSON export | `compiler/std/data.ostrin`, `examples/data_engine.ostrin`, `examples/data/calibration.csv` | `std_data_engine_reads_validates_fits_and_exports_identically_in_both_backends` (interpreter = native); `scripts/data-engine.test.mjs` compares every printed statistic and fit with an exact BigInt-rational reference, tolerance 1e-12 |
+| 2. Figures from computed data | Figures with std.viz from the computed fits: measurements with linear and quadratic curves, residuals, and the table behind them | `examples/data_figures.ostrin`, `examples/data/figures/` | `std_data_figures_agree_in_both_backends`; `scripts/data-figures.test.mjs` checks the table row by row against the reference, and counts one marker per measurement |
+| 3. Dimensional model | First-order decay (k in 1/s, m0 in kg) and a damped oscillator (w in 1/s, x0 in m); RK4 and RK45 from std.numeric; analytic validation; a starved step budget reported as a convergence failure | `examples/scientific_model.ostrin`, `examples/data/model/` | `std_scientific_model_agrees_in_both_backends_and_writes_its_tables`; `scripts/scientific-model.test.mjs` recomputes every row analytically in JavaScript; `a_dimension_mismatch_is_refused_at_compile_time` |
+
+What these blocks do not establish:
+
+- Visual quality of the figures was not inspected. The browser pane cannot show local SVG files, so the checks are numeric and structural.
+- The log scales, histograms, heat maps and error bars of std.viz are not used by these figures and are not verified here.
+- Regression is polynomial only. Multiple regression and weighted fits are not implemented.
+- Missing-value handling is explicit but minimal: no imputation, and a numeric computation refuses a column with missing cells.
+- The CSV reader does not support quoted fields that span lines. It reports them as unsupported.
+
+### Native backend defect found in this stage
+
+A `match` statement on a `Result<Void, String>` whose `Ok` binding is unused fails in the C code generator, while the same match with `Ok(_)` compiles.
+
+Minimal reproducer (fails to compile natively with `undeclared __ir_v…`; the interpreter runs it):
+
+```ostrin
+fn main() -> Void {
+    match write_file("out.txt", "hello") {
+        Ok(done) => print("wrote"),
+        Err(message) => print("cannot write: " + message),
+    }
+}
+```
+
+Replacing `Ok(done)` with `Ok(_)` compiles and runs on both backends. The examples in this stage use `Ok(_)`. The defect is not fixed here; a fix belongs in the native code generator and needs its own test.
+
+### Not yet started
+
+- **Notebook (block 5)**: no notebook module, format, or interface exists in the repository.
+- **CAS expansion (block 4)**: this branch added polynomial solving and rational factorization over Q. Exact radical simplification, complex results and simplification under explicit assumptions are not done.
+- **Benchmarks (block 7)**: Python 3.12 and Julia 1.13 are installed on this machine; Wolfram and MATLAB are not. No benchmark has been run, and no comparison is claimed.
+- **Modelling engine breadth (block 5 of the directive)**: the ODE example uses fixed grids. Adaptive error control, stiff solvers and parameter estimation are not implemented.
