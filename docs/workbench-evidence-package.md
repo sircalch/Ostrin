@@ -83,7 +83,9 @@ the run-entry format `ostrin.history/v1`. A package never contains IndexedDB ref
 | `withheld[]` | Digests whose bytes were not exported, each with a short `reason`. |
 | `integrity` | Algorithm, canonicalization, the covered fields and the digest. |
 
-Unknown fields are refused at every level, so a reader never silently ignores data it does not understand.
+Unknown fields are refused in the package, in each run object, in each content, in each withheld entry and in the run
+entry (the rebuilt entry must equal the stored one exactly). The `results` document of a run is validated for the fields it
+requires; additional fields inside it are preserved and covered by the integrity digest, but are never interpreted.
 
 ### Run entries
 
@@ -91,7 +93,11 @@ Unknown fields are refused at every level, so a reader never silently ignores da
 `projectId`, `projectName`, `entry`, `command`, `status`, `evidence`, `exitCode`, `compilerIdentity`, `startedAt`,
 `durationMs`, `parameters`, `results` (the validated RESULTS document or `null`), `resultsRejected`, and `digests`
 (`sources`, `stdout`, `stderr`, `figure`, `manifest`). The reader rebuilds the entry through the same validation as the
-history model and requires the result to be identical.
+history model and requires the result to be identical. In addition:
+
+- every result row has finite numbers for `c`, `root`, `residual`, `residual_bound`, `analytic_derivative` and `numeric_derivative`, a boolean `passed`, a string `message`, a known `status`, and a `c` that appears once;
+- `parameters`, when present, is exactly `{ "c": [...] }` with the parameter values of the rows, in the same order;
+- an incomplete run (not `completed`, or without validated results) carries no `parameters` and no `results`.
 
 `runs[].contentStatus` says, for every digest the entry refers to, what the package carries:
 
@@ -227,8 +233,34 @@ local one.
 ## Known limitations (v1)
 
 - No signature or external trusted digest. Authenticity is not provided.
-- Import has no per-run resolution for conflicts; a conflict refuses the whole package.
+- Import has no per-run resolution for conflicts; a conflict refuses the whole package. A run id that is already stored as a damaged record is also refused, and the record is not changed.
+- Duplicate JSON object keys are not refused. The reader takes the last value, and the integrity digest covers that value. Another JSON reader could take the first value; then its digest would not match, and the package would be refused rather than accepted.
+- Comparability is decided by the metadata the program declares (family, bracket, method, tolerances) and by the compiler identity. It does not analyse the source. Two programs that declare the same family but differ in their source are comparable under the rules; this is the existing rule set, and it is a scientific limitation, not a defect of the format.
+- Imported runs are marked with their origin (`imported from an evidence package`, with the time they were stored). Local runs are marked `run in this browser`. Records saved before imports existed count as local.
+- A second browser tab does not see runs saved by the first one until it reloads; the store is per page and writes are checked by IndexedDB, so no data is lost, but the list can be stale.
 - Manifest documents (`digests.manifest`) are carried as digests only; manifest bytes are not exported.
 - Two figures are shown side by side; no combined comparative figure exists yet.
 - Storage quotas are the browser's. A package larger than the limits must be split by the user.
 - Verification of the package in the browser runs in the page; it depends on the browser's SHA-256 implementation.
+
+## Reproducing the checks
+
+These are the commands that verify this format and the Run History. They run on Windows, macOS and Linux with Node 24
+and a built `website/ostrinc.wasm` (the browser tests need it).
+
+```bash
+# Node: history, storage, evidence package and the other Workbench model tests
+node --test scripts/workbench-*.test.mjs
+
+# Repository checks that cover the website and the demos
+node scripts/workbench-demo.mjs
+node scripts/website-check.mjs --wasm
+node scripts/linguist-check.mjs
+
+# Chromium: the Epsilon flows, persistence, evidence packages and the earlier phases
+cd tests/browser
+npx playwright test workbench-epsilon.spec.mjs workbench-persistence.spec.mjs workbench-evidence.spec.mjs --project=chromium
+```
+
+Firefox and WebKit are run by CI only (`npm test` in `tests/browser` with all projects). The Windows visual suite is
+recorded separately in the Epsilon closure note.
