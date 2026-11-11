@@ -22145,3 +22145,14 @@ fn std_void_payload_bindings_compile_and_agree_in_both_backends_without_leaks() 
         String::from_utf8_lossy(&native.stderr)
     );
 }
+
+#[test]
+fn std_data_reader_checks_hold_in_both_backends() {
+    // RFC 4180 records spanning lines, Unicode, empty text versus missing values, refused schemas and malformed
+    // quotes, CSV and TSV round trips, stable sorting and filtering, and a 3000-record round trip.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("examples");
+    let output = interpreter_and_native_agree_from("data_io_checks.ostrin", &examples_dir);
+    assert!(!output.contains("FAIL"), "{output}");
+    assert!(output.ends_with("all data checks passed\n"), "{output}");
+    assert_eq!(output.matches("ok: ").count(), 22, "{output}");
+}

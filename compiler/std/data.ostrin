@@ -12,7 +12,7 @@
 //   column with missing cells fails until the caller drops those rows with `complete_rows`.
 // - Fields are split by a validating record reader: a quote may only open a field, "" inside a quoted
 //   field is one quote, the delimiter inside quotes is literal, and text after a closing quote is an error.
-//   A quoted field spanning two physical lines is reported as unsupported rather than mis-split.
+//   A quoted field may span physical lines (RFC 4180): the line break is kept as part of the field.
 // - Regression uses std.numeric.polyfit (QR on a scaled Vandermonde matrix), not the normal equations.
 // - Every number is computed from the data given to the function. Nothing is simulated or stored in advance.
 
@@ -69,7 +69,7 @@ fn split_record(line: String, delimiter: String) -> Result<List<String>, String>
             mut closed = false
             while not closed {
                 if j >= n {
-                    return Err("a quoted field is not closed on this line; quoted fields that span lines are not supported")
+                    return Err("a quoted field is not closed")
                 }
                 c = line.char_at(j)
                 if c == "\"" {
@@ -110,6 +110,45 @@ fn split_record(line: String, delimiter: String) -> Result<List<String>, String>
         }
     }
     Ok(fields)
+}
+
+/// One record of the input: its first physical line (1-based) and its text, which may span several lines.
+record Logical {
+    line: Int
+    text: String
+}
+
+/// The number of double quotes in a physical line.
+fn quote_count(line: String) -> Int {
+    line.split("\"").length() - 1
+}
+
+/// Joins physical lines into RFC 4180 records. A line that leaves a quoted field open (an odd number of quotes so
+/// far) continues on the next line, and the line break is kept inside that field. Blank lines between records are
+/// skipped. A quote left open at the end of the text is an error that names the record's first line.
+fn logical_records(lines: List<String>, from: Int) -> Result<List<Logical>, String> {
+    mut out: List<Logical> = []
+    mut i = from
+    while i < lines.length() {
+        if lines[i].trim() == "" {
+            i = i + 1
+        } else {
+            start = i
+            mut text = lines[i]
+            mut quotes = quote_count(lines[i])
+            i = i + 1
+            while quotes % 2 == 1 {
+                if i >= lines.length() {
+                    return Err("line " + (start + 1).to_string() + ": a quote is not closed; check for an unclosed quoted field or a quote inside an unquoted field")
+                }
+                text = text + "\n" + lines[i]
+                quotes = quotes + quote_count(lines[i])
+                i = i + 1
+            }
+            out.push(Logical { line: start + 1, text: text })
+        }
+    }
+    Ok(out)
 }
 
 // ---------------------------------------------------------------- value conversion
@@ -196,19 +235,16 @@ pub fn read_table(text: String, delimiter: String, names: List<String>, kinds: L
             }
         }
     }
-    lines = text.lines()
-    mut header_at = -1
-    for i in 0 until lines.length() {
-        if header_at < 0 and lines[i].trim() != "" {
-            header_at = i
-        }
+    records = match logical_records(text.lines(), 0) {
+        Ok(found) => found,
+        Err(message) => { return Err(message) },
     }
-    if header_at < 0 {
+    if records.length() == 0 {
         return Err("the text has no header line")
     }
-    header = match split_record(lines[header_at], delimiter) {
+    header = match split_record(records[0].text, delimiter) {
         Ok(fields) => fields,
-        Err(message) => { return Err("line " + (header_at + 1).to_string() + ": " + message) },
+        Err(message) => { return Err("line " + records[0].line.to_string() + ": " + message) },
     }
     mut positions: List<Int> = []
     for j in 0 until names.length() {
@@ -241,11 +277,9 @@ pub fn read_table(text: String, delimiter: String, names: List<String>, kinds: L
         missing.push(column_missing)
     }
     mut rows = 0
-    for i in header_at + 1 until lines.length() {
-        if lines[i].trim() == "" {
-            continue
-        }
-        fields = match split_record(lines[i], delimiter) {
+    for r in 1 until records.length() {
+        i = records[r].line - 1
+        fields = match split_record(records[r].text, delimiter) {
             Ok(parts) => parts,
             Err(message) => { return Err("line " + (i + 1).to_string() + ": " + message) },
         }
@@ -254,7 +288,9 @@ pub fn read_table(text: String, delimiter: String, names: List<String>, kinds: L
         }
         for j in 0 until names.length() {
             raw = fields[positions[j]].trim()
-            if is_missing_token(raw) {
+            // Text keeps its exact content: an empty field is the empty string, and only the token NA is missing.
+            // A number has no empty value, so an empty numeric field is missing.
+            if kinds[j] == "text" and fields[positions[j]] == "NA" {
                 missing[j].push(true)
                 numbers[j].push(0.0)
                 texts[j].push("")
@@ -262,6 +298,10 @@ pub fn read_table(text: String, delimiter: String, names: List<String>, kinds: L
                 missing[j].push(false)
                 numbers[j].push(0.0)
                 texts[j].push(fields[positions[j]])
+            } else if is_missing_token(raw) {
+                missing[j].push(true)
+                numbers[j].push(0.0)
+                texts[j].push("")
             } else {
                 converted = if kinds[j] == "int" { parse_int_strict(raw) } else { parse_float_strict(raw) }
                 match converted {

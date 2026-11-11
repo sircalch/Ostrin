@@ -1,0 +1,155 @@
+// Checks of the data reader and the table operations, with each expected value worked out by hand from its input.
+//
+// Covered: RFC 4180 records with quoted line breaks, escaped quotes and commas; Unicode text; empty text versus
+// missing values; duplicate and missing headers; unknown column kinds; a stray quote; CSV and TSV round trips;
+// stable sorting with missing values; grouping with an empty key; filtering; and a larger table that round-trips.
+import std.data
+
+fn check(label: String, ok: Bool) -> Int {
+    if ok {
+        print("ok: " + label)
+        0
+    } else {
+        print("FAIL: " + label)
+        1
+    }
+}
+
+fn main() -> Void {
+    mut failures = 0
+
+    // Records spanning lines, with a comma, an escaped quote and Unicode.
+    text = "id,note,score\n1,\"line one\nline two, with a comma\",10\n2,plain,NA\n3,\"ñandú 中文 \"\"quoted\"\"\",30\n4,,20\n\n5,zz,5\n"
+    names = ["id", "note", "score"]
+    kinds = ["int", "text", "float"]
+    table = match data.read_table(text, ",", names, kinds) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: read " + message)
+            return
+        },
+    }
+    notes = data.strings(table, "note").unwrap()
+    failures = failures + check("five records, the blank line skipped", table.rows == 5)
+    failures = failures + check("a quoted line break is kept as content", notes[0] == "line one\nline two, with a comma")
+    failures = failures + check("escaped quotes and Unicode", notes[2] == "ñandú 中文 \"quoted\"")
+    failures = failures + check("an empty text cell is the empty string, not missing", table.missing[1][3] == false and notes[3] == "")
+    failures = failures + check("NA is missing in a numeric column", table.missing[2][1] == true)
+    empty_numeric = match data.read_table("a,b\n1,\n", ",", ["a", "b"], ["float", "float"]) {
+        Ok(t) => t.missing[1][0] == true,
+        Err(message) => false,
+    }
+    failures = failures + check("an empty numeric cell is missing", empty_numeric)
+
+    // Operations: complete rows, sorting (missing last, stable), grouping with an empty key, filtering.
+    scored = match data.complete_rows(table, ["score"]) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: complete " + message)
+            return
+        },
+    }
+    failures = failures + check("complete rows keep four records", scored.rows == 4)
+    ordered = match data.sort_by(scored, "score", true) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: sort " + message)
+            return
+        },
+    }
+    values = data.floats(ordered, "score")
+    failures = failures + check("ascending order of the scores", match values {
+        Ok(v) => v[0] == 5.0 and v[1] == 10.0 and v[2] == 20.0 and v[3] == 30.0,
+        Err(message) => false,
+    })
+    descending = match data.sort_by(scored, "score", false) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: sort " + message)
+            return
+        },
+    }
+    failures = failures + check("descending order of the scores", match data.floats(descending, "score") {
+        Ok(v) => v[0] == 30.0 and v[3] == 5.0,
+        Err(message) => false,
+    })
+    band = match data.filter_between(table, "id", 2.0, 4.0) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: filter " + message)
+            return
+        },
+    }
+    failures = failures + check("filter keeps the ids from 2 to 4", band.rows == 3)
+    groups = match data.group_summary(table, "note", "id") {
+        Ok(g) => g,
+        Err(message) => {
+            print("FAIL: group " + message)
+            return
+        },
+    }
+    failures = failures + check("group summary of a text key with an empty group", groups.rows == 5)
+
+    // CSV and TSV round trips keep every value, including the empty and missing ones.
+    csv_back = match data.read_table(data.table_text(table, ","), ",", names, kinds) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: csv round trip " + message)
+            return
+        },
+    }
+    failures = failures + check("CSV round trip keeps the rows", csv_back.rows == table.rows)
+    failures = failures + check("CSV round trip keeps the text exactly", data.strings(csv_back, "note").unwrap()[0] == notes[0])
+    failures = failures + check("CSV round trip keeps missingness", csv_back.missing[2][1] == true and csv_back.missing[1][3] == false)
+    tsv = data.table_text(table, "\t")
+    tsv_back = match data.read_table(tsv, "\t", names, kinds) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: tsv round trip " + message)
+            return
+        },
+    }
+    failures = failures + check("TSV round trip keeps the text exactly", data.strings(tsv_back, "note").unwrap()[2] == notes[2])
+
+    // Errors that must be refused, with the reason.
+    failures = failures + check("a repeated header is refused", data.read_table("a,a\n1,2\n", ",", ["a"], ["float"]).is_err())
+    failures = failures + check("an unknown kind is refused", data.read_table("a\n1\n", ",", ["a"], ["bool"]).is_err())
+    failures = failures + check("a missing column is refused", data.read_table("a\n1\n", ",", ["b"], ["float"]).is_err())
+    failures = failures + check("an unclosed quote is refused", data.read_table("a\n\"open\n", ",", ["a"], ["text"]).is_err())
+    failures = failures + check("a stray quote is refused", data.read_table("a\nx\"y\n", ",", ["a"], ["text"]).is_err())
+
+    // A larger table: 3000 records of three columns, written and read back in full.
+    mut ids: List<Float> = []
+    mut values_list: List<Float> = []
+    for i in 0 until 3000 {
+        ids.push(i as Float)
+        values_list.push((i as Float) * 0.25)
+    }
+    big = match data.table_from_columns(["id", "value"], [array(ids), array(values_list)]) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: big table " + message)
+            return
+        },
+    }
+    big_text = data.table_text(big, ",")
+    big_back = match data.read_table(big_text, ",", ["id", "value"], ["float", "float"]) {
+        Ok(t) => t,
+        Err(message) => {
+            print("FAIL: big read " + message)
+            return
+        },
+    }
+    failures = failures + check("3000 records round-trip", big_back.rows == 3000)
+    last = match data.floats(big_back, "value") {
+        Ok(v) => v[2999],
+        Err(message) => 0.0,
+    }
+    failures = failures + check("the last value is exact", last == 749.75)
+
+    if failures == 0 {
+        print("all data checks passed")
+    } else {
+        print("data checks failed: " + failures.to_string())
+    }
+}
