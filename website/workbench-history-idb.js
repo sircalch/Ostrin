@@ -15,6 +15,7 @@ import {
   classifyStorageError,
   createSerialQueue,
   ERROR_CODES,
+  planImport,
   prepareRecord,
   restoreRecords,
   StorageError,
@@ -151,6 +152,47 @@ export function createHistoryStore({ factory = globalThis.indexedDB, name = DB_N
         await transaction(db, "readwrite", commitBody(prepared));
       });
       return { id: entry.id, verification: prepared.verification, bytes: prepared.bytes };
+    },
+
+    // The stored bytes for the given digests, as a Map digest -> Uint8Array. Digests not stored are absent. The bytes
+    // are returned as stored; callers verify them before using them as evidence.
+    async readContents(digests) {
+      return enqueue(async () => {
+        const db = await database();
+        return transaction(db, "readonly", (tx) => {
+          const store = tx.objectStore(STORES.contents);
+          const requests = [...new Set(digests)].map((digest) => [digest, store.get(digest)]);
+          return () => new Map(requests.filter(([, r]) => r.result !== undefined).map(([d, r]) => [d, r.result.bytes]));
+        });
+      });
+    },
+
+    // Imports a verified package atomically. The existing records and contents are read first and the whole import
+    // is planned from them: a conflicting run id refuses everything, identical runs are not duplicated. Then every
+    // write happens in one readwrite transaction, so a quota or transaction failure leaves nothing behind.
+    async importPackage(verified, { now = new Date().toISOString() } = {}) {
+      return enqueue(async () => {
+        const db = await database();
+        const existing = await transaction(db, "readonly", (tx) => {
+          const records = tx.objectStore(STORES.records);
+          const contents = tx.objectStore(STORES.contents);
+          const runRequests = verified.runs.map(({ entry }) => [entry.id, records.get(entry.id)]);
+          const contentRequests = verified.contents.map((item) => [item.digest, contents.get(item.digest)]);
+          return () => ({
+            records: new Map(runRequests.map(([id, r]) => [id, r.result])),
+            contents: new Map(contentRequests.map(([d, r]) => [d, r.result])),
+          });
+        });
+        const plan = planImport(verified, existing, now);
+        if (plan.newRuns.length === 0 && plan.newContents.length === 0) return plan.summary;
+        await transaction(db, "readwrite", (tx) => {
+          const contents = tx.objectStore(STORES.contents);
+          for (const item of plan.newContents) contents.put({ bytes: item.bytes, size: item.bytes.byteLength }, item.digest);
+          const records = tx.objectStore(STORES.records);
+          for (const run of plan.newRuns) records.add(run.record, run.id);
+        });
+        return plan.summary;
+      });
     },
   };
 }

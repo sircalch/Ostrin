@@ -11,6 +11,7 @@
 // run-entry format (HISTORY_SCHEMA, ostrin.history/v1 in workbench-history.js).
 
 import { runRecord, snapshot } from "./workbench-history.js";
+import { canonicalJson, referencesOf } from "./workbench-evidence.js";
 
 export const RECORD_SCHEMA = "ostrin.history-record/v1";
 // Upper bound for the bytes of one run (sources, stdout, stderr and figure, each counted once). Above it nothing is
@@ -25,7 +26,61 @@ export const ERROR_CODES = Object.freeze({
   invalid: "invalid",
   unavailable: "unavailable",
   transaction: "transaction",
+  conflict: "conflict",
 });
+
+// Plans an import against what is already stored. `verified` comes from verifyPackage; `existing` holds the stored
+// record (or undefined) for each run id and the stored content (or undefined) for each digest. Nothing is written
+// here. Identical runs are not duplicated; a run id with different content is a conflict, and any conflict refuses
+// the whole import. Content already stored under the same digest is reused, after comparing its bytes.
+export function planImport(verified, existing, now) {
+  const identical = [];
+  const conflicts = [];
+  const newRuns = [];
+  for (const { entry, contentStatus } of verified.runs) {
+    const stored = existing.records.get(entry.id);
+    if (stored === undefined) {
+      newRuns.push({ id: entry.id, record: importRecord(entry, contentStatus, now) });
+    } else if (canonicalJson(stored.entry) === canonicalJson(entry)) {
+      identical.push(entry.id);
+    } else {
+      conflicts.push(entry.id);
+    }
+  }
+  if (conflicts.length > 0) {
+    throw new StorageError(ERROR_CODES.conflict, `run ${conflicts.join(", ")} already stored with different content; nothing was imported`);
+  }
+  const newContents = [];
+  let reused = 0;
+  for (const item of verified.contents) {
+    const stored = existing.contents.get(item.digest);
+    if (stored === undefined) {
+      newContents.push(item);
+    } else if (!sameBytes(stored.bytes, item.bytes)) {
+      throw new StorageError(ERROR_CODES.conflict, `content ${item.digest} is stored with different bytes; nothing was imported`);
+    } else {
+      reused += 1;
+    }
+  }
+  return {
+    newRuns,
+    newContents,
+    summary: { added: newRuns.map((r) => r.id), identical, contentsAdded: newContents.length, contentsReused: reused },
+  };
+}
+
+function importRecord(entry, contentStatus, now) {
+  const missing = referencesOf(entry)
+    .filter((ref) => (ref.kind === "source" ? contentStatus.sources[ref.name] : contentStatus[ref.kind]) !== "included")
+    .map((ref) => (ref.kind === "source" ? "source " + ref.name : ref.kind));
+  return { schema: RECORD_SCHEMA, entry: snapshot(entry), missing, storedAt: now, origin: "evidence package" };
+}
+
+function sameBytes(a, b) {
+  if (a.byteLength !== b.byteLength) return false;
+  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
 
 export class StorageError extends Error {
   constructor(code, message) {
