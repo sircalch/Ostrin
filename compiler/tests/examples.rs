@@ -22111,3 +22111,37 @@ fn std_data_figures_agree_in_both_backends() {
     assert!(output.contains("wrote data/figures/calibration_table.csv with 36 rows"), "{output}");
     assert!(output.contains("quadratic residual sum:"), "{output}");
 }
+
+#[test]
+fn std_void_payload_bindings_compile_and_agree_in_both_backends_without_leaks() {
+    // A Result whose Ok payload is Void: the named binding `Ok(done)`, the wildcard `Ok(_)`, and the constructor
+    // `Ok(announce())`. The native backend used to fail on the named binding and on the constructor.
+    assert_eq!(
+        interpreter_and_native_agree("native_void_binding.ostrin"),
+        "announced\nnamed binding: passed\nnamed binding: refused\nannounced\nwildcard: passed\n"
+    );
+    let path = example_path("native_void_binding.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("native_void_binding_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}

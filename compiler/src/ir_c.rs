@@ -4387,16 +4387,22 @@ fn emit_instruction(
                 } else {
                     ".ok = false"
                 };
+                // A Void payload has no storage: the call that produced it already ran as its own statement, and the
+                // C struct only has a placeholder field, so the placeholder is written instead of the undeclared value.
+                let payload = if *expected == Ty::Void {
+                    String::from("0")
+                } else {
+                    codes[0].clone()
+                };
                 if result_managed_payload(expected, records) {
                     let retain =
                         retain_payload(&format!("__ostrin_result.{field}"), expected, records)
                             .ok_or(())?;
                     format!(
-                        "({{ {result_name} __ostrin_result = (({result_name}){{ {active}, .{field} = {} }}); {retain}; __ostrin_result; }})",
-                        codes[0]
+                        "({{ {result_name} __ostrin_result = (({result_name}){{ {active}, .{field} = {payload} }}); {retain}; __ostrin_result; }})"
                     )
                 } else {
-                    format!("(({result_name}){{ {active}, .{field} = {} }})", codes[0])
+                    format!("(({result_name}){{ {active}, .{field} = {payload} }})")
                 }
             } else if callee == "print" && args.len() == 1 {
                 if *ty != Ty::Void {
@@ -4822,7 +4828,13 @@ fn emit_instruction(
             if bound_ty != *ty {
                 return Err(());
             }
-            out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+            if *ty == Ty::Void {
+                // A Void binding has no storage: Void values are never declared, and nothing reads the binding.
+                // The projection is evaluated only to keep the source expression referenced, as the other arms do.
+                out.push_str(&format!("    (void)({code});\n"));
+            } else {
+                out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+            }
         }
         IrInstr::Phi { dst, incoming, ty } => {
             if !supported(ty, records) || *ty == Ty::Void || incoming.is_empty() {

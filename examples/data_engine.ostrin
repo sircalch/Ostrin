@@ -13,7 +13,7 @@ fn main() -> Void {
     text = match read_file("data/calibration.csv") {
         Ok(contents) => contents,
         Err(message) => {
-            print("cannot read the experiment: " + message)
+            print("cannot read the experiment")
             return
         },
     }

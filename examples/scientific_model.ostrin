@@ -57,7 +57,7 @@ fn main() -> Void {
     }
     match write_file("data/model/decay.csv", data.table_text(decay_table, ",")) {
         Ok(_) => print("wrote data/model/decay.csv"),
-        Err(message) => print("cannot write: " + message),
+        Err(message) => print("cannot write the file"),
     }
     decay_figure = viz.figure("First-order decay with dimensional parameters")
         .describe("m(t) = m0 exp(-k t), m0 = 2 kg, k = 0.35 / s, RK4 with 1200 steps")
@@ -66,7 +66,7 @@ fn main() -> Void {
         .line(times, analytic_mass, label: "analytic", dash: "6 4")
     match decay_figure.save("data/model/decay_figure.svg") {
         Ok(_) => print("wrote data/model/decay_figure.svg"),
-        Err(message) => print("cannot write: " + message),
+        Err(message) => print("cannot write the file"),
     }
 
     // ---- damped oscillator: x'' + 2 zeta w x' + w^2 x = 0, underdamped, state (x, v)
@@ -104,7 +104,7 @@ fn main() -> Void {
     }
     match write_file("data/model/oscillator.csv", data.table_text(oscillator_table, ",")) {
         Ok(_) => print("wrote data/model/oscillator.csv"),
-        Err(message) => print("cannot write: " + message),
+        Err(message) => print("cannot write the file"),
     }
     oscillator_figure = viz.figure("Damped oscillator")
         .describe("x'' + 2 zeta w x' + w^2 x = 0 with w = 2 / s, zeta = 0.1, x0 = 0.5 m, v0 = 0")
@@ -114,7 +114,7 @@ fn main() -> Void {
         .hline(0.0)
     match oscillator_figure.save("data/model/oscillator_figure.svg") {
         Ok(_) => print("wrote data/model/oscillator_figure.svg"),
-        Err(message) => print("cannot write: " + message),
+        Err(message) => print("cannot write the file"),
     }
 }
 
