@@ -12,6 +12,7 @@
 // overflow: only a zero denominator marks the store as failed (`symbolic.status`).
 
 import std.bigint
+import std.polynomial
 
 // ---------------------------------------------------------------- store and nodes
 
@@ -1493,4 +1494,336 @@ impl Div for Expr {
     fn div(self, other: Expr) -> Expr {
         over_expr(self, other)
     }
+}
+
+// ---------------------------------------------------------------- one variable over the rationals
+//
+// The functions below treat an expression as a polynomial in one symbol `v` whose coefficients do not
+// contain `v`. The expression is expanded first, so a product of sums is read term by term. Anything
+// else (a function of `v`, a negative or non-integer power of `v`, a power of a sum that cannot be
+// expanded) fails with a message, and nothing is guessed. Solutions are exact: rational roots are
+// rational, and an irrational quadratic root is written as (-b ± sqrt(D)) / (2a) with the discriminant
+// D kept exact. A perfect-square discriminant is detected only while its numerator and denominator fit
+// in 63 bits; beyond that the root stays in the sqrt form, which is still exact.
+
+record Term {
+    degree: Int
+    coefficient: Int
+}
+
+/// One term of an expanded polynomial in `v`: its degree and the id of the product of its other factors.
+fn term_split(s: Store, term: Int, v: Int) -> Result<Term, String> {
+    mut degree = 0
+    mut rest: List<Int> = []
+    factors = if s.kinds[term] == 3 { args_of(s, term) } else { [term] }
+    for f in factors {
+        if f == v {
+            degree = degree + 1
+        } else if s.kinds[f] == 4 and arg_of(s, f, 0) == v {
+            e = arg_of(s, f, 1)
+            if s.kinds[e] != 0 {
+                return Err("the exponent of the variable must be a number")
+            }
+            ex = rat_of(s, e)
+            if ex.big != "" or ex.d != 1 or ex.n < 0 {
+                return Err("the exponent of the variable must be a non-negative integer")
+            }
+            degree = degree + ex.n
+        } else if not free_of(s, f, v) {
+            return Err("the expression is not a polynomial in the variable")
+        } else {
+            rest.push(f)
+        }
+    }
+    Ok(Term { degree: degree, coefficient: mul_ids(s, rest) })
+}
+
+/// The coefficients of `a` as a polynomial in `v`, ascending in degree: element i is the coefficient of v^i.
+pub fn coefficients(a: Expr, v: Expr) -> Result<List<Expr>, String> {
+    s = a.store
+    if s.kinds[v.id] != 1 {
+        return Err("the variable must be a symbol")
+    }
+    if s.failures.length() > 0 {
+        return Err(s.failures[0])
+    }
+    expanded = expand_ids(s, a.id)
+    if s.failures.length() > 0 {
+        return Err(s.failures[0])
+    }
+    terms = if s.kinds[expanded] == 2 { args_of(s, expanded) } else { [expanded] }
+    mut parts: List<Term> = []
+    mut top = 0
+    for t in terms {
+        match term_split(s, t, v.id) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(part) => {
+                parts.push(part)
+                if part.degree > top {
+                    top = part.degree
+                }
+            },
+        }
+    }
+    mut out: List<Expr> = []
+    for k in 0 until top + 1 {
+        mut same_degree: List<Int> = []
+        for part in parts {
+            if part.degree == k {
+                same_degree.push(part.coefficient)
+            }
+        }
+        out.push(wrap(s, add_ids(s, same_degree)))
+    }
+    Ok(out)
+}
+
+/// The coefficients as exact rationals, or a failure naming the first coefficient that is not a number.
+fn exact_coefficients(s: Store, cs: List<Expr>) -> Result<List<Rat>, String> {
+    mut out: List<Rat> = []
+    for c in cs {
+        if s.kinds[c.id] != 0 {
+            return Err("solving needs exact rational coefficients; a coefficient depends on another symbol")
+        }
+        out.push(rat_of(s, c.id))
+    }
+    Ok(out)
+}
+
+/// The integer square root of n when n is a perfect square with 0 <= n <= 3037000499^2, else -1.
+fn exact_isqrt(n: Int) -> Int {
+    if n < 0 or n > 9223372030926249001 {
+        return 0 - 1
+    }
+    mut lo = 0
+    mut hi = 3037000499
+    while lo < hi {
+        mid = (lo + hi + 1) / 2
+        if mid * mid <= n {
+            lo = mid
+        } else {
+            hi = mid - 1
+        }
+    }
+    if lo * lo == n {
+        return lo
+    }
+    0 - 1
+}
+
+/// Roots of the exact polynomial with ascending rational coefficients `c`.
+fn solve_rationals(s: Store, c: List<Rat>) -> Result<List<Expr>, String> {
+    mut top = c.length() - 1
+    while top >= 0 and rat_is_zero(c[top]) {
+        top = top - 1
+    }
+    if top < 0 {
+        return Err("every value is a solution: the expression is zero")
+    }
+    if top == 0 {
+        return Ok([])
+    }
+    if top == 1 {
+        root = rat(s, 0 - c[0].n * c[1].d, c[0].d * c[1].n)
+        return Ok([wrap(s, num_id(s, root))])
+    }
+    if top == 2 {
+        return solve_quadratic(s, c[2], c[1], c[0])
+    }
+    polynomial_roots(s, c, top)
+}
+
+/// Roots of a x^2 + b x + c = 0 with a nonzero. Negative discriminants fail: complex roots are not represented.
+fn solve_quadratic(s: Store, a: Rat, b: Rat, c: Rat) -> Result<List<Expr>, String> {
+    if a.big != "" or b.big != "" or c.big != "" {
+        return Err("the coefficients are too large for the closed form")
+    }
+    disc = rat_add(s, rat_mul(s, b, b), rat_mul(s, rat(s, 0 - 4 * a.n, a.d), c))
+    if disc.big == "" and disc.n < 0 {
+        return Err("the discriminant is negative: the roots are complex, which is not represented")
+    }
+    if disc.big != "" {
+        return Err("the discriminant is too large for the closed form")
+    }
+    neg_b = rat(s, 0 - b.n, b.d)
+    two_a_inverse = rat(s, a.d, 2 * a.n)
+    sq_n = exact_isqrt(disc.n)
+    sq_d = exact_isqrt(disc.d)
+    if sq_n >= 0 and sq_d >= 0 {
+        r1 = rat_mul(s, rat_add(s, neg_b, rat(s, sq_n, sq_d)), two_a_inverse)
+        r2 = rat_mul(s, rat_add(s, neg_b, rat(s, 0 - sq_n, sq_d)), two_a_inverse)
+        if disc.n == 0 {
+            return Ok([wrap(s, num_id(s, r1))])
+        }
+        return Ok([wrap(s, num_id(s, r1)), wrap(s, num_id(s, r2))])
+    }
+    sqrt_id = pow_ids(s, num_id(s, disc), num_id(s, rat(s, 1, 2)))
+    neg_b_id = num_id(s, neg_b)
+    inverse_id = num_id(s, two_a_inverse)
+    plus = mul_ids(s, [add_ids(s, [neg_b_id, sqrt_id]), inverse_id])
+    minus = mul_ids(s, [add_ids(s, [neg_b_id, mul_ids(s, [int_id(s, 0 - 1), sqrt_id])]), inverse_id])
+    Ok([wrap(s, plus), wrap(s, minus)])
+}
+
+/// The result of splitting a polynomial over the rationals: the rational roots (one text per linear factor, in
+/// the polynomial module's order), the degree of what is left, and the leftover constant when nothing is left.
+record Split {
+    roots: List<String>
+    leftover_degree: Int
+    constant: String
+}
+
+/// Splits a polynomial with exact rational coefficients by the polynomial module's rational root search.
+fn split_polynomial(c: List<Rat>, top: Int) -> Result<Split, String> {
+    mut texts: List<String> = []
+    for i in 0 until top + 1 {
+        texts.push(rat_text_of(c[i]))
+    }
+    match polynomial.poly_from_texts(texts) {
+        Err(message) => Err(message),
+        Ok(p) => match polynomial.poly_factor_linear(p) {
+            Err(message) => Err(message),
+            Ok(f) => {
+                mut roots: List<String> = []
+                for factor in f.factors {
+                    roots.push(factor.coeffs[0])
+                }
+                leftover = f.cofactor.coeffs.length() - 1
+                constant = if leftover == 0 { f.cofactor.coeffs[0] } else { "" }
+                Ok(Split { roots: roots, leftover_degree: leftover, constant: constant })
+            },
+        },
+    }
+}
+
+/// Rational roots of a polynomial of degree 3 or more, when it splits completely over the rationals.
+/// A leftover factor without a rational root fails with its degree: its exact solution is not implemented.
+fn polynomial_roots(s: Store, c: List<Rat>, top: Int) -> Result<List<Expr>, String> {
+    match split_polynomial(c, top) {
+        Err(message) => Err(message),
+        Ok(f) => {
+            if f.leftover_degree != 0 {
+                return Err("a factor of degree " + f.leftover_degree.to_string() + " has no rational root; its exact solution is not implemented")
+            }
+            mut roots: List<Expr> = []
+            mut seen: List<String> = []
+            for text in f.roots {
+                root = rat_neg_text(s, text)
+                key = rat_text_of(root)
+                if not text_in(seen, key) {
+                    seen.push(key)
+                    roots.push(wrap(s, num_id(s, root)))
+                }
+            }
+            Ok(roots)
+        },
+    }
+}
+
+/// The exact rational written by `text`, failing the store when it does not fit the closed form.
+fn rat_from_checked(s: Store, text: String) -> Rat {
+    r = rat_from_text(s, text)
+    if r.big != "" {
+        fail(s, "the coefficient is too large for the closed form")
+        return Rat { n: 0, d: 1, big: "" }
+    }
+    r
+}
+
+/// The root r of the linear factor (x - r), given its constant term `text`, which is -r.
+fn rat_neg_text(s: Store, text: String) -> Rat {
+    r = rat_from_checked(s, text)
+    rat(s, 0 - r.n, r.d)
+}
+
+/// The exact solutions of a(v) = 0 for a polynomial a in the symbol v, with exact rational coefficients.
+/// Degree 1 and 2 are closed forms; degree 3 and more return the rational roots when the polynomial splits
+/// completely over the rationals, and fail otherwise.
+pub fn solve_polynomial(a: Expr, v: Expr) -> Result<List<Expr>, String> {
+    match coefficients(a, v) {
+        Err(message) => Err(message),
+        Ok(cs) => {
+            if cs.length() == 0 {
+                return Err("every value is a solution: the expression is zero")
+            }
+            s = cs[0].store
+            match exact_coefficients(s, cs) {
+                Err(message) => Err(message),
+                Ok(c) => solve_rationals(s, c),
+            }
+        },
+    }
+}
+
+/// a(v) as a product of linear factors (v - r) with rational r, times a rational constant. Fails when a does not
+/// split completely over the rationals; the message names the degree of the part that has no rational root.
+pub fn factor_rational(a: Expr, v: Expr) -> Result<Expr, String> {
+    match coefficients(a, v) {
+        Err(message) => Err(message),
+        Ok(cs) => {
+            if cs.length() == 0 {
+                return Err("the zero expression has no factorization")
+            }
+            s = cs[0].store
+            match exact_coefficients(s, cs) {
+                Err(message) => Err(message),
+                Ok(c) => factor_rationals(s, v, c),
+            }
+        },
+    }
+}
+
+fn factor_rationals(s: Store, v: Expr, c: List<Rat>) -> Result<Expr, String> {
+    mut top = c.length() - 1
+    while top >= 0 and rat_is_zero(c[top]) {
+        top = top - 1
+    }
+    match split_polynomial(c, top) {
+        Err(message) => Err(message),
+        Ok(f) => {
+            if f.leftover_degree != 0 {
+                return Err("a factor of degree " + f.leftover_degree.to_string() + " has no rational root; its factorization over the rationals is not implemented")
+            }
+            mut product = wrap(s, num_id(s, rat_from_text(s, f.constant)))
+            for text in f.roots {
+                // The factor's constant term is -r, so (v - r) is v plus that constant.
+                linear = add(v, wrap(s, num_id(s, rat_from_checked(s, text))))
+                product = mul(product, linear)
+            }
+            Ok(product)
+        },
+    }
+}
+
+/// The solutions of a(v) = 0 as text, separated by ", ", or "error: ..." with the typed message.
+pub fn roots_text(a: Expr, v: Expr) -> String {
+    match solve_polynomial(a, v) {
+        Ok(roots) => {
+            mut text = ""
+            for i in 0 until roots.length() {
+                if i > 0 {
+                    text = text + ", "
+                }
+                text = text + show(roots[i])
+            }
+            text
+        },
+        Err(message) => "error: " + message,
+    }
+}
+
+/// True when the expansion of a with v replaced by r is the number zero.
+pub fn is_root(a: Expr, v: Expr, r: Expr) -> Bool {
+    same(expand(subs(a, v, r)), number(a.store, 0))
+}
+
+fn text_in(items: List<String>, text: String) -> Bool {
+    for item in items {
+        if item == text {
+            return true
+        }
+    }
+    false
 }

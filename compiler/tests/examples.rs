@@ -21062,7 +21062,9 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        symbolic_source.contains("ir=94")
+        // The IR count grows with the module (110 after the one-variable solver was added); the guarded property
+        // is that no node falls back to the slower HIR or AST lowering.
+        symbolic_source.contains("ir=110")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -21968,6 +21970,41 @@ fn std_arrays_slicing_joining_reductions_and_grids_match_an_oracle_in_both_backe
     let report_text = stdout(&report);
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     let exe = temp_artifact("array_operations_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_solve_matches_interpreter_and_native_without_leaks() {
+    // Exact roots of quadratics and of cubics that split over the rationals, the sqrt form of an
+    // irrational quadratic root, the repeated root listed once, a rational factorization checked by
+    // identity, and the stated failures for complex, non-polynomial and symbolic-coefficient inputs.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_solve.ostrin"),
+        "roots of x^2 - 3x + 2: 2, 1\nfactor of x^2 - 3x + 2: (-1 + x)*(-2 + x)\nroots of 2x^2 + 3x - 2: 1/2, -2\nroots of x^3 - 6x^2 + 11x - 6: 1, 2, 3\nroots of (x - 1)^2: 1\nroots of x^2 - 2: 1/2*8^(1/2), -1/2*8^(1/2)\nnumeric values: 1.4142135623730954 and -1.4142135623730954\nx^2 + 1: error: the discriminant is negative: the roots are complex, which is not represented\nx^3 + 1: error: a factor of degree 2 has no rational root; its exact solution is not implemented\nsin(x): error: the expression is not a polynomial in the variable\ny*x + 1: error: solving needs exact rational coefficients; a coefficient depends on another symbol\n0: error: every value is a solution: the expression is zero\nroots of 3x - 6: 2\nall solver checks passed\n"
+    );
+    let path = example_path("symbolic_solve.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_solve_leak.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(
         compile.status.success(),
