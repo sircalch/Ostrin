@@ -22021,3 +22021,57 @@ fn std_symbolic_solve_matches_interpreter_and_native_without_leaks() {
         String::from_utf8_lossy(&native.stderr)
     );
 }
+
+fn interpreter_and_native_agree_from(file: &str, dir: &std::path::Path) -> String {
+    // Like interpreter_and_native_agree, but the program runs from `dir`, so it can read its data by a relative path.
+    let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(dir)
+        .args(["--run", file])
+        .output()
+        .expect("failed to run ostrinc");
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed on {file}: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    let exe = temp_artifact(&format!("{file}.exe"));
+    let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(dir)
+        .args(["--compile", "--out", &exe, file])
+        .output()
+        .expect("failed to run ostrinc");
+    if skip_if_no_c_compiler(&compile) {
+        return expected;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "output mismatch for {file}"
+    );
+    expected
+}
+
+#[test]
+fn std_data_engine_reads_validates_fits_and_exports_identically_in_both_backends() {
+    // A CSV experiment with quoted text, NA cells and a blank line: schema checks, missing-value policy,
+    // statistics, correlation, linear and quadratic regression in physical units, residuals, sorting,
+    // filtering and grouping. The reference values are checked by scripts/data-engine.test.mjs.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("examples");
+    let output = interpreter_and_native_agree_from("data_engine.ostrin", &examples_dir);
+    assert!(output.contains("rows read: 36"), "{output}");
+    assert!(output.contains("rows with a pressure value: 32"), "{output}");
+    assert!(output.contains("wrong kind refused: line 2, column temperature_c: not an integer: 30.23"), "{output}");
+    assert!(output.contains("missing column refused: the header has no column voltage"), "{output}");
+    assert!(output.contains("correlation temperature-response: 0.99368810255027"), "{output}");
+}

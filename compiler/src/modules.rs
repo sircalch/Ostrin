@@ -169,6 +169,7 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("polynomial", include_str!("../std/polynomial.ostrin")),
     ("solve", include_str!("../std/solve.ostrin")),
     ("autodiff", include_str!("../std/autodiff.ostrin")),
+    ("data", include_str!("../std/data.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {

@@ -1,0 +1,849 @@
+// std.data — typed scientific tables: explicit schema, validated CSV and TSV, explicit missing values,
+// selection, filtering, sorting, grouping, descriptive statistics, covariance and correlation, polynomial
+// regression with residuals, and structured export.
+//
+// Design
+// - A column has one kind, given by the schema: "float" (finite decimal numbers), "int" (integers) or
+//   "text". Numeric kinds are stored as Float; text is stored as String. Nothing is guessed from the data.
+// - A missing value is explicit. In a CSV field, an empty field or the token NA means missing, for every
+//   kind. Anything else that does not match the kind is an error with its line number. In particular
+//   "NaN", "inf" and "1,5" (a decimal comma) are errors, never silently missing or silently converted.
+// - Each table keeps a presence flag for every cell. Computations that need every value say so: a numeric
+//   column with missing cells fails until the caller drops those rows with `complete_rows`.
+// - Fields are split by a validating record reader: a quote may only open a field, "" inside a quoted
+//   field is one quote, the delimiter inside quotes is literal, and text after a closing quote is an error.
+//   A quoted field spanning two physical lines is reported as unsupported rather than mis-split.
+// - Regression uses std.numeric.polyfit (QR on a scaled Vandermonde matrix), not the normal equations.
+// - Every number is computed from the data given to the function. Nothing is simulated or stored in advance.
+
+import std.numeric
+
+/// A table with an explicit schema. `numbers[j]` holds column j when its kind is "float" or "int", and `texts[j]`
+/// when it is "text"; the other list of the pair is empty for that column. `missing[j][i]` is true for a missing cell.
+pub record Table {
+    names: List<String>
+    kinds: List<String>
+    numbers: List<List<Float>>
+    texts: List<List<String>>
+    missing: List<List<Bool>>
+    rows: Int
+}
+
+/// Descriptive statistics of a numeric sample (sample variance with n - 1).
+pub record Summary {
+    n: Int
+    mean: Float
+    sd: Float
+    min: Float
+    max: Float
+    median: Float
+}
+
+/// A polynomial fit with its residuals and the metrics that apply to it.
+/// `r_squared` is defined only when `r_squared_defined` is true: it needs the response to vary.
+pub record Fit {
+    degree: Int
+    center: Float
+    scale: Float
+    coefficients: Array<Float>
+    predictions: Array<Float>
+    residuals: Array<Float>
+    sse: Float
+    rmse: Float
+    r_squared: Float
+    r_squared_defined: Bool
+}
+
+// ---------------------------------------------------------------- record splitting
+
+/// Splits one physical line into its fields. `delimiter` is one character.
+fn split_record(line: String, delimiter: String) -> Result<List<String>, String> {
+    n = line.length()
+    mut fields: List<String> = []
+    mut i = 0
+    mut more = true
+    while more {
+        if i < n and line.char_at(i) == "\"" {
+            mut content = ""
+            mut j = i + 1
+            mut closed = false
+            while not closed {
+                if j >= n {
+                    return Err("a quoted field is not closed on this line; quoted fields that span lines are not supported")
+                }
+                c = line.char_at(j)
+                if c == "\"" {
+                    if j + 1 < n and line.char_at(j + 1) == "\"" {
+                        content = content + "\""
+                        j = j + 2
+                    } else {
+                        closed = true
+                        j = j + 1
+                    }
+                } else {
+                    content = content + c
+                    j = j + 1
+                }
+            }
+            fields.push(content)
+            if j == n {
+                more = false
+            } else if line.slice(j, j + 1) == delimiter {
+                i = j + 1
+            } else {
+                return Err("text after a closing quote must be the delimiter or the end of the line")
+            }
+        } else {
+            mut k = i
+            while k < n and line.slice(k, k + 1) != delimiter {
+                if line.char_at(k) == "\"" {
+                    return Err("a quote may only open a field: found a quote inside an unquoted field")
+                }
+                k = k + 1
+            }
+            fields.push(line.slice(i, k))
+            if k == n {
+                more = false
+            } else {
+                i = k + 1
+            }
+        }
+    }
+    Ok(fields)
+}
+
+// ---------------------------------------------------------------- value conversion
+
+fn is_missing_token(raw: String) -> Bool {
+    raw == "" or raw == "NA"
+}
+
+fn is_finite_value(x: Float) -> Bool {
+    x - x == 0.0
+}
+
+/// A decimal number in the strict grammar: digits, one sign, a decimal point and an exponent. Rejects NaN, inf and
+/// any locale-specific form before the platform parser sees it.
+fn parse_float_strict(raw: String) -> Result<Float, String> {
+    n = raw.length()
+    if n == 0 {
+        return Err("empty number")
+    }
+    mut i = 0
+    while i < n {
+        if not "0123456789+-.eE".contains(raw.char_at(i)) {
+            return Err("not a decimal number: " + raw)
+        }
+        i = i + 1
+    }
+    match raw.to_float() {
+        Ok(value) => {
+            if is_finite_value(value) {
+                Ok(value)
+            } else {
+                Err("not a finite number: " + raw)
+            }
+        },
+        Err(message) => Err("not a decimal number: " + raw),
+    }
+}
+
+/// An integer with an optional sign and digits only.
+fn parse_int_strict(raw: String) -> Result<Float, String> {
+    n = raw.length()
+    if n == 0 {
+        return Err("empty integer")
+    }
+    mut i = 0
+    while i < n {
+        c = raw.char_at(i)
+        if not ("0123456789".contains(c) or (i == 0 and (c == "+" or c == "-") and n > 1)) {
+            return Err("not an integer: " + raw)
+        }
+        i = i + 1
+    }
+    match raw.to_int() {
+        Ok(value) => Ok(value as Float),
+        Err(message) => Err("not an integer in range: " + raw),
+    }
+}
+
+fn valid_kind(kind: String) -> Bool {
+    kind == "float" or kind == "int" or kind == "text"
+}
+
+// ---------------------------------------------------------------- reading
+
+/// Reads a table from CSV or TSV text. `names` and `kinds` are the schema: the header of the text must contain
+/// exactly these column names, in any order, each once. Blank lines are skipped. Every error names its line.
+pub fn read_table(text: String, delimiter: String, names: List<String>, kinds: List<String>) -> Result<Table, String> {
+    if delimiter.length() != 1 or delimiter == "\"" or delimiter == "\n" or delimiter == "\r" {
+        return Err("the delimiter must be one character other than a quote or a line break")
+    }
+    if names.length() == 0 or names.length() != kinds.length() {
+        return Err("the schema needs at least one column, and one kind for each name")
+    }
+    for j in 0 until names.length() {
+        if names[j].trim() == "" {
+            return Err("a column name is empty")
+        }
+        if not valid_kind(kinds[j]) {
+            return Err("unknown column kind " + kinds[j] + " for " + names[j] + "; use float, int or text")
+        }
+        for k in 0 until j {
+            if names[k] == names[j] {
+                return Err("the schema repeats the column " + names[j])
+            }
+        }
+    }
+    lines = text.lines()
+    mut header_at = -1
+    for i in 0 until lines.length() {
+        if header_at < 0 and lines[i].trim() != "" {
+            header_at = i
+        }
+    }
+    if header_at < 0 {
+        return Err("the text has no header line")
+    }
+    header = match split_record(lines[header_at], delimiter) {
+        Ok(fields) => fields,
+        Err(message) => { return Err("line " + (header_at + 1).to_string() + ": " + message) },
+    }
+    mut positions: List<Int> = []
+    for j in 0 until names.length() {
+        mut found = -1
+        for h in 0 until header.length() {
+            if header[h].trim() == names[j] {
+                if found >= 0 {
+                    return Err("the header repeats the column " + names[j])
+                }
+                found = h
+            }
+        }
+        if found < 0 {
+            return Err("the header has no column " + names[j])
+        }
+        positions.push(found)
+    }
+    if header.length() != names.length() {
+        return Err("the header has " + header.length().to_string() + " columns but the schema has " + names.length().to_string())
+    }
+    mut numbers: List<List<Float>> = []
+    mut texts: List<List<String>> = []
+    mut missing: List<List<Bool>> = []
+    for j in 0 until names.length() {
+        mut column_numbers: List<Float> = []
+        mut column_texts: List<String> = []
+        mut column_missing: List<Bool> = []
+        numbers.push(column_numbers)
+        texts.push(column_texts)
+        missing.push(column_missing)
+    }
+    mut rows = 0
+    for i in header_at + 1 until lines.length() {
+        if lines[i].trim() == "" {
+            continue
+        }
+        fields = match split_record(lines[i], delimiter) {
+            Ok(parts) => parts,
+            Err(message) => { return Err("line " + (i + 1).to_string() + ": " + message) },
+        }
+        if fields.length() != header.length() {
+            return Err("line " + (i + 1).to_string() + " has " + fields.length().to_string() + " fields but the header has " + header.length().to_string())
+        }
+        for j in 0 until names.length() {
+            raw = fields[positions[j]].trim()
+            if is_missing_token(raw) {
+                missing[j].push(true)
+                numbers[j].push(0.0)
+                texts[j].push("")
+            } else if kinds[j] == "text" {
+                missing[j].push(false)
+                numbers[j].push(0.0)
+                texts[j].push(fields[positions[j]])
+            } else {
+                converted = if kinds[j] == "int" { parse_int_strict(raw) } else { parse_float_strict(raw) }
+                match converted {
+                    Ok(value) => {
+                        missing[j].push(false)
+                        numbers[j].push(value)
+                        texts[j].push("")
+                    },
+                    Err(message) => { return Err("line " + (i + 1).to_string() + ", column " + names[j] + ": " + message) },
+                }
+            }
+        }
+        rows = rows + 1
+    }
+    Ok(Table { names: names, kinds: kinds, numbers: numbers, texts: texts, missing: missing, rows: rows })
+}
+
+// ---------------------------------------------------------------- columns
+
+/// The position of a column, or an error naming it.
+pub fn column_index(t: Table, name: String) -> Result<Int, String> {
+    for j in 0 until t.names.length() {
+        if t.names[j] == name {
+            return Ok(j)
+        }
+    }
+    Err("no column " + name)
+}
+
+/// A numeric column as an array. Fails for a text column, and for a column with missing cells: drop those rows
+/// first with `complete_rows`, so the missing values never enter a computation.
+pub fn floats(t: Table, name: String) -> Result<Array<Float>, String> {
+    j = match column_index(t, name) {
+        Ok(k) => k,
+        Err(message) => { return Err(message) },
+    }
+    if t.kinds[j] == "text" {
+        return Err("column " + name + " is text, not a number")
+    }
+    for i in 0 until t.rows {
+        if t.missing[j][i] {
+            return Err("column " + name + " has missing values; drop them with complete_rows first")
+        }
+    }
+    Ok(array(t.numbers[j]))
+}
+
+/// The text of a text column.
+pub fn strings(t: Table, name: String) -> Result<List<String>, String> {
+    j = match column_index(t, name) {
+        Ok(k) => k,
+        Err(message) => { return Err(message) },
+    }
+    if t.kinds[j] != "text" {
+        return Err("column " + name + " is numeric, not text")
+    }
+    Ok(t.texts[j])
+}
+
+/// Rows where every named column is present. Rows with any missing value among them are removed.
+pub fn complete_rows(t: Table, names: List<String>) -> Result<Table, String> {
+    mut columns: List<Int> = []
+    for name in names {
+        match column_index(t, name) {
+            Ok(j) => columns.push(j),
+            Err(message) => { return Err(message) },
+        }
+    }
+    mut keep: List<Int> = []
+    for i in 0 until t.rows {
+        mut whole = true
+        for j in columns {
+            if t.missing[j][i] {
+                whole = false
+            }
+        }
+        if whole {
+            keep.push(i)
+        }
+    }
+    Ok(take_rows(t, keep))
+}
+
+/// The table restricted to the given rows, in the given order. Shared by every row operation.
+fn take_rows(t: Table, indices: List<Int>) -> Table {
+    mut numbers: List<List<Float>> = []
+    mut texts: List<List<String>> = []
+    mut missing: List<List<Bool>> = []
+    for j in 0 until t.names.length() {
+        mut column_numbers: List<Float> = []
+        mut column_texts: List<String> = []
+        mut column_missing: List<Bool> = []
+        for i in indices {
+            column_numbers.push(t.numbers[j][i])
+            column_texts.push(t.texts[j][i])
+            column_missing.push(t.missing[j][i])
+        }
+        numbers.push(column_numbers)
+        texts.push(column_texts)
+        missing.push(column_missing)
+    }
+    Table { names: t.names, kinds: t.kinds, numbers: numbers, texts: texts, missing: missing, rows: indices.length() }
+}
+
+/// The named columns only, in the order given.
+pub fn select_columns(t: Table, names: List<String>) -> Result<Table, String> {
+    mut positions: List<Int> = []
+    mut kinds: List<String> = []
+    mut numbers: List<List<Float>> = []
+    mut texts: List<List<String>> = []
+    mut missing: List<List<Bool>> = []
+    for name in names {
+        j = match column_index(t, name) {
+            Ok(k) => k,
+            Err(message) => { return Err(message) },
+        }
+        positions.push(j)
+        kinds.push(t.kinds[j])
+        numbers.push(t.numbers[j])
+        texts.push(t.texts[j])
+        missing.push(t.missing[j])
+    }
+    Ok(Table { names: names, kinds: kinds, numbers: numbers, texts: texts, missing: missing, rows: t.rows })
+}
+
+/// Rows whose numeric column lies in [low, high]. Missing values are not in any range and are removed.
+pub fn filter_between(t: Table, name: String, low: Float, high: Float) -> Result<Table, String> {
+    j = match column_index(t, name) {
+        Ok(k) => k,
+        Err(message) => { return Err(message) },
+    }
+    if t.kinds[j] == "text" {
+        return Err("filter_between needs a numeric column, and " + name + " is text")
+    }
+    if not (low <= high) {
+        return Err("filter_between needs low <= high")
+    }
+    mut keep: List<Int> = []
+    for i in 0 until t.rows {
+        if not t.missing[j][i] and t.numbers[j][i] >= low and t.numbers[j][i] <= high {
+            keep.push(i)
+        }
+    }
+    Ok(take_rows(t, keep))
+}
+
+/// Stable merge sort of row indices by one column. Missing values come last in either direction.
+pub fn sort_by(t: Table, name: String, ascending: Bool) -> Result<Table, String> {
+    j = match column_index(t, name) {
+        Ok(k) => k,
+        Err(message) => { return Err(message) },
+    }
+    mut order: List<Int> = []
+    for i in 0 until t.rows {
+        order.push(i)
+    }
+    mut width = 1
+    while width < t.rows {
+        mut merged: List<Int> = []
+        mut start = 0
+        while start < t.rows {
+            mid = if start + width < t.rows { start + width } else { t.rows }
+            stop = if start + 2 * width < t.rows { start + 2 * width } else { t.rows }
+            mut a = start
+            mut b = mid
+            while a < mid or b < stop {
+                if a < mid and (b >= stop or not before(t, j, order[b], order[a], ascending)) {
+                    merged.push(order[a])
+                    a = a + 1
+                } else {
+                    merged.push(order[b])
+                    b = b + 1
+                }
+            }
+            start = start + 2 * width
+        }
+        order = merged
+        width = width * 2
+    }
+    Ok(take_rows(t, order))
+}
+
+/// True when row a must come before row b in the requested order (a and b are row indices of column j).
+fn before(t: Table, j: Int, a: Int, b: Int, ascending: Bool) -> Bool {
+    if t.missing[j][a] {
+        return false
+    }
+    if t.missing[j][b] {
+        return true
+    }
+    if t.kinds[j] == "text" {
+        if ascending {
+            return t.texts[j][a] < t.texts[j][b]
+        }
+        return t.texts[j][a] > t.texts[j][b]
+    }
+    if ascending {
+        return t.numbers[j][a] < t.numbers[j][b]
+    }
+    t.numbers[j][a] > t.numbers[j][b]
+}
+
+// ---------------------------------------------------------------- statistics
+
+/// Descriptive statistics of a non-empty sample. The mean is two-pass and compensated, the variance is the sample
+/// variance with n - 1 (so it needs n >= 2), and the median is the middle value or the mean of the two middle values.
+pub fn describe(xs: Array<Float>) -> Result<Summary, String> {
+    n = xs.length()
+    if n == 0 {
+        return Err("describe needs at least one value")
+    }
+    mut total = 0.0
+    mut compensation = 0.0
+    mut low = xs[0]
+    mut high = xs[0]
+    for i in 0 until n {
+        value = xs[i]
+        if not is_finite_value(value) {
+            return Err("describe needs finite values")
+        }
+        corrected = value - compensation
+        running = total + corrected
+        compensation = (running - total) - corrected
+        total = running
+        if value < low {
+            low = value
+        }
+        if value > high {
+            high = value
+        }
+    }
+    mean = total / (n as Float)
+    mut squares = 0.0
+    for i in 0 until n {
+        squares = squares + (xs[i] - mean) * (xs[i] - mean)
+    }
+    sd = if n >= 2 { sqrt(squares / ((n - 1) as Float)) } else { 0.0 }
+    sorted = sorted_values(xs)
+    median = if n % 2 == 1 { sorted[n / 2] } else { (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0 }
+    Ok(Summary { n: n, mean: mean, sd: sd, min: low, max: high, median: median })
+}
+
+/// The values in ascending order (insertion into a sorted list; used for medians of modest samples).
+fn sorted_values(xs: Array<Float>) -> Array<Float> {
+    mut out: List<Float> = []
+    for i in 0 until xs.length() {
+        value = xs[i]
+        mut placed: List<Float> = []
+        mut done = false
+        for k in 0 until out.length() {
+            if not done and value < out[k] {
+                placed.push(value)
+                done = true
+            }
+            placed.push(out[k])
+        }
+        if not done {
+            placed.push(value)
+        }
+        out = placed
+    }
+    array(out)
+}
+
+/// Sample covariance (n - 1) of two equally long samples of at least two values.
+pub fn covariance(xs: Array<Float>, ys: Array<Float>) -> Result<Float, String> {
+    n = xs.length()
+    if ys.length() != n {
+        return Err("covariance needs samples of the same length")
+    }
+    if n < 2 {
+        return Err("covariance needs at least two pairs")
+    }
+    mx = match describe(xs) {
+        Ok(s) => s.mean,
+        Err(message) => { return Err(message) },
+    }
+    my = match describe(ys) {
+        Ok(s) => s.mean,
+        Err(message) => { return Err(message) },
+    }
+    mut total = 0.0
+    for i in 0 until n {
+        total = total + (xs[i] - mx) * (ys[i] - my)
+    }
+    Ok(total / ((n - 1) as Float))
+}
+
+/// Pearson correlation. Undefined when either sample has no variation, and then the function fails.
+pub fn correlation(xs: Array<Float>, ys: Array<Float>) -> Result<Float, String> {
+    cov = match covariance(xs, ys) {
+        Ok(c) => c,
+        Err(message) => { return Err(message) },
+    }
+    sx = match describe(xs) {
+        Ok(s) => s.sd,
+        Err(message) => { return Err(message) },
+    }
+    sy = match describe(ys) {
+        Ok(s) => s.sd,
+        Err(message) => { return Err(message) },
+    }
+    if sx == 0.0 or sy == 0.0 {
+        return Err("correlation is undefined: one sample has no variation")
+    }
+    r = cov / (sx * sy)
+    Ok(if r > 1.0 { 1.0 } else if r < 0.0 - 1.0 { 0.0 - 1.0 } else { r })
+}
+
+/// Mean, sample sd and count of `value` for each distinct text in `key`, in order of first appearance. Rows with a
+/// missing key or value are left out of the group they would join. The result is a table with typed columns.
+pub fn group_summary(t: Table, key: String, value: String) -> Result<Table, String> {
+    kj = match column_index(t, key) {
+        Ok(k) => k,
+        Err(message) => { return Err(message) },
+    }
+    vj = match column_index(t, value) {
+        Ok(k) => k,
+        Err(message) => { return Err(message) },
+    }
+    if t.kinds[kj] != "text" {
+        return Err("group_summary needs a text key column, and " + key + " is not text")
+    }
+    if t.kinds[vj] == "text" {
+        return Err("group_summary needs a numeric value column, and " + value + " is text")
+    }
+    mut groups: List<String> = []
+    mut members: List<List<Float>> = []
+    for i in 0 until t.rows {
+        if t.missing[kj][i] or t.missing[vj][i] {
+            continue
+        }
+        label = t.texts[kj][i]
+        mut at = -1
+        for g in 0 until groups.length() {
+            if groups[g] == label {
+                at = g
+            }
+        }
+        if at < 0 {
+            groups.push(label)
+            members.push([])
+            at = groups.length() - 1
+        }
+        members[at].push(t.numbers[vj][i])
+    }
+    mut counts: List<Float> = []
+    mut means: List<Float> = []
+    mut sds: List<Float> = []
+    for g in 0 until groups.length() {
+        summary = match describe(array(members[g])) {
+            Ok(s) => s,
+            Err(message) => { return Err(message) },
+        }
+        counts.push(summary.n as Float)
+        means.push(summary.mean)
+        sds.push(summary.sd)
+    }
+    mut numbers: List<List<Float>> = []
+    mut texts: List<List<String>> = []
+    mut missing: List<List<Bool>> = []
+    mut no_numbers: List<Float> = []
+    mut no_texts: List<String> = []
+    numbers.push(no_numbers)
+    numbers.push(counts)
+    numbers.push(means)
+    numbers.push(sds)
+    texts.push(groups)
+    texts.push(no_texts)
+    texts.push(no_texts)
+    texts.push(no_texts)
+    for c in 0 until 4 {
+        mut flags: List<Bool> = []
+        for g in 0 until groups.length() {
+            flags.push(false)
+        }
+        missing.push(flags)
+    }
+    mut names: List<String> = [key]
+    names.push("n")
+    names.push(value + "_mean")
+    names.push(value + "_sd")
+    mut kinds: List<String> = ["text"]
+    kinds.push("int")
+    kinds.push("float")
+    kinds.push("float")
+    Ok(Table {
+        names: names,
+        kinds: kinds,
+        numbers: numbers,
+        texts: texts,
+        missing: missing,
+        rows: groups.length(),
+    })
+}
+
+// ---------------------------------------------------------------- regression
+
+/// Horner evaluation of a fit at x, in the scaled variable t = (x - center) / scale.
+fn evaluate(coefficients: Array<Float>, degree: Int, center: Float, scale: Float, x: Float) -> Float {
+    t = (x - center) / scale
+    mut value = 0.0
+    mut k = degree
+    while k >= 0 {
+        value = value * t + coefficients[k]
+        k = k - 1
+    }
+    value
+}
+
+/// Least-squares polynomial of `degree` through (xs[i], ys[i]), with predictions, residuals, SSE, RMSE and R².
+/// The coefficients come from std.numeric.polyfit (QR), so the conditioning of the Vandermonde system is handled
+/// there. R² is defined only when the response varies; otherwise `r_squared_defined` is false.
+pub fn fit_polynomial(xs: Array<Float>, ys: Array<Float>, degree: Int) -> Result<Fit, String> {
+    n = xs.length()
+    if n == 0 {
+        return Err("fit needs data")
+    }
+    p = match numeric.polyfit(xs, ys, degree) {
+        Ok(found) => found,
+        Err(message) => { return Err(message) },
+    }
+    mut predictions: List<Float> = []
+    mut residuals: List<Float> = []
+    mut sse = 0.0
+    for i in 0 until n {
+        yhat = evaluate(p.coefficients, degree, p.center, p.scale, xs[i])
+        r = ys[i] - yhat
+        predictions.push(yhat)
+        residuals.push(r)
+        sse = sse + r * r
+    }
+    summary = match describe(ys) {
+        Ok(s) => s,
+        Err(message) => { return Err(message) },
+    }
+    mut sst = 0.0
+    for i in 0 until n {
+        sst = sst + (ys[i] - summary.mean) * (ys[i] - summary.mean)
+    }
+    defined = sst > 0.0
+    r2 = if defined { 1.0 - sse / sst } else { 0.0 }
+    Ok(Fit {
+        degree: degree,
+        center: p.center,
+        scale: p.scale,
+        coefficients: p.coefficients,
+        predictions: array(predictions),
+        residuals: array(residuals),
+        sse: sse,
+        rmse: sqrt(sse / (n as Float)),
+        r_squared: r2,
+        r_squared_defined: defined,
+    })
+}
+
+/// The fitted value at x.
+pub fn predict(f: Fit, x: Float) -> Float {
+    evaluate(f.coefficients, f.degree, f.center, f.scale, x)
+}
+
+// ---------------------------------------------------------------- export
+
+/// A CSV or TSV field, quoted when it contains the delimiter, a quote, a line break or edge spaces.
+fn export_field(text: String, delimiter: String) -> String {
+    needs = text.contains(delimiter) or text.contains("\"") or text.contains("\n") or text.contains("\r") or text.trim() != text
+    if needs {
+        "\"" + text.replace("\"", "\"\"") + "\""
+    } else {
+        text
+    }
+}
+
+/// The table as CSV or TSV text with a header line. Missing cells are written as NA, so the output reads back
+/// into the same table with the same schema.
+pub fn table_text(t: Table, delimiter: String) -> String {
+    mut out = ""
+    for j in 0 until t.names.length() {
+        if j > 0 {
+            out = out + delimiter
+        }
+        out = out + export_field(t.names[j], delimiter)
+    }
+    out = out + "\n"
+    for i in 0 until t.rows {
+        for j in 0 until t.names.length() {
+            if j > 0 {
+                out = out + delimiter
+            }
+            if t.missing[j][i] {
+                out = out + "NA"
+            } else if t.kinds[j] == "text" {
+                out = out + export_field(t.texts[j][i], delimiter)
+            } else if t.kinds[j] == "int" {
+                out = out + (t.numbers[j][i] as Int).to_string()
+            } else {
+                out = out + t.numbers[j][i].to_string()
+            }
+        }
+        out = out + "\n"
+    }
+    out
+}
+
+/// A table of observed, predicted and residual values for a fit: the structured record of the regression.
+pub fn fit_table(xs: Array<Float>, ys: Array<Float>, f: Fit, x_name: String, y_name: String) -> Table {
+    n = xs.length()
+    mut numbers: List<List<Float>> = []
+    mut texts: List<List<String>> = []
+    mut missing: List<List<Bool>> = []
+    mut x_list: List<Float> = []
+    mut y_list: List<Float> = []
+    mut p_list: List<Float> = []
+    mut r_list: List<Float> = []
+    for i in 0 until n {
+        x_list.push(xs[i])
+        y_list.push(ys[i])
+        p_list.push(f.predictions[i])
+        r_list.push(f.residuals[i])
+    }
+    numbers.push(x_list)
+    numbers.push(y_list)
+    numbers.push(p_list)
+    numbers.push(r_list)
+    mut no_texts: List<String> = []
+    for c in 0 until 4 {
+        texts.push(no_texts)
+        mut flags: List<Bool> = []
+        for i in 0 until n {
+            flags.push(false)
+        }
+        missing.push(flags)
+    }
+    mut names: List<String> = [x_name]
+    names.push(y_name)
+    names.push("predicted")
+    names.push("residual")
+    mut kinds: List<String> = ["float"]
+    kinds.push("float")
+    kinds.push("float")
+    kinds.push("float")
+    Table {
+        names: names,
+        kinds: kinds,
+        numbers: numbers,
+        texts: texts,
+        missing: missing,
+        rows: n,
+    }
+}
+
+/// The metrics of a fit as one JSON object (numbers are shortest round-trip text; r_squared is null when undefined).
+pub fn fit_json(f: Fit) -> String {
+    r2 = if f.r_squared_defined { f.r_squared.to_string() } else { "null" }
+    mut coefficient_text = ""
+    for k in 0 until f.coefficients.length() {
+        if k > 0 {
+            coefficient_text = coefficient_text + ","
+        }
+        coefficient_text = coefficient_text + f.coefficients[k].to_string()
+    }
+    "{\"degree\":" + f.degree.to_string() + ",\"center\":" + f.center.to_string() + ",\"scale\":" + f.scale.to_string() +
+        ",\"coefficients_scaled\":[" + coefficient_text + "],\"sse\":" + f.sse.to_string() + ",\"rmse\":" + f.rmse.to_string() +
+        ",\"r_squared\":" + r2 + "}"
+}
+
+/// The fitted polynomial in the original variable: element k is the coefficient of x^k, in the units of the
+/// data. The fit itself is kept in the scaled variable for conditioning; this is the conversion for reporting.
+pub fn raw_coefficients(f: Fit) -> Array<Float> {
+    mut poly: List<Float> = [f.coefficients[f.degree]]
+    mut k = f.degree - 1
+    while k >= 0 {
+        // poly := poly * (x - center) / scale + coefficients[k]
+        mut next: List<Float> = []
+        for i in 0 until poly.length() + 1 {
+            below = if i >= 1 { poly[i - 1] } else { 0.0 }
+            here = if i < poly.length() { poly[i] } else { 0.0 }
+            added = if i == 0 { f.coefficients[k] } else { 0.0 }
+            next.push((below - f.center * here) / f.scale + added)
+        }
+        poly = next
+        k = k - 1
+    }
+    array(poly)
+}
