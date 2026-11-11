@@ -847,3 +847,12 @@ pub fn raw_coefficients(f: Fit) -> Array<Float> {
     }
     array(poly)
 }
+
+/// The fitted values at each x of `xs`.
+pub fn predict_all(f: Fit, xs: Array<Float>) -> Array<Float> {
+    mut out: List<Float> = []
+    for i in 0 until xs.length() {
+        out.push(evaluate(f.coefficients, f.degree, f.center, f.scale, xs[i]))
+    }
+    array(out)
+}
