@@ -154,7 +154,9 @@ export function comparability(a, b) {
     else if (run.evidence !== "validated") reasons.push(`run ${run.id} has no validated structured results`);
   }
   if (a.evidence === "validated" && b.evidence === "validated") {
-    if (a.results.experiment !== b.results.experiment) reasons.push("different experiments");
+    // The experiment name is not a comparability rule: it can carry the parameter set itself (c = 1, 3, 5, 7 against
+    // c = 2, 4, 6, 8). The model question is the family, bracket, method, tolerances and compiler below.
+
     if (a.results.family !== b.results.family) reasons.push("different model family");
     if (JSON.stringify(a.results.bracket) !== JSON.stringify(b.results.bracket)) reasons.push("different bracket");
     if (a.results.method !== b.results.method) reasons.push("different method");

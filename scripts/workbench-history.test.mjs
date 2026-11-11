@@ -148,7 +148,7 @@ test("comparable runs: the same question, method, tolerances and compiler", () =
 
 test("incompatible runs are refused, with the reason for each rule", () => {
   const a = run("A", doc([1, 3]));
-  assert.match(comparability(a, run("B", doc([1, 3], { experiment: "other" }))).reasons.join(";"), /different experiments/);
+  assert.deepEqual(comparability(a, run("B", doc([1, 3], { experiment: "other-parameter-set" }))), { comparable: true, reasons: [] }, "a different parameter-set name is not a model difference");
   assert.match(comparability(a, run("B", doc([1, 3], { family: "x^3 - c" }))).reasons.join(";"), /different model family/);
   assert.match(comparability(a, run("B", doc([1, 3], { bracket: [0.5, 3] }))).reasons.join(";"), /different bracket/);
   assert.match(comparability(a, run("B", doc([1, 3], { method: "bisect" }))).reasons.join(";"), /different method/);
@@ -173,4 +173,14 @@ test("the example from the brief: c = [1, 3, 5, 7] against c = [2, 4, 6, 8] shar
   assert.equal(cmp.rows.length, 0, "no shared c, so no numeric difference");
   assert.deepEqual(cmp.onlyInA, [1, 3, 5, 7]);
   assert.deepEqual(cmp.onlyInB, [2, 4, 6, 8]);
+});
+
+test("shared parameters with different roots: the difference is b minus a, computed from the recorded values", () => {
+  const rowsA = [{ c: 5, status: "converged", root: 2.0, residual: 1e-14, residual_bound: 1e-11, analytic_derivative: 1, numeric_derivative: 1, passed: true, message: "" }];
+  const rowsB = [{ c: 5, status: "converged", root: 2.5, residual: 2e-14, residual_bound: 1e-11, analytic_derivative: 1, numeric_derivative: 1, passed: true, message: "" }];
+  const cmp = compareRuns(run("A", doc([5], { rows: rowsA })), run("B", doc([5], { rows: rowsB })));
+  assert.equal(cmp.rows.length, 1);
+  assert.equal(cmp.rows[0].rootDifference, 0.5);
+  assert.equal(cmp.rows[0].residualB, 2e-14);
+  assert.deepEqual(cmp.references, { a: "A", b: "B" });
 });

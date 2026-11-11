@@ -822,14 +822,33 @@ let history = createHistory();
 let historySelectedId = null;
 const historyPanel = $("run-history");
 const projectIdOf = (project) => project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+// Comparison selection: at most two runs. Choosing a third replaces the older of the two.
+let historySelection = [];
+let historyComparison = null;
 function renderHistory() {
-  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId }, {
+  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison }, {
     onSelect: (id) => {
       historySelectedId = id;
+      historyComparison = null;
       renderHistory();
     },
     onClose: () => {
       historySelectedId = null;
+      renderHistory();
+    },
+    onToggle: (id) => {
+      historySelection = historySelection.includes(id)
+        ? historySelection.filter((x) => x !== id)
+        : [...historySelection, id].slice(-2);
+      renderHistory();
+    },
+    onCompare: () => {
+      if (historySelection.length !== 2) return;
+      historyComparison = { a: historySelection[0], b: historySelection[1] };
+      renderHistory();
+    },
+    onCloseCompare: () => {
+      historyComparison = null;
       renderHistory();
     },
   });
@@ -1519,6 +1538,7 @@ async function loadDemo(documentPath, label) {
 }
 $("demo-project")?.addEventListener("click", () => loadDemo("workbench-demos/cubic-root.ostrin.project.json", "the cubic root demonstration"));
 $("demo-sweep")?.addEventListener("click", () => loadDemo("workbench-demos/parameter-sweep.ostrin.project.json", "the parameter sweep"));
+$("demo-sweep-even")?.addEventListener("click", () => loadDemo("workbench-demos/parameter-sweep-even.ostrin.project.json", "the parameter sweep for c = 2, 4, 6, 8"));
 $("download-results")?.addEventListener("click", () => {
   if (!lastResultsDocument) return;
   // The file is the exact payload of the RESULTS line that was validated and shown.

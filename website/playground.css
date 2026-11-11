@@ -66,3 +66,12 @@
 .history-scope { color: #8b93a7; font-size: .78rem; }
 .history-actions { margin-top: .6rem; }
 @media (max-width: 600px) { .history-fields { grid-template-columns: 1fr; } .history-field { display: block; } }
+
+/* Comparison of two runs: reasons, shared parameters, exclusive values and the figures of both runs. */
+.history-toolbar { margin: .4rem 0 .6rem; }
+.history-compare { margin-top: 1rem; border-top: 1px solid #263045; padding-top: .9rem; }
+.history-compare h3 { font-size: .95rem; margin: 0 0 .5rem; overflow-wrap: anywhere; }
+.history-rejected { color: #f2b35e; margin: 0 0 .3rem; }
+.history-reasons { margin: 0 0 .7rem; padding-left: 1.2rem; font-size: .85rem; }
+.history-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .8rem; margin-top: .6rem; }
+.history-figure-card { min-width: 0; }
