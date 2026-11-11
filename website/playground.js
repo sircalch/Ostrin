@@ -1311,7 +1311,8 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
         sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
       }
       outputNode.innerHTML = html || '<span class="dim">(no output)</span>';
-      renderResultsTable(outputNode, isWorkbench && flag === "--run" ? lines : []);
+      // Only Workbench runs own the results export; a standalone demo run never touches it.
+      if (isWorkbench) renderResultsTable(outputNode, flag === "--run" ? lines : []);
       // Measurement hook for the benchmark harness: the timing of the last Workbench run, read-only for pages.
       if (rawRun) window.__ostrinLastRun = { ...rawRun.timing, wallMs: performance.now() - started, command };
       statusNode.textContent = `${summary} · ${elapsed} ms`;
@@ -1322,7 +1323,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     // An exception from a stale run must not replace the output or status of a newer one.
     publish(() => {
       figureStore.delete(outputNode);
-      clearResultsExport();
+      if (sourceNode === source) clearResultsExport();
       outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
       statusNode.textContent = "failed to start";
       clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
