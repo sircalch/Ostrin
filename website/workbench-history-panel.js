@@ -83,6 +83,34 @@ function storageBanner(storage) {
 
 const SAVED_TEXT = { saving: "saving…", saved: "saved", "not-saved": "not saved" };
 
+// The import control: a button that opens a file picker. The file is handed to the handler; nothing is read here.
+function importControl(handlers) {
+  const wrap = el("div", "history-import");
+  const button = el("button", "button-quiet", "Import evidence package…");
+  button.type = "button";
+  const input = el("input");
+  input.type = "file";
+  input.accept = ".json,.ostrin.evidence.json,application/json";
+  input.hidden = true;
+  input.setAttribute("aria-label", "Evidence package to import");
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) handlers.onImport(file);
+  });
+  button.addEventListener("click", () => input.click());
+  wrap.append(button, input);
+  return wrap;
+}
+
+// The evidence coverage of a run, as the Run History shows it: what the stored evidence supports.
+function coverageText(entry, verification) {
+  if (entry.status !== "completed") return "incomplete: run " + entry.status + ", no validated results";
+  if (entry.evidence !== "validated") return "incomplete: no validated results";
+  const states = [...Object.values(verification?.sources ?? {}), verification?.stdout, verification?.stderr, verification?.figure].filter(Boolean);
+  return states.every((s) => s === "verified") ? "complete: validated results and all declared content verified" : "partial: some declared content is not stored or failed verification";
+}
+
 // state: { selectedId, selection: [id, ...], comparison: { a, b } | null,
 //          persistence: { storage, runs: { id: { state, reason } }, verification: { id: verification } } }
 export function renderHistoryPanel(container, history, state, handlers) {
@@ -95,17 +123,25 @@ export function renderHistoryPanel(container, history, state, handlers) {
 
   if (history.entries.length === 0) {
     container.append(el("p", "history-empty", "No runs recorded yet. Run a project and its result is kept here."));
+    if (state.notice) container.append(el("p", state.notice.kind === "error" ? "history-rejected" : "history-scope", state.notice.text));
+    container.append(importControl(handlers));
     return;
   }
 
   const selection = state.selection ?? [];
+  if (state.notice) container.append(el("p", state.notice.kind === "error" ? "history-rejected" : "history-scope", state.notice.text));
   const bar = el("div", "history-toolbar");
   const compare = el("button", "button-quiet", selection.length === 2 ? "Compare the two selected runs" : `Compare (select two runs, ${selection.length} selected)`);
   compare.type = "button";
   compare.disabled = selection.length !== 2;
   compare.addEventListener("click", () => handlers.onCompare());
-  bar.append(compare);
-  container.append(bar);
+  const exportButton = el("button", "button-quiet", `Export selected runs (${selection.length})`);
+  exportButton.type = "button";
+  exportButton.disabled = selection.length === 0;
+  exportButton.addEventListener("click", () => handlers.onExport(selection));
+  bar.append(compare, exportButton);
+  container.append(bar, importControl(handlers));
+  container.append(el("p", "history-scope", "Evidence packages contain source code and program output, which may be sensitive. Share them only on purpose."));
 
   const grid = el("table", "history-table");
   const head = el("thead");
@@ -176,6 +212,7 @@ function renderDetails(history, entry, handlers, persistence) {
     field("Rejected results", entry.resultsRejected),
     field("Storage", SAVED_TEXT[persistence?.runs?.[entry.id]?.state ?? "not-saved"]),
     field("Stored content", storedContentText(persistence?.verification?.[entry.id])),
+    field("Evidence coverage", coverageText(entry, persistence?.verification?.[entry.id])),
   );
   section.append(meta);
 
@@ -207,7 +244,10 @@ function renderDetails(history, entry, handlers, persistence) {
   const back = el("button", "button-quiet", "Back to the open project");
   back.type = "button";
   back.addEventListener("click", () => handlers.onClose());
-  actions.append(back);
+  const exportOne = el("button", "button-quiet", "Export this run as evidence");
+  exportOne.type = "button";
+  exportOne.addEventListener("click", () => handlers.onExport([entry.id]));
+  actions.append(back, exportOne);
   section.append(actions);
   return section;
 }

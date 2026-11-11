@@ -23,6 +23,8 @@ import { createHistory, recordRun as recordHistoryEntry } from "./workbench-hist
 import { captureRun, sha256Hex } from "./workbench-history-capture.js";
 import { createHistoryStore } from "./workbench-history-idb.js";
 import { classifyStorageError, mergeHistory } from "./workbench-history-storage.js";
+import { buildPackage, LIMITS, packageFileName, PACKAGE_MIME, referencesOf, verifyPackage } from "./workbench-evidence.js";
+import { findRun } from "./workbench-history.js";
 import { renderHistoryPanel } from "./workbench-history-panel.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
@@ -834,9 +836,12 @@ const historyStore = createHistoryStore({ digestOf: sha256Hex });
 let historyStorage = { state: "loading", reason: null, quarantined: [], altered: [] };
 const historyRunState = {}; // id -> { state: "saving" | "saved" | "not-saved", reason }
 const historyVerification = {}; // id -> verification of the stored content
+let historyNotice = null; // outcome of the last export or import: { kind: "ok" | "error", text }
 function renderHistory() {
   const persistence = { storage: historyStorage, runs: historyRunState, verification: historyVerification };
-  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison, persistence }, {
+  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison, persistence, notice: historyNotice }, {
+    onExport: (ids) => exportHistory(ids),
+    onImport: (file) => importHistoryFile(file),
     onSelect: (id) => {
       historySelectedId = id;
       historyComparison = null;
@@ -885,6 +890,72 @@ async function loadStoredHistory() {
   }
   renderHistory();
 }
+const textBytes = (text) => new TextEncoder().encode(text);
+
+// Exports the selected runs as one evidence package. Every byte comes from the store, or from the figure in memory
+// when it was never saved; each one is hashed again before it is packaged, and a mismatch withholds it.
+async function exportHistory(ids) {
+  const entries = ids.map((id) => findRun(history, id)).filter(Boolean);
+  if (entries.length === 0) return;
+  try {
+    const digests = entries.flatMap((entry) => referencesOf(entry).map((ref) => ref.digest));
+    const stored = await historyStore.readContents(digests).catch(() => new Map());
+    const contents = new Map();
+    for (const entry of entries) {
+      for (const ref of referencesOf(entry)) {
+        if (contents.has(ref.digest)) continue;
+        let bytes = stored.get(ref.digest) ?? null;
+        if (!bytes && ref.kind === "figure" && history.figures[ref.digest]) bytes = textBytes(history.figures[ref.digest]);
+        if (bytes) contents.set(ref.digest, { kind: ref.kind, bytes });
+      }
+    }
+    const built = await buildPackage({
+      runs: entries.map((entry) => ({ entry })),
+      contents,
+      createdAt: new Date().toISOString(),
+      producer: { name: "ostrin playground" },
+      digestOf: sha256Hex,
+    });
+    const notes = [];
+    const withheld = built.pkg.withheld.length;
+    const digestOnly = built.pkg.runs.reduce((n, run) => n + Object.values(run.contentStatus.sources).concat([run.contentStatus.stdout, run.contentStatus.stderr, run.contentStatus.figure]).filter((s) => s === "digest-only").length, 0);
+    if (withheld) notes.push(`${withheld} content(s) withheld: their stored bytes do not match their SHA-256`);
+    if (digestOnly) notes.push(`${digestOnly} digest(s) exported without their bytes (not stored here)`);
+    download(packageFileName(ids), built.text, PACKAGE_MIME);
+    historyNotice = {
+      kind: "ok",
+      text: `Exported ${entries.length} run(s) as evidence. ${built.pkg.coverage.complete} complete, ${built.pkg.coverage.partialContent} partial, ${built.pkg.coverage.incompleteRun + built.pkg.coverage.incompleteResults} incomplete.` + (notes.length ? " " + notes.join("; ") + "." : ""),
+    };
+  } catch (error) {
+    historyNotice = { kind: "error", text: "Export not created: " + (error.message ?? error) };
+  }
+  renderHistory();
+}
+
+// Imports an evidence package. The whole file is verified before anything is written; a refused package changes
+// nothing. A valid package is committed in one transaction and then read back from the store.
+async function importHistoryFile(file) {
+  if (file.size > LIMITS.maxPackageChars * 4) {
+    historyNotice = { kind: "error", text: `Import refused: the file is ${file.size} bytes; the limit is ${LIMITS.maxPackageChars * 4}. Nothing was imported.` };
+    renderHistory();
+    return;
+  }
+  try {
+    const verified = await verifyPackage(await file.text(), sha256Hex);
+    const summary = await historyStore.importPackage(verified);
+    const added = summary.added.length;
+    historyNotice = {
+      kind: "ok",
+      text: `Imported ${added} new run(s); ${summary.identical.length} already present and identical, not duplicated; ${summary.contentsAdded} content(s) stored, ${summary.contentsReused} reused by digest. No program was run.`,
+    };
+    await loadStoredHistory();
+  } catch (error) {
+    const reason = error.code && error.name === "PackageError" ? error.message : classifyStorageError(error).message;
+    historyNotice = { kind: "error", text: `Import refused: ${reason}. Nothing was imported and the saved history is unchanged.` };
+    renderHistory();
+  }
+}
+
 // Records a finished run. It is shown at once, marked "saving", and marked "saved" only after the transaction has
 // committed. A failure marks it "not saved" with the reason; the run stays visible and nothing else changes.
 async function persistRunHistory(options) {

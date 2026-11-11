@@ -62,8 +62,16 @@ test("a cancelled run is recorded as incomplete evidence, with no results shown 
   await expect(page.locator("#run-history .history-results-table")).toHaveCount(0);
 });
 
+// Loading a demo is asynchronous and cancels any run in flight. Wait for the demo's own message before pressing Run;
+// the file list alone is already true from the previous demo.
+const DEMO_LOADED = {
+  "#demo-sweep": "Loaded the parameter sweep. Nothing has run yet",
+  "#demo-sweep-even": "Loaded the parameter sweep for c = 2, 4, 6, 8. Nothing has run yet",
+};
+
 async function runDemo(page, button, expectedId) {
   await page.locator(button).click();
+  await expect(page.locator("#output")).toContainText(DEMO_LOADED[button], { timeout: 45_000 });
   await expect(page.locator("#file-explorer")).toContainText("4 files");
   await page.locator("#run").click();
   await expect(page.locator("#output")).toContainText("all checks passed", { timeout: 90_000 });
