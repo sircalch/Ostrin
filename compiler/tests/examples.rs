@@ -22075,3 +22075,39 @@ fn std_data_engine_reads_validates_fits_and_exports_identically_in_both_backends
     assert!(output.contains("missing column refused: the header has no column voltage"), "{output}");
     assert!(output.contains("correlation temperature-response: 0.99368810255027"), "{output}");
 }
+
+#[test]
+fn std_scientific_model_agrees_in_both_backends_and_writes_its_tables() {
+    // Dimensional parameters, RK4 and RK45 from std.numeric, analytic validation and the detected convergence failure.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("examples");
+    let output = interpreter_and_native_agree_from("scientific_model.ostrin", &examples_dir);
+    assert!(output.contains("decay: 1201 RK4 nodes"), "{output}");
+    assert!(output.contains("convergence failure detected"), "{output}");
+    assert!(output.contains("oscillator: 2401 RK4 nodes"), "{output}");
+}
+
+#[test]
+fn a_dimension_mismatch_is_refused_at_compile_time() {
+    // Adding a mass to a time is a type error, reported before the program can run.
+    let path = temp_artifact("dimension_mismatch.ostrin");
+    fs::write(
+        &path,
+        "fn main() -> Void {\n    x = 2.0 kg + 1.0 s\n    print(\"unreachable\")\n}\n",
+    )
+    .unwrap();
+    let check = run(&["--check", &path]);
+    let _ = fs::remove_file(&path);
+    assert!(!check.status.success(), "a mismatched sum was accepted");
+    let text = format!("{}{}", stdout(&check), stderr(&check));
+    assert!(!text.contains("unreachable"), "{text}");
+}
+
+#[test]
+fn std_data_figures_agree_in_both_backends() {
+    // The figures and the table written from the computed fits. Backend agreement covers the printed summary;
+    // scripts/data-figures.test.mjs checks the written files against the exact reference.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("examples");
+    let output = interpreter_and_native_agree_from("data_figures.ostrin", &examples_dir);
+    assert!(output.contains("wrote data/figures/calibration_table.csv with 36 rows"), "{output}");
+    assert!(output.contains("quadratic residual sum:"), "{output}");
+}

@@ -856,3 +856,35 @@ pub fn predict_all(f: Fit, xs: Array<Float>) -> Array<Float> {
     }
     array(out)
 }
+
+/// A table of float columns built from computed arrays. Every column has the same length, which is checked.
+pub fn table_from_columns(names: List<String>, columns: List<Array<Float>>) -> Result<Table, String> {
+    if names.length() == 0 or names.length() != columns.length() {
+        return Err("table_from_columns needs one name for each column, and at least one column")
+    }
+    rows = columns[0].length()
+    mut numbers: List<List<Float>> = []
+    mut texts: List<List<String>> = []
+    mut missing: List<List<Bool>> = []
+    mut kinds: List<String> = []
+    for j in 0 until columns.length() {
+        if columns[j].length() != rows {
+            return Err("every column needs the same number of rows")
+        }
+        mut values: List<Float> = []
+        mut flags: List<Bool> = []
+        for i in 0 until rows {
+            if not is_finite_value(columns[j][i]) {
+                return Err("column " + names[j] + " has a value that is not finite")
+            }
+            values.push(columns[j][i])
+            flags.push(false)
+        }
+        numbers.push(values)
+        mut no_texts: List<String> = []
+        texts.push(no_texts)
+        missing.push(flags)
+        kinds.push("float")
+    }
+    Ok(Table { names: names, kinds: kinds, numbers: numbers, texts: texts, missing: missing, rows: rows })
+}

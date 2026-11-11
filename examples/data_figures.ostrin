@@ -69,7 +69,7 @@ fn main() -> Void {
         .line(grid, quadratic_curve, label: "quadratic fit")
     print("fit figure: " + fit_figure.svg().length().to_string() + " characters of SVG")
     match fit_figure.save("data/figures/calibration_fit.svg") {
-        Ok(done) => print("wrote data/figures/calibration_fit.svg"),
+        Ok(_) => print("wrote data/figures/calibration_fit.svg"),
         Err(message) => print("cannot write the fit figure: " + message),
     }
 
@@ -79,14 +79,14 @@ fn main() -> Void {
         .scatter(temperature, quadratic.residuals, label: "residuals")
         .hline(0.0, label: "zero")
     match residual_figure.save("data/figures/calibration_residuals.svg") {
-        Ok(done) => print("wrote data/figures/calibration_residuals.svg"),
+        Ok(_) => print("wrote data/figures/calibration_residuals.svg"),
         Err(message) => print("cannot write the residual figure: " + message),
     }
 
     // The numbers behind both figures, as a table with the same rows.
     table_out = data.fit_table(temperature, response, quadratic, "temperature_c", "response")
     match write_file("data/figures/calibration_table.csv", data.table_text(table_out, ",")) {
-        Ok(done) => print("wrote data/figures/calibration_table.csv with " + table_out.rows.to_string() + " rows"),
+        Ok(_) => print("wrote data/figures/calibration_table.csv with " + table_out.rows.to_string() + " rows"),
         Err(message) => print("cannot write the table: " + message),
     }
     print("quadratic residual sum: " + sum_of(quadratic.residuals).to_string())
