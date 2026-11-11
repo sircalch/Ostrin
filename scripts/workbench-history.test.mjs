@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparability, compareRuns, createHistory, figureOf, findRun, recordRun, runRecord } from "../website/workbench-history.js";
+import { createHash } from "node:crypto";
+import { comparability, compareRuns, createHistory, figureOf, findRun, isSha256Hex, recordRun, runRecord, validateMetadata, verifyEntry } from "../website/workbench-history.js";
 
 const TOL = "x: 1e-12 (Brent); residual <= 10*|f'(root)|*1e-12; derivative: |numeric - analytic| <= 1e-5";
 const doc = (cs, overrides = {}) => ({
@@ -13,53 +14,136 @@ const doc = (cs, overrides = {}) => ({
   rows: cs.map((c) => ({ c, status: "converged", root: c + 0.5, residual: 0, residual_bound: 1e-11, analytic_derivative: 1, numeric_derivative: 1, passed: true, message: "" })),
   ...overrides,
 });
-const digests = (figure = "<svg>a</svg>") => ({ sources: { "main.ostrin": "a".repeat(64) }, stdout: "b".repeat(64), stderr: "c".repeat(64), figure: figure ? "d".repeat(64) : null, manifest: "e".repeat(64) });
+const sha = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+const digestOf = async (text) => sha(text);
+const H = (c) => c.repeat(64);
+const digests = () => ({ sources: { "main.ostrin": H("a") }, stdout: H("b"), stderr: H("c"), figure: H("d"), manifest: H("e") });
 const run = (id, results, overrides = {}) =>
   runRecord({
-    id,
-    projectId: "sweep-project",
-    projectName: "Parameter sweep",
-    entry: "main.ostrin",
-    command: "--run main.ostrin",
-    status: "completed",
-    exitCode: 0,
-    compilerIdentity: "ostrinc 0.2.0",
-    startedAt: "2026-11-10T10:00:00Z",
-    durationMs: 300,
-    results,
-    digests: digests(),
-    ...overrides,
+    id, projectId: "sweep-project", projectName: "Parameter sweep", entry: "main.ostrin", command: "--run main.ostrin",
+    status: "completed", exitCode: 0, compilerIdentity: "ostrinc 0.2.0", startedAt: "2026-11-10T10:00:00Z", durationMs: 300,
+    results, digests: digests(), ...overrides,
   });
+
+// ---- recording and figures -------------------------------------------------------------------------------------------
 
 test("a run is recorded once; a duplicate id is refused", () => {
   let history = createHistory();
   history = recordRun(history, run("r1", doc([1, 3])), "<svg>a</svg>");
   assert.throws(() => recordRun(history, run("r1", doc([1, 3])), "<svg>a</svg>"), /already recorded/);
-  assert.equal(history.entries.length, 1);
   assert.equal(findRun(history, "r1").id, "r1");
 });
 
-test("a figure is stored once per digest and is shared by runs that produce the same SVG", () => {
+test("a figure is stored once per digest; the same content is accepted, different content under the same digest is refused", () => {
   let history = createHistory();
-  history = recordRun(history, run("r1", doc([1]), { digests: digests("x") }), "<svg>same</svg>");
-  history = recordRun(history, run("r2", doc([1]), { digests: digests("x") }), "<svg>same</svg>");
-  assert.equal(Object.keys(history.figures).length, 1, "one stored figure for two runs");
-  assert.equal(figureOf(history, findRun(history, "r2")), "<svg>same</svg>");
+  history = recordRun(history, run("r1", doc([1]), { digests: { ...digests(), figure: H("f") } }), "<svg>same</svg>");
+  history = recordRun(history, run("r2", doc([1]), { digests: { ...digests(), figure: H("f") } }), "<svg>same</svg>");
+  assert.equal(Object.keys(history.figures).length, 1);
+  assert.throws(
+    () => recordRun(history, run("r3", doc([1]), { digests: { ...digests(), figure: H("f") } }), "<svg>different</svg>"),
+    /refusing to overwrite/,
+  );
+  assert.equal(figureOf(history, findRun(history, "r2")), "<svg>same</svg>", "the stored figure is unchanged");
 });
 
-test("a figure without its digest is refused, and an unknown status is refused", () => {
-  assert.throws(() => recordRun(createHistory(), run("r1", doc([1]), { digests: digests(null) }), "<svg/>"), /SHA-256 digest/);
+test("the digests must be SHA-256 hex; a non-hash value is refused, never accepted as a digest", () => {
+  assert.throws(() => run("r1", doc([1]), { digests: { ...digests(), sources: { "main.ostrin": "not-a-hash" } } }), /not SHA-256 hex/);
+  assert.throws(() => run("r1", doc([1]), { digests: { ...digests(), stdout: "b".repeat(63) } }), /stdout digest is not SHA-256 hex/);
+  assert.equal(isSha256Hex(H("a")), true);
+  assert.equal(isSha256Hex("A".repeat(64)), false, "uppercase hex is not the canonical form");
+});
+
+test("an unknown status is refused, and the timeout state is named as the controller names it", () => {
   assert.throws(() => run("r1", doc([1]), { status: "maybe" }), /unknown status/);
+  assert.throws(() => run("r1", null, { status: "timeout" }), /unknown status/, "the controller uses timed-out");
+  const timed = run("r1", null, { status: "timed-out" });
+  assert.equal(timed.status, "timed-out");
 });
 
-test("the digests must be supplied by the caller; the record never invents one", () => {
-  assert.throws(() => runRecord({ id: "r1", status: "completed", projectId: "p", entry: "main.ostrin", command: "x" }), /digests/);
+// ---- immutability ----------------------------------------------------------------------------------------------------
+
+test("a recorded entry shares no mutable object with its caller: changing the source afterwards changes nothing", () => {
+  const results = doc([1, 3]);
+  const sources = { "main.ostrin": H("a") };
+  const entry = run("r1", results, { digests: { sources, stdout: H("b"), stderr: null, figure: null, manifest: null } });
+  results.rows[0].root = 999;
+  sources["main.ostrin"] = H("9");
+  assert.equal(entry.results.rows[0].root, 1.5, "the recorded result is unchanged");
+  assert.equal(entry.digests.sources["main.ostrin"], H("a"), "the recorded digest is unchanged");
+  assert.throws(() => { entry.results.rows[0].root = 0; }, TypeError, "a recorded entry is frozen");
 });
+
+// ---- hashes: verification and discrepancies --------------------------------------------------------------------------
+
+test("verification recomputes SHA-256 from the content and accepts exactly the recorded content", async () => {
+  const content = { sources: { "main.ostrin": "fn main() -> Void {}\n" }, stdout: "49\n", stderr: "", figure: "<svg/>" };
+  const entry = run("r1", doc([1]), {
+    digests: { sources: { "main.ostrin": sha(content.sources["main.ostrin"]) }, stdout: sha("49\n"), stderr: sha(""), figure: sha("<svg/>"), manifest: null },
+  });
+  assert.deepEqual(await verifyEntry(entry, content, digestOf), []);
+});
+
+test("verification detects every altered artefact: source, stdout, stderr and figure", async () => {
+  const good = { sources: { "main.ostrin": "A" }, stdout: "out", stderr: "err", figure: "<svg/>" };
+  const entry = run("r1", doc([1]), { digests: { sources: { "main.ostrin": sha("A") }, stdout: sha("out"), stderr: sha("err"), figure: sha("<svg/>"), manifest: null } });
+  assert.deepEqual(await verifyEntry(entry, good, digestOf), []);
+  assert.match((await verifyEntry(entry, { ...good, sources: { "main.ostrin": "B" } }, digestOf)).join(";"), /source main.ostrin does not match/);
+  assert.match((await verifyEntry(entry, { ...good, stdout: "OUT" }, digestOf)).join(";"), /stdout does not match/);
+  assert.match((await verifyEntry(entry, { ...good, stderr: "x" }, digestOf)).join(";"), /stderr does not match/);
+  assert.match((await verifyEntry(entry, { ...good, figure: "<svg>tampered</svg>" }, digestOf)).join(";"), /figure does not match/);
+});
+
+test("verification reports missing artefacts as incomplete, not as matching", async () => {
+  const entry = run("r1", doc([1]), { digests: { sources: { "main.ostrin": sha("A") }, stdout: sha("out"), stderr: null, figure: sha("<svg/>"), manifest: null } });
+  const mismatches = (await verifyEntry(entry, { sources: {}, stdout: undefined, figure: null }, digestOf)).join(";");
+  assert.match(mismatches, /source main.ostrin is missing/);
+  assert.match(mismatches, /stdout is missing/);
+  assert.match(mismatches, /figure is missing/);
+});
+
+// ---- incomplete and failed runs --------------------------------------------------------------------------------------
+
+test("a cancelled, timed-out or failed run is recorded as incomplete evidence with no results", () => {
+  for (const status of ["cancelled", "timed-out", "failed"]) {
+    const entry = run("r-" + status, doc([1, 3]), { status, exitCode: null, digests: { ...digests(), figure: null } });
+    assert.equal(entry.evidence, "incomplete", status);
+    assert.equal(entry.results, null, `${status} keeps no results`);
+    assert.equal(entry.status, status);
+  }
+});
+
+test("an incomplete run is never comparable with anything, and says why", () => {
+  const ok = run("A", doc([1, 3]));
+  const failed = run("B", doc([1, 3]), { status: "failed", digests: { ...digests(), figure: null } });
+  const check = comparability(ok, failed);
+  assert.equal(check.comparable, false);
+  assert.match(check.reasons.join(";"), /run B is failed, not completed/);
+  assert.throws(() => compareRuns(ok, failed), /not comparable/);
+});
+
+test("a completed run without a validated document is incomplete, not a scientific result", () => {
+  const entry = run("A", null, { resultsRejected: "structured results are not valid JSON" });
+  assert.equal(entry.evidence, "incomplete");
+  assert.equal(entry.resultsRejected, "structured results are not valid JSON");
+});
+
+// ---- metadata --------------------------------------------------------------------------------------------------------
+
+test("metadata is validated formally: family, method, tolerances and bracket", () => {
+  assert.deepEqual(validateMetadata(doc([1])), []);
+  assert.match(validateMetadata(doc([1], { family: "" })).join(";"), /family/);
+  assert.match(validateMetadata(doc([1], { method: undefined })).join(";"), /method/);
+  assert.match(validateMetadata(doc([1], { tolerances: 3 })).join(";"), /tolerances/);
+  assert.match(validateMetadata(doc([1], { bracket: [1] })).join(";"), /bracket must be two finite numbers/);
+  assert.match(validateMetadata(doc([1], { bracket: [3, 1] })).join(";"), /increasing/);
+  assert.match(validateMetadata(doc([1], { bracket: [1, 1e999] })).join(";"), /two finite numbers/, "an infinite bracket end is refused");
+  assert.throws(() => run("A", doc([1], { method: "" })), /results metadata is invalid/);
+});
+
+// ---- comparison ------------------------------------------------------------------------------------------------------
 
 test("comparable runs: the same question, method, tolerances and compiler", () => {
-  const a = run("A", doc([1, 3, 5, 7]));
-  const b = run("B", doc([1, 3, 5, 7]));
-  assert.deepEqual(comparability(a, b), { comparable: true, reasons: [] });
+  assert.deepEqual(comparability(run("A", doc([1, 3])), run("B", doc([1, 3]))), { comparable: true, reasons: [] });
 });
 
 test("incompatible runs are refused, with the reason for each rule", () => {
@@ -70,29 +154,23 @@ test("incompatible runs are refused, with the reason for each rule", () => {
   assert.match(comparability(a, run("B", doc([1, 3], { method: "bisect" }))).reasons.join(";"), /different method/);
   assert.match(comparability(a, run("B", doc([1, 3], { tolerances: "other" }))).reasons.join(";"), /different tolerances/);
   assert.match(comparability(a, run("B", doc([1, 3]), { compilerIdentity: "ostrinc 0.3.0" })).reasons.join(";"), /different compiler identity/);
-  assert.throws(() => compareRuns(a, run("B", doc([1, 3], { method: "bisect" }))), /not comparable/);
+  assert.match(comparability(a, run("B", doc([1, 3]), { compilerIdentity: null })).reasons.join(";"), /compiler identity not recorded/);
 });
 
-test("a run whose method or tolerances are not declared is never assumed equal to another", () => {
-  const undeclared = { ...doc([1, 3]) };
-  delete undeclared.method;
-  delete undeclared.tolerances;
-  const reasons = comparability(run("A", doc([1, 3])), run("B", undeclared)).reasons.join(";");
-  assert.match(reasons, /method not declared/);
-  assert.match(reasons, /tolerances not declared/);
-});
-
-test("runs without validated results or without a compiler identity are not compared", () => {
-  assert.match(comparability(run("A", null), run("B", doc([1]))).reasons.join(";"), /no validated structured results/);
-  assert.match(comparability(run("A", doc([1]), { compilerIdentity: null }), run("B", doc([1]))).reasons.join(";"), /compiler identity not recorded/);
-});
-
-test("comparing two experiments matches rows by c and reports the differences b minus a", () => {
+test("matching by c: differences only for shared parameters, exclusive values listed, references kept", () => {
   const a = run("A", doc([1, 3, 5, 7]));
   const b = run("B", doc([3, 5, 7, 9]));
   const cmp = compareRuns(a, b);
   assert.deepEqual(cmp.rows.map((r) => r.c), [3, 5, 7]);
-  assert.equal(cmp.rows[0].rootDifference, 0, "same root for the same c");
+  assert.equal(cmp.rows[0].rootDifference, 0);
   assert.deepEqual(cmp.onlyInA, [1]);
   assert.deepEqual(cmp.onlyInB, [9]);
+  assert.deepEqual(cmp.references, { a: "A", b: "B" });
+});
+
+test("the example from the brief: c = [1, 3, 5, 7] against c = [2, 4, 6, 8] shares no parameter and invents no difference", () => {
+  const cmp = compareRuns(run("A", doc([1, 3, 5, 7])), run("B", doc([2, 4, 6, 8])));
+  assert.equal(cmp.rows.length, 0, "no shared c, so no numeric difference");
+  assert.deepEqual(cmp.onlyInA, [1, 3, 5, 7]);
+  assert.deepEqual(cmp.onlyInB, [2, 4, 6, 8]);
 });
