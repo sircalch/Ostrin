@@ -45,3 +45,24 @@
 .file-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
 .file-actions button { font-size: .78rem; }
 .file-note { margin: 0; font-size: .75rem; color: #8b93a7; }
+
+/* Run history: a compact table of recorded runs and the selected run's details. */
+.run-history { margin-top: 1.25rem; border: 1px solid #263045; border-radius: 10px; padding: 1rem; background: #0b0e15; }
+.history-title { font-size: 1rem; margin: 0 0 .6rem; }
+.history-empty { color: #8b93a7; margin: 0; }
+.history-table, .history-results-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.history-table th, .history-table td, .history-results-table th, .history-results-table td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid #1d2638; overflow-wrap: anywhere; }
+.history-table tbody tr { cursor: pointer; }
+.history-table tbody tr:hover, .history-table tbody tr:focus-visible { background: #151b29; outline: none; }
+.history-table tbody tr.is-selected { background: #1b2438; }
+.history-details { margin-top: 1rem; border-top: 1px solid #263045; padding-top: .9rem; }
+.history-details h3 { font-size: .95rem; margin: 0 0 .5rem; overflow-wrap: anywhere; }
+.history-fields { display: grid; grid-template-columns: minmax(7rem, max-content) 1fr; gap: .25rem .9rem; margin: 0 0 .8rem; font-size: .85rem; }
+.history-field { display: contents; }
+.history-field dt { color: #8b93a7; }
+.history-field dd { margin: 0; overflow-wrap: anywhere; }
+.history-results { overflow-x: auto; margin: .6rem 0; }
+.history-provenance ul { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .75rem; padding-left: 1.1rem; overflow-wrap: anywhere; }
+.history-scope { color: #8b93a7; font-size: .78rem; }
+.history-actions { margin-top: .6rem; }
+@media (max-width: 600px) { .history-fields { grid-template-columns: 1fr; } .history-field { display: block; } }

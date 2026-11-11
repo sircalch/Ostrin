@@ -19,6 +19,9 @@ import {
   setEntry,
 } from "./workbench-controller.js";
 import { renderExplorer } from "./workbench-explorer.js";
+import { createHistory, recordRun as recordHistoryEntry } from "./workbench-history.js";
+import { captureRun } from "./workbench-history-capture.js";
+import { renderHistoryPanel } from "./workbench-history-panel.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
 import { parseResults, resultsTable, resultsExportText, RESULTS_PREFIX } from "./workbench-results.js";
@@ -814,6 +817,35 @@ const importProjectInput = $("import-project-file");
 let workbench = createWorkbench(projectFromSourceFile("main.ostrin", EXAMPLES[Object.keys(EXAMPLES)[0]]));
 let compilerIdentityPromise = null;
 const cancelRunButton = $("cancel-run");
+// Scientific run history of this page. Entries are kept in memory; each one is an immutable record of one run.
+let history = createHistory();
+let historySelectedId = null;
+const historyPanel = $("run-history");
+const projectIdOf = (project) => project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+function renderHistory() {
+  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId }, {
+    onSelect: (id) => {
+      historySelectedId = id;
+      renderHistory();
+    },
+    onClose: () => {
+      historySelectedId = null;
+      renderHistory();
+    },
+  });
+}
+// Records a finished run without blocking the publication of its results. A failure is reported, and the open
+// project is never changed by it.
+async function persistRunHistory(options) {
+  try {
+    const { entry, figureSvg } = await captureRun(options);
+    history = recordHistoryEntry(history, entry, figureSvg);
+    renderHistory();
+  } catch (error) {
+    reportError("Run history not saved: " + (error.message ?? error));
+  }
+}
+renderHistory();
 const outputDecoder = new TextDecoder();
 // Runs of the project execute in a Worker, so the page stays responsive. One run is active at a time.
 const executor = createExecutor({
@@ -1229,6 +1261,8 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
   controls.forEach((b) => (b.disabled = true));
   statusNode.textContent = "running…";
   const started = performance.now();
+  const startedAt = new Date().toISOString();
+  let runId = null;
   try {
     const flags = ["--check", "--run"].includes(flag) ? [flag, "--json"] : [flag];
     const isWorkbench = sourceNode === source;
@@ -1246,6 +1280,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       // The previous results are no longer the ones on screen once a new run starts.
       clearResultsExport();
       const outcome = await executor.run({ command: args, entry: runInputSnapshot.entry, files: runInputSnapshot.files });
+      runId = outcome.id;
       if (!current()) return;
       if (outcome.state !== "completed") {
         // Cancelled, timed-out or failed runs show no results; the editor keeps its text.
@@ -1259,6 +1294,18 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
           clearResultsExport();
           outputNode.textContent = message;
           statusNode.textContent = runStateMessages[outcome.state] ?? outcome.state;
+          // An incomplete run is recorded as incomplete evidence: no output, no results, no figure.
+          if (isWorkbench) {
+            persistRunHistory({
+              id: outcome.id,
+              input: runInputSnapshot,
+              status: outcome.state,
+              command,
+              startedAt,
+              durationMs: performance.now() - started,
+              projectId: projectIdOf(runInputSnapshot.project),
+            });
+          }
         });
         return;
       }
@@ -1306,6 +1353,21 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
           compilerIdentity: identity,
         });
         refreshExplorer();
+        persistRunHistory({
+          id: runId,
+          input: runInputSnapshot,
+          status: "completed",
+          command,
+          startedAt,
+          durationMs: performance.now() - started,
+          exitCode: code,
+          compilerIdentity: identity,
+          lines,
+          stdoutBytes: rawRun.stdout,
+          stderrBytes: rawRun.stderr,
+          figureSvg: figure ? figure.svg : null,
+          projectId: projectIdOf(runInputSnapshot.project),
+        });
       }
       if (flag === "--fmt" && code === 0) {
         sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
