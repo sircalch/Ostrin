@@ -15,13 +15,23 @@ export async function sha256Hex(data) {
 
 // options: { id, input, status, command, startedAt, durationMs, exitCode, compilerIdentity, lines, stdoutBytes,
 //            stderrBytes, figureSvg, projectId }
-// Returns { entry, figureSvg } ready for recordRun. Incomplete runs (no output) pass null bytes and lines.
+// Returns { entry, figureSvg, contents } ready for recordRun. `contents` is the list of original bytes the digests
+// stand for (sources as UTF-8, stdout and stderr raw, the figure as UTF-8). Incomplete runs pass null bytes and lines.
 export async function captureRun(options) {
   const { id, input, status, command, startedAt, durationMs, exitCode = null, compilerIdentity = null, lines = null, stdoutBytes = null, stderrBytes = null, figureSvg = null, projectId } = options;
+  const contents = [];
   const sources = {};
   for (const [name, text] of Object.entries(input.project.files).sort()) {
-    sources[name] = await sha256Hex(text);
+    const bytes = encoder.encode(text);
+    sources[name] = await sha256Hex(bytes);
+    contents.push({ bytes });
   }
+  const stdoutDigest = stdoutBytes ? await sha256Hex(stdoutBytes) : null;
+  if (stdoutBytes) contents.push({ bytes: stdoutBytes });
+  const stderrDigest = stderrBytes ? await sha256Hex(stderrBytes) : null;
+  if (stderrBytes) contents.push({ bytes: stderrBytes });
+  const figureBytes = figureSvg !== null ? encoder.encode(figureSvg) : null;
+  if (figureBytes) contents.push({ bytes: figureBytes });
   const completed = status === "completed";
   const parsed = completed && lines ? parseResults(lines) : { ok: false, reason: null };
   const entry = runRecord({
@@ -40,11 +50,11 @@ export async function captureRun(options) {
     resultsRejected: completed && !parsed.ok && parsed.reason !== "no structured results in this run" ? parsed.reason : null,
     digests: {
       sources,
-      stdout: stdoutBytes ? await sha256Hex(stdoutBytes) : null,
-      stderr: stderrBytes ? await sha256Hex(stderrBytes) : null,
-      figure: figureSvg !== null ? await sha256Hex(figureSvg) : null,
+      stdout: stdoutDigest,
+      stderr: stderrDigest,
+      figure: figureBytes ? await sha256Hex(figureBytes) : null,
       manifest: null,
     },
   });
-  return { entry, figureSvg };
+  return { entry, figureSvg, contents };
 }

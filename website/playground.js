@@ -20,7 +20,9 @@ import {
 } from "./workbench-controller.js";
 import { renderExplorer } from "./workbench-explorer.js";
 import { createHistory, recordRun as recordHistoryEntry } from "./workbench-history.js";
-import { captureRun } from "./workbench-history-capture.js";
+import { captureRun, sha256Hex } from "./workbench-history-capture.js";
+import { createHistoryStore } from "./workbench-history-idb.js";
+import { classifyStorageError, mergeHistory } from "./workbench-history-storage.js";
 import { renderHistoryPanel } from "./workbench-history-panel.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
@@ -825,8 +827,16 @@ const projectIdOf = (project) => project.name.toLowerCase().replace(/[^a-z0-9]+/
 // Comparison selection: at most two runs. Choosing a third replaces the older of the two.
 let historySelection = [];
 let historyComparison = null;
+// Persistence in IndexedDB. The store is separate from the history model: a failed write never changes `history`
+// or the open project; it only marks the run as not saved. `historyStorage.state` is "loading" until the saved
+// runs are read, then "ready", or "unavailable" with the reason.
+const historyStore = createHistoryStore({ digestOf: sha256Hex });
+let historyStorage = { state: "loading", reason: null, quarantined: [], altered: [] };
+const historyRunState = {}; // id -> { state: "saving" | "saved" | "not-saved", reason }
+const historyVerification = {}; // id -> verification of the stored content
 function renderHistory() {
-  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison }, {
+  const persistence = { storage: historyStorage, runs: historyRunState, verification: historyVerification };
+  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison, persistence }, {
     onSelect: (id) => {
       historySelectedId = id;
       historyComparison = null;
@@ -853,18 +863,61 @@ function renderHistory() {
     },
   });
 }
-// Records a finished run without blocking the publication of its results. A failure is reported, and the open
-// project is never changed by it.
-async function persistRunHistory(options) {
+// Restores the saved runs of this browser. Runs already recorded on this page are kept; the saved ones are added.
+// It runs after the editor and compiler are set up and never blocks them. Failure leaves the page working in memory.
+async function loadStoredHistory() {
   try {
-    const { entry, figureSvg } = await captureRun(options);
-    history = recordHistoryEntry(history, entry, figureSvg);
-    renderHistory();
+    const restored = await historyStore.load();
+    const merged = mergeHistory(history, restored);
+    history = merged.history;
+    for (const [id, verification] of Object.entries(merged.verification)) {
+      historyRunState[id] = { state: "saved", reason: null };
+      historyVerification[id] = verification;
+    }
+    historyStorage = {
+      state: "ready",
+      reason: null,
+      quarantined: restored.quarantined,
+      altered: restored.altered,
+    };
+  } catch (error) {
+    historyStorage = { state: "unavailable", reason: classifyStorageError(error).message, quarantined: [], altered: [] };
+  }
+  renderHistory();
+}
+// Records a finished run. It is shown at once, marked "saving", and marked "saved" only after the transaction has
+// committed. A failure marks it "not saved" with the reason; the run stays visible and nothing else changes.
+async function persistRunHistory(options) {
+  let captured;
+  try {
+    captured = await captureRun(options);
   } catch (error) {
     reportError("Run history not saved: " + (error.message ?? error));
+    return;
   }
+  const { entry, figureSvg, contents } = captured;
+  try {
+    history = recordHistoryEntry(history, entry, figureSvg);
+  } catch (error) {
+    reportError("Run history not saved: " + (error.message ?? error));
+    return;
+  }
+  historyRunState[entry.id] = { state: "saving", reason: null };
+  renderHistory();
+  try {
+    const stored = await historyStore.record(entry, contents);
+    historyRunState[entry.id] = { state: "saved", reason: null };
+    historyVerification[entry.id] = stored.verification;
+    historyStorage = { ...historyStorage, writeError: null };
+  } catch (error) {
+    const storageError = classifyStorageError(error);
+    historyRunState[entry.id] = { state: "not-saved", reason: storageError.message };
+    historyStorage = { ...historyStorage, writeError: `run ${entry.id} was not saved permanently: ${storageError.message}` };
+  }
+  renderHistory();
 }
 renderHistory();
+loadStoredHistory();
 const outputDecoder = new TextDecoder();
 // Runs of the project execute in a Worker, so the page stays responsive. One run is active at a time.
 const executor = createExecutor({

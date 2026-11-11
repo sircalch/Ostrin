@@ -44,11 +44,54 @@ function figureImage(svg, alt) {
   return figure;
 }
 
-// state: { selectedId, selection: [id, ...], comparison: { a, b } | null }
+const STORED_STATE_TEXT = {
+  verified: "verified now",
+  missing: "digest only: bytes not stored",
+  altered: "altered: failed verification, not used",
+};
+
+// One line describing what the storage holds for a run: each registered digest and whether its bytes verified now.
+function storedContentText(verification) {
+  if (!verification) return "not recorded";
+  const parts = Object.entries(verification.sources).map(([name, s]) => "source " + name + ": " + STORED_STATE_TEXT[s]);
+  if (verification.stdout) parts.push("stdout: " + STORED_STATE_TEXT[verification.stdout]);
+  if (verification.stderr) parts.push("stderr: " + STORED_STATE_TEXT[verification.stderr]);
+  if (verification.figure) parts.push("figure: " + STORED_STATE_TEXT[verification.figure]);
+  return parts.join("; ");
+}
+
+function storageBanner(storage) {
+  if (!storage) return null;
+  if (storage.state === "loading") return el("p", "history-scope", "Loading saved runs from this browser…");
+  if (storage.state === "unavailable") {
+    return el(
+      "p",
+      "history-rejected",
+      "Saved history is unavailable (" + storage.reason + "). Runs shown here are kept on this page only and are not saved permanently.",
+    );
+  }
+  const notes = [];
+  if (storage.writeError) notes.push(storage.writeError + ". It stays visible on this page only.");
+  if (storage.quarantined?.length) {
+    notes.push(storage.quarantined.length + " saved record(s) could not be read and were not loaded (" + storage.quarantined.map((q) => q.key).join(", ") + "). They stay in storage; nothing was deleted.");
+  }
+  if (storage.altered?.length) {
+    notes.push(storage.altered.length + " stored content(s) failed verification and are not used by any run.");
+  }
+  return notes.length ? el("p", "history-rejected", notes.join(" ")) : null;
+}
+
+const SAVED_TEXT = { saving: "saving…", saved: "saved", "not-saved": "not saved" };
+
+// state: { selectedId, selection: [id, ...], comparison: { a, b } | null,
+//          persistence: { storage, runs: { id: { state, reason } }, verification: { id: verification } } }
 export function renderHistoryPanel(container, history, state, handlers) {
   if (!container) return;
   container.replaceChildren();
   container.append(el("h2", "history-title", "Run history"));
+  const persistence = state.persistence ?? {};
+  const banner = storageBanner(persistence.storage);
+  if (banner) container.append(banner);
 
   if (history.entries.length === 0) {
     container.append(el("p", "history-empty", "No runs recorded yet. Run a project and its result is kept here."));
@@ -67,7 +110,7 @@ export function renderHistoryPanel(container, history, state, handlers) {
   const grid = el("table", "history-table");
   const head = el("thead");
   const headRow = el("tr");
-  for (const label of ["Compare", "Run", "Status", "Evidence", "Project", "Entry", "Recorded"]) headRow.append(el("th", null, label));
+  for (const label of ["Compare", "Run", "Status", "Evidence", "Project", "Entry", "Recorded", "Saved"]) headRow.append(el("th", null, label));
   head.append(headRow);
   const body = el("tbody");
   for (const entry of history.entries) {
@@ -87,6 +130,11 @@ export function renderHistoryPanel(container, history, state, handlers) {
     for (const text of [entry.id, entry.status, entry.evidence, entry.projectName, entry.entry, entry.startedAt]) {
       tr.append(el("td", null, text));
     }
+    const saved = persistence.runs?.[entry.id];
+    const savedText = saved ? SAVED_TEXT[saved.state] : SAVED_TEXT["not-saved"];
+    const savedCell = el("td", "history-saved-" + (saved?.state ?? "not-saved"), savedText);
+    if (saved?.reason) savedCell.title = saved.reason;
+    tr.append(savedCell);
     tr.addEventListener("click", () => handlers.onSelect(entry.id));
     tr.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -104,10 +152,10 @@ export function renderHistoryPanel(container, history, state, handlers) {
     return;
   }
   const entry = state.selectedId ? findRun(history, state.selectedId) : null;
-  if (entry) container.append(renderDetails(history, entry, handlers));
+  if (entry) container.append(renderDetails(history, entry, handlers, persistence));
 }
 
-function renderDetails(history, entry, handlers) {
+function renderDetails(history, entry, handlers, persistence) {
   const section = el("section", "history-details");
   section.setAttribute("aria-label", "Selected run");
   section.append(el("h3", null, "Run " + entry.id));
@@ -126,6 +174,8 @@ function renderDetails(history, entry, handlers) {
     field("Method", entry.results?.method ?? null),
     field("Tolerances", entry.results?.tolerances ?? null),
     field("Rejected results", entry.resultsRejected),
+    field("Storage", SAVED_TEXT[persistence?.runs?.[entry.id]?.state ?? "not-saved"]),
+    field("Stored content", storedContentText(persistence?.verification?.[entry.id])),
   );
   section.append(meta);
 
@@ -138,6 +188,9 @@ function renderDetails(history, entry, handlers) {
 
   const svg = figureOf(history, entry);
   if (svg) section.append(figureImage(svg, "Figure recorded with run " + entry.id));
+  else if (entry.digests.figure) {
+    section.append(el("p", "history-scope", "Figure not available: its stored bytes are " + (persistence?.verification?.[entry.id]?.figure === "altered" ? "altered" : "missing") + ", so it is not shown."));
+  }
 
   const provenance = el("div", "history-provenance");
   provenance.append(el("h4", null, "Provenance and digests (SHA-256)"));
