@@ -14,6 +14,7 @@ const demosDir = path.join(root, "website", "workbench-demos");
 export const DEMOS = Object.freeze([
   { id: "cubic-root", name: "Cubic root: x^3 - 2x - 5" },
   { id: "parameter-sweep", name: "Parameter sweep: x^3 - 2x - c for c = 1, 3, 5, 7" },
+  { id: "parameter-sweep-even", name: "Parameter sweep: x^3 - 2x - c for c = 2, 4, 6, 8" },
 ]);
 
 export function demoProject(id = "cubic-root") {

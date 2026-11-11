@@ -28,7 +28,7 @@ fn main() -> Int {
         },
         Err(message) => print("expected error for [0, 1]: " + message),
     }
-    document = "{\"schema\":\"ostrin.results/v1\",\"experiment\":\"cubic-parameter-sweep\",\"family\":\"x^3 - 2x - c\",\"bracket\":[1.0,3.0],\"rows\":[" + sweep.row_json(r1) + "," + sweep.row_json(r3) + "," + sweep.row_json(r5) + "," + sweep.row_json(r7) + "]}"
+    document = "{\"schema\":\"ostrin.results/v1\",\"experiment\":\"cubic-parameter-sweep\",\"family\":\"x^3 - 2x - c\",\"bracket\":[1.0,3.0],\"method\":\"std.numeric.brent\",\"tolerances\":\"x: 1e-12 (Brent); residual <= 10*|f'(root)|*1e-12; derivative: |numeric - analytic| <= 1e-5\",\"rows\":[" + sweep.row_json(r1) + "," + sweep.row_json(r3) + "," + sweep.row_json(r5) + "," + sweep.row_json(r7) + "]}"
     print("RESULTS " + document)
     print(graphics.figure(1.0, 3.0, 5.0, 7.0, r1.root, r3.root, r5.root, r7.root))
     if failures == 0 {

@@ -1,0 +1,32 @@
+// The family f(x; c) = x^3 - 2x - c. One definition for every scenario: the parameter is an argument.
+// Ostrin has no closures, so std.numeric.brent (which takes a one-argument function) receives the named
+// wrappers g2, g4, g6, g8 below, each fixing c for one scenario.
+pub fn f(x: Float, c: Float) -> Float {
+    x * x * x - 2.0 * x - c
+}
+
+// Analytic derivative in x; it does not depend on c.
+pub fn df(x: Float) -> Float {
+    3.0 * x * x - 2.0
+}
+
+// Vectorised over the samples of x for one parameter value c.
+pub fn samples(xs: Array<Float>, c: Float) -> Array<Float> {
+    xs * xs * xs - xs * 2.0 - c
+}
+
+pub fn g2(x: Float) -> Float {
+    f(x, 2.0)
+}
+
+pub fn g4(x: Float) -> Float {
+    f(x, 4.0)
+}
+
+pub fn g6(x: Float) -> Float {
+    f(x, 6.0)
+}
+
+pub fn g8(x: Float) -> Float {
+    f(x, 8.0)
+}

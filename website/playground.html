@@ -50,6 +50,7 @@
           <button id="import-project" class="button-quiet" type="button" title="Open a .ostrin.project.json file">Import project</button>
           <button id="demo-project" class="button-quiet" type="button" title="Load the cubic root demonstration project (nothing runs until you press Run)">Demo: cubic root</button>
           <button id="demo-sweep" class="button-quiet" type="button" title="Load the parameter sweep of x^3 - 2x - c for c = 1, 3, 5, 7 (nothing runs until you press Run)">Demo: parameter sweep</button>
+          <button id="demo-sweep-even" class="button-quiet" type="button" title="Load the parameter sweep of x^3 - 2x - c for c = 2, 4, 6, 8 (nothing runs until you press Run)">Demo: sweep c = 2, 4, 6, 8</button>
           <button id="download-results" class="button-quiet" type="button" title="Download the structured results of the last run" disabled>Results JSON</button>
           <button id="download-manifest" class="button-quiet" type="button" title="Download the manifest of the last run" disabled>Manifest</button>
           <button id="cancel-run" class="button-quiet" type="button" title="Stop the running program. The worker is terminated; your edits are kept." disabled>Cancel</button>
@@ -62,6 +63,7 @@
           <div class="pane"><div class="code-title"><span id="active-file-name">main.ostrin</span><span id="source-status" class="source-status" aria-live="polite"></span></div><textarea id="source" spellcheck="false" autocomplete="off" aria-label="Ostrin source"></textarea></div>
           <div class="pane"><div class="code-title">output <span id="status" class="status"></span></div><div id="output" class="output" role="status" aria-live="polite">Loading the compiler…</div></div>
         </div>
+        <section id="run-history" class="run-history" aria-label="Run history"></section>
         <p class="playground-note">Run executes the interpreter. Native C compilation needs a C toolchain, so it is not available in the browser. Programs see a single in-memory file and no network.</p>
       </section>
     </main>
