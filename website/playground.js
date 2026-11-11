@@ -836,9 +836,10 @@ const historyStore = createHistoryStore({ digestOf: sha256Hex });
 let historyStorage = { state: "loading", reason: null, quarantined: [], altered: [] };
 const historyRunState = {}; // id -> { state: "saving" | "saved" | "not-saved", reason }
 const historyVerification = {}; // id -> verification of the stored content
+const historyOrigin = {}; // id -> { kind: "local" } or { kind: "imported", source, at }: never mixed up in a comparison
 let historyNotice = null; // outcome of the last export or import: { kind: "ok" | "error", text }
 function renderHistory() {
-  const persistence = { storage: historyStorage, runs: historyRunState, verification: historyVerification };
+  const persistence = { storage: historyStorage, runs: historyRunState, verification: historyVerification, origins: historyOrigin };
   renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison, persistence, notice: historyNotice }, {
     onExport: (ids) => exportHistory(ids),
     onImport: (file) => importHistoryFile(file),
@@ -875,6 +876,7 @@ async function loadStoredHistory() {
     const restored = await historyStore.load();
     const merged = mergeHistory(history, restored);
     history = merged.history;
+    Object.assign(historyOrigin, merged.origins);
     for (const [id, verification] of Object.entries(merged.verification)) {
       historyRunState[id] = { state: "saved", reason: null };
       historyVerification[id] = verification;
@@ -974,6 +976,7 @@ async function persistRunHistory(options) {
     return;
   }
   historyRunState[entry.id] = { state: "saving", reason: null };
+  historyOrigin[entry.id] = { kind: "local" };
   renderHistory();
   try {
     const stored = await historyStore.record(entry, contents);

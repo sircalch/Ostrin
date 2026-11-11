@@ -83,6 +83,15 @@ function storageBanner(storage) {
 
 const SAVED_TEXT = { saving: "saving…", saved: "saved", "not-saved": "not saved" };
 
+// Where a run came from. An imported run is never presented as one executed in this browser.
+function originText(origin) {
+  if (!origin || origin.kind === "local") return "run in this browser";
+  return "imported from an evidence package (stored " + origin.at + ")";
+}
+function originShort(origin) {
+  return !origin || origin.kind === "local" ? "local" : "imported";
+}
+
 // The import control: a button that opens a file picker. The file is handed to the handler; nothing is read here.
 function importControl(handlers) {
   const wrap = el("div", "history-import");
@@ -146,7 +155,7 @@ export function renderHistoryPanel(container, history, state, handlers) {
   const grid = el("table", "history-table");
   const head = el("thead");
   const headRow = el("tr");
-  for (const label of ["Compare", "Run", "Status", "Evidence", "Project", "Entry", "Recorded", "Saved"]) headRow.append(el("th", null, label));
+  for (const label of ["Compare", "Run", "Status", "Evidence", "Project", "Entry", "Recorded", "Origin", "Saved"]) headRow.append(el("th", null, label));
   head.append(headRow);
   const body = el("tbody");
   for (const entry of history.entries) {
@@ -166,6 +175,7 @@ export function renderHistoryPanel(container, history, state, handlers) {
     for (const text of [entry.id, entry.status, entry.evidence, entry.projectName, entry.entry, entry.startedAt]) {
       tr.append(el("td", null, text));
     }
+    tr.append(el("td", "history-origin-" + originShort(persistence.origins?.[entry.id]), originShort(persistence.origins?.[entry.id])));
     const saved = persistence.runs?.[entry.id];
     const savedText = saved ? SAVED_TEXT[saved.state] : SAVED_TEXT["not-saved"];
     const savedCell = el("td", "history-saved-" + (saved?.state ?? "not-saved"), savedText);
@@ -184,7 +194,7 @@ export function renderHistoryPanel(container, history, state, handlers) {
   container.append(grid);
 
   if (state.comparison) {
-    container.append(renderComparison(history, state.comparison, handlers));
+    container.append(renderComparison(history, state.comparison, handlers, persistence));
     return;
   }
   const entry = state.selectedId ? findRun(history, state.selectedId) : null;
@@ -210,6 +220,7 @@ function renderDetails(history, entry, handlers, persistence) {
     field("Method", entry.results?.method ?? null),
     field("Tolerances", entry.results?.tolerances ?? null),
     field("Rejected results", entry.resultsRejected),
+    field("Origin", originText(persistence?.origins?.[entry.id])),
     field("Storage", SAVED_TEXT[persistence?.runs?.[entry.id]?.state ?? "not-saved"]),
     field("Stored content", storedContentText(persistence?.verification?.[entry.id])),
     field("Evidence coverage", coverageText(entry, persistence?.verification?.[entry.id])),
@@ -254,7 +265,7 @@ function renderDetails(history, entry, handlers, persistence) {
 
 // The comparison of two runs. Incompatible runs show the reasons and no numbers. Compatible runs show the shared
 // parameters with their differences, the values exclusive to each run, and the references to the original runs.
-function renderComparison(history, { a: aId, b: bId }, handlers) {
+function renderComparison(history, { a: aId, b: bId }, handlers, persistence = {}) {
   const a = findRun(history, aId);
   const b = findRun(history, bId);
   const section = el("section", "history-compare");
@@ -271,7 +282,7 @@ function renderComparison(history, { a: aId, b: bId }, handlers) {
       section.append(reasons);
     } else {
       const cmp = compareRuns(a, b);
-      section.append(el("p", "history-scope", `Comparable: same experiment family, bracket, method, tolerances and compiler (${a.compilerIdentity}). References: run ${a.id} (A) and run ${b.id} (B).`));
+      section.append(el("p", "history-scope", `Comparable: same experiment family, bracket, method, tolerances and compiler (${a.compilerIdentity}). References: run ${a.id} (A, ${originShort(persistence.origins?.[a.id])}) and run ${b.id} (B, ${originShort(persistence.origins?.[b.id])}).`));
       if (cmp.rows.length === 0) {
         section.append(el("p", "history-scope", "No parameter is shared, so no numeric difference is computed."));
       } else {

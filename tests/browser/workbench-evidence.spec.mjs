@@ -157,9 +157,14 @@ test("flow A: a real run is exported, then imported into a clean browser context
   await expect(details).toContainText("figure: verified now");
   await expect(details).toContainText("Evidence coverage");
   await expect(details).toContainText("complete: validated results and all declared content verified");
+  // An imported run is distinguishable from a run executed in this browser.
+  await expect(details).toContainText("imported from an evidence package");
+  await expect(rows.first().locator("td.history-origin-imported")).toHaveCount(1);
   // Importing never changes the open project nor runs anything.
   await expect(page.locator("#source")).toHaveValue(projectBefore);
   await expect(page.locator("#output")).toHaveText(outputBefore ?? "");
+  // No program ran: the Workbench records a timing for every run it executes, and none exists in this context.
+  expect(await page.evaluate(() => window.__ostrinLastRun ?? null)).toBeNull();
   await clean.close();
 });
 
@@ -187,6 +192,8 @@ test("flow B: two runs exported together are imported into a clean context and s
   await page.getByRole("button", { name: "Compare the two selected runs" }).click();
   const comparison = page.locator("#run-history .history-compare");
   await expect(comparison).toContainText("Comparable");
+  await expect(comparison).toContainText("(A, imported)");
+  await expect(comparison).toContainText("(B, imported)");
   await expect(comparison).toContainText("No parameter is shared");
   await expect(comparison).toContainText("Only in A: c = 1, 3, 5, 7");
   await expect(comparison).toContainText("Only in B: c = 2, 4, 6, 8");
