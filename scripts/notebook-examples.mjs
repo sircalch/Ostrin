@@ -394,6 +394,163 @@ fn main() -> Void {
 
 // ---------------------------------------------------------------- assembly
 
+// ---------------------------------------------------------------- D: symbolic to numeric
+
+const NUMERIC_TEXT = `# Symbolic to numeric
+
+The polynomial f(x) = a x^3 - b x + c is built with std.symbolic from the parameters in c1. Its derivative is computed
+symbolically, sampled on an interval, compared with central differences, checked for counterexamples, and plotted.
+
+Change a value in c1 and run it: the cells that depend on c1 become stale. Run them again and every table, check and
+figure shows the new values. Each code cell builds its own expression, so no value passes between cells except
+through c1.`;
+
+const NUMERIC_PARAMETERS = `// The parameters of f(x) = a x^3 - b x + c. Each function returns one integer coefficient; the cells that depend on
+// this cell read them. Change a value, then run the cells again.
+pub fn coefficient_a() -> Int {
+    return 2
+}
+
+pub fn coefficient_b() -> Int {
+    return 3
+}
+
+pub fn coefficient_c() -> Int {
+    return 1
+}`;
+
+const NUMERIC_TRANSFORM = `import std.symbolic
+import c1
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    three = symbolic.number(s, 3)
+    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))
+    print("f(x) = " + symbolic.show(f))
+    print("expanded: " + symbolic.show(symbolic.expand(f)))
+    match symbolic.diff(f, x) {
+        Ok(df) => print("f'(x) = " + symbolic.show(df)),
+        Err(message) => print("derivative not available: " + message),
+    }
+    print("f(1/2) exactly: " + symbolic.show(symbolic.expand(symbolic.subs(f, x, symbolic.number(s, 1, 2)))))
+}`;
+
+const NUMERIC_TABLE = `import std.symbolic
+import c1
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    three = symbolic.number(s, 3)
+    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))
+    match symbolic.diff(f, x) {
+        Ok(df) => {
+            xs = linspace(0.0 - 2.0, 2.0, 9)
+            h = 0.000001
+            mut up = zeros([9])
+            mut down = zeros([9])
+            for i in 0 until 9 {
+                up.set(i, xs[i] + h)
+                down.set(i, xs[i] - h)
+            }
+            values = symbolic.sample(f, x, xs)
+            slopes = symbolic.sample(df, x, xs)
+            ahead = symbolic.sample(f, x, up)
+            behind = symbolic.sample(f, x, down)
+            match values {
+                Ok(fv) => {
+                    match slopes {
+                        Ok(dv) => {
+                            print("OSTRIN-TABLE f and its derivative on [-2, 2]")
+                            print("x,f(x),f'(x),central difference")
+                            match ahead {
+                                Ok(uv) => {
+                                    match behind {
+                                        Ok(bv) => {
+                                            for i in 0 until 9 {
+                                                quotient = (uv[i] - bv[i]) / (2.0 * h)
+                                                print(xs[i].to_string() + "," + fv[i].to_string() + "," + dv[i].to_string() + "," + quotient.to_string())
+                                            }
+                                        },
+                                        Err(message) => print("sample: " + message),
+                                    }
+                                },
+                                Err(message) => print("sample: " + message),
+                            }
+                            print("OSTRIN-TABLE-END")
+                        },
+                        Err(message) => print("sample: " + message),
+                    }
+                },
+                Err(message) => print("sample: " + message),
+            }
+        },
+        Err(message) => print("derivative not available: " + message),
+    }
+}`;
+
+const NUMERIC_CHECKS = `import std.symbolic
+import c1
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    three = symbolic.number(s, 3)
+    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))
+    xs = linspace(0.0 - 2.0, 2.0, 41)
+    match symbolic.derivative_mismatches(f, x, xs, 0.000001, 0.000001) {
+        Ok(points) => print("derivative against central differences: " + points.length().to_string() + " mismatched points of 41"),
+        Err(message) => print("derivative check refused: " + message),
+    }
+    match symbolic.derivative_mismatches(f, x, xs, 0.0000000000000001, 0.000001) {
+        Ok(points) => print("a step of 1e-16 gave " + points.length().to_string() + " mismatches"),
+        Err(message) => print("a step of 1e-16 is refused, as it should be: " + message),
+    }
+    // The identity (x + 1)^3 = x^3 + 3x^2 + 3x + 1 holds, so it has no counterexample on the grid.
+    x_plus = symbolic.add(x, symbolic.number(s, 1))
+    cube = symbolic.power(x_plus, three)
+    expanded = symbolic.add(symbolic.power(x, three), symbolic.add(symbolic.mul(symbolic.number(s, 3), symbolic.power(x, symbolic.number(s, 2))), symbolic.add(symbolic.mul(symbolic.number(s, 3), x), symbolic.number(s, 1))))
+    match symbolic.disagreements(cube, expanded, x, xs, 0.000000000001) {
+        Ok(points) => print("(x + 1)^3 = x^3 + 3x^2 + 3x + 1: " + points.length().to_string() + " counterexamples on the grid"),
+        Err(message) => print("identity check refused: " + message),
+    }
+}`;
+
+const NUMERIC_FIGURE = `import std.symbolic
+import c1
+import std.viz
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    three = symbolic.number(s, 3)
+    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))
+    xs = linspace(0.0 - 2.0, 2.0, 81)
+    match symbolic.diff(f, x) {
+        Ok(df) => {
+            match symbolic.sample(f, x, xs) {
+                Ok(fv) => {
+                    match symbolic.sample(df, x, xs) {
+                        Ok(dv) => {
+                            fig = viz.figure("f and its derivative, from the symbolic expressions")
+                                .describe("f(x) = a x^3 - b x + c with the parameters of c1; the derivative is computed symbolically")
+                                .labels("x", "value")
+                                .line(xs, fv, label: "f(x)")
+                                .line(xs, dv, label: "f'(x)", dash: "6 4")
+                                .hline(0.0)
+                            print(fig.svg())
+                        },
+                        Err(message) => print("sample: " + message),
+                    }
+                },
+                Err(message) => print("sample: " + message),
+            }
+        },
+        Err(message) => print("derivative not available: " + message),
+    }
+}`;
+
 function build({ id, title, text, cells, resources = [] }) {
   let doc = createNotebook({ id, title, now: NOW });
   doc = addCell(doc, "text", { source: text });
@@ -441,6 +598,18 @@ export function notebooks() {
       text: SYMBOLIC_TEXT,
       cells: [{ source: SYMBOLIC_BUILD }, { source: SYMBOLIC_SOLVE }, { source: SYMBOLIC_FIGURE }],
     }),
+    numeric: build({
+      id: "numeric",
+      title: "D · Symbolic to numeric",
+      text: NUMERIC_TEXT,
+      cells: [
+        { source: NUMERIC_PARAMETERS },
+        { source: NUMERIC_TRANSFORM, deps: ["c1"] },
+        { source: NUMERIC_TABLE, deps: ["c1"] },
+        { source: NUMERIC_CHECKS, deps: ["c1"] },
+        { source: NUMERIC_FIGURE, deps: ["c1"] },
+      ],
+    }),
   };
 }
 
@@ -448,6 +617,7 @@ const FILES = {
   experimental: "experimental.ostrin.notebook.json",
   physical: "physical.ostrin.notebook.json",
   symbolic: "symbolic.ostrin.notebook.json",
+  numeric: "numeric.ostrin.notebook.json",
 };
 
 if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}` || process.argv[1]?.endsWith("notebook-examples.mjs")) {

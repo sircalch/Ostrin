@@ -239,6 +239,49 @@ test("the symbolic example runs in the browser: derivative and substitution, roo
   await expect(page.locator('[data-cell-id="c3"] .nb-figure img')).toBeVisible({ timeout: 120_000 });
 });
 
+// ---------------------------------------------------------------- symbolic to numeric, end to end
+
+test("the numeric example runs from expression to figure, and a changed parameter updates every output after a run", async ({ page }) => {
+  test.setTimeout(480_000);
+  await open(page);
+  await openFileMenu(page);
+  await page.locator("#nb-example").selectOption("numeric");
+  await expect(page.locator(".nb-cell")).toHaveCount(6);
+  await page.getByRole("button", { name: "Run all" }).click();
+  // transformation and derivation
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f'(x) = -3 + 6*x^2", { timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f(1/2) exactly: -1/4");
+  // numeric table of f, f' and the central difference
+  await expect(page.locator('[data-cell-id="c3"] .nb-table').first()).toBeVisible({ timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c3"] .nb-table').first()).toContainText("21");
+  // checks against the independent quotient and a refused step
+  await expect(page.locator('[data-cell-id="c4"] .nb-stdout')).toContainText("0 mismatched points of 41", { timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c4"] .nb-stdout')).toContainText("is refused, as it should be");
+  // figure
+  await expect(page.locator('[data-cell-id="c5"] .nb-figure img')).toBeVisible({ timeout: 240_000 });
+
+  // change the parameter a from 2 to 5 in c1: the cells that depend on it become stale
+  const parameters = page.locator('[data-cell-id="c1"] textarea.nb-source');
+  await parameters.fill((await parameters.inputValue()).replace("return 2", "return 5"));
+  for (const id of ["c2", "c3", "c4", "c5"]) {
+    await expect(page.locator(`[data-cell-id="${id}"] .nb-chip`)).toHaveText(/stale/);
+  }
+  await page.getByRole("button", { name: "Run all" }).click();
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f'(x) = -3 + 15*x^2", { timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f(1/2) exactly: 1/8");
+  await expect(page.locator('[data-cell-id="c3"] .nb-table').first()).toContainText("15", { timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c5"] .nb-figure img')).toBeVisible({ timeout: 240_000 });
+
+  // the changed parameter is part of the document: a reload keeps it and does not run anything by itself
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "saved", { timeout: 15_000 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
+  await expect(page.locator('[data-cell-id="c1"] textarea.nb-source')).toHaveValue(/return 5/);
+  // The outputs are stored with the document and shown as restored, not as computed in this page.
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f'(x) = -3 + 15*x^2");
+  await expect(page.locator('[data-cell-id="c2"] .nb-meta').first()).toContainText("restored from the document");
+});
+
 // ---------------------------------------------------------------- Markdown in text cells
 
 test("text cells render Markdown, and their links and HTML cannot run anything", async ({ page }) => {

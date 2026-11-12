@@ -41,6 +41,7 @@ const EXAMPLE_FILES = {
   experimental: "notebooks/experimental.ostrin.notebook.json",
   physical: "notebooks/physical.ostrin.notebook.json",
   symbolic: "notebooks/symbolic.ostrin.notebook.json",
+  numeric: "notebooks/numeric.ostrin.notebook.json",
 };
 const RUN_TIMEOUT_MS = 60_000;
 const $ = (id) => document.getElementById(id);

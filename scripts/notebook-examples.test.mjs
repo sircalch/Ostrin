@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { parseNotebook, planRun, outputsFromLines, csvRows } from "../website/workbench-notebook.js";
+import { parseNotebook, planRun, outputsFromLines, csvRows, setSource, serializeNotebook } from "../website/workbench-notebook.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -53,7 +53,7 @@ function runCell(doc, cellId) {
 const near = (a, b, tol = 1e-12) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
 
 test("the three notebooks are valid and carry no recorded outputs", () => {
-  for (const name of ["experimental", "physical", "symbolic"]) {
+  for (const name of ["experimental", "physical", "symbolic", "numeric"]) {
     const doc = load(name);
     assert.deepEqual(doc.runs, {}, `${name} must not contain outputs`);
     assert.equal(doc.format, "ostrin.notebook");
@@ -180,10 +180,65 @@ test("symbolic: the figure of f and f' is drawn from the evaluated expressions",
 });
 
 test("each notebook's code is stored as text, so a run's outputs can be tied to it", () => {
-  for (const name of ["experimental", "physical", "symbolic"]) {
+  for (const name of ["experimental", "physical", "symbolic", "numeric"]) {
     const doc = load(name);
     for (const cell of doc.cells.filter((c) => c.kind === "code")) {
       assert.match(createHash("sha256").update(cell.source).digest("hex"), /^[0-9a-f]{64}$/);
     }
   }
+});
+
+// The numeric notebook (D): symbolic to numeric. Its references are computed by hand: f(x) = 2x^3 - 3x + 1 with
+// its derivative 6x^2 - 3, and f(1/2) = -1/4.
+test("numeric: the transformation and the derivative are the exact expressions, and f(1/2) is exact", { skip: !available }, () => {
+  const out = runCell(load("numeric"), "c2");
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /f\(x\) = 1 \+ 2\*x\^3 - 3\*x/);
+  assert.match(out.stdout, /f'\(x\) = -3 \+ 6\*x\^2/);
+  assert.match(out.stdout, /f\(1\/2\) exactly: -1\/4/);
+});
+
+test("numeric: the table gives f, f' and the central difference at nine points, each matching the hand values", { skip: !available }, () => {
+  const out = runCell(load("numeric"), "c3");
+  assert.equal(out.status, 0, out.stdout);
+  assert.equal(out.tables.length, 1);
+  const rows = csvRows(out.tables[0].csv).slice(1);
+  assert.equal(rows.length, 9);
+  for (const [x, f, df, quotient] of rows) {
+    const xv = Number(x);
+    assert.ok(near(Number(f), 2 * xv ** 3 - 3 * xv + 1), "f at " + x);
+    assert.ok(near(Number(df), 6 * xv * xv - 3), "f' at " + x);
+    assert.ok(Math.abs(Number(quotient) - Number(df)) < 1e-7, "central difference at " + x);
+  }
+});
+
+test("numeric: the checks report no mismatch, refuse the tiny step, and find no counterexample to the true identity", { skip: !available }, () => {
+  const out = runCell(load("numeric"), "c4");
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /derivative against central differences: 0 mismatched points of 41/);
+  assert.match(out.stdout, /a step of 1e-16 is refused, as it should be/);
+  assert.match(out.stdout, /\(x \+ 1\)\^3 = x\^3 \+ 3x\^2 \+ 3x \+ 1: 0 counterexamples on the grid/);
+});
+
+test("numeric: the figure is an SVG document drawn from the sampled values", { skip: !available }, () => {
+  const out = runCell(load("numeric"), "c5");
+  assert.equal(out.status, 0, out.stdout);
+  assert.equal(out.figures.length, 1);
+  assert.match(out.figures[0], /^<svg /);
+});
+
+test("numeric: changing a parameter in c1 changes the next run of the cells that depend on it", { skip: !available }, () => {
+  let doc = load("numeric");
+  const before = runCell(doc, "c2");
+  assert.match(before.stdout, /f'\(x\) = -3 \+ 6\*x\^2/);
+  const parameters = doc.cells.find((cell) => cell.id === "c1");
+  const edited = parameters.source.replace("return 2", "return 5");
+  doc = setSource(doc, "c1", edited);
+  const after = runCell(doc, "c2");
+  assert.equal(after.status, 0, after.stdout);
+  assert.match(after.stdout, /f'\(x\) = -3 \+ 15\*x\^2/);
+  const table = csvRows(runCell(doc, "c3").tables[0].csv).slice(1);
+  const [, f] = table.find(([value]) => Number(value) === 1);
+  assert.ok(near(Number(f), 5 - 3 + 1), "f(1) with a = 5 is 3, got " + f);
+  assert.equal(serializeNotebook(doc).includes("return 5"), true);
 });
