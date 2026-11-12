@@ -21062,9 +21062,9 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        // The IR count grows with the module (121 after the numeric bridge checks were added); the guarded property
+        // The IR count grows with the module (141 after the explicit assumption contexts and conditional rules were added); the guarded property
         // is that no node falls back to the slower HIR or AST lowering.
-        symbolic_source.contains("ir=121")
+        symbolic_source.contains("ir=141")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -22107,6 +22107,40 @@ fn std_symbolic_numeric_bridge_matches_interpreter_and_native_without_leaks() {
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     assert!(report_text.contains("divergences: 0"), "{report_text}");
     let exe = temp_artifact("symbolic_numeric_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_conditional_matches_interpreter_and_native_without_leaks() {
+    // Conditional simplification under explicit contexts: the sqrt, cancellation, self-quotient and logarithm rules,
+    // contradictions and intervals, each checked with the numeric bridge and with the expected status.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_conditional.ostrin"),
+        "A. empty context: no assumptions (every symbol real)\nA. after x positive: x positive\nA. the empty context is unchanged: no assumptions (every symbol real)\nA. x > 0 and x < 0: contradictory assumptions for x: positive and negative\nA. x >= 0 and x <= 0 give x = 0: x nonnegative, x nonpositive\nA. x nonzero: positive is unknown, not false\nA. unknown kind: unknown assumption sometimes: use real, complex, positive, negative, nonnegative, nonpositive or nonzero\nA. x in (0, 3]: sign positive\nA. [2, 1]: the interval for x is empty\nB. sqrt(x^2) for real x: abs(x) (applied)\nB. abs(x) against sqrt(x*x) on the grid: largest gap 0\nB. sqrt(x^2) for x >= 0: x (applied)\nB. x against sqrt(x*x) on the grid: 20 counterexamples, all with x < 0: true\nB. sqrt(x^2) for x <= 0: -x (applied)\nB. sqrt(x^2) for complex x: refused: sqrt(x^2) = abs(x) holds for real x only, and x is not known to be real\nC. (x^2 - 1)/(x - 1) for real x: 1 + x (applied-conditional), requires 1 condition, unknown 1\nC. the original at x = 1: at 1: division by zero\nC. original against 1 + x on the grid: 0 counterexamples\nC. (x^2 - 1)/(x + 1) for x > 0: -1 + x (applied)\nC. (x + 1)/(x - 1): refused: the numerator does not vanish at the root, so nothing cancels\nD. x / x for real x: 1 (applied-conditional)\nD. x / x for nonzero x: 1 (applied)\nD. x / x when x = 0: refused: x is zero in this context, so x / x is undefined\nE. ln(x y) with x, y positive: ln(x) + ln(y) (applied)\nE. ln(x y) for real x, y: refused: ln(a b) = ln(a) + ln(b) needs a > 0 and b > 0, and the context does not establish both, so the rule is not applied\nE. ln(x) at x = -2, the factor the split needs: at -2: ln of a non-positive number\nall conditional checks passed\n"
+    );
+    let path = example_path("symbolic_conditional.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_conditional_leak.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(
         compile.status.success(),

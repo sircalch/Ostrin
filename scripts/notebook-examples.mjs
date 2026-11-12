@@ -551,6 +551,163 @@ fn main() -> Void {
     }
 }`;
 
+// ---------------------------------------------------------------- E: assumptions and conditions
+
+const CONDITIONAL_TEXT = `# Assumptions and conditions
+
+The same expressions are simplified under different contexts. A context is a value: each row below is computed with a
+context built from the one before it, and the expression itself is never changed. Each result says what it is valid for:
+the conditions it needs, whether the context proves them, and why the rule applies or is refused.
+
+Run the cells in order. Cell c1 builds the table of results; c2 checks them against values computed without the rules,
+using the numeric bridge; c3 draws sqrt(x^2) under the contexts. Changing a context in c1 changes the table after a run.`;
+
+const CONDITIONAL_TABLE = `import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    two = symbolic.number(s, 2)
+    numerator = symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 1))
+    denominator = symbolic.sub(x, symbolic.number(s, 1))
+    none = symbolic.context()
+    positive = symbolic.assume(none, "x", "positive").unwrap()
+    nonnegative = symbolic.assume(none, "x", "nonnegative").unwrap()
+    nonpositive = symbolic.assume(none, "x", "nonpositive").unwrap()
+    complex = symbolic.assume(none, "x", "complex").unwrap()
+    contexts = [none, positive, nonnegative, nonpositive, complex]
+    names = ["no assumptions", "x positive", "x nonnegative", "x nonpositive", "x complex"]
+    print("OSTRIN-TABLE The same expressions under five contexts")
+    print("rule,context,result,status,conditions")
+    for i in 0 until 5 {
+        sq = symbolic.sqrt_of_square(contexts[i], x)
+        mut conditions = ""
+        for c in sq.required {
+            conditions = conditions + c + "; "
+        }
+        print("sqrt(x^2)," + names[i] + "," + sq.transformed + "," + sq.status + "," + conditions)
+    }
+    for i in 0 until 5 {
+        cq = symbolic.simplify_quotient(contexts[i], numerator, denominator, x)
+        mut conditions = ""
+        for c in cq.required {
+            conditions = conditions + c + "; "
+        }
+        print("(x^2 - 1)/(x - 1)," + names[i] + "," + cq.transformed + "," + cq.status + "," + conditions)
+    }
+    for i in 0 until 5 {
+        sx = symbolic.simplify_self_quotient(contexts[i], x)
+        mut conditions = ""
+        for c in sx.required {
+            conditions = conditions + c + "; "
+        }
+        print("x / x," + names[i] + "," + sx.transformed + "," + sx.status + "," + conditions)
+    }
+    for i in 0 until 5 {
+        lg = symbolic.expand_log_product(contexts[i], x, x)
+        mut conditions = ""
+        for c in lg.required {
+            conditions = conditions + c + "; "
+        }
+        print("ln(x x)," + names[i] + "," + lg.transformed + "," + lg.status + "," + conditions)
+    }
+    print("OSTRIN-TABLE-END")
+}`;
+
+const CONDITIONAL_CHECKS = `import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    two = symbolic.number(s, 2)
+    grid = linspace(0.0 - 3.0, 3.0, 41)
+    mut reference = zeros([41])
+    for i in 0 until 41 {
+        reference.set(i, sqrt(grid[i] * grid[i]))
+    }
+    none = symbolic.context()
+    nonnegative = symbolic.assume(none, "x", "nonnegative").unwrap()
+    real_rule = symbolic.sqrt_of_square(none, x)
+    nonneg_rule = symbolic.sqrt_of_square(nonnegative, x)
+    match symbolic.sample(real_rule.value, x, grid) {
+        Ok(values) => {
+            mut worst = 0.0
+            for i in 0 until 41 {
+                mut d = values[i] - reference[i]
+                if d < 0.0 {
+                    d = 0.0 - d
+                }
+                if d > worst {
+                    worst = d
+                }
+            }
+            print("abs(x) against sqrt(x*x) on the grid: largest difference " + worst.to_string())
+        },
+        Err(message) => print("sample: " + message),
+    }
+    match symbolic.sample(nonneg_rule.value, x, grid) {
+        Ok(values) => {
+            mut counterexamples = 0
+            for i in 0 until 41 {
+                mut d = values[i] - reference[i]
+                if d < 0.0 {
+                    d = 0.0 - d
+                }
+                if d > 0.000000000001 {
+                    counterexamples = counterexamples + 1
+                }
+            }
+            print("x against sqrt(x*x) under x >= 0: " + counterexamples.to_string() + " counterexamples on the grid, the negative points")
+        },
+        Err(message) => print("sample: " + message),
+    }
+    numerator = symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 1))
+    denominator = symbolic.sub(x, symbolic.number(s, 1))
+    cancelled = symbolic.simplify_quotient(none, numerator, denominator, x)
+    match symbolic.sample(symbolic.div(numerator, denominator), x, linspace(1.0, 1.0, 1)) {
+        Ok(values) => print("the original at x = 1 has the value " + values[0].to_string()),
+        Err(message) => print("the original at x = 1 is undefined: " + message),
+    }
+    match symbolic.sample(cancelled.value, x, linspace(1.0, 1.0, 1)) {
+        Ok(values) => print("the cancelled form 1 + x at x = 1 is " + values[0].to_string() + ": the point x = 1 is the one the condition keeps"),
+        Err(message) => print("the cancelled form: " + message),
+    }
+}`;
+
+const CONDITIONAL_FIGURE = `import std.symbolic
+import std.viz
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    grid = linspace(0.0 - 3.0, 3.0, 61)
+    mut reference = zeros([61])
+    for i in 0 until 61 {
+        reference.set(i, sqrt(grid[i] * grid[i]))
+    }
+    none = symbolic.context()
+    nonnegative = symbolic.assume(none, "x", "nonnegative").unwrap()
+    real_rule = symbolic.sqrt_of_square(none, x)
+    nonneg_rule = symbolic.sqrt_of_square(nonnegative, x)
+    match symbolic.sample(real_rule.value, x, grid) {
+        Ok(real_values) => {
+            match symbolic.sample(nonneg_rule.value, x, grid) {
+                Ok(nonneg_values) => {
+                    fig = viz.figure("sqrt(x^2) under two contexts")
+                        .describe("sqrt(x^2) is abs(x) for real x; under x >= 0 the rule gives x, which differs for x < 0")
+                        .labels("x", "value")
+                        .line(grid, reference, label: "sqrt(x*x)")
+                        .line(grid, real_values, label: "abs(x), real x", dash: "6 4")
+                        .line(grid, nonneg_values, label: "x, under x >= 0")
+                    print(fig.svg())
+                },
+                Err(message) => print("sample: " + message),
+            }
+        },
+        Err(message) => print("sample: " + message),
+    }
+}`;
+
 function build({ id, title, text, cells, resources = [] }) {
   let doc = createNotebook({ id, title, now: NOW });
   doc = addCell(doc, "text", { source: text });
@@ -598,6 +755,12 @@ export function notebooks() {
       text: SYMBOLIC_TEXT,
       cells: [{ source: SYMBOLIC_BUILD }, { source: SYMBOLIC_SOLVE }, { source: SYMBOLIC_FIGURE }],
     }),
+    conditional: build({
+      id: "conditional",
+      title: "E · Assumptions and conditions",
+      text: CONDITIONAL_TEXT,
+      cells: [{ source: CONDITIONAL_TABLE }, { source: CONDITIONAL_CHECKS }, { source: CONDITIONAL_FIGURE }],
+    }),
     numeric: build({
       id: "numeric",
       title: "D · Symbolic to numeric",
@@ -618,6 +781,7 @@ const FILES = {
   physical: "physical.ostrin.notebook.json",
   symbolic: "symbolic.ostrin.notebook.json",
   numeric: "numeric.ostrin.notebook.json",
+  conditional: "conditional.ostrin.notebook.json",
 };
 
 if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}` || process.argv[1]?.endsWith("notebook-examples.mjs")) {

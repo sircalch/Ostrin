@@ -282,6 +282,47 @@ test("the numeric example runs from expression to figure, and a changed paramete
   await expect(page.locator('[data-cell-id="c2"] .nb-meta').first()).toContainText("restored from the document");
 });
 
+// ---------------------------------------------------------------- assumptions and conditions, end to end
+
+test("the conditional example shows how a result changes with its context, and a changed context is run again", async ({ page }) => {
+  test.setTimeout(480_000);
+  await open(page);
+  await openFileMenu(page);
+  await page.locator("#nb-example").selectOption("conditional");
+  await expect(page.locator(".nb-cell")).toHaveCount(4);
+  await page.getByRole("button", { name: "Run all" }).click();
+  // the table of results under the five contexts
+  const table = page.locator('[data-cell-id="c1"] .nb-table').first();
+  await expect(table).toBeVisible({ timeout: 240_000 });
+  await expect(table).toContainText("abs(x)");
+  await expect(table).toContainText("x != 1");
+  await expect(table).toContainText("refused");
+  // the checks, computed by the program
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("largest difference 0", { timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("20 counterexamples on the grid");
+  await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("the original at x = 1 is undefined");
+  await expect(page.locator('[data-cell-id="c3"] .nb-figure img')).toBeVisible({ timeout: 240_000 });
+
+  // change the context from nonpositive to negative in c1, and its label: the result of the radical changes to -x
+  const source = page.locator('[data-cell-id="c1"] textarea.nb-source');
+  const edited = (await source.inputValue())
+    .replace('symbolic.assume(none, "x", "nonpositive")', 'symbolic.assume(none, "x", "negative")')
+    .replace('"x nonpositive"', '"x negative"');
+  await source.fill(edited);
+  // Each cell of this example builds its own context, so only c1 depends on the edit.
+  await expect(page.locator('[data-cell-id="c1"] .nb-chip')).toHaveText(/stale/);
+  await expect(page.locator('[data-cell-id="c2"] .nb-chip')).toHaveText(/current/);
+  await page.getByRole("button", { name: "Run all" }).click();
+  await expect(page.locator('[data-cell-id="c1"] .nb-table').first()).toContainText("x negative", { timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c1"] .nb-table').first()).toContainText("-x");
+  await expect(page.locator('[data-cell-id="c1"] .nb-table').first()).not.toContainText("x nonpositive");
+  // the saved document keeps the changed context and its outputs
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "saved", { timeout: 15_000 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
+  await expect(page.locator('[data-cell-id="c1"] textarea.nb-source')).toHaveValue(/"x", "negative"/);
+});
+
 // ---------------------------------------------------------------- Markdown in text cells
 
 test("text cells render Markdown, and their links and HTML cannot run anything", async ({ page }) => {

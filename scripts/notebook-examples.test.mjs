@@ -53,7 +53,7 @@ function runCell(doc, cellId) {
 const near = (a, b, tol = 1e-12) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
 
 test("the three notebooks are valid and carry no recorded outputs", () => {
-  for (const name of ["experimental", "physical", "symbolic", "numeric"]) {
+  for (const name of ["experimental", "physical", "symbolic", "numeric", "conditional"]) {
     const doc = load(name);
     assert.deepEqual(doc.runs, {}, `${name} must not contain outputs`);
     assert.equal(doc.format, "ostrin.notebook");
@@ -180,7 +180,7 @@ test("symbolic: the figure of f and f' is drawn from the evaluated expressions",
 });
 
 test("each notebook's code is stored as text, so a run's outputs can be tied to it", () => {
-  for (const name of ["experimental", "physical", "symbolic", "numeric"]) {
+  for (const name of ["experimental", "physical", "symbolic", "numeric", "conditional"]) {
     const doc = load(name);
     for (const cell of doc.cells.filter((c) => c.kind === "code")) {
       assert.match(createHash("sha256").update(cell.source).digest("hex"), /^[0-9a-f]{64}$/);
@@ -241,4 +241,39 @@ test("numeric: changing a parameter in c1 changes the next run of the cells that
   const [, f] = table.find(([value]) => Number(value) === 1);
   assert.ok(near(Number(f), 5 - 3 + 1), "f(1) with a = 5 is 3, got " + f);
   assert.equal(serializeNotebook(doc).includes("return 5"), true);
+});
+
+// The conditional notebook (E): the same expressions under explicit contexts. The expected statuses are the rules'
+// definitions: the radical is applied with no condition for real x, the cancellation keeps x != 1, and the logarithm
+// split is applied only when the factors are known positive.
+test("conditional: the table gives each rule's result, status and conditions under five contexts", { skip: !available }, () => {
+  const out = runCell(load("conditional"), "c1");
+  assert.equal(out.status, 0, out.stdout);
+  assert.equal(out.tables.length, 1);
+  const rows = csvRows(out.tables[0].csv).slice(1);
+  const find = (rule, context) => rows.find(([r, c]) => r === rule && c === context);
+  assert.deepEqual(find("sqrt(x^2)", "no assumptions").slice(2, 4), ["abs(x)", "applied"]);
+  assert.deepEqual(find("sqrt(x^2)", "x nonpositive").slice(2, 4), ["-x", "applied"]);
+  assert.deepEqual(find("sqrt(x^2)", "x complex").slice(2, 4), ["sqrt(x^2)", "refused"]);
+  assert.deepEqual(find("(x^2 - 1)/(x - 1)", "no assumptions").slice(2, 5), ["1 + x", "applied-conditional", "x != 1; "]);
+  assert.deepEqual(find("x / x", "x positive").slice(2, 4), ["1", "applied"]);
+  assert.deepEqual(find("x / x", "no assumptions").slice(2, 4), ["1", "applied-conditional"]);
+  assert.deepEqual(find("ln(x x)", "x positive").slice(2, 4), ["2*ln(x)", "applied"]);
+  assert.deepEqual(find("ln(x x)", "no assumptions").slice(2, 4), ["ln(x^2)", "refused"]);
+});
+
+test("conditional: the numeric checks find the counterexamples the conditions predict", { skip: !available }, () => {
+  const out = runCell(load("conditional"), "c2");
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /abs\(x\) against sqrt\(x\*x\) on the grid: largest difference 0/);
+  assert.match(out.stdout, /x against sqrt\(x\*x\) under x >= 0: 20 counterexamples on the grid/);
+  assert.match(out.stdout, /the original at x = 1 is undefined: at 1: division by zero/);
+  assert.match(out.stdout, /the cancelled form 1 \+ x at x = 1 is 2/);
+});
+
+test("conditional: the figure of sqrt(x^2) under two contexts is an SVG document", { skip: !available }, () => {
+  const out = runCell(load("conditional"), "c3");
+  assert.equal(out.status, 0, out.stdout);
+  assert.equal(out.figures.length, 1);
+  assert.match(out.figures[0], /^<svg /);
 });

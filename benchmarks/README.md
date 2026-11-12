@@ -64,3 +64,13 @@ Each run writes `benchmarks/results/benchmark-<stamp>.json`; the report is writt
 - The kernels are not tuned library calls: NumPy, BLAS and other compiled libraries are not used.
 - The numbers are measurements on the recorded machine, not claims about the languages in general.
 - No Wolfram or MATLAB results are included.
+
+## Comparisons made by this suite
+
+- **interpreter-versus-native**: the same Ostrin kernel run by `ostrinc --run` and as a compiled native executable. The
+  two are measured separately and reported in the same table; the native build is the one meant for speed.
+- **Ostrin against Python and Julia**: algorithmically equivalent kernels, each checked against the same reference
+  before it is timed. These are comparisons of equivalent code written in each language, not of optimised libraries
+  (NumPy, BLAS and similar are not used).
+
+Ostrin's symbolic engine is not part of these comparisons.

@@ -815,6 +815,9 @@ fn eval_ids(s: Store, id: Int, names: List<String>, values: List<Float>) -> Resu
     }
     name = s.names[id]
     x = parts[0]
+    if name == "abs" {
+        return Ok(abs(x))
+    }
     if name == "sin" {
         return Ok(sin(x))
     }
@@ -2038,4 +2041,549 @@ fn text_in(items: List<String>, text: String) -> Bool {
         }
     }
     false
+}
+
+// ---------------------------------------------------------------- explicit assumptions
+//
+// A Context is a value: a list of facts about named symbols. It is separate from the expression store: an expression
+// is analysed under any number of contexts without rebuilding its symbols, and assuming a fact returns a new context
+// and leaves the old one unchanged. Symbols are real unless a context says otherwise.
+//
+// Reasoning is conservative. A fact is derived only from the closure below. `holds` answers "true" when the facts
+// prove a kind, "false" when they refute it, and "unknown" otherwise; "unknown" is never reported as "false".
+
+/// A fact about one named symbol. `kind` is one of: real, complex, positive, negative, nonnegative, nonpositive,
+/// nonzero (zero is derived, never assumed directly).
+pub record Fact {
+    name: String
+    kind: String
+}
+
+/// An immutable set of facts.
+pub record Context {
+    facts: List<Fact>
+}
+
+/// The result of a conditional rule. `required` are the conditions the rewritten expression needs to equal the
+/// original; `established` are those the context proves; `unknown` are those it neither proves nor refutes. `status`
+/// is "applied" (every required condition is established), "applied-conditional" (some are unknown: the result holds
+/// only where they hold, and they are listed), or "refused" (the rule does not apply; `value` is the original).
+pub record Outcome {
+    rule: String
+    original: String
+    transformed: String
+    value: Expr
+    status: String
+    required: List<String>
+    established: List<String>
+    unknown: List<String>
+    reason: String
+}
+
+fn known_kinds() -> List<String> {
+    ["real", "complex", "positive", "negative", "nonnegative", "nonpositive", "nonzero"]
+}
+
+/// The empty context: every symbol real, no other facts.
+pub fn context() -> Context {
+    Context { facts: [] }
+}
+
+/// The kinds of one symbol, closed under the implications between kinds: positive implies nonzero, nonnegative and
+/// real; negative implies nonzero, nonpositive and real; nonnegative together with nonpositive implies zero.
+fn closure_of(c: Context, name: String) -> List<String> {
+    mut kinds: List<String> = []
+    for f in c.facts {
+        if f.name == name and not text_in(kinds, f.kind) {
+            kinds.push(f.kind)
+        }
+    }
+    mut changed = true
+    while changed {
+        changed = false
+        mut derived: List<String> = []
+        if text_in(kinds, "positive") {
+            derived.push("nonzero")
+            derived.push("nonnegative")
+            derived.push("real")
+        }
+        if text_in(kinds, "negative") {
+            derived.push("nonzero")
+            derived.push("nonpositive")
+            derived.push("real")
+        }
+        if text_in(kinds, "nonnegative") and text_in(kinds, "nonpositive") {
+            derived.push("zero")
+        }
+        for k in derived {
+            if not text_in(kinds, k) {
+                kinds.push(k)
+                changed = true
+            }
+        }
+    }
+    kinds
+}
+
+/// Pairs of kinds that cannot hold together for one symbol. A complex symbol has no ordering, so it conflicts with
+/// every ordering kind and with real.
+fn conflict_firsts() -> List<String> {
+    ["positive", "positive", "positive", "negative", "negative", "nonzero", "complex", "complex", "complex", "complex", "complex", "complex"]
+}
+
+fn conflict_seconds() -> List<String> {
+    ["negative", "nonpositive", "zero", "nonnegative", "zero", "zero", "positive", "negative", "nonnegative", "nonpositive", "zero", "real"]
+}
+
+/// The first conflicting pair among the kinds, as text; empty when they are consistent.
+fn conflict_in(kinds: List<String>) -> String {
+    firsts = conflict_firsts()
+    seconds = conflict_seconds()
+    for i in 0 until firsts.length() {
+        if text_in(kinds, firsts[i]) and text_in(kinds, seconds[i]) {
+            return firsts[i] + " and " + seconds[i]
+        }
+    }
+    ""
+}
+
+/// True when `kind` is excluded by one of the kinds in the list.
+fn refuted_by(kinds: List<String>, kind: String) -> Bool {
+    firsts = conflict_firsts()
+    seconds = conflict_seconds()
+    for i in 0 until firsts.length() {
+        if firsts[i] == kind and text_in(kinds, seconds[i]) {
+            return true
+        }
+        if seconds[i] == kind and text_in(kinds, firsts[i]) {
+            return true
+        }
+    }
+    false
+}
+
+/// Assumes one fact about a symbol. An unknown kind, or a contradiction with the facts already in the context, is an
+/// error that names the conflicting pair; the context is not changed, because a new one is returned only on success.
+pub fn assume(c: Context, name: String, kind: String) -> Result<Context, String> {
+    if not text_in(known_kinds(), kind) {
+        return Err("unknown assumption " + kind + ": use real, complex, positive, negative, nonnegative, nonpositive or nonzero")
+    }
+    mut facts: List<Fact> = []
+    for f in c.facts {
+        facts.push(f)
+    }
+    facts.push(Fact { name: name, kind: kind })
+    next = Context { facts: facts }
+    conflict = conflict_in(closure_of(next, name))
+    if conflict != "" {
+        return Err("contradictory assumptions for " + name + ": " + conflict)
+    }
+    Ok(next)
+}
+
+/// Assumes that a symbol lies in the interval with the given bounds, open or closed at each end. The interval is used
+/// through the sign facts it implies (a closed interval [0, b] implies nonnegative) and through its emptiness; general
+/// interval arithmetic is not performed.
+pub fn assume_interval(c: Context, name: String, lower: Float, lower_closed: Bool, upper: Float, upper_closed: Bool) -> Result<Context, String> {
+    if lower > upper or (lower == upper and not (lower_closed and upper_closed)) {
+        return Err("the interval for " + name + " is empty")
+    }
+    mut kinds: List<String> = []
+    if lower > 0.0 or (lower == 0.0 and not lower_closed) {
+        kinds.push("positive")
+    } else if lower == 0.0 {
+        kinds.push("nonnegative")
+    }
+    if upper < 0.0 or (upper == 0.0 and not upper_closed) {
+        kinds.push("negative")
+    } else if upper == 0.0 {
+        kinds.push("nonpositive")
+    }
+    mut next = c
+    for k in kinds {
+        match assume(next, name, k) {
+            Ok(n) => {
+                next = n
+            },
+            Err(message) => {
+                return Err(message)
+            },
+        }
+    }
+    Ok(next)
+}
+
+/// "true" when the context proves the kind for the symbol, "false" when it refutes it, "unknown" otherwise. A symbol is
+/// real unless the context says it is complex, so "real" holds by default.
+pub fn holds(c: Context, name: String, kind: String) -> String {
+    kinds = closure_of(c, name)
+    if kind == "real" {
+        if text_in(kinds, "complex") {
+            return "false"
+        }
+        return "true"
+    }
+    if text_in(kinds, kind) {
+        return "true"
+    }
+    if refuted_by(kinds, kind) {
+        return "false"
+    }
+    "unknown"
+}
+
+/// A readable list of the facts of a context, in the order they were assumed.
+pub fn describe(c: Context) -> String {
+    if c.facts.length() == 0 {
+        return "no assumptions (every symbol real)"
+    }
+    mut text = ""
+    for i in 0 until c.facts.length() {
+        piece = c.facts[i].name + " " + c.facts[i].kind
+        if i == 0 {
+            text = piece
+        } else {
+            text = text + ", " + piece
+        }
+    }
+    text
+}
+
+// ---------------------------------------------------------------- signs
+
+/// The sign of a node under the context, from its structure. "unknown" means the engine could not prove a sign; it never
+/// means that the expression has none.
+fn sign_id(c: Context, s: Store, id: Int) -> String {
+    kind = s.kinds[id]
+    if kind == 0 {
+        if s.dens[id] == 0 {
+            if s.names[id].starts_with("-") {
+                return "negative"
+            }
+            return "positive"
+        }
+        if s.nums[id] > 0 {
+            return "positive"
+        }
+        if s.nums[id] < 0 {
+            return "negative"
+        }
+        return "zero"
+    }
+    if kind == 1 {
+        name = s.names[id]
+        if known_positive(s, id) {
+            return "positive"
+        }
+        kinds = closure_of(c, name)
+        if text_in(kinds, "positive") {
+            return "positive"
+        }
+        if text_in(kinds, "negative") {
+            return "negative"
+        }
+        if text_in(kinds, "zero") {
+            return "zero"
+        }
+        if text_in(kinds, "nonnegative") {
+            return "nonnegative"
+        }
+        if text_in(kinds, "nonpositive") {
+            return "nonpositive"
+        }
+        if text_in(kinds, "nonzero") or known_nonzero(s, id) {
+            return "nonzero"
+        }
+        return "unknown"
+    }
+    if kind == 2 {
+        mut all_positive = true
+        mut all_nonneg = true
+        mut all_nonpos = true
+        mut all_negative = true
+        for i in 0 until s.counts[id] {
+            t = sign_id(c, s, arg_of(s, id, i))
+            if t != "positive" {
+                all_positive = false
+            }
+            if not (t == "positive" or t == "nonnegative" or t == "zero") {
+                all_nonneg = false
+            }
+            if not (t == "negative" or t == "nonpositive" or t == "zero") {
+                all_nonpos = false
+            }
+            if t != "negative" {
+                all_negative = false
+            }
+        }
+        if all_positive {
+            return "positive"
+        }
+        if all_negative {
+            return "negative"
+        }
+        if all_nonneg {
+            return "nonnegative"
+        }
+        if all_nonpos {
+            return "nonpositive"
+        }
+        return "unknown"
+    }
+    if kind == 3 {
+        mut zero = false
+        mut unknown = false
+        mut strict = true
+        mut negatives = 0
+        for i in 0 until s.counts[id] {
+            t = sign_id(c, s, arg_of(s, id, i))
+            if t == "zero" {
+                zero = true
+            } else if t == "negative" {
+                negatives = negatives + 1
+            } else if t == "nonnegative" {
+                strict = false
+            } else if t == "nonpositive" {
+                strict = false
+                negatives = negatives + 1
+            } else if t != "positive" {
+                unknown = true
+            }
+        }
+        if zero {
+            return "zero"
+        }
+        if unknown {
+            return "unknown"
+        }
+        negative = negatives % 2 == 1
+        if strict {
+            if negative {
+                return "negative"
+            }
+            return "positive"
+        }
+        if negative {
+            return "nonpositive"
+        }
+        return "nonnegative"
+    }
+    if kind == 4 {
+        base = arg_of(s, id, 0)
+        exponent = arg_of(s, id, 1)
+        base_sign = sign_id(c, s, base)
+        if base_sign == "positive" {
+            return "positive"
+        }
+        if is_int_num(s, exponent) and s.nums[exponent] > 0 and s.nums[exponent] % 2 == 0 {
+            if base_sign == "positive" or base_sign == "negative" or base_sign == "nonzero" {
+                return "positive"
+            }
+            return "nonnegative"
+        }
+        return "unknown"
+    }
+    if kind == 5 {
+        name = s.names[id]
+        if name == "exp" {
+            return "positive"
+        }
+        if name == "abs" {
+            return "nonnegative"
+        }
+        return "unknown"
+    }
+    "unknown"
+}
+
+/// The sign of an expression under a context: positive, negative, zero, nonnegative, nonpositive, nonzero or unknown.
+pub fn sign_of(c: Context, a: Expr) -> String {
+    sign_id(c, a.store, a.id)
+}
+
+// ---------------------------------------------------------------- conditional rules
+
+fn applied_status(unknown: List<String>) -> String {
+    if unknown.length() == 0 {
+        return "applied"
+    }
+    "applied-conditional"
+}
+
+/// sqrt(u^2) for a symbol u. For real u the identity is sqrt(u^2) = abs(u), with no condition. When the context shows
+/// u >= 0 the result is u; when it shows u <= 0 the result is -u. For complex u the identity is not valid on the
+/// principal branch, so the rule is refused; so it is when u is not a symbol.
+pub fn sqrt_of_square(c: Context, u: Expr) -> Outcome {
+    s = u.store
+    square_id = pow_ids(s, u.id, int_id(s, 2))
+    root_id = pow_ids(s, square_id, num_id(s, rat(s, 1, 2)))
+    original = "sqrt(" + show(wrap(s, square_id)) + ")"
+    if s.kinds[u.id] != 1 {
+        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the rule is stated for a symbol; the argument is not a symbol" }
+    }
+    name = s.names[u.id]
+    if holds(c, name, "real") != "true" {
+        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "sqrt(x^2) = abs(x) holds for real x only, and " + name + " is not known to be real" }
+    }
+    sign = sign_of(c, u)
+    if sign == "positive" or sign == "nonnegative" or sign == "zero" {
+        return Outcome { rule: "sqrt-of-square", original: original, transformed: name, value: u, status: "applied", required: [name + " >= 0"], established: [name + " >= 0"], unknown: [], reason: "the context shows " + name + " >= 0, so sqrt(x^2) = x" }
+    }
+    if sign == "negative" or sign == "nonpositive" {
+        negated = wrap(s, mul_ids(s, [int_id(s, 0 - 1), u.id]))
+        return Outcome { rule: "sqrt-of-square", original: original, transformed: "-" + name, value: negated, status: "applied", required: [name + " <= 0"], established: [name + " <= 0"], unknown: [], reason: "the context shows " + name + " <= 0, so sqrt(x^2) = -x" }
+    }
+    absolute = wrap(s, intern(s, 5, 0, 1, "abs", [u.id]))
+    Outcome { rule: "sqrt-of-square", original: original, transformed: "abs(" + name + ")", value: absolute, status: "applied", required: [], established: [], unknown: [], reason: "for real " + name + ", sqrt(x^2) = abs(x); the sign of " + name + " is not needed and is not assumed" }
+}
+
+/// Cancels the factor (x - r) of numerator / denominator, when the denominator is linear in the symbol v with root r
+/// and the numerator vanishes at r. The quotient is exact. The condition v != r of the original is kept in `required`;
+/// it is listed as established only when the context proves it (v nonzero when r = 0; v positive when r < 0;
+/// v negative when r > 0), and as unknown otherwise.
+pub fn simplify_quotient(c: Context, numerator: Expr, denominator: Expr, v: Expr) -> Outcome {
+    s = v.store
+    original_expr = div(numerator, denominator)
+    original = "(" + show(numerator) + ") / (" + show(denominator) + ")"
+    name = if s.kinds[v.id] == 1 { s.names[v.id] } else { "x" }
+    return match coefficients(denominator, v) {
+        Err(message) => refusal_outcome("cancel-factor", original, original_expr, "the denominator is not a polynomial in the variable: " + message),
+        Ok(dcs) => match exact_coefficients(s, dcs) {
+            Err(message) => refusal_outcome("cancel-factor", original, original_expr, "the denominator does not have exact rational coefficients: " + message),
+            Ok(dr) => match coefficients(numerator, v) {
+                Err(message) => refusal_outcome("cancel-factor", original, original_expr, "the numerator is not a polynomial in the variable: " + message),
+                Ok(ncs) => match exact_coefficients(s, ncs) {
+                    Err(message) => refusal_outcome("cancel-factor", original, original_expr, "the numerator does not have exact rational coefficients: " + message),
+                    Ok(nr) => cancel_linear(c, s, v, name, original, original_expr, dr, nr),
+                },
+            },
+        },
+    }
+}
+
+/// A refused rule: the original expression is kept and the reason is stated.
+fn refusal_outcome(rule: String, original: String, value: Expr, reason: String) -> Outcome {
+    Outcome { rule: rule, original: original, transformed: original, value: value, status: "refused", required: [], established: [], unknown: [], reason: reason }
+}
+
+fn cancel_linear(c: Context, s: Store, v: Expr, name: String, original: String, original_expr: Expr, dr: List<Rat>, nr: List<Rat>) -> Outcome {
+    if dr.length() != 2 or rat_is_zero(dr[1]) or nr.length() < 2 {
+        return Outcome { rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the denominator is not linear in " + name }
+    }
+    a = dr[1]
+    // denominator = a (x - r) with r = -b / a, where b = dr[0]
+    r = rat_mul(s, rat(s, 0 - dr[0].n, dr[0].d), rat(s, a.d, a.n))
+    if r.big != "" {
+        return Outcome { rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the root is too large for an exact cancellation" }
+    }
+    // The numerator must vanish at r, evaluated exactly.
+    mut total = rat(s, 0, 1)
+    mut pw = rat(s, 1, 1)
+    for k in 0 until nr.length() {
+        total = rat_add(s, total, rat_mul(s, nr[k], pw))
+        pw = rat_mul(s, pw, r)
+    }
+    if not rat_is_zero(total) {
+        return Outcome { rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the numerator does not vanish at the root, so nothing cancels" }
+    }
+    // Synthetic division of the ascending numerator coefficients by (x - r). The quotient coefficients are produced from
+    // the highest degree down: descending[i] is the coefficient of x^(deg - 1 - i).
+    deg = nr.length() - 1
+    mut descending: List<Rat> = []
+    mut current = nr[deg]
+    descending.push(current)
+    for j in 1 until deg {
+        k = deg - j
+        current = rat_add(s, nr[k], rat_mul(s, r, current))
+        descending.push(current)
+    }
+    scale = rat(s, a.d, a.n)
+    mut terms: List<Int> = []
+    for i in 0 until descending.length() {
+        power_index = deg - 1 - i
+        coefficient = num_id(s, rat_mul(s, descending[i], scale))
+        if power_index == 0 {
+            terms.push(coefficient)
+        } else {
+            terms.push(mul_ids(s, [coefficient, pow_ids(s, v.id, int_id(s, power_index))]))
+        }
+    }
+    result_id = add_ids(s, terms)
+    rtext = rat_text_of(r)
+    condition = name + " != " + rtext
+    mut unknown: List<String> = []
+    mut established: List<String> = []
+    if rat_is_zero(r) and holds(c, name, "nonzero") == "true" {
+        established.push(condition)
+    } else if r.n < 0 and sign_of(c, v) == "positive" {
+        established.push(condition)
+    } else if r.n > 0 and sign_of(c, v) == "negative" {
+        established.push(condition)
+    } else {
+        unknown.push(condition)
+    }
+    mut required: List<String> = []
+    required.push(condition)
+    Outcome { rule: "cancel-factor", original: original, transformed: show(wrap(s, result_id)), value: wrap(s, result_id), status: applied_status(unknown), required: required, established: established, unknown: unknown, reason: "the factor " + name + " - " + rtext + " cancels; the original is undefined at " + name + " = " + rtext + ", so the result is kept with that condition" }
+}
+
+/// x / x for a symbol x. The result 1 requires x != 0. When the context proves it, the rule is applied. When the context
+/// does not decide it, the result is given with x != 0 listed as unknown. When the context says x = 0, the rule is refused.
+pub fn simplify_self_quotient(c: Context, x: Expr) -> Outcome {
+    s = x.store
+    name = s.names[x.id]
+    original_expr = div(x, x)
+    original = name + " / " + name
+    condition = name + " != 0"
+    verdict = holds(c, name, "nonzero")
+    if verdict == "false" {
+        return Outcome { rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition], established: [], unknown: [], reason: name + " is zero in this context, so " + original + " is undefined" }
+    }
+    mut unknown: List<String> = []
+    mut established: List<String> = []
+    if verdict == "true" {
+        established.push(condition)
+    } else {
+        unknown.push(condition)
+    }
+    mut required: List<String> = []
+    required.push(condition)
+    Outcome { rule: "self-quotient", original: original, transformed: "1", value: wrap(s, int_id(s, 1)), status: applied_status(unknown), required: required, established: established, unknown: unknown, reason: original + " = 1 when " + condition + "; the context gives: " + verdict }
+}
+
+/// ln(a b) = ln(a) + ln(b) is applied only when both a and b are positive in the context. Otherwise it is refused and the
+/// conditions are listed: the splitting is not an identity for arbitrary real or complex arguments.
+pub fn expand_log_product(c: Context, a: Expr, b: Expr) -> Outcome {
+    s = a.store
+    product_id = mul_ids(s, [a.id, b.id])
+    original = "ln(" + show(wrap(s, product_id)) + ")"
+    ca = show(a) + " > 0"
+    cb = show(b) + " > 0"
+    mut established: List<String> = []
+    mut unknown: List<String> = []
+    if sign_of(c, a) == "positive" {
+        established.push(ca)
+    } else {
+        unknown.push(ca)
+    }
+    if sign_of(c, b) == "positive" {
+        if cb != ca {
+            established.push(cb)
+        }
+    } else {
+        if cb != ca {
+            unknown.push(cb)
+        }
+    }
+    mut required: List<String> = []
+    required.push(ca)
+    if cb != ca {
+        required.push(cb)
+    }
+    original_id = intern(s, 5, 0, 1, "ln", [product_id])
+    if unknown.length() == 0 {
+        split_id = add_ids(s, [intern(s, 5, 0, 1, "ln", [a.id]), intern(s, 5, 0, 1, "ln", [b.id])])
+        return Outcome { rule: "log-of-product", original: original, transformed: show(wrap(s, split_id)), value: wrap(s, split_id), status: "applied", required: required, established: established, unknown: unknown, reason: "both factors are positive in this context, so ln(a b) = ln(a) + ln(b)" }
+    }
+    Outcome { rule: "log-of-product", original: original, transformed: original, value: wrap(s, original_id), status: "refused", required: required, established: established, unknown: unknown, reason: "ln(a b) = ln(a) + ln(b) needs a > 0 and b > 0, and the context does not establish both, so the rule is not applied" }
 }

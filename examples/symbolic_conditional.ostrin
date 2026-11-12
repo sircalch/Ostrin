@@ -1,0 +1,278 @@
+// Conditional simplification: the same expression under different contexts, with the conditions each result keeps.
+//
+// Every rule returns an outcome that says what it did and why. Each claim is checked two ways that do not use the rule:
+// by the numeric bridge (sample, disagreements), against values computed here with sqrt, abs and ln from the language,
+// and by the expected status. Numeric agreement on a finite grid is evidence for an identity on those points, never a
+// proof; the counterexamples found on the grid are the points where a rule without its condition fails.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    y = symbolic.symbol(s, "y")
+    two = symbolic.number(s, 2)
+    mut failures = 0
+    grid = linspace(0.0 - 3.0, 3.0, 41)
+    mut root_reference = zeros([41])
+    for i in 0 until 41 {
+        root_reference.set(i, sqrt(grid[i] * grid[i]))
+    }
+
+    // 1. The contexts are values: an assumption returns a new context and leaves the old one unchanged.
+    c0 = symbolic.context()
+    print("A. empty context: " + symbolic.describe(c0))
+    match symbolic.assume(c0, "x", "positive") {
+        Ok(cp) => {
+            print("A. after x positive: " + symbolic.describe(cp))
+            print("A. the empty context is unchanged: " + symbolic.describe(c0))
+            if symbolic.describe(c0) != "no assumptions (every symbol real)" {
+                print("FAIL the original context changed")
+                failures = failures + 1
+            }
+            // x > 0 implies x != 0 and x real, but not x < 0 and not x = 1.
+            if symbolic.holds(cp, "x", "nonzero") != "true" or symbolic.holds(cp, "x", "real") != "true" {
+                print("FAIL x positive should imply nonzero and real")
+                failures = failures + 1
+            }
+            if symbolic.holds(cp, "x", "negative") != "false" {
+                print("FAIL x positive should refute negative")
+                failures = failures + 1
+            }
+            if symbolic.holds(cp, "x", "complex") != "false" {
+                print("FAIL x positive should refute complex")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+
+    // 2. Contradictions are errors, and a consistent pair derives the zero.
+    cp = symbolic.assume(c0, "x", "positive").unwrap()
+    match symbolic.assume(cp, "x", "negative") {
+        Ok(bad) => {
+            print("FAIL x > 0 and x < 0 were accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("A. x > 0 and x < 0: " + message)
+        },
+    }
+    cn = symbolic.assume(c0, "x", "nonnegative").unwrap()
+    cz = symbolic.assume(cn, "x", "nonpositive").unwrap()
+    if symbolic.holds(cz, "x", "zero") != "true" {
+        print("FAIL x >= 0 and x <= 0 should give x = 0")
+        failures = failures + 1
+    } else {
+        print("A. x >= 0 and x <= 0 give x = 0: " + symbolic.describe(cz))
+    }
+    // Nonzero alone does not give a sign: the answer is unknown, not false.
+    cnz = symbolic.assume(c0, "x", "nonzero").unwrap()
+    if symbolic.holds(cnz, "x", "positive") != "unknown" {
+        print("FAIL nonzero must not imply positive")
+        failures = failures + 1
+    } else {
+        print("A. x nonzero: positive is unknown, not false")
+    }
+    match symbolic.assume(c0, "x", "sometimes") {
+        Ok(bad) => {
+            print("FAIL an unknown kind was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("A. unknown kind: " + message)
+        },
+    }
+
+    // 3. Intervals give sign facts; an empty interval is an error.
+    match symbolic.assume_interval(c0, "x", 0.0, false, 3.0, true) {
+        Ok(ci) => {
+            if symbolic.sign_of(ci, x) != "positive" {
+                print("FAIL the open lower bound 0 should give positive")
+                failures = failures + 1
+            } else {
+                print("A. x in (0, 3]: sign " + symbolic.sign_of(ci, x))
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+    match symbolic.assume_interval(c0, "x", 2.0, true, 1.0, true) {
+        Ok(ce) => {
+            print("FAIL an empty interval was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("A. [2, 1]: " + message)
+        },
+    }
+
+    // 4. Radicals: sqrt(x^2) under each context. The numeric check uses sqrt(x*x) from the language, not the rule.
+    real_outcome = symbolic.sqrt_of_square(c0, x)
+    print("B. sqrt(x^2) for real x: " + real_outcome.transformed + " (" + real_outcome.status + ")")
+    if real_outcome.transformed != "abs(x)" or real_outcome.status != "applied" or real_outcome.required.length() != 0 {
+        print("FAIL the real case must be abs(x) with no condition")
+        failures = failures + 1
+    }
+    match symbolic.sample(real_outcome.value, x, grid) {
+        Ok(values) => {
+            mut gap = 0.0
+            for i in 0 until 41 {
+                mut d = values[i] - root_reference[i]
+                if d < 0.0 {
+                    d = 0.0 - d
+                }
+                if d > gap {
+                    gap = d
+                }
+            }
+            print("B. abs(x) against sqrt(x*x) on the grid: largest gap " + gap.to_string())
+            if gap > 0.000000000001 {
+                print("FAIL abs(x) differs from sqrt(x*x)")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+    nonneg_outcome = symbolic.sqrt_of_square(cn, x)
+    print("B. sqrt(x^2) for x >= 0: " + nonneg_outcome.transformed + " (" + nonneg_outcome.status + ")")
+    match symbolic.sample(nonneg_outcome.value, x, grid) {
+        Ok(values) => {
+            mut counterexamples = 0
+            mut negative_only = true
+            for i in 0 until 41 {
+                mut d = values[i] - root_reference[i]
+                if d < 0.0 {
+                    d = 0.0 - d
+                }
+                if d > 0.000000000001 {
+                    counterexamples = counterexamples + 1
+                    if grid[i] >= 0.0 {
+                        negative_only = false
+                    }
+                }
+            }
+            print("B. x against sqrt(x*x) on the grid: " + counterexamples.to_string() + " counterexamples, all with x < 0: " + negative_only.to_string())
+            if counterexamples != 20 or not negative_only {
+                print("FAIL expected exactly the 20 negative grid points as counterexamples")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+    neg_outcome = symbolic.sqrt_of_square(symbolic.assume(c0, "x", "negative").unwrap(), x)
+    print("B. sqrt(x^2) for x <= 0: " + neg_outcome.transformed + " (" + neg_outcome.status + ")")
+    if neg_outcome.transformed != "-x" or neg_outcome.status != "applied" {
+        print("FAIL x <= 0 must give -x")
+        failures = failures + 1
+    }
+    complex_outcome = symbolic.sqrt_of_square(symbolic.assume(c0, "x", "complex").unwrap(), x)
+    print("B. sqrt(x^2) for complex x: " + complex_outcome.status + ": " + complex_outcome.reason)
+    if complex_outcome.status != "refused" {
+        print("FAIL the complex case must be refused")
+        failures = failures + 1
+    }
+
+    // 5. Cancellation: (x^2 - 1)/(x - 1) keeps x != 1, and the original is undefined at x = 1.
+    numerator = symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 1))
+    denominator = symbolic.sub(x, symbolic.number(s, 1))
+    cancelled = symbolic.simplify_quotient(c0, numerator, denominator, x)
+    print("C. (x^2 - 1)/(x - 1) for real x: " + cancelled.transformed + " (" + cancelled.status + "), requires " + cancelled.required.length().to_string() + " condition, unknown " + cancelled.unknown.length().to_string())
+    if cancelled.transformed != "1 + x" or cancelled.status != "applied-conditional" or cancelled.unknown.length() != 1 {
+        print("FAIL the real case must keep x != 1 as an unknown condition")
+        failures = failures + 1
+    }
+    match symbolic.sample(symbolic.div(numerator, denominator), x, linspace(1.0, 1.0, 1)) {
+        Ok(values) => {
+            print("FAIL the original was evaluated at x = 1")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("C. the original at x = 1: " + message)
+        },
+    }
+    match symbolic.disagreements(symbolic.div(numerator, denominator), cancelled.value, x, grid, 0.000000000001) {
+        Ok(points) => {
+            print("C. original against 1 + x on the grid: " + points.length().to_string() + " counterexamples")
+            if points.length() != 0 {
+                print("FAIL the cancellation disagrees with the original on the grid")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+    shifted = symbolic.simplify_quotient(cp, symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 1)), symbolic.add(x, symbolic.number(s, 1)), x)
+    print("C. (x^2 - 1)/(x + 1) for x > 0: " + shifted.transformed + " (" + shifted.status + ")")
+    if shifted.status != "applied" or shifted.transformed != "-1 + x" {
+        print("FAIL with x > 0 the point x = -1 is excluded, so the rule applies")
+        failures = failures + 1
+    }
+    no_cancel = symbolic.simplify_quotient(c0, symbolic.add(x, symbolic.number(s, 1)), denominator, x)
+    print("C. (x + 1)/(x - 1): " + no_cancel.status + ": " + no_cancel.reason)
+    if no_cancel.status != "refused" {
+        print("FAIL nothing cancels in (x + 1)/(x - 1)")
+        failures = failures + 1
+    }
+
+    // 6. x / x: the result 1 needs x != 0.
+    self_real = symbolic.simplify_self_quotient(c0, x)
+    print("D. x / x for real x: " + self_real.transformed + " (" + self_real.status + ")")
+    if self_real.status != "applied-conditional" or self_real.transformed != "1" {
+        print("FAIL x / x without information must keep x != 0")
+        failures = failures + 1
+    }
+    self_nonzero = symbolic.simplify_self_quotient(cnz, x)
+    print("D. x / x for nonzero x: " + self_nonzero.transformed + " (" + self_nonzero.status + ")")
+    if self_nonzero.status != "applied" {
+        print("FAIL x nonzero establishes the condition")
+        failures = failures + 1
+    }
+    self_zero = symbolic.simplify_self_quotient(cz, x)
+    print("D. x / x when x = 0: " + self_zero.status + ": " + self_zero.reason)
+    if self_zero.status != "refused" {
+        print("FAIL x / x with x = 0 must be refused")
+        failures = failures + 1
+    }
+
+    // 7. Logarithms: ln(x y) = ln x + ln y only when both are positive.
+    split = symbolic.expand_log_product(cp, x, symbolic.symbol(s, "y", "positive"))
+    print("E. ln(x y) with x, y positive: " + split.transformed + " (" + split.status + ")")
+    if split.status != "applied" {
+        print("FAIL both positive should apply")
+        failures = failures + 1
+    }
+    unsplit = symbolic.expand_log_product(c0, x, y)
+    print("E. ln(x y) for real x, y: " + unsplit.status + ": " + unsplit.reason)
+    if unsplit.status != "refused" {
+        print("FAIL the split must be refused for real factors")
+        failures = failures + 1
+    }
+    match symbolic.sample(symbolic.call("ln", x), x, linspace(0.0 - 2.0, 0.0 - 2.0, 1)) {
+        Ok(values) => {
+            print("FAIL the original was defined at a negative x")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("E. ln(x) at x = -2, the factor the split needs: " + message)
+        },
+    }
+
+    if failures == 0 {
+        print("all conditional checks passed")
+    } else {
+        print("conditional checks failed: " + failures.to_string())
+    }
+}

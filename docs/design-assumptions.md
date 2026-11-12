@@ -1,7 +1,7 @@
 # Design: explicit assumptions for std.symbolic
 
-Status: design for the first increment. The implemented subset is listed at the end; everything else is future work and
-is not claimed.
+Status: implemented for the first increment in `std.symbolic`. The implemented scope is listed in
+docs/scientific-platform-core.md; everything else is future work and is not claimed.
 
 ## Problem
 
