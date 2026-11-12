@@ -1659,11 +1659,47 @@ fn solve_quadratic(s: Store, a: Rat, b: Rat, c: Rat) -> Result<List<Expr>, Strin
         }
         return Ok([wrap(s, num_id(s, r1)), wrap(s, num_id(s, r2))])
     }
+    if disc.n <= 1000000000000 and disc.d <= 1000000 and disc.n * disc.d <= 1000000000000 {
+        return radical_roots(s, disc, neg_b, two_a_inverse)
+    }
     sqrt_id = pow_ids(s, num_id(s, disc), num_id(s, rat(s, 1, 2)))
     neg_b_id = num_id(s, neg_b)
     inverse_id = num_id(s, two_a_inverse)
     plus = mul_ids(s, [add_ids(s, [neg_b_id, sqrt_id]), inverse_id])
     minus = mul_ids(s, [add_ids(s, [neg_b_id, mul_ids(s, [int_id(s, 0 - 1), sqrt_id])]), inverse_id])
+    Ok([wrap(s, plus), wrap(s, minus)])
+}
+
+/// Splits n = k * k * m with m squarefree, for 1 <= n <= 10^12.
+fn square_split(n: Int) -> List<Int> {
+    mut k = 1
+    mut m = n
+    mut f = 2
+    while f * f <= m {
+        while m % (f * f) == 0 {
+            m = m / (f * f)
+            k = k * f
+        }
+        f = f + 1
+    }
+    [k, m]
+}
+
+/// The two roots (-b +- sqrt(disc)) / (2a), written as p +- q * m^(1/2) with m squarefree, so 2^(1/2) and not 8^(1/2).
+/// sqrt(n / d) is sqrt(n * d) / d; the square part of n * d is taken out, so the radical is always reduced.
+fn radical_roots(s: Store, disc: Rat, neg_b: Rat, two_a_inverse: Rat) -> Result<List<Expr>, String> {
+    parts = square_split(disc.n * disc.d)
+    k = parts[0]
+    m = parts[1]
+    shift = rat_mul(s, neg_b, two_a_inverse)
+    spread = rat_mul(s, rat(s, k, disc.d), two_a_inverse)
+    if shift.big != "" or spread.big != "" {
+        return Err("the coefficients are too large for the closed form")
+    }
+    root_form = pow_ids(s, int_id(s, m), num_id(s, rat(s, 1, 2)))
+    shift_id = num_id(s, shift)
+    plus = add_ids(s, [shift_id, mul_ids(s, [num_id(s, spread), root_form])])
+    minus = add_ids(s, [shift_id, mul_ids(s, [num_id(s, rat(s, 0 - spread.n, spread.d)), root_form])])
     Ok([wrap(s, plus), wrap(s, minus)])
 }
 
