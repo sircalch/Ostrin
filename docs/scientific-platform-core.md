@@ -52,6 +52,23 @@ A positive integer to a half-integer power is reduced too: `sqrt(8)` is `2*2^(1/
 `16*2^(1/2)`, and sums and products of such radicals combine (`sqrt(8) + sqrt(2)` is `3*2^(1/2)`). Complex roots are
 still refused. Not yet implemented: radicals of other exponents or of symbols.
 
+## Numeric bridge
+
+`std.symbolic` can be checked against numbers that do not come from its own code:
+
+- `sample(a, v, xs)` evaluates `a` at each point of `xs`, with `v` as the variable. A point that cannot be evaluated,
+  such as `1/x` at 0, fails the whole sample and names the point; a free symbol with no value fails it too.
+- `disagreements(a, b, v, xs, tol)` lists the points where two expressions differ by more than `tol`, relative to the
+  larger magnitude. A non-empty list is a counterexample to the identity `a = b`; an empty one is evidence for it, not
+  a proof.
+- `derivative_mismatches(a, v, xs, delta, tol)` compares the symbolic derivative with central differences of `a`.
+  It fails when `a` has no derivative rule, so a missing rule is reported rather than skipped.
+
+`examples/symbolic_numeric.ostrin` checks derivatives of a cubic, `sin(x) exp(x)` and `cos(x^2)`, a deliberately wrong
+derivative (which must disagree at every point), a true and a false identity, the error for a point that cannot be
+evaluated, and a `std.viz` figure built from sampled values. Not yet implemented: adaptive sampling, root isolation on
+an interval, and sampling of more than one variable.
+
 ## Assumptions and positivity
 
 A symbol is real unless it is declared `positive`, `nonzero` or `integer`. A simplification fires only when the

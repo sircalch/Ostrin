@@ -1047,6 +1047,155 @@ pub fn eval_or(a: Expr, names: List<String>, values: List<Float>, fallback: Floa
     }
 }
 
+/// The values of `a` at the points `xs`, with the symbol `v` as the variable. Any other symbol in `a` has no value and
+/// fails. The first point that cannot be evaluated (a division by zero, a negative base to a fraction) fails the whole
+/// sample, so a domain error is reported rather than replaced by a number.
+pub fn sample(a: Expr, v: Expr, xs: Array<Float>) -> Result<Array<Float>, String> {
+    if a.store.failures.length() > 0 {
+        return Err(a.store.failures[0])
+    }
+    if xs.length() == 0 {
+        return Err("sample needs at least one point")
+    }
+    if v.store.kinds[v.id] != 1 {
+        return Err("sample needs a symbol as its variable")
+    }
+    name = v.store.names[v.id]
+    mut out = zeros([xs.length()])
+    for i in 0 until xs.length() {
+        match eval_ids(a.store, a.id, [name], [xs[i]]) {
+            Ok(value) => out.set(i, value),
+            Err(message) => {
+                return Err("at " + xs[i].to_string() + ": " + message)
+            },
+        }
+    }
+    Ok(out)
+}
+
+/// True for an ordinary finite number. NaN is not equal to itself; an infinite value is larger than any finite bound.
+fn finite_value(v: Float) -> Bool {
+    if v != v {
+        return false
+    }
+    abs(v) < 1.0e308
+}
+
+/// The points where two sampled value lists disagree. A point where either value is not finite always disagrees, since
+/// a NaN or an infinity is not evidence of agreement. Otherwise a point disagrees when the difference exceeds `tol`
+/// relative to the larger magnitude, and at least `tol` in absolute size (the scale never falls below 1).
+fn mismatched_points(left: Array<Float>, right: Array<Float>, xs: Array<Float>, tol: Float) -> List<Float> {
+    mut found: List<Float> = []
+    for i in 0 until xs.length() {
+        if not finite_value(left[i]) or not finite_value(right[i]) {
+            found.push(xs[i])
+        } else {
+            mut scale = 1.0
+            if abs(left[i]) > scale {
+                scale = abs(left[i])
+            }
+            if abs(right[i]) > scale {
+                scale = abs(right[i])
+            }
+            if abs(left[i] - right[i]) > tol * scale {
+                found.push(xs[i])
+            }
+        }
+    }
+    found
+}
+
+/// The points of `xs` where `a` and `b` disagree (see mismatched_points). These are counterexamples to the identity
+/// a = b. An empty list means that no sampled point disagrees; it is evidence for the identity on those points, not a
+/// proof. Duplicate points are sampled and compared like any others; an empty `xs` gives an empty list.
+pub fn disagreements(a: Expr, b: Expr, v: Expr, xs: Array<Float>, tol: Float) -> Result<List<Float>, String> {
+    left = sample(a, v, xs)
+    right = sample(b, v, xs)
+    match left {
+        Ok(lv) => {
+            match right {
+                Ok(rv) => Ok(mismatched_points(lv, rv, xs, tol)),
+                Err(message) => Err(message),
+            }
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// `xs` moved by `shift`.
+fn shifted_points(xs: Array<Float>, shift: Float) -> Array<Float> {
+    mut out = zeros([xs.length()])
+    for i in 0 until xs.length() {
+        out.set(i, xs[i] + shift)
+    }
+    out
+}
+
+/// The central difference quotient of `a` at each point of `xs`, with step `delta`.
+fn difference_quotients(a: Expr, v: Expr, xs: Array<Float>, delta: Float) -> Result<Array<Float>, String> {
+    up = sample(a, v, shifted_points(xs, delta))
+    down = sample(a, v, shifted_points(xs, 0.0 - delta))
+    match up {
+        Ok(uv) => {
+            match down {
+                Ok(dv) => {
+                    mut out = zeros([xs.length()])
+                    for i in 0 until xs.length() {
+                        out.set(i, (uv[i] - dv[i]) / (2.0 * delta))
+                    }
+                    Ok(out)
+                },
+                Err(message) => Err(message),
+            }
+        },
+        Err(message) => Err(message),
+    }
+}
+
+/// Compares the symbolic derivative of `a` with central differences of `a` at the points `xs`. The quotient is taken
+/// with the step `delta` and with `delta / 10`. A central difference is trusted only when the two steps agree: a step
+/// too large leaves truncation error, a step too small leaves rounding error, and either one would make the comparison
+/// misleading. When they disagree the call fails and names the point. Otherwise it returns the points where the
+/// symbolic derivative and the quotient disagree (see mismatched_points). A missing derivative rule also fails.
+pub fn derivative_mismatches(a: Expr, v: Expr, xs: Array<Float>, delta: Float, tol: Float) -> Result<List<Float>, String> {
+    if xs.length() == 0 {
+        return Err("derivative_mismatches needs at least one point")
+    }
+    derivative = diff(a, v)
+    coarse = difference_quotients(a, v, xs, delta)
+    fine = difference_quotients(a, v, xs, delta / 10.0)
+    match derivative {
+        Ok(d) => {
+            match coarse {
+                Ok(cq) => {
+                    match fine {
+                        Ok(fq) => {
+                            mut unstable = -1
+                            for i in 0 until xs.length() {
+                                if unstable < 0 and not (not finite_value(cq[i]) or not finite_value(fq[i])) {
+                                    if abs(cq[i] - fq[i]) > tol * (1.0 + abs(cq[i])) {
+                                        unstable = i
+                                    }
+                                }
+                            }
+                            if unstable >= 0 {
+                                return Err("the step is not reliable at " + xs[unstable].to_string() + ": steps " + delta.to_string() + " and " + (delta / 10.0).to_string() + " give different quotients; choose a step between them")
+                            }
+                            match sample(d, v, xs) {
+                                Ok(exact) => Ok(mismatched_points(exact, cq, xs, tol)),
+                                Err(message) => Err(message),
+                            }
+                        },
+                        Err(message) => Err(message),
+                    }
+                },
+                Err(message) => Err(message),
+            }
+        },
+        Err(message) => Err(message),
+    }
+}
+
 /// An exact integer given as decimal text of any length ("-123456789012345678901234567890").
 pub fn big_number(s: Store, text: String) -> Expr {
     match bigint.rational_make(text, "1") {

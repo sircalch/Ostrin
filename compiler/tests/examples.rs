@@ -21062,9 +21062,9 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        // The IR count grows with the module (114 after the positivity rules were added); the guarded property
+        // The IR count grows with the module (121 after the numeric bridge checks were added); the guarded property
         // is that no node falls back to the slower HIR or AST lowering.
-        symbolic_source.contains("ir=114")
+        symbolic_source.contains("ir=121")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -22073,6 +22073,40 @@ fn std_symbolic_assumptions_match_interpreter_and_native_without_leaks() {
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     assert!(report_text.contains("divergences: 0"), "{report_text}");
     let exe = temp_artifact("symbolic_assumptions_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_numeric_bridge_matches_interpreter_and_native_without_leaks() {
+    // Symbolic derivatives against central differences, counterexamples to a true and a false identity, a sample
+    // that names the point where 1/x cannot be evaluated, and a figure built from sampled values.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_numeric.ostrin"),
+        "derivative of x^3 - 2x + 1: 0 mismatched points\nderivative of sin(x) exp(x): 0 mismatched points\nderivative of cos(x^2): 0 mismatched points\nwrong derivative 3x^2 + 1 disagrees at all 41 points\n(x + 1)^2 = x^2 + 2x + 1: 0 counterexamples\nsin^2 + cos^2 = 1: 0 counterexamples\n(x + 1)^2 = x^2 + 1: 40 counterexamples\n1/x through 0 fails: at 0: division by zero\nx + y with y free fails: at -2: no value for symbol y\nfigure of the sampled cubic is svg: true\nstep 1e-16 is refused: the step is not reliable at -0.8999999999999999: steps 0.0000000000000001 and 0.000000000000000009999999999999999 give different quotients; choose a step between them\nstep 1 is refused for cos(x^2): the step is not reliable at -2: steps 1 and 0.1 give different quotients; choose a step between them\nexp(1000) = exp(1000) is reported as a non-finite mismatch\nall numeric bridge checks passed\n"
+    );
+    let path = example_path("symbolic_numeric.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_numeric_leak.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(
         compile.status.success(),
