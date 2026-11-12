@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // The Ostrin Scientific Notebook in a real browser, with the real compiler (WASM in a Worker). Every output checked
 // here was produced by a run in the page; restored outputs are labelled as such.
@@ -390,4 +392,78 @@ test("a write already in progress cannot overwrite a newer change made during it
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
   await expect(page.locator("#notebook-title")).toHaveValue("second");
+});
+
+const FAIL_INIT = () => {
+  const real = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (key, value) {
+    if (window.__failStorage && key === "ostrin.notebook.v1.draft") throw new DOMException("storage is full for this test", "QuotaExceededError");
+    return real.call(this, key, value);
+  };
+};
+
+test("edits made while storage is failing are all stored by the first write that succeeds", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(FAIL_INIT);
+  await open(page);
+  await page.evaluate(() => {
+    window.__failStorage = true;
+  });
+  const id = await addCode(page);
+  await setSource(page, id, 'fn main() -> Void {\n    print("one")\n}\n');
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "error", { timeout: 15_000 });
+  // A newer edit while the failure is still in place: it must not be reported as saved, and must not be lost.
+  await setSource(page, id, 'fn main() -> Void {\n    print("two")\n}\n');
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "error", { timeout: 15_000 });
+  await page.evaluate(() => {
+    window.__failStorage = false;
+  });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectSaved(page);
+  const stored = await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft"));
+  expect(stored).toContain('print(\\"two\\")');
+  expect(stored).not.toContain('print(\\"one\\")');
+  await expect(page.locator("#nb-notice")).toHaveText("");
+});
+
+test("a failed write does not clear the error or mark a later change saved until a write succeeds", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(FAIL_INIT);
+  await open(page);
+  await page.evaluate(() => {
+    window.__failStorage = true;
+  });
+  // The title edit starts an autosave; a Save click queues a second write behind it. Both fail.
+  await page.locator("#notebook-title").fill("Failing title");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "error", { timeout: 15_000 });
+  await page.waitForTimeout(1_000);
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "error");
+  await page.evaluate(() => {
+    window.__failStorage = false;
+  });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectSaved(page);
+  const stored = JSON.parse(await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft")));
+  expect(stored.title).toBe("Failing title");
+});
+
+test("an imported document is the one stored, even when a save of the previous document is in progress", async ({ page }) => {
+  test.setTimeout(120_000);
+  page.on("dialog", (dialog) => dialog.accept());
+  await open(page);
+  const id = await addCode(page);
+  await setSource(page, id, 'fn main() -> Void {\n    print("before import")\n}\n');
+  const file = join(tmpdir(), `ostrin-import-race-${Date.now()}.json`);
+  const stamp = "2026-11-11T09:00:00.000Z";
+  writeFileSync(file, JSON.stringify({ format: "ostrin.notebook", version: 1, id: "importedrace", title: "Imported race", created: stamp, updated: stamp, cells: [{ id: "c1", kind: "code", source: 'fn main() -> Void {\n    print("imported")\n}\n', deps: [] }], resources: [], runs: {} }));
+  // A Save of the previous document starts; the import is chosen while that write may still be in progress.
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.locator(INPUT).setInputFiles(file);
+  await expect(page.locator("#notebook-title")).toHaveValue("Imported race");
+  await expectSaved(page);
+  const stored = JSON.parse(await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft")));
+  expect(stored.title).toBe("Imported race");
+  expect(stored.cells[0].source).toContain("imported");
+  expect(stored.cells[0].source).not.toContain("before import");
 });
