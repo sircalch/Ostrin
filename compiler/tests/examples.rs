@@ -22028,7 +22028,7 @@ fn std_symbolic_radicals_match_interpreter_and_native_without_leaks() {
     // exact substitution, a rejected wrong candidate and a numeric value against the reference square root.
     assert_eq!(
         interpreter_and_native_agree("symbolic_radicals.ostrin"),
-        "x^2 - 2: 2^(1/2), -2^(1/2)\nx^2 - 8: 2*2^(1/2), -2*2^(1/2)\nx^2 - 12: 2*3^(1/2), -2*3^(1/2)\nx^2 - 18: 3*2^(1/2), -3*2^(1/2)\nx^2 - x - 1: 1/2 + 1/2*5^(1/2), 1/2 - 1/2*5^(1/2)\n2x^2 - 3x - 1: 3/4 + 1/4*17^(1/2), 3/4 - 1/4*17^(1/2)\n3^(1/2) is rejected as a root of x^2 - 2\nall radical checks passed\n"
+        "x^2 - 2: 2^(1/2), -2^(1/2)\nx^2 - 8: 2*2^(1/2), -2*2^(1/2)\nx^2 - 12: 2*3^(1/2), -2*3^(1/2)\nx^2 - 18: 3*2^(1/2), -3*2^(1/2)\nx^2 - x - 1: 1/2 + 1/2*5^(1/2), 1/2 - 1/2*5^(1/2)\n2x^2 - 3x - 1: 3/4 + 1/4*17^(1/2), 3/4 - 1/4*17^(1/2)\n3^(1/2) is rejected as a root of x^2 - 2\nstandalone radicals reduced: 16*2^(1/2)\nall radical checks passed\n"
     );
     let path = example_path("symbolic_radicals.ostrin");
     let report = run(&["--native-type-report", &path]);

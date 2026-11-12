@@ -48,8 +48,10 @@ States:
 Irrational quadratic roots are written in reduced radical form: the square part of the radicand is taken out, so the
 roots of `x^2 - 8` are `2*2^(1/2)` and `-2*2^(1/2)`, and `2x^2 - 3x - 1` gives `3/4 + 1/4*17^(1/2)`. Discriminants
 whose numerator and denominator product exceeds 10^12 keep the earlier unreduced form `(-b + D^(1/2)) * 1/(2a)`.
-Complex roots are still refused. Not yet implemented: radical simplification of general expressions (only the roots
-of quadratics are reduced), and assumptions or positivity beyond the existing checks.
+A positive integer to a half-integer power is reduced too: `sqrt(8)` is `2*2^(1/2)`, `sqrt(4)` is `2`, `8^(3/2)` is
+`16*2^(1/2)`, and sums and products of such radicals combine (`sqrt(8) + sqrt(2)` is `3*2^(1/2)`). Complex roots are
+still refused. Not yet implemented: radicals of other exponents or of symbols, and assumptions or positivity beyond the
+existing checks.
 
 ## Verification run for this note
 

@@ -90,6 +90,42 @@ fn main() -> Void {
         },
     }
 
+    // Standalone radicals and sums or products of them are reduced, and the reduced value is the same number.
+    // Each reference is the value of the unreduced expression, computed as an independent decimal.
+    sq8 = symbolic.power(symbolic.number(s, 8), symbolic.number(s, 1, 2))
+    sq2 = symbolic.power(symbolic.number(s, 2), symbolic.number(s, 1, 2))
+    sq12 = symbolic.power(symbolic.number(s, 12), symbolic.number(s, 1, 2))
+    sq3 = symbolic.power(symbolic.number(s, 3), symbolic.number(s, 1, 2))
+    sq18 = symbolic.power(symbolic.number(s, 18), symbolic.number(s, 1, 2))
+    cases = [sq8, sq12, symbolic.add(sq8, sq2), symbolic.add(sq12, sq3), symbolic.mul(sq2, sq8), symbolic.sub(sq18, sq2), symbolic.power(symbolic.number(s, 8), symbolic.number(s, 3, 2))]
+    texts = ["2*2^(1/2)", "2*3^(1/2)", "3*2^(1/2)", "3*3^(1/2)", "4", "2*2^(1/2)", "16*2^(1/2)"]
+    values = [2.8284271247461903, 3.4641016151377544, 4.242640687119285, 5.196152422706632, 4.0, 2.8284271247461903, 22.627416997969522]
+    mut j = 0
+    while j < cases.length() {
+        if symbolic.show(cases[j]) != texts[j] {
+            print("FAIL radical text: " + symbolic.show(cases[j]) + " expected " + texts[j])
+            failures = failures + 1
+        }
+        match symbolic.eval(cases[j], [], []) {
+            Ok(value) => {
+                mut gap = value - values[j]
+                if gap < 0.0 {
+                    gap = 0.0 - gap
+                }
+                if gap > 0.000000000001 {
+                    print("FAIL radical value of " + symbolic.show(cases[j]))
+                    failures = failures + 1
+                }
+            },
+            Err(message) => {
+                print("FAIL eval: " + message)
+                failures = failures + 1
+            },
+        }
+        j = j + 1
+    }
+    print("standalone radicals reduced: " + symbolic.show(cases[6]))
+
     if failures == 0 {
         print("all radical checks passed")
     } else {

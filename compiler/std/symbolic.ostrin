@@ -538,6 +538,21 @@ fn pow_ids(s: Store, base: Int, exponent: Int) -> Int {
         if s.kinds[base] == 0 and s.nums[base] == 0 and e.n > 0 {
             return base
         }
+        // A positive integer to a half-integer power: n^(p/2) = k^p * m^(p/2) where n = k*k*m and m is squarefree,
+        // so sqrt(8) is 2*2^(1/2) and sqrt(4) is 2. The square part leaves the radical; the rest stays inside it.
+        if s.kinds[base] == 0 and e.d == 2 and e.n > 0 {
+            b = rat_of(s, base)
+            if b.big == "" and b.d == 1 and b.n > 0 and b.n <= 1000000000000 {
+                parts = square_split(b.n)
+                if parts[0] > 1 {
+                    // e.n is odd here (e.d is 2), so (p/2) = (p-1)/2 + 1/2 and only one half-power stays inside.
+                    half = (e.n - 1) / 2
+                    outside = rat_mul(s, rat_pow_int(s, rat(s, parts[0], 1), e.n), rat_pow_int(s, rat(s, parts[1], 1), half))
+                    radical = pow_ids(s, int_id(s, parts[1]), num_id(s, rat(s, 1, 2)))
+                    return mul_ids(s, [num_id(s, outside), radical])
+                }
+            }
+        }
         if s.kinds[base] == 4 and s.kinds[arg_of(s, base, 1)] == 0 {
             inner_base = arg_of(s, base, 0)
             inner = rat_of(s, arg_of(s, base, 1))
