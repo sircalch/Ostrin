@@ -37,20 +37,34 @@
       <section class="page-hero shell"><p class="eyebrow">Scientific notebook</p><h1>Compute, read, <em>keep.</em></h1><p class="lede">Each code cell is compiled and run by the real Ostrin compiler in this page. Nothing runs when a document opens; outputs from an earlier edit are marked stale.</p><div class="page-meta"><span>ostrin.notebook/v1</span><span>cells run in isolation</span><span>attached data files</span></div></section>
       <section class="shell notebook" aria-label="Notebook">
         <div class="notebook-bar" role="toolbar" aria-label="Notebook actions">
-          <label class="notebook-title-label" for="notebook-title">Title</label>
-          <input id="notebook-title" class="notebook-title" type="text" maxlength="200" aria-label="Notebook title">
-          <span class="spacer"></span>
-          <button id="nb-run-all" class="button-quiet" type="button">Run all</button>
-          <button id="nb-cancel" class="button-quiet" type="button" disabled>Cancel</button>
-          <button id="nb-restart" class="button-quiet" type="button">Restart context</button>
-          <button id="nb-add-code" class="button-quiet" type="button">+ Code</button>
-          <button id="nb-add-text" class="button-quiet" type="button">+ Text</button>
-          <button id="nb-attach" class="button-quiet" type="button" title="Attach a data file under data/ to this notebook">Attach data</button>
-          <button id="nb-export" class="button-quiet" type="button">Export</button>
-          <button id="nb-import" class="button-quiet" type="button">Import</button>
-          <button id="nb-new" class="button-quiet" type="button">New</button>
-          <label class="notebook-example-label" for="nb-example">Example</label>
-          <select id="nb-example" aria-label="Load an example notebook"><option value="">Choose an example…</option><option value="experimental">A · Experimental data analysis</option><option value="physical">B · Physical modelling</option><option value="symbolic">C · Symbolic mathematics</option></select>
+          <div class="nb-group" role="group" aria-label="Run">
+            <button id="nb-run-all" class="button-quiet nb-primary" type="button">Run all</button>
+            <button id="nb-cancel" class="button-quiet" type="button" disabled>Cancel</button>
+            <button id="nb-restart" class="button-quiet" type="button">Restart context</button>
+          </div>
+          <div class="nb-group" role="group" aria-label="Cells">
+            <button id="nb-add-code" class="button-quiet nb-primary" type="button">+ Code</button>
+            <button id="nb-add-text" class="button-quiet" type="button">+ Text</button>
+            <button id="nb-attach" class="button-quiet" type="button" title="Attach a data file under data/ to this notebook">Attach data</button>
+          </div>
+          <div class="nb-group nb-group-doc" role="group" aria-label="Document">
+            <button id="nb-save" class="button-quiet" type="button" title="Store the document in this browser now">Save</button>
+            <div class="nb-title-row">
+              <label class="notebook-title-label" for="notebook-title">Title</label>
+              <input id="notebook-title" class="notebook-title" type="text" maxlength="200">
+            </div>
+            <span id="nb-save-state" class="nb-save-state" role="status" aria-live="polite" data-state="saved">Saved in this browser</span>
+          </div>
+          <details class="nb-menu">
+            <summary>File and examples</summary>
+            <div class="nb-menu-body">
+              <button id="nb-new" class="button-quiet" type="button">New notebook</button>
+              <button id="nb-import" class="button-quiet" type="button">Import…</button>
+              <button id="nb-export" class="button-quiet" type="button">Export…</button>
+              <label class="notebook-example-label" for="nb-example">Example</label>
+              <select id="nb-example" aria-label="Load an example notebook"><option value="">Choose an example…</option><option value="experimental">A · Experimental data analysis</option><option value="physical">B · Physical modelling</option><option value="symbolic">C · Symbolic mathematics</option></select>
+            </div>
+          </details>
           <input id="nb-import-file" type="file" accept=".json,application/json" hidden aria-label="Notebook file to import">
           <input id="nb-attach-file" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,application/json" hidden aria-label="Data file to attach">
         </div>

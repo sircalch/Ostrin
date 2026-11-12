@@ -13,6 +13,7 @@ import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
 import { sha256Hex } from "./workbench-project.js";
 import { resultsTable } from "./workbench-results.js";
+import { parseBlocks } from "./workbench-markdown.js";
 import {
   addCell,
   attachResource,
@@ -47,12 +48,15 @@ const encoder = new TextEncoder();
 
 let doc = createNotebook({ title: "Untitled notebook" });
 let hashes = {};
-let dirty = false;
-let saveTimer = null;
 let activeCell = null;
 let runAllActive = false;
 // The cells that ran in this page session. Any other recorded output came from the document and is labelled so.
 const ranThisSession = new Set();
+// The display mode of each text cell for this page session: "read" (rendered) or "edit" (the original text).
+const textModes = new Map();
+function textMode(cell) {
+  return textModes.get(cell.id) ?? (cell.source.trim() === "" ? "edit" : "read");
+}
 let cancelRequested = false;
 
 const executor = createExecutor({
@@ -72,31 +76,97 @@ function notice(text, kind = "info") {
 function renderStatus() {
   const cancel = $("nb-cancel");
   cancel.disabled = !(runAllActive || activeCell !== null);
-  const status = $("nb-status");
-  if (activeCell) status.textContent = `Running cell ${activeCell}…`;
-  else status.textContent = dirty ? "Unsaved changes." : "Saved in this browser.";
+  $("nb-status").textContent = activeCell ? `Running cell ${activeCell}…` : "";
+  renderSaveState();
 }
 
 // ---------------------------------------------------------------- persistence
+//
+// The save state is derived from two counters. `revision` counts every change to the document. `savedRevision` is the
+// revision of the last write that completed. A change made while a write is in progress is not lost: it keeps the
+// document "unsaved" and starts the next write. The states are:
+//   saved    the stored text is the current document (savedRevision equals revision, and no error)
+//   saving   a write is in progress
+//   unsaved  the document has changes that are not stored yet; an autosave is pending or about to run
+//   error    the last write failed: the change is NOT stored, and the document stays open in this page
+// "saved" is shown only after the storage call returned; a pending write is never reported as an error.
 
-function save() {
+const save = { revision: 0, savedRevision: 0, writing: false, error: null, timer: null, chain: Promise.resolve() };
+const SAVE_LABEL = { saved: "Saved in this browser", saving: "Saving…", unsaved: "Unsaved changes", error: "Not saved" };
+
+function isUnsaved() {
+  return save.revision !== save.savedRevision;
+}
+
+function saveState() {
+  if (save.error !== null) return "error";
+  if (save.writing) return "saving";
+  if (isUnsaved()) return "unsaved";
+  return "saved";
+}
+
+function renderSaveState() {
+  const state = saveState();
+  const node = $("nb-save-state");
+  node.dataset.state = state;
+  node.textContent = SAVE_LABEL[state];
+  // Save is useful whenever something is not stored, including after an error.
+  $("nb-save").disabled = state === "saved" || state === "saving";
+}
+
+// Records a change. The autosave runs shortly after the last change, so typing does not write on every key.
+function markChanged() {
+  save.revision += 1;
+  renderSaveState();
+  clearTimeout(save.timer);
+  save.timer = setTimeout(saveNow, 400);
+}
+
+// Writes the document now, after any write already in progress. Returns when the write has finished.
+function saveNow() {
+  clearTimeout(save.timer);
+  save.chain = save.chain.then(writeDocument);
+  return save.chain;
+}
+
+async function writeDocument() {
+  if (!isUnsaved() && save.error === null) return;
+  const revision = save.revision;
+  let text;
   try {
-    localStorage.setItem(DRAFT_KEY, serializeNotebook(doc));
-    dirty = false;
-    renderStatus();
+    text = serializeNotebook(doc);
   } catch (error) {
-    // The document stays open; the user is told that it is not stored, and can export it.
-    dirty = true;
-    renderStatus();
-    notice(`Not saved in this browser: ${error.message ?? error}. The document is still open; export it to keep it.`, "error");
+    failSave(error);
+    return;
+  }
+  save.writing = true;
+  renderSaveState();
+  // Storage writes are asynchronous; yielding here keeps the "saving" state observable and lets edits queue behind it.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    localStorage.setItem(DRAFT_KEY, text);
+    save.savedRevision = Math.max(save.savedRevision, revision);
+    if (save.error !== null) {
+      save.error = null;
+      notice("");
+    }
+  } catch (error) {
+    failSave(error);
+  } finally {
+    save.writing = false;
+    renderSaveState();
+  }
+  // A change made during the write is saved by the next write; it is not reported as an error.
+  if (isUnsaved() && save.error === null) {
+    clearTimeout(save.timer);
+    save.timer = setTimeout(saveNow, 400);
   }
 }
 
-function scheduleSave() {
-  dirty = true;
-  renderStatus();
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(save, 300);
+function failSave(error) {
+  save.error = String(error?.message ?? error);
+  notice(`Not saved: ${save.error}. The changes are still in this page, but they are not stored in this browser. Export the notebook to keep a copy.`, "error");
+  renderSaveState();
 }
 
 function restoreDraft() {
@@ -133,7 +203,7 @@ async function commit(next, { redraw = true } = {}) {
   await refreshHashes();
   if (redraw) renderCells();
   else renderChips();
-  scheduleSave();
+  markChanged();
 }
 
 // ---------------------------------------------------------------- rendering
@@ -206,6 +276,15 @@ function renderCell(cell, index) {
   const actions = el("div", "nb-cell-actions");
   if (cell.kind === "code") {
     actions.append(button("Run", () => runCell(cell.id), { disabled: runAllActive || activeCell !== null, title: "Compile and run this cell" }));
+  } else {
+    const reading = textMode(cell) === "read";
+    const toggle = button(reading ? "Edit" : "Read", () => {
+      textModes.set(cell.id, reading ? "edit" : "read");
+      renderCells();
+    });
+    toggle.setAttribute("aria-pressed", String(reading));
+    toggle.setAttribute("aria-label", reading ? `Edit text cell ${cell.id}` : `Read text cell ${cell.id} rendered`);
+    actions.append(toggle);
   }
   actions.append(
     button("Up", () => commit(moveCell(doc, cell.id, -1)), { disabled: index === 0 }),
@@ -228,9 +307,13 @@ function renderCell(cell, index) {
       const outputs = article.querySelector(".nb-outputs");
       if (outputs) outputs.replaceWith(renderOutputs(cell.id));
     });
-    scheduleSave();
+    markChanged();
   });
-  article.append(source);
+  if (cell.kind === "text" && textMode(cell) === "read") {
+    article.append(renderMarkdown(cell.source));
+  } else {
+    article.append(source);
+  }
 
   if (cell.kind === "code") {
     const deps = el("label", "nb-deps");
@@ -286,6 +369,74 @@ function renderOutputs(cellId) {
   }
   if (run.resultsRejected) box.append(el("p", "nb-error", `Structured results rejected: ${run.resultsRejected}`));
   return box;
+}
+
+// Rendered Markdown of a text cell. Only the subset of workbench-markdown.js is built, with createElement and
+// textContent; a link gets an href only when its target passed the policy.
+function renderMarkdown(source) {
+  const root = el("div", "nb-md");
+  const blocks = parseBlocks(source);
+  if (blocks.length === 0) root.append(el("p", "nb-muted", "Empty text cell. Use Edit to write it."));
+  for (const block of blocks) root.append(markdownBlock(block));
+  return root;
+}
+
+function markdownBlock(block) {
+  switch (block.type) {
+    case "heading": {
+      const node = el(`h${Math.min(block.level + 2, 6)}`);
+      node.append(...markdownInlines(block.inlines));
+      return node;
+    }
+    case "paragraph": {
+      const node = el("p");
+      node.append(...markdownInlines(block.inlines));
+      return node;
+    }
+    case "list": {
+      const list = el(block.ordered ? "ol" : "ul");
+      for (const item of block.items) {
+        const li = el("li");
+        li.append(...markdownInlines(item));
+        list.append(li);
+      }
+      return list;
+    }
+    case "code": {
+      const pre = el("pre", "nb-md-code");
+      pre.append(el("code", null, block.text));
+      return pre;
+    }
+    case "quote": {
+      const quote = el("blockquote");
+      for (const inner of block.blocks) quote.append(markdownBlock(inner));
+      return quote;
+    }
+    default:
+      return el("hr");
+  }
+}
+
+function markdownInlines(nodes) {
+  return nodes.map((node) => {
+    switch (node.type) {
+      case "code":
+        return el("code", null, node.text);
+      case "strong":
+        return el("strong", null, node.text);
+      case "em":
+        return el("em", null, node.text);
+      case "link": {
+        if (node.href === null) return document.createTextNode(`${node.text} (link not allowed)`);
+        const anchor = el("a", null, node.text);
+        anchor.href = node.href;
+        anchor.rel = "noopener noreferrer";
+        return anchor;
+      }
+      default:
+        return document.createTextNode(node.text);
+    }
+  });
 }
 
 function renderTable(table) {
@@ -393,7 +544,7 @@ async function runCell(cellId) {
   if (doc.cells.some((c) => c.id === cellId)) {
     doc = { ...doc, runs: { ...doc.runs, [cellId]: record } };
     ranThisSession.add(cellId);
-    scheduleSave();
+    markChanged();
   }
   await refreshHashes();
   renderCells();
@@ -466,13 +617,14 @@ function exportNotebook() {
 // Replaces the open document only after the new one is validated, and never without asking when there is work to keep.
 async function replaceDocument(next, what) {
   ranThisSession.clear();
-  if (dirty && doc.cells.length > 0 && !window.confirm(`Replace the open notebook with ${what}? Unsaved changes will be lost.`)) {
+  if (isUnsaved() && doc.cells.length > 0 && !window.confirm(`Replace the open notebook with ${what}? Unsaved changes will be lost.`)) {
     return false;
   }
   doc = next;
   await refreshHashes();
   renderCells();
-  save();
+  markChanged();
+  saveNow();
   notice(`${what} is open. Nothing has been run.`, "info");
   return true;
 }
@@ -521,11 +673,12 @@ async function attachFile(file) {
 }
 
 function newNotebook() {
-  if (dirty && doc.cells.length > 0 && !window.confirm("Start a new notebook? Unsaved changes will be lost.")) return;
+  if (isUnsaved() && doc.cells.length > 0 && !window.confirm("Start a new notebook? Unsaved changes will be lost.")) return;
   doc = createNotebook({ title: "Untitled notebook" });
   refreshHashes().then(() => {
     renderCells();
-    save();
+    markChanged();
+    saveNow();
     notice("A new notebook is open.", "info");
   });
 }
@@ -536,7 +689,7 @@ function restartContext() {
   doc = clearOutputs(doc);
   refreshHashes().then(() => {
     renderCells();
-    scheduleSave();
+    markChanged();
     notice("The context was restarted: no output is recorded now.", "info");
   });
 }
@@ -545,6 +698,7 @@ function restartContext() {
 
 function wire() {
   $("nb-run-all").addEventListener("click", runAll);
+  $("nb-save").addEventListener("click", () => saveNow());
   $("nb-cancel").addEventListener("click", cancel);
   $("nb-restart").addEventListener("click", restartContext);
   $("nb-add-code").addEventListener("click", () => addCellOf("code"));
@@ -570,12 +724,18 @@ function wire() {
   });
   $("notebook-title").addEventListener("input", (event) => {
     doc = { ...doc, title: event.target.value.slice(0, LIMITS.maxTitleLength) };
-    scheduleSave();
+    markChanged();
   });
   window.addEventListener("beforeunload", (event) => {
-    if (dirty) {
-      save();
-      if (dirty) event.preventDefault();
+    if (isUnsaved()) {
+      // A last synchronous attempt. The document counts as saved only if this write succeeds.
+      try {
+        localStorage.setItem(DRAFT_KEY, serializeNotebook(doc));
+        save.savedRevision = save.revision;
+      } catch (_) {
+        // Still unsaved: the page asks before it closes.
+      }
+      if (isUnsaved()) event.preventDefault();
     }
   });
 }

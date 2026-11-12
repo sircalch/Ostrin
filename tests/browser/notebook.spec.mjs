@@ -5,17 +5,27 @@ import { writeFileSync } from "node:fs";
 // here was produced by a run in the page; restored outputs are labelled as such.
 
 const INPUT = 'input[type=file][aria-label="Notebook file to import"]';
-const ATTACH = 'input[type=file][aria-label="Data file to attach"]';
+const SAVE_STATE = "#nb-save-state";
 
 async function open(page) {
   await page.goto("./notebook.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
 }
 
+// The less frequent actions live in the File menu; it is opened before they are used.
+async function openFileMenu(page) {
+  const menu = page.locator("details.nb-menu");
+  if (!(await menu.evaluate((node) => node.open))) await menu.locator("summary").click();
+}
+
 async function addCode(page) {
   await page.getByRole("button", { name: "+ Code" }).click();
-  const cells = page.locator(".nb-cell-code");
-  return cells.last().getAttribute("data-cell-id");
+  return page.locator(".nb-cell-code").last().getAttribute("data-cell-id");
+}
+
+async function addText(page) {
+  await page.getByRole("button", { name: "+ Text" }).click();
+  return page.locator(".nb-cell-text").last().getAttribute("data-cell-id");
 }
 
 const cell = (page, id) => page.locator(`[data-cell-id="${id}"]`);
@@ -26,6 +36,11 @@ async function setSource(page, id, text) {
 
 async function runCell(page, id) {
   await cell(page, id).getByRole("button", { name: "Run", exact: true }).click();
+}
+
+// Waits until the document is stored: the state element says so, and the stored text is the current one.
+async function expectSaved(page) {
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "saved", { timeout: 15_000 });
 }
 
 const HELLO = 'fn main() -> Void {\n    print("hello from a cell")\n}\n';
@@ -103,9 +118,10 @@ test("a program that fails to compile shows its diagnostics, and the notebook re
 test("the experimental example runs end to end: a table and a figure from the attached data, then save and recover", async ({ page }) => {
   test.setTimeout(420_000);
   await open(page);
+  await openFileMenu(page);
   await page.locator("#nb-example").selectOption("experimental");
-  await expect(page.locator("#nb-status")).toContainText("Saved in this browser", { timeout: 30_000 });
-  await expect(page.locator(".nb-cell")).toHaveCount(5);
+  await expect(page.locator(".nb-cell")).toHaveCount(5, { timeout: 30_000 });
+  await expectSaved(page);
   await expect(page.locator(".nb-resource")).toContainText("data/calibration.csv");
   await page.getByRole("button", { name: "Run all" }).click();
   await expect(page.locator('[data-cell-id="c2"] .nb-table').first()).toBeVisible({ timeout: 240_000 });
@@ -114,7 +130,7 @@ test("the experimental example runs end to end: a table and a figure from the at
   await expect(page.locator('[data-cell-id="c3"] .nb-figure img')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('[data-cell-id="c4"] .nb-figure img')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('[data-cell-id="c2"] .nb-chip')).toHaveText("current");
-  await expect(page.locator("#nb-status")).toContainText("Unsaved changes");
+  await expectSaved(page);
   await page.waitForFunction(() => localStorage.getItem("ostrin.notebook.v1.draft")?.includes("calibration"), null, { timeout: 15_000 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
@@ -131,7 +147,8 @@ test("export, then import into a clean browser context: the cells and outputs co
   await setSource(page, id, HELLO);
   await runCell(page, id);
   await expect(cell(page, id).locator(".nb-stdout")).toContainText("hello from a cell", { timeout: 120_000 });
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export" }).click()]);
+  await openFileMenu(page);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export…" }).click()]);
   const file = testInfo.outputPath(download.suggestedFilename());
   await download.saveAs(file);
   expect(download.suggestedFilename()).toMatch(/\.ostrin\.notebook\.json$/);
@@ -146,6 +163,7 @@ test("export, then import into a clean browser context: the cells and outputs co
   // Nothing ran on import: no output is marked as computed in this session.
   await expect(other.locator(".nb-meta", { hasText: "computed in this session" })).toHaveCount(0);
   await expect(other.locator("#nb-status")).not.toContainText("Running");
+  await expectSaved(other);
   await clean.close();
 });
 
@@ -175,9 +193,8 @@ test("an open document is kept in the browser, so a reload restores its cells", 
   test.setTimeout(120_000);
   await open(page);
   const id = await addCode(page);
-  await setSource(page, id, "fn main() -> Void {\n    print(\"kept\")\n}\n");
-  await expect(page.locator("#nb-status")).toContainText("Unsaved changes");
-  await page.waitForFunction(() => localStorage.getItem("ostrin.notebook.v1.draft")?.includes("kept"), null, { timeout: 15_000 });
+  await setSource(page, id, 'fn main() -> Void {\n    print("kept")\n}\n');
+  await expectSaved(page);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
   await expect(page.locator(`[data-cell-id="${id}"] textarea.nb-source`)).toHaveValue(/kept/);
@@ -186,6 +203,7 @@ test("an open document is kept in the browser, so a reload restores its cells", 
 test("the physical example runs in the browser; changing a parameter makes the outputs stale and the re-run shows the new values", async ({ page }) => {
   test.setTimeout(420_000);
   await open(page);
+  await openFileMenu(page);
   await page.locator("#nb-example").selectOption("physical");
   await expect(page.locator(".nb-cell")).toHaveCount(6);
   await page.getByRole("button", { name: "Run all" }).click();
@@ -195,7 +213,6 @@ test("the physical example runs in the browser; changing a parameter makes the o
   await expect(page.locator('[data-cell-id="c5"] .nb-figure img')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('[data-cell-id="c2"] .nb-chip')).toHaveText("current");
   const before = await page.locator('[data-cell-id="c2"] .nb-table').first().textContent();
-  // Change the decay constant in the parameters cell: every cell that uses it becomes stale.
   const params = page.locator('[data-cell-id="c1"] textarea.nb-source');
   const text = await params.inputValue();
   await params.fill(text.replace("0.35 / (1 s)", "0.5 / (1 s)"));
@@ -210,6 +227,7 @@ test("the physical example runs in the browser; changing a parameter makes the o
 test("the symbolic example runs in the browser: derivative and substitution, roots and factorization, and a figure", async ({ page }) => {
   test.setTimeout(420_000);
   await open(page);
+  await openFileMenu(page);
   await page.locator("#nb-example").selectOption("symbolic");
   await expect(page.locator(".nb-cell")).toHaveCount(4);
   await page.getByRole("button", { name: "Run all" }).click();
@@ -217,4 +235,134 @@ test("the symbolic example runs in the browser: derivative and substitution, roo
   await expect(page.locator('[data-cell-id="c1"] .nb-table').first()).toBeVisible();
   await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("factorization: (-1 + x)*(-2 + x)", { timeout: 120_000 });
   await expect(page.locator('[data-cell-id="c3"] .nb-figure img')).toBeVisible({ timeout: 120_000 });
+});
+
+// ---------------------------------------------------------------- Markdown in text cells
+
+test("text cells render Markdown, and their links and HTML cannot run anything", async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  const id = await addText(page);
+  await setSource(page, id, "# Heading\n\nA paragraph with **bold**, *soft*, `code` and [a link](https://example.org/x).\n\n- first\n- second\n\n<script>window.__evil = 3</script>\n\n[bad](javascript:alert(1))");
+  await cell(page, id).getByRole("button", { name: /Edit text cell|Read text cell/ }).click();
+  await expect(cell(page, id).locator("h3")).toHaveText("Heading");
+  await expect(cell(page, id).locator("strong")).toHaveText("bold");
+  await expect(cell(page, id).locator("ul li")).toHaveCount(2);
+  await expect(cell(page, id).locator('a[href="https://example.org/x"]')).toHaveText("a link");
+  await expect(cell(page, id).locator("a[href^='javascript']")).toHaveCount(0);
+  await expect(cell(page, id).getByText("(link not allowed)")).toBeVisible();
+  await expect(cell(page, id).locator("script")).toHaveCount(0);
+  await expect(cell(page, id).getByText("<script>window.__evil = 3</script>")).toBeVisible();
+  expect(await page.evaluate(() => window.__evil ?? null)).toBeNull();
+});
+
+test("the Edit and Read toggle switches between the original text and the rendered view", async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  const id = await addText(page);
+  await setSource(page, id, "## Notes\n\nSome *text*.");
+  await cell(page, id).getByRole("button", { name: /Read text cell/ }).click();
+  await expect(cell(page, id).locator(".nb-md h4")).toHaveText("Notes");
+  await cell(page, id).getByRole("button", { name: /Edit text cell/ }).click();
+  await expect(cell(page, id).locator("textarea.nb-source")).toHaveValue(/## Notes/);
+  await expect(cell(page, id).locator(".nb-md")).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------- persistence states
+
+test("the save state moves through unsaved, saving and saved, and an edit during a save is not lost", async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  const id = await addCode(page);
+  await setSource(page, id, 'fn main() -> Void {\n    print("one")\n}\n');
+  await expect(page.locator(SAVE_STATE)).not.toHaveAttribute("data-state", "error");
+  for (const word of ["two", "three", "four"]) {
+    await setSource(page, id, `fn main() -> Void {\n    print("${word}")\n}\n`);
+  }
+  await expectSaved(page);
+  const stored = await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft"));
+  expect(stored).toContain('print(\\"four\\")');
+  expect(stored).not.toContain('print(\\"one\\")');
+});
+
+test("the Save button stores the document now and reports it saved", async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  const id = await addCode(page);
+  await setSource(page, id, 'fn main() -> Void {\n    print("now")\n}\n');
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectSaved(page);
+  const stored = await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft"));
+  expect(stored).toContain('print(\\"now\\")');
+});
+
+test("when storage fails, the page says the changes are not saved, keeps the document open, and recovers when storage works again", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (window.__failStorage && key === "ostrin.notebook.v1.draft") throw new DOMException("storage is full for this test", "QuotaExceededError");
+      return real.call(this, key, value);
+    };
+  });
+  await open(page);
+  await page.evaluate(() => {
+    window.__failStorage = true;
+  });
+  const id = await addCode(page);
+  await setSource(page, id, 'fn main() -> Void {\n    print("in memory")\n}\n');
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "error", { timeout: 15_000 });
+  await expect(page.locator(SAVE_STATE)).toHaveText("Not saved");
+  await expect(page.locator("#nb-notice")).toContainText("they are not stored in this browser");
+  // The document is still open, with its code, and nothing claims it is saved.
+  await expect(cell(page, id).locator("textarea.nb-source")).toHaveValue(/in memory/);
+  await expect(page.locator(SAVE_STATE)).not.toHaveAttribute("data-state", "saved");
+  await page.evaluate(() => {
+    window.__failStorage = false;
+  });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectSaved(page);
+  await expect(page.locator("#nb-notice")).toHaveText("");
+});
+
+test("a pending autosave is not reported as an error", async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  const id = await addCode(page);
+  await setSource(page, id, 'fn main() -> Void {\n    print("pending")\n}\n');
+  const state = await page.locator(SAVE_STATE).getAttribute("data-state");
+  expect(["unsaved", "saving", "saved"]).toContain(state);
+  await expectSaved(page);
+  await expect(page.locator("#nb-notice")).toHaveText("");
+});
+
+test("the physical example keeps working after a reload, and running a cell after a reload does not change its stored text", async ({ page }) => {
+  test.setTimeout(420_000);
+  await open(page);
+  await openFileMenu(page);
+  await page.locator("#nb-example").selectOption("physical");
+  await expect(page.locator(".nb-cell")).toHaveCount(6);
+  await expectSaved(page);
+  const before = await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft"));
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
+  await expect(page.locator(".nb-cell")).toHaveCount(6);
+  const after = await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft"));
+  expect(after).toEqual(before);
+  await page.getByRole("button", { name: "Run all" }).click();
+  await expect(page.locator('[data-cell-id="c2"] .nb-table').first()).toBeVisible({ timeout: 240_000 });
+  await expect(page.locator('[data-cell-id="c2"] .nb-meta')).toContainText("computed in this session");
+});
+
+test("the toolbar keeps every action reachable at a narrow width, and its states are correct", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 360, height: 780 });
+  await open(page);
+  await expect(page.getByRole("button", { name: "Run all" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await openFileMenu(page);
+  await expect(page.getByRole("button", { name: "Export…" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import…" })).toBeVisible();
+  await expect(page.locator("#nb-example")).toBeVisible();
 });
