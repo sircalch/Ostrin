@@ -679,6 +679,11 @@ fn diff_ids(s: Store, id: Int, v: Int) -> Int {
     if name == "ln" {
         return mul_ids(s, [inner_d, pow_ids(s, arg, int_id(s, 0 - 1))])
     }
+    if name == "abs" {
+        // d/dx abs(u) = sign(u) du/dx. sign is undefined at 0, where abs has a corner: the expression keeps that point
+        // undefined, and evaluating it there fails instead of returning a value.
+        return mul_ids(s, [call_id(s, "sign", arg), inner_d])
+    }
     note(s, "no derivative rule for function " + name)
     int_id(s, 0)
 }
@@ -817,6 +822,15 @@ fn eval_ids(s: Store, id: Int, names: List<String>, values: List<Float>) -> Resu
     x = parts[0]
     if name == "abs" {
         return Ok(abs(x))
+    }
+    if name == "sign" {
+        if x == 0.0 {
+            return Err("sign is undefined at 0: the derivative of abs has a corner there and no value")
+        }
+        if x > 0.0 {
+            return Ok(1.0)
+        }
+        return Ok(0.0 - 1.0)
     }
     if name == "sin" {
         return Ok(sin(x))
@@ -2092,10 +2106,20 @@ pub fn context() -> Context {
 /// The kinds of one symbol, closed under the implications between kinds: positive implies nonzero, nonnegative and
 /// real; negative implies nonzero, nonpositive and real; nonnegative together with nonpositive implies zero.
 fn closure_of(c: Context, name: String) -> List<String> {
-    mut kinds: List<String> = []
+    mut start: List<String> = []
     for f in c.facts {
-        if f.name == name and not text_in(kinds, f.kind) {
-            kinds.push(f.kind)
+        if f.name == name {
+            start.push(f.kind)
+        }
+    }
+    closure_of_kinds(start)
+}
+
+fn closure_of_kinds(start: List<String>) -> List<String> {
+    mut kinds: List<String> = []
+    for k in start {
+        if not text_in(kinds, k) {
+            kinds.push(k)
         }
     }
     mut changed = true
@@ -2123,6 +2147,55 @@ fn closure_of(c: Context, name: String) -> List<String> {
         }
     }
     kinds
+}
+
+/// The kinds given to a symbol node by the older symbol(s, name, assumption) API: bit 1 is positive, bit 2 is nonzero.
+/// Bit 4 (integer) is not an ordering kind and is not used here.
+fn legacy_kinds(s: Store, id: Int) -> List<String> {
+    mut kinds: List<String> = []
+    if s.nums[id] % 2 == 1 {
+        kinds.push("positive")
+    }
+    if s.nums[id] % 4 >= 2 {
+        kinds.push("nonzero")
+    }
+    kinds
+}
+
+/// The kinds of a symbol node: the context's facts for its name together with the node's built-in assumption, closed
+/// under the implications. A context and a built-in assumption are combined, never one overriding the other.
+fn node_kinds(c: Context, s: Store, id: Int) -> List<String> {
+    mut start = closure_of(c, s.names[id])
+    for k in legacy_kinds(s, id) {
+        start.push(k)
+    }
+    closure_of_kinds(start)
+}
+
+/// The conflict between the built-in assumption and the context, as text; empty when they agree.
+fn node_conflict(c: Context, s: Store, id: Int) -> String {
+    conflict_in(node_kinds(c, s, id))
+}
+
+/// "true", "false" or "unknown" for a kind of a symbol node, combining the context and the built-in assumption.
+fn holds_node(c: Context, s: Store, id: Int, kind: String) -> String {
+    kinds = node_kinds(c, s, id)
+    if conflict_in(kinds) != "" {
+        return "contradictory"
+    }
+    if kind == "real" {
+        if text_in(kinds, "complex") {
+            return "false"
+        }
+        return "true"
+    }
+    if text_in(kinds, kind) {
+        return "true"
+    }
+    if refuted_by(kinds, kind) {
+        return "false"
+    }
+    "unknown"
 }
 
 /// Pairs of kinds that cannot hold together for one symbol. A complex symbol has no ordering, so it conflicts with
@@ -2213,10 +2286,14 @@ pub fn assume_interval(c: Context, name: String, lower: Float, lower_closed: Boo
     Ok(next)
 }
 
-/// "true" when the context proves the kind for the symbol, "false" when it refutes it, "unknown" otherwise. A symbol is
-/// real unless the context says it is complex, so "real" holds by default.
+/// "true" when the context proves the kind for the symbol, "false" when it refutes it, "unknown" otherwise, and
+/// "contradictory" when the facts for the symbol are inconsistent (then nothing is proved). A symbol is real unless the
+/// context says it is complex, so "real" holds by default.
 pub fn holds(c: Context, name: String, kind: String) -> String {
     kinds = closure_of(c, name)
+    if conflict_in(kinds) != "" {
+        return "contradictory"
+    }
     if kind == "real" {
         if text_in(kinds, "complex") {
             return "false"
@@ -2232,6 +2309,21 @@ pub fn holds(c: Context, name: String, kind: String) -> String {
     "unknown"
 }
 
+/// "true", "false" or "unknown" for a kind of an expression that is a symbol: the context's facts for its name, together
+/// with the symbol's built-in assumption from the older API. A contradiction between them is reported as "false" for
+/// the kinds it excludes and by sign_of as "contradictory". Non-symbols are "unknown" for every kind except real.
+pub fn knows(c: Context, a: Expr, kind: String) -> String {
+    if a.store.kinds[a.id] != 1 {
+        if kind == "real" {
+            return "unknown"
+        }
+        return "unknown"
+    }
+    holds_node(c, a.store, a.id, kind)
+}
+
+/// Name-based query: uses only the context's facts for the name. Use knows for an expression, which also includes the
+/// built-in assumption of the symbol.
 /// A readable list of the facts of a context, in the order they were assumed.
 pub fn describe(c: Context) -> String {
     if c.facts.length() == 0 {
@@ -2271,11 +2363,10 @@ fn sign_id(c: Context, s: Store, id: Int) -> String {
         return "zero"
     }
     if kind == 1 {
-        name = s.names[id]
-        if known_positive(s, id) {
-            return "positive"
+        if node_conflict(c, s, id) != "" {
+            return "contradictory"
         }
-        kinds = closure_of(c, name)
+        kinds = node_kinds(c, s, id)
         if text_in(kinds, "positive") {
             return "positive"
         }
@@ -2291,7 +2382,7 @@ fn sign_id(c: Context, s: Store, id: Int) -> String {
         if text_in(kinds, "nonpositive") {
             return "nonpositive"
         }
-        if text_in(kinds, "nonzero") or known_nonzero(s, id) {
+        if text_in(kinds, "nonzero") {
             return "nonzero"
         }
         return "unknown"
@@ -2422,10 +2513,16 @@ pub fn sqrt_of_square(c: Context, u: Expr) -> Outcome {
         return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the rule is stated for a symbol; the argument is not a symbol" }
     }
     name = s.names[u.id]
-    if holds(c, name, "real") != "true" {
+    if node_conflict(c, s, u.id) != "" {
+        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the built-in assumption of " + name + " contradicts the context: " + node_conflict(c, s, u.id) }
+    }
+    if holds_node(c, s, u.id, "real") != "true" {
         return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "sqrt(x^2) = abs(x) holds for real x only, and " + name + " is not known to be real" }
     }
     sign = sign_of(c, u)
+    if sign == "contradictory" {
+        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the sign of " + name + " is contradictory in this context" }
+    }
     if sign == "positive" or sign == "nonnegative" or sign == "zero" {
         return Outcome { rule: "sqrt-of-square", original: original, transformed: name, value: u, status: "applied", required: [name + " >= 0"], established: [name + " >= 0"], unknown: [], reason: "the context shows " + name + " >= 0, so sqrt(x^2) = x" }
     }
@@ -2513,7 +2610,7 @@ fn cancel_linear(c: Context, s: Store, v: Expr, name: String, original: String, 
     condition = name + " != " + rtext
     mut unknown: List<String> = []
     mut established: List<String> = []
-    if rat_is_zero(r) and holds(c, name, "nonzero") == "true" {
+    if rat_is_zero(r) and holds_node(c, s, v.id, "nonzero") == "true" {
         established.push(condition)
     } else if r.n < 0 and sign_of(c, v) == "positive" {
         established.push(condition)
@@ -2535,7 +2632,10 @@ pub fn simplify_self_quotient(c: Context, x: Expr) -> Outcome {
     original_expr = div(x, x)
     original = name + " / " + name
     condition = name + " != 0"
-    verdict = holds(c, name, "nonzero")
+    if node_conflict(c, s, x.id) != "" {
+        return Outcome { rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition], established: [], unknown: [], reason: "the built-in assumption of " + name + " contradicts the context" }
+    }
+    verdict = holds_node(c, s, x.id, "nonzero")
     if verdict == "false" {
         return Outcome { rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition], established: [], unknown: [], reason: name + " is zero in this context, so " + original + " is undefined" }
     }
@@ -2586,4 +2686,10 @@ pub fn expand_log_product(c: Context, a: Expr, b: Expr) -> Outcome {
         return Outcome { rule: "log-of-product", original: original, transformed: show(wrap(s, split_id)), value: wrap(s, split_id), status: "applied", required: required, established: established, unknown: unknown, reason: "both factors are positive in this context, so ln(a b) = ln(a) + ln(b)" }
     }
     Outcome { rule: "log-of-product", original: original, transformed: original, value: wrap(s, original_id), status: "refused", required: required, established: established, unknown: unknown, reason: "ln(a b) = ln(a) + ln(b) needs a > 0 and b > 0, and the context does not establish both, so the rule is not applied" }
+}
+
+/// True only when the result holds with no condition: the rule was applied and required nothing. A conditional result
+/// is not an identity of the expression; it is valid only where its required conditions hold.
+pub fn is_identity(o: Outcome) -> Bool {
+    o.status == "applied" and o.required.length() == 0
 }

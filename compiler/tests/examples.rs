@@ -21062,9 +21062,9 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        // The IR count grows with the module (141 after the explicit assumption contexts and conditional rules were added); the guarded property
+        // The IR count grows with the module (148 after the abs derivative, sign and built-in assumption checks were added); the guarded property
         // is that no node falls back to the slower HIR or AST lowering.
-        symbolic_source.contains("ir=141")
+        symbolic_source.contains("ir=148")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -22141,6 +22141,72 @@ fn std_symbolic_conditional_matches_interpreter_and_native_without_leaks() {
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     assert!(report_text.contains("divergences: 0"), "{report_text}");
     let exe = temp_artifact("symbolic_conditional_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_assumption_audit_matches_interpreter_and_native_without_leaks() {
+    // Audit: a built-in assumption is combined with the context and a contradiction is refused; contexts are values; a conditional result is not an identity.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_assumption_audit.ostrin"),
+        "A. knows positive under w negative: contradictory\nA. sqrt(w^2) under the contradiction: refused: the built-in assumption of w contradicts the context: positive and negative\nB. sign of x: positive under one context, negative under another\nC. identity for real x: true; identity under x >= 0: false\nall audit checks passed\n"
+    );
+    let path = example_path("symbolic_assumption_audit.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_audit_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_abs_derivative_matches_interpreter_and_native_without_leaks() {
+    // The derivative of abs is sign(x) away from 0; at 0 it has no value and the numeric check refuses a grid through 0.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_abs_derivative.ostrin"),
+        "d abs(x)/dx = sign(x)\nat 0: sign is undefined at 0: the derivative of abs has a corner there and no value\nabs(x) against central differences away from 0: 0 mismatched points\na grid through 0 is refused: at 0: sign is undefined at 0: the derivative of abs has a corner there and no value\nd abs(2x)/dx at 1: 2\nall abs derivative checks passed\n"
+    );
+    let path = example_path("symbolic_abs_derivative.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_abs_leak.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(
         compile.status.success(),

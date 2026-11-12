@@ -1,0 +1,122 @@
+// The derivative of abs: sign(x) times the derivative of the argument, valid away from the corner at 0.
+//
+// abs has a corner at 0: its derivative jumps from -1 to 1 there and has no value. The symbolic derivative keeps that
+// point undefined: evaluating it at 0 is an error, and the numeric bridge refuses a grid that contains 0 rather than
+// reporting agreement. Away from 0 the symbolic derivative is checked against central differences.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    mut failures = 0
+
+    d = symbolic.diff(symbolic.call("abs", x), x)
+    match d {
+        Ok(dx) => {
+            print("d abs(x)/dx = " + symbolic.show(dx))
+            if symbolic.show(dx) != "sign(x)" {
+                print("FAIL the derivative of abs(x) must be sign(x)")
+                failures = failures + 1
+            }
+            // Values away from 0: +1 on the right, -1 on the left.
+            match symbolic.eval(dx, ["x"], [2.0]) {
+                Ok(v) => {
+                    if v != 1.0 {
+                        print("FAIL sign at 2")
+                        failures = failures + 1
+                    }
+                },
+                Err(message) => {
+                    print("FAIL " + message)
+                    failures = failures + 1
+                },
+            }
+            // At 0 there is no value: the evaluation fails and says why.
+            match symbolic.eval(dx, ["x"], [0.0]) {
+                Ok(v) => {
+                    print("FAIL the derivative of abs returned " + v.to_string() + " at 0")
+                    failures = failures + 1
+                },
+                Err(message) => {
+                    print("at 0: " + message)
+                },
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+
+    // Central differences of abs(x) on a grid away from 0 agree with sign(x), up to the rounding of the difference.
+    off_zero = linspace(0.0 - 2.0, 2.0, 41)
+    mut away = zeros([41])
+    for i in 0 until 41 {
+        mut v = off_zero[i]
+        if v > -0.01 and v < 0.01 {
+            v = 0.5
+        }
+        away.set(i, v)
+    }
+    match d {
+        Ok(dx) => {
+            match symbolic.derivative_mismatches(symbolic.call("abs", x), x, away, 0.000001, 0.000001) {
+                Ok(points) => {
+                    print("abs(x) against central differences away from 0: " + points.length().to_string() + " mismatched points")
+                    if points.length() != 0 {
+                        print("FAIL the derivative of abs disagrees with central differences away from 0")
+                        failures = failures + 1
+                    }
+                },
+                Err(message) => {
+                    print("FAIL " + message)
+                    failures = failures + 1
+                },
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+
+    // A grid that contains 0 is refused by the numeric check: the corner is not evidence of agreement.
+    match symbolic.derivative_mismatches(symbolic.call("abs", x), x, off_zero, 0.000001, 0.000001) {
+        Ok(points) => {
+            print("FAIL a grid through the corner was accepted with " + points.length().to_string() + " mismatches")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("a grid through 0 is refused: " + message)
+        },
+    }
+
+    // Chain rule: d/dx abs(2x) = 2 sign(2x).
+    match symbolic.diff(symbolic.call("abs", symbolic.mul(symbolic.number(s, 2), x)), x) {
+        Ok(dy) => {
+            match symbolic.eval(dy, ["x"], [1.0]) {
+                Ok(v) => {
+                    print("d abs(2x)/dx at 1: " + v.to_string())
+                    if v != 2.0 {
+                        print("FAIL the chain rule for abs")
+                        failures = failures + 1
+                    }
+                },
+                Err(message) => {
+                    print("FAIL " + message)
+                    failures = failures + 1
+                },
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+
+    if failures == 0 {
+        print("all abs derivative checks passed")
+    } else {
+        print("abs derivative checks failed: " + failures.to_string())
+    }
+}
