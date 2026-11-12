@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Ostrin Scientific Notebook: code, text, tables and figures computed by the real Ostrin compiler in your browser.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/notebook.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Scientific Notebook">
+    <meta property="og:description" content="Write Ostrin cells, run them with the real compiler, and keep the document with its outputs.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/notebook.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ostrin Scientific Notebook">
+    <meta name="twitter:description" content="Write Ostrin cells, run them with the real compiler, and keep the document with its outputs.">
+    <meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="playground.css">
+    <link rel="stylesheet" href="notebook.css">
+    <script src="site-data.js" defer></script>
+    <script src="site.js" defer></script>
+    <script type="module" src="notebook.js"></script>
+    <title>Ostrin Scientific Notebook</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo-72.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version"></span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="viz.html">Viz</a><a href="playground.html">Playground</a><a href="notebook.html" aria-current="page">Notebook</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav></div></header>
+    <main id="main-content" tabindex="-1">
+      <section class="page-hero shell"><p class="eyebrow">Scientific notebook</p><h1>Compute, read, <em>keep.</em></h1><p class="lede">Each code cell is compiled and run by the real Ostrin compiler in this page. Nothing runs when a document opens; outputs from an earlier edit are marked stale.</p><div class="page-meta"><span>ostrin.notebook/v1</span><span>cells run in isolation</span><span>attached data files</span></div></section>
+      <section class="shell notebook" aria-label="Notebook">
+        <div class="notebook-bar" role="toolbar" aria-label="Notebook actions">
+          <label class="notebook-title-label" for="notebook-title">Title</label>
+          <input id="notebook-title" class="notebook-title" type="text" maxlength="200" aria-label="Notebook title">
+          <span class="spacer"></span>
+          <button id="nb-run-all" class="button-quiet" type="button">Run all</button>
+          <button id="nb-cancel" class="button-quiet" type="button" disabled>Cancel</button>
+          <button id="nb-restart" class="button-quiet" type="button">Restart context</button>
+          <button id="nb-add-code" class="button-quiet" type="button">+ Code</button>
+          <button id="nb-add-text" class="button-quiet" type="button">+ Text</button>
+          <button id="nb-attach" class="button-quiet" type="button" title="Attach a data file under data/ to this notebook">Attach data</button>
+          <button id="nb-export" class="button-quiet" type="button">Export</button>
+          <button id="nb-import" class="button-quiet" type="button">Import</button>
+          <button id="nb-new" class="button-quiet" type="button">New</button>
+          <label class="notebook-example-label" for="nb-example">Example</label>
+          <select id="nb-example" aria-label="Load an example notebook"><option value="">Choose an example…</option><option value="experimental">A · Experimental data analysis</option><option value="physical">B · Physical modelling</option><option value="symbolic">C · Symbolic mathematics</option></select>
+          <input id="nb-import-file" type="file" accept=".json,application/json" hidden aria-label="Notebook file to import">
+          <input id="nb-attach-file" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,application/json" hidden aria-label="Data file to attach">
+        </div>
+        <p id="nb-status" class="notebook-status" role="status" aria-live="polite">Loading…</p>
+        <p id="nb-notice" class="notebook-notice" role="alert" hidden></p>
+        <div id="nb-cells" class="notebook-cells" aria-label="Cells"></div>
+        <aside id="nb-resources" class="notebook-resources" aria-label="Attached data"></aside>
+        <p class="notebook-note">Run executes the real compiler in a Worker. A cell is compiled alone with the cells it lists as dependencies; values never pass between cells except through imported definitions. Files a program writes are discarded after the run.</p>
+      </section>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo-72.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="language.html">Language</a><a href="ecosystem.html">Ecosystem</a><a href="showcase.html">Showcase</a><a href="community.html">Community</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

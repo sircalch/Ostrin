@@ -1,0 +1,56 @@
+{
+  "format": "ostrin.notebook",
+  "version": 1,
+  "id": "physical",
+  "title": "B · Physical modelling",
+  "created": "2026-11-11T09:00:00.000Z",
+  "updated": "2026-11-11T09:00:00.000Z",
+  "cells": [
+    {
+      "id": "t1",
+      "kind": "text",
+      "source": "# Physical modelling\n\nTwo dimensional models solved with the real RK4 solver of std.numeric and compared with their analytic solutions.\n\n- Decay of a mass: dm/dt = -k m, with m0 = 2 kg and k = 0.35 / s.\n- A damped oscillator: x'' + 2 zeta w x' + w^2 x = 0, with w = 2 / s, zeta = 0.1, x0 = 0.5 m, v0 = 0 m/s.\n\nEvery parameter is defined once, in c1, with its unit. To change a parameter, edit c1 and run the cells again: the\noutputs that depended on it become stale until they are run. The unit of each parameter is checked by the compiler.",
+      "deps": []
+    },
+    {
+      "id": "c1",
+      "kind": "code",
+      "source": "// The parameters of the model, each with its unit. The compiler checks every use against the unit.\npub fn initial_mass() -> Quantity<Mass> {\n    2.0 kg\n}\n\npub fn decay_rate() -> Quantity<Frequency> {\n    0.35 / (1 s)\n}\n\npub fn horizon() -> Quantity<Time> {\n    12.0 s\n}\n\npub fn oscillator_frequency() -> Quantity<Frequency> {\n    2.0 / (1 s)\n}\n\npub fn damping_ratio() -> Float {\n    0.1\n}\n\npub fn initial_position() -> Quantity<Length> {\n    0.5 m\n}\n\npub fn initial_velocity() -> Quantity<Length / Time> {\n    0.0 m / (1 s)\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c2",
+      "kind": "code",
+      "source": "import std.numeric\nimport c1\n\nfn main() -> Void {\n    m0 = c1.initial_mass() / (1 kg)\n    rate = (c1.decay_rate() * (1 s)).value()\n    t_end = c1.horizon() / (1 s)\n    sol = numeric.rk4(fn(t, y) { array([0.0 - rate * y[0]]) }, array([m0]), 0.0, t_end, 1200)\n    mass = sol.component(0)\n    times = sol.t\n    print(\"OSTRIN-TABLE Decay of the mass: RK4 against the analytic solution\")\n    print(\"time_s,mass_kg,analytic_mass_kg,error_kg\")\n    mut worst = 0.0\n    for i in 0 until times.length() {\n        exact = m0 * exp(0.0 - rate * times[i])\n        error = abs(mass[i] - exact)\n        if error > worst {\n            worst = error\n        }\n        if i % 100 == 0 {\n            print(times[i].to_string() + \",\" + mass[i].to_string() + \",\" + exact.to_string() + \",\" + error.to_string())\n        }\n    }\n    print(\"OSTRIN-TABLE-END\")\n    print(\"largest error over the \" + times.length().to_string() + \" nodes: \" + worst.to_string() + \" kg\")\n}\n",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c3",
+      "kind": "code",
+      "source": "import std.numeric\nimport std.viz\nimport c1\n\nfn main() -> Void {\n    m0 = c1.initial_mass() / (1 kg)\n    rate = (c1.decay_rate() * (1 s)).value()\n    t_end = c1.horizon() / (1 s)\n    sol = numeric.rk4(fn(t, y) { array([0.0 - rate * y[0]]) }, array([m0]), 0.0, t_end, 1200)\n    times = sol.t\n    mut exact = zeros([times.length()])\n    for i in 0 until times.length() {\n        exact.set(i, m0 * exp(0.0 - rate * times[i]))\n    }\n    fig = viz.figure(\"First-order decay of a mass\")\n        .describe(\"m(t) = m0 exp(-k t) with the parameters of c1, RK4 with 1200 steps\")\n        .labels(\"time / s\", \"mass / kg\")\n        .line(times, sol.component(0), label: \"RK4\")\n        .line(times, exact, label: \"analytic\", dash: \"6 4\")\n    print(fig.svg())\n}\n",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c4",
+      "kind": "code",
+      "source": "import std.numeric\nimport c1\n\nfn main() -> Void {\n    w = (c1.oscillator_frequency() * (1 s)).value()\n    zeta = c1.damping_ratio()\n    x0 = c1.initial_position() / (1 m)\n    v0 = c1.initial_velocity() / (1 m / (1 s))\n    t_end = c1.horizon() / (1 s)\n    wd = w * sqrt(1.0 - zeta * zeta)\n    sol = numeric.rk4(fn(t, y) { array([y[1], 0.0 - 2.0 * zeta * w * y[1] - w * w * y[0]]) }, array([x0, v0]), 0.0, t_end, 2400)\n    position = sol.component(0)\n    times = sol.t\n    print(\"OSTRIN-TABLE Damped oscillator: RK4 against the analytic solution\")\n    print(\"time_s,position_m,analytic_position_m,error_m\")\n    mut worst = 0.0\n    for i in 0 until times.length() {\n        tt = times[i]\n        exact = exp(0.0 - zeta * w * tt) * (x0 * cos(wd * tt) + ((v0 + zeta * w * x0) / wd) * sin(wd * tt))\n        error = abs(position[i] - exact)\n        if error > worst {\n            worst = error\n        }\n        if i % 200 == 0 {\n            print(tt.to_string() + \",\" + position[i].to_string() + \",\" + exact.to_string() + \",\" + error.to_string())\n        }\n    }\n    print(\"OSTRIN-TABLE-END\")\n    print(\"largest error over the \" + times.length().to_string() + \" nodes: \" + worst.to_string() + \" m\")\n}\n",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c5",
+      "kind": "code",
+      "source": "import std.numeric\nimport std.viz\nimport c1\n\nfn main() -> Void {\n    w = (c1.oscillator_frequency() * (1 s)).value()\n    zeta = c1.damping_ratio()\n    x0 = c1.initial_position() / (1 m)\n    v0 = c1.initial_velocity() / (1 m / (1 s))\n    t_end = c1.horizon() / (1 s)\n    wd = w * sqrt(1.0 - zeta * zeta)\n    sol = numeric.rk4(fn(t, y) { array([y[1], 0.0 - 2.0 * zeta * w * y[1] - w * w * y[0]]) }, array([x0, v0]), 0.0, t_end, 2400)\n    times = sol.t\n    mut exact = zeros([times.length()])\n    for i in 0 until times.length() {\n        tt = times[i]\n        exact.set(i, exp(0.0 - zeta * w * tt) * (x0 * cos(wd * tt) + ((v0 + zeta * w * x0) / wd) * sin(wd * tt)))\n    }\n    fig = viz.figure(\"Damped oscillator\")\n        .describe(\"x'' + 2 zeta w x' + w^2 x = 0 with the parameters of c1\")\n        .labels(\"time / s\", \"position / m\")\n        .line(times, sol.component(0), label: \"RK4\")\n        .line(times, exact, label: \"analytic\", dash: \"6 4\")\n        .hline(0.0)\n    print(fig.svg())\n}\n",
+      "deps": [
+        "c1"
+      ]
+    }
+  ],
+  "resources": [],
+  "runs": {}
+}
