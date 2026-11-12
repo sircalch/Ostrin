@@ -131,19 +131,15 @@ function saveNow() {
 
 async function writeDocument() {
   if (!isUnsaved() && save.error === null) return;
-  const revision = save.revision;
-  let text;
-  try {
-    text = serializeNotebook(doc);
-  } catch (error) {
-    failSave(error);
-    return;
-  }
   save.writing = true;
   renderSaveState();
   // Storage writes are asynchronous; yielding here keeps the "saving" state observable and lets edits queue behind it.
   await new Promise((resolve) => setTimeout(resolve, 0));
   try {
+    // The document is read after the yield: a change made meanwhile is stored by this write, and a write never stores
+    // text older than the revision it records. Writing a captured earlier text would overwrite the newer change.
+    const revision = save.revision;
+    const text = serializeNotebook(doc);
     localStorage.setItem(DRAFT_KEY, text);
     save.savedRevision = Math.max(save.savedRevision, revision);
     if (save.error !== null) {
@@ -728,13 +724,15 @@ function wire() {
   });
   window.addEventListener("beforeunload", (event) => {
     if (isUnsaved()) {
-      // A last synchronous attempt. The document counts as saved only if this write succeeds.
+      // Best effort only: a synchronous localStorage write on unload. It is not a recovery guarantee; the page
+      // asks before closing while the document is unsaved. The document counts as saved only if this write succeeds.
       try {
         localStorage.setItem(DRAFT_KEY, serializeNotebook(doc));
-        save.savedRevision = save.revision;
+        save.savedRevision = Math.max(save.savedRevision, save.revision);
       } catch (_) {
         // Still unsaved: the page asks before it closes.
       }
+      renderSaveState();
       if (isUnsaved()) event.preventDefault();
     }
   });

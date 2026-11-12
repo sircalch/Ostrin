@@ -366,3 +366,28 @@ test("the toolbar keeps every action reachable at a narrow width, and its states
   await expect(page.getByRole("button", { name: "Import…" })).toBeVisible();
   await expect(page.locator("#nb-example")).toBeVisible();
 });
+
+test("a write already in progress cannot overwrite a newer change made during it, even when the unload save runs", async ({ page }) => {
+  test.setTimeout(60_000);
+  await open(page);
+  // In one task: a Save starts a write that captures the title "first" and yields; then a newer title is typed and the
+  // page's unload save runs before the yielded write resumes.
+  await page.evaluate(async () => {
+    const title = document.getElementById("notebook-title");
+    title.value = "first";
+    title.dispatchEvent(new Event("input"));
+    document.getElementById("nb-save").click();
+    // The write starts after a microtask: let it capture "first" and reach its yield.
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    title.value = "second";
+    title.dispatchEvent(new Event("input"));
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+  });
+  await page.waitForTimeout(1_000);
+  const stored = JSON.parse(await page.evaluate(() => localStorage.getItem("ostrin.notebook.v1.draft")));
+  expect(stored.title).toBe("second");
+  await expectSaved(page);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
+  await expect(page.locator("#notebook-title")).toHaveValue("second");
+});
