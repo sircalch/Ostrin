@@ -1,0 +1,1356 @@
+{
+  "generated": "2026-11-12T13:37:23.780Z",
+  "repetitions": 7,
+  "interpreterRepetitions": 3,
+  "hardware": {
+    "os": "win32 10.0.26200 x64",
+    "cpuModel": "AMD Ryzen 7 5700X 8-Core Processor             ",
+    "logicalCores": 16,
+    "memoryGiB": 32,
+    "physicalCores": 8
+  },
+  "versions": {
+    "node": "v24.19.0",
+    "ostrinc": "ostrinc 0.2.0",
+    "python": "Python 3.12.10",
+    "julia": "julia version 1.13.3"
+  },
+  "cells": [
+    {
+      "language": "Ostrin native",
+      "kernel": "simpson",
+      "compile": {
+        "n": 7,
+        "median": 3921.6895,
+        "min": 1868.563,
+        "max": 12525.7042,
+        "mad": 1807.3087
+      },
+      "correct": true,
+      "values": [
+        1.999999999999995
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 281.0021,
+          "min": 273.895,
+          "max": 312.9866,
+          "mad": 7.107100000000003
+        },
+        "samples": [
+          281,
+          290.1,
+          313,
+          274.5,
+          280.7,
+          303.1,
+          273.9
+        ]
+      },
+      "init": {
+        "label": "ostrin native init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 20.7816,
+          "min": 15.6922,
+          "max": 23.0498,
+          "mad": 2.2682
+        },
+        "samples": [
+          22,
+          20.8,
+          23,
+          22.9,
+          15.8,
+          16,
+          15.7
+        ],
+        "outputs": [
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin native",
+      "kernel": "bisect",
+      "compile": {
+        "n": 7,
+        "median": 1752.7434,
+        "min": 1640.4934,
+        "max": 3964.099,
+        "mad": 112.25
+      },
+      "correct": true,
+      "values": [
+        2.094551481542311
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 47.3036,
+          "min": 46.2639,
+          "max": 48.784,
+          "mad": 0.7413999999999987
+        },
+        "samples": [
+          48.1,
+          46.8,
+          46.8,
+          48.8,
+          47.3,
+          46.3,
+          48
+        ]
+      },
+      "init": {
+        "label": "ostrin native init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 20.7816,
+          "min": 15.6922,
+          "max": 23.0498,
+          "mad": 2.2682
+        },
+        "samples": [
+          22,
+          20.8,
+          23,
+          22.9,
+          15.8,
+          16,
+          15.7
+        ],
+        "outputs": [
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin native",
+      "kernel": "matmul",
+      "compile": {
+        "n": 7,
+        "median": 435.3006,
+        "min": 408.5021,
+        "max": 462.5822,
+        "mad": 6.717099999999959
+      },
+      "correct": true,
+      "values": [
+        591176,
+        177353400
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 44.6384,
+          "min": 41.7264,
+          "max": 49.1772,
+          "mad": 1.406099999999995
+        },
+        "samples": [
+          49.2,
+          41.7,
+          45.3,
+          43.2,
+          44.6,
+          44,
+          46.4
+        ]
+      },
+      "init": {
+        "label": "ostrin native init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 20.7816,
+          "min": 15.6922,
+          "max": 23.0498,
+          "mad": 2.2682
+        },
+        "samples": [
+          22,
+          20.8,
+          23,
+          22.9,
+          15.8,
+          16,
+          15.7
+        ],
+        "outputs": [
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin native",
+      "kernel": "regression",
+      "compile": {
+        "n": 7,
+        "median": 357.8627,
+        "min": 349.5824,
+        "max": 365.7742,
+        "mad": 7.863799999999969
+      },
+      "correct": true,
+      "values": [
+        1.0000000000001408,
+        2.000000000000003,
+        -3.0000000000003624
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 19.7254,
+          "min": 18.8261,
+          "max": 20.2077,
+          "mad": 0.22269999999999968
+        },
+        "samples": [
+          19.8,
+          19.9,
+          19.5,
+          19.7,
+          20.2,
+          18.8,
+          19.5
+        ]
+      },
+      "init": {
+        "label": "ostrin native init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 20.7816,
+          "min": 15.6922,
+          "max": 23.0498,
+          "mad": 2.2682
+        },
+        "samples": [
+          22,
+          20.8,
+          23,
+          22.9,
+          15.8,
+          16,
+          15.7
+        ],
+        "outputs": [
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin native",
+      "kernel": "horner",
+      "compile": {
+        "n": 7,
+        "median": 402.6895,
+        "min": 387.5277,
+        "max": 744.9549,
+        "mad": 15.161800000000028
+      },
+      "correct": true,
+      "values": [
+        -4407262.486960069
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 122.1954,
+          "min": 110.8371,
+          "max": 128.7005,
+          "mad": 5.778299999999987
+        },
+        "samples": [
+          110.8,
+          112.4,
+          118.4,
+          128,
+          128,
+          122.2,
+          128.7
+        ]
+      },
+      "init": {
+        "label": "ostrin native init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 20.7816,
+          "min": 15.6922,
+          "max": 23.0498,
+          "mad": 2.2682
+        },
+        "samples": [
+          22,
+          20.8,
+          23,
+          22.9,
+          15.8,
+          16,
+          15.7
+        ],
+        "outputs": [
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n",
+          "RESULT empty 0\r\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin interpreter",
+      "kernel": "simpson",
+      "correct": true,
+      "values": [
+        1.999999999999995
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 8616.3853,
+          "min": 8268.0196,
+          "max": 8773.3165,
+          "mad": 156.9312000000009
+        },
+        "samples": [
+          8773.3,
+          8268,
+          8616.4
+        ]
+      },
+      "init": {
+        "label": "ostrin interpreter init",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 22.5752,
+          "min": 21.2283,
+          "max": 23.9047,
+          "mad": 1.3294999999999995
+        },
+        "samples": [
+          23.9,
+          22.6,
+          21.2
+        ],
+        "outputs": [
+          "RESULT empty 0\n",
+          "RESULT empty 0\n",
+          "RESULT empty 0\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin interpreter",
+      "kernel": "bisect",
+      "correct": true,
+      "values": [
+        2.094551481542311
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 27898.8053,
+          "min": 27744.4832,
+          "max": 28208.8734,
+          "mad": 154.32210000000123
+        },
+        "samples": [
+          27898.8,
+          28208.9,
+          27744.5
+        ]
+      },
+      "init": {
+        "label": "ostrin interpreter init",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 22.5752,
+          "min": 21.2283,
+          "max": 23.9047,
+          "mad": 1.3294999999999995
+        },
+        "samples": [
+          23.9,
+          22.6,
+          21.2
+        ],
+        "outputs": [
+          "RESULT empty 0\n",
+          "RESULT empty 0\n",
+          "RESULT empty 0\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin interpreter",
+      "kernel": "matmul",
+      "correct": true,
+      "values": [
+        591176,
+        177353400
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 38647.9536,
+          "min": 38445.9794,
+          "max": 41619.0237,
+          "mad": 201.9742000000042
+        },
+        "samples": [
+          41619,
+          38446,
+          38648
+        ]
+      },
+      "init": {
+        "label": "ostrin interpreter init",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 22.5752,
+          "min": 21.2283,
+          "max": 23.9047,
+          "mad": 1.3294999999999995
+        },
+        "samples": [
+          23.9,
+          22.6,
+          21.2
+        ],
+        "outputs": [
+          "RESULT empty 0\n",
+          "RESULT empty 0\n",
+          "RESULT empty 0\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin interpreter",
+      "kernel": "regression",
+      "correct": true,
+      "values": [
+        1.0000000000001408,
+        2.000000000000003,
+        -3.0000000000003624
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 8210.3755,
+          "min": 8172.0284,
+          "max": 8307.1812,
+          "mad": 38.347099999999955
+        },
+        "samples": [
+          8210.4,
+          8307.2,
+          8172
+        ]
+      },
+      "init": {
+        "label": "ostrin interpreter init",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 22.5752,
+          "min": 21.2283,
+          "max": 23.9047,
+          "mad": 1.3294999999999995
+        },
+        "samples": [
+          23.9,
+          22.6,
+          21.2
+        ],
+        "outputs": [
+          "RESULT empty 0\n",
+          "RESULT empty 0\n",
+          "RESULT empty 0\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Ostrin interpreter",
+      "kernel": "horner",
+      "correct": true,
+      "values": [
+        -4407262.486960069
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 85343.6055,
+          "min": 84782.9446,
+          "max": 85611.3298,
+          "mad": 267.7243000000017
+        },
+        "samples": [
+          85611.3,
+          85343.6,
+          84782.9
+        ]
+      },
+      "init": {
+        "label": "ostrin interpreter init",
+        "incomplete": false,
+        "stats": {
+          "n": 3,
+          "median": 22.5752,
+          "min": 21.2283,
+          "max": 23.9047,
+          "mad": 1.3294999999999995
+        },
+        "samples": [
+          23.9,
+          22.6,
+          21.2
+        ],
+        "outputs": [
+          "RESULT empty 0\n",
+          "RESULT empty 0\n",
+          "RESULT empty 0\n"
+        ]
+      },
+      "complete": true
+    },
+    {
+      "language": "Python",
+      "kernel": "simpson",
+      "correct": true,
+      "values": [
+        1.999999999999995
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 905.8846,
+          "min": 899.889,
+          "max": 921.8071,
+          "mad": 5.065600000000018
+        },
+        "samples": [
+          921.8,
+          905.6,
+          911,
+          905.9,
+          899.9,
+          904.3,
+          915.3
+        ]
+      },
+      "init": {
+        "label": "Python init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 98.3991,
+          "min": 97.1777,
+          "max": 105.2002,
+          "mad": 1.2214000000000027
+        },
+        "samples": [
+          103.8,
+          97.9,
+          97.9,
+          105.2,
+          97.2,
+          98.4,
+          100.7
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 402.662,
+          "min": 399.552,
+          "max": 417.985,
+          "mad": 1.024000000000001
+        },
+        "warm": {
+          "n": 7,
+          "median": 403.096,
+          "min": 400.842,
+          "max": 406.566,
+          "mad": 2.026999999999987
+        }
+      }
+    },
+    {
+      "language": "Python",
+      "kernel": "bisect",
+      "correct": true,
+      "values": [
+        2.094551481542311
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 2767.9315,
+          "min": 2694.1676,
+          "max": 2801.4873,
+          "mad": 20.125099999999748
+        },
+        "samples": [
+          2767.9,
+          2740.7,
+          2788.1,
+          2801.5,
+          2777.7,
+          2694.2,
+          2762.1
+        ]
+      },
+      "init": {
+        "label": "Python init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 98.3991,
+          "min": 97.1777,
+          "max": 105.2002,
+          "mad": 1.2214000000000027
+        },
+        "samples": [
+          103.8,
+          97.9,
+          97.9,
+          105.2,
+          97.2,
+          98.4,
+          100.7
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 1341.097,
+          "min": 1297.18,
+          "max": 1350.831,
+          "mad": 9.733999999999924
+        },
+        "warm": {
+          "n": 7,
+          "median": 1326.197,
+          "min": 1298.199,
+          "max": 1346.496,
+          "mad": 15.332000000000107
+        }
+      }
+    },
+    {
+      "language": "Python",
+      "kernel": "matmul",
+      "correct": true,
+      "values": [
+        591176,
+        177353400
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 4692.2874,
+          "min": 4569.4452,
+          "max": 4740.1466,
+          "mad": 47.85919999999987
+        },
+        "samples": [
+          4726.6,
+          4692.3,
+          4639.1,
+          4639.1,
+          4740.1,
+          4569.4,
+          4713.1
+        ]
+      },
+      "init": {
+        "label": "Python init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 98.3991,
+          "min": 97.1777,
+          "max": 105.2002,
+          "mad": 1.2214000000000027
+        },
+        "samples": [
+          103.8,
+          97.9,
+          97.9,
+          105.2,
+          97.2,
+          98.4,
+          100.7
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 2202.025,
+          "min": 2166.406,
+          "max": 2244.176,
+          "mad": 23.42599999999993
+        },
+        "warm": {
+          "n": 7,
+          "median": 2381.661,
+          "min": 2288.22,
+          "max": 2424.909,
+          "mad": 25.48199999999997
+        }
+      }
+    },
+    {
+      "language": "Python",
+      "kernel": "regression",
+      "correct": true,
+      "values": [
+        1.0000000000001408,
+        2.000000000000003,
+        -3.0000000000003624
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 1030.1714,
+          "min": 1006.8441,
+          "max": 1041.2816,
+          "mad": 11.110200000000077
+        },
+        "samples": [
+          1041.3,
+          1036.4,
+          1012.7,
+          1007.9,
+          1030.2,
+          1034.7,
+          1006.8
+        ]
+      },
+      "init": {
+        "label": "Python init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 98.3991,
+          "min": 97.1777,
+          "max": 105.2002,
+          "mad": 1.2214000000000027
+        },
+        "samples": [
+          103.8,
+          97.9,
+          97.9,
+          105.2,
+          97.2,
+          98.4,
+          100.7
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 463.261,
+          "min": 453.88,
+          "max": 469.454,
+          "mad": 3.8730000000000473
+        },
+        "warm": {
+          "n": 7,
+          "median": 464.319,
+          "min": 445.739,
+          "max": 476.782,
+          "mad": 11.552000000000021
+        }
+      }
+    },
+    {
+      "language": "Python",
+      "kernel": "horner",
+      "correct": true,
+      "values": [
+        -4407262.486960069
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 7753.4566,
+          "min": 7643.8093,
+          "max": 7841.2145,
+          "mad": 54.07550000000083
+        },
+        "samples": [
+          7748.6,
+          7841.2,
+          7643.8,
+          7840.9,
+          7699.4,
+          7771.2,
+          7753.5
+        ]
+      },
+      "init": {
+        "label": "Python init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 98.3991,
+          "min": 97.1777,
+          "max": 105.2002,
+          "mad": 1.2214000000000027
+        },
+        "samples": [
+          103.8,
+          97.9,
+          97.9,
+          105.2,
+          97.2,
+          98.4,
+          100.7
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 3722.864,
+          "min": 3705.031,
+          "max": 3846.223,
+          "mad": 17.833000000000084
+        },
+        "warm": {
+          "n": 7,
+          "median": 3898.159,
+          "min": 3834.399,
+          "max": 3959.701,
+          "mad": 23.57699999999977
+        }
+      }
+    },
+    {
+      "language": "Julia",
+      "kernel": "simpson",
+      "correct": true,
+      "values": [
+        1.999999999999995
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 512.7986,
+          "min": 503.7623,
+          "max": 527.0381,
+          "mad": 9.036299999999983
+        },
+        "samples": [
+          521.9,
+          527,
+          511.9,
+          512.8,
+          503.8,
+          524,
+          511.5
+        ]
+      },
+      "init": {
+        "label": "Julia init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 225.9858,
+          "min": 224.5502,
+          "max": 230.0697,
+          "mad": 1.1694999999999993
+        },
+        "samples": [
+          227.3,
+          227.1,
+          224.6,
+          224.8,
+          226,
+          230.1,
+          225.5
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 31.533,
+          "min": 30.761,
+          "max": 33.284,
+          "mad": 0.7680000000000007
+        },
+        "warm": {
+          "n": 7,
+          "median": 20.52,
+          "min": 15.98,
+          "max": 20.766,
+          "mad": 0.24599999999999866
+        }
+      }
+    },
+    {
+      "language": "Julia",
+      "kernel": "bisect",
+      "correct": true,
+      "values": [
+        2.094551481542311
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 517.2973,
+          "min": 511.7913,
+          "max": 541.5905,
+          "mad": 3.2789999999999964
+        },
+        "samples": [
+          514,
+          521.5,
+          541.6,
+          514.9,
+          517.3,
+          511.8,
+          518.7
+        ]
+      },
+      "init": {
+        "label": "Julia init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 225.9858,
+          "min": 224.5502,
+          "max": 230.0697,
+          "mad": 1.1694999999999993
+        },
+        "samples": [
+          227.3,
+          227.1,
+          224.6,
+          224.8,
+          226,
+          230.1,
+          225.5
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 36.364,
+          "min": 35.611,
+          "max": 39.353,
+          "mad": 0.47799999999999443
+        },
+        "warm": {
+          "n": 7,
+          "median": 14.599,
+          "min": 14.313,
+          "max": 17.508,
+          "mad": 0.14400000000000013
+        }
+      }
+    },
+    {
+      "language": "Julia",
+      "kernel": "matmul",
+      "correct": true,
+      "values": [
+        591176,
+        177353400
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 533.2154,
+          "min": 526.824,
+          "max": 557.0295,
+          "mad": 3.1089999999999236
+        },
+        "samples": [
+          530.3,
+          533.8,
+          529.1,
+          557,
+          533.2,
+          536.3,
+          526.8
+        ]
+      },
+      "init": {
+        "label": "Julia init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 225.9858,
+          "min": 224.5502,
+          "max": 230.0697,
+          "mad": 1.1694999999999993
+        },
+        "samples": [
+          227.3,
+          227.1,
+          224.6,
+          224.8,
+          226,
+          230.1,
+          225.5
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 56.259,
+          "min": 54.915,
+          "max": 59.133,
+          "mad": 0.6060000000000016
+        },
+        "warm": {
+          "n": 7,
+          "median": 16.433,
+          "min": 16.244,
+          "max": 17.036,
+          "mad": 0.14199999999999946
+        }
+      }
+    },
+    {
+      "language": "Julia",
+      "kernel": "regression",
+      "correct": true,
+      "values": [
+        1.0000000000001408,
+        2.000000000000003,
+        -3.0000000000003624
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 494.8619,
+          "min": 490.02,
+          "max": 512.0517,
+          "mad": 4.84190000000001
+        },
+        "samples": [
+          494.7,
+          501.7,
+          494.9,
+          494.4,
+          490,
+          512.1,
+          500.9
+        ]
+      },
+      "init": {
+        "label": "Julia init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 225.9858,
+          "min": 224.5502,
+          "max": 230.0697,
+          "mad": 1.1694999999999993
+        },
+        "samples": [
+          227.3,
+          227.1,
+          224.6,
+          224.8,
+          226,
+          230.1,
+          225.5
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 31.329,
+          "min": 30.407,
+          "max": 31.908,
+          "mad": 0.3930000000000007
+        },
+        "warm": {
+          "n": 7,
+          "median": 5.92,
+          "min": 5.789,
+          "max": 6.208,
+          "mad": 0.13100000000000023
+        }
+      }
+    },
+    {
+      "language": "Julia",
+      "kernel": "horner",
+      "correct": true,
+      "values": [
+        -4407262.486960069
+      ],
+      "total": {
+        "label": "total",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 647.2501,
+          "min": 645.5263,
+          "max": 659.4323,
+          "mad": 1.723799999999983
+        },
+        "samples": [
+          653.2,
+          647.3,
+          645.5,
+          659.4,
+          646,
+          646.6,
+          649.3
+        ]
+      },
+      "init": {
+        "label": "Julia init",
+        "incomplete": false,
+        "stats": {
+          "n": 7,
+          "median": 225.9858,
+          "min": 224.5502,
+          "max": 230.0697,
+          "mad": 1.1694999999999993
+        },
+        "samples": [
+          227.3,
+          227.1,
+          224.6,
+          224.8,
+          226,
+          230.1,
+          225.5
+        ],
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "complete": true,
+      "internal": {
+        "cold": {
+          "n": 7,
+          "median": 118.462,
+          "min": 117.748,
+          "max": 121.305,
+          "mad": 0.6509999999999962
+        },
+        "warm": {
+          "n": 7,
+          "median": 68.831,
+          "min": 68.211,
+          "max": 69.343,
+          "mad": 0.3850000000000051
+        }
+      }
+    }
+  ],
+  "ostrinNativeInit": {
+    "n": 7,
+    "median": 20.7816,
+    "min": 15.6922,
+    "max": 23.0498,
+    "mad": 2.2682
+  },
+  "ostrinInterpreterInit": {
+    "n": 3,
+    "median": 22.5752,
+    "min": 21.2283,
+    "max": 23.9047,
+    "mad": 1.3294999999999995
+  },
+  "pythonInit": {
+    "n": 7,
+    "median": 98.3991,
+    "min": 97.1777,
+    "max": 105.2002,
+    "mad": 1.2214000000000027
+  },
+  "juliaInit": {
+    "n": 7,
+    "median": 225.9858,
+    "min": 224.5502,
+    "max": 230.0697,
+    "mad": 1.1694999999999993
+  },
+  "allComplete": true
+}

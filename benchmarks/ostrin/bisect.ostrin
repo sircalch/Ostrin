@@ -1,0 +1,17 @@
+// Bisection for the root of x^3 - 2x - 5 on [2, 3], repeated 200,000 times (root 2.0945514815423265).
+import std.numeric
+
+fn main() -> Void {
+    mut root = 0.0
+    for r in 0 until 200000 {
+        match numeric.bisect(fn(x) { x * x * x - 2.0 * x - 5.0 }, 2.0, 3.0, 0.0000000000001, 200) {
+            Ok(v) => {
+                root = v
+            },
+            Err(message) => {
+                print("FAIL " + message)
+            },
+        }
+    }
+    print("RESULT bisect " + root.to_string())
+}

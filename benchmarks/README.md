@@ -1,79 +1,66 @@
-# Ostrin benchmark contract
+# Benchmarks
 
-This directory documents the reproducible interpreter-versus-native benchmark
-that is run by `scripts/benchmark.mjs` and by `.github/workflows/benchmarks.yml`.
-The benchmark measures wall-clock process time for the same Ostrin source in two
-execution modes:
+A reproducible comparison of five numerical kernels in Ostrin (native and interpreter), Python and Julia.
 
-1. `ostrinc --run`, the reference interpreter;
-2. `ostrinc --compile` followed by the generated native executable.
+## What is compared
 
-Every workload must print deterministic output. The runner checks that the
-interpreter and native outputs match before recording timing samples. Schema 3
-also records the exact source hash for every workload, the full Git revision
-and checkout state, OS release, CPU model and logical core count, the C
-compiler, compiler-managed native defaults and environment flag inputs,
-warmups, per-sample timings and summary statistics (minimum, maximum, mean,
-median, p95 and standard deviation). The report labels those defaults as
-source-defined metadata; it does not pretend to intercept the compiler's
-internal subprocess argv.
-The raw `sourceSha256` and runtime-input `sha256` values cover the exact bytes
-in that runner's checkout and staged files. Windows checkouts can use CRLF
-while Unix checkouts use LF, so the report also records `sourceContentSha256`
-and runtime-input `contentSha256`, which normalize UTF-8 line endings to LF.
-The cross-platform workflow compares those content identities and exact output
-hashes for Linux, macOS and Windows while retaining the host-specific raw
-hashes and byte counts. Binary or invalid UTF-8 runtime inputs have no normalized
-text hash and are compared by their raw SHA-256.
-Results are machine-specific; a ratio is not a claim about another language or
-hardware. Allocation counters and peak resident set are reported separately by
-`scripts/benchmark-abstraction-overhead.mjs` (`OSTRIN_MEM_DETAIL=1`); this runner
-still records only wall-clock time.
+Each kernel is written with the same algorithm and the same order of floating-point operations in every language:
 
-## Current workloads
+| Kernel | Operation | Size |
+|---|---|---|
+| `simpson` | composite Simpson rule for ∫ sin over [0, π] | 4,000,000 panels |
+| `bisect` | bisection for the root of x³ − 2x − 5 on [2, 3] | 200,000 repetitions |
+| `matmul` | dense matrix product, integer entries, trace and total | 300 × 300 |
+| `regression` | quadratic least squares through the normal equations | 2,000,000 points |
+| `horner` | polynomial evaluation by Horner's rule | degree 50, 2,000,000 points |
 
-| Workload | Coverage |
-| --- | --- |
-| `benchmark_numeric.ostrin` | scalar loop and arithmetic |
-| `arrays.ostrin` | one to three dimensional arrays and reductions |
-| `quantity_arrays.ostrin` | unit-aware array operations |
-| `numeric_methods.ostrin` | roots, quadrature, ODEs and FFT |
-| `numeric_lu.ostrin` | dense LU factorization and solve |
-| `numeric_svd.ostrin` | SVD, rank, condition number and least squares |
-| `numeric_complex_linear_algebra.ostrin` | dense split-complex solve and adjoint product |
-| `viz_scatter_fit.ostrin` | deterministic fit, band and SVG rendering |
-| `viz_pendulum_calibration.ostrin` | file-backed dimensional calibration, correlated uncertainty and scientific SVG output |
-| `temperature-float.ostrin` | scalar `Float` addition control |
-| `temperature-interval.ostrin` | linear `Quantity<Temperature>` additions in K |
-| `temperature-point.ostrin` | absolute Celsius point shifted by Kelvin intervals |
-| `measurement-source-identity.ostrin` | repeated scalar measurement addition with one shared source ID; checks correlation-preserving coefficient accumulation |
+Not compared: the Ostrin symbolic engine. Python and Julia have no operation with the same semantics here, so a timing
+would not be a fair comparison.
 
-The measurement workload performs 50,000 additions of the same source to exercise
-correlation-aware coefficient merging. Compare it only with the scalar workload as
-a coarse same-host control: process startup, `Result` handling, ownership and
-measurement bookkeeping are included, so the ratio does not isolate the cost of
-the source ID field or predict application performance. Peak memory and allocation
-counts remain unmeasured.
+## Correctness comes first
 
-The temperature workloads use the same 50,000-iteration loop and let the
-report compare `Float`, linear interval and affine point costs on one host. The
-reported wall time includes process startup; it does not isolate per-operation
-latency or allocation counts, and it must not be generalized beyond the
-recorded platform and compiler configuration.
-The first source-backed Windows x64 run is stored in
-`validation/affine-temperature-cost.json`. Its `commit` field identifies the
-clean source revision used for the binaries; the later commit that checks in
-the report is the evidence revision, so the report does not need a self-hash.
+Every program prints a `RESULT <kernel> ...` line. The driver checks it against a reference computed independently:
+analytic values (the Simpson integral is 2, the regression coefficients are 1, 2, −3), a Newton iteration for the root,
+and a JavaScript computation for the integer matrix product (exact) and the Horner sum. A result that fails the check is
+reported and its timings are not used.
 
-Run a local report after building the release compiler:
+## Timing method
 
-```text
-cargo build --release --manifest-path compiler/Cargo.toml
-node scripts/benchmark.mjs --iterations 7 --warmups 1
-node scripts/benchmark-contract-check.mjs
-node scripts/benchmark-page.mjs --write
+- **compile**: the wall time of `ostrinc --compile` (Ostrin native only).
+- **init**: the median wall time of an empty program, which measures the process start of each runtime.
+- **total**: the median wall time of one kernel run, including process start.
+- **run ≈**: total − init. Ostrin has no clock inside a program, so the kernel time is always estimated from outside
+  the process. Values below the measurement resolution (the larger MAD) are marked and not interpreted.
+- **dispersion**: minimum, maximum and median absolute deviation over the repetitions.
+
+The driver runs one warm-up and then `BENCH_REPS` repetitions (default 7); the interpreter uses `BENCH_INTERP_REPS`
+(default 3) because a single interpreter run of the largest kernel takes minutes.
+
+## Reproduce
+
+Requirements: the Ostrin compiler built in release mode (`cargo build --release` in `compiler/`), Python 3.12 on the
+`python` command, Julia 1.13 on the `julia` command, and Node 20 or later.
+
+```bash
+node benchmarks/run.mjs
+node benchmarks/report.mjs benchmarks/results/benchmark-<stamp>.json
 ```
 
-The workflow keeps the raw JSON as an artifact. The website only publishes a
-report when it is deliberately regenerated, so a reader can inspect the exact
-commit and environment behind the displayed numbers.
+Environment variables: `BENCH_REPS`, `BENCH_INTERP_REPS`, `BENCH_TIMEOUT_MS`.
+
+Each run writes `benchmarks/results/benchmark-<stamp>.json`; the report is written next to it as `REPORT-<stamp>.md`.
+
+## Files
+
+- `ostrin/*.ostrin`: the Ostrin kernels.
+- `python/kernels.py`, `julia/kernels.jl`: the same algorithms.
+- `run.mjs`: the driver (correctness, timing, JSON).
+- `report.mjs`: the Markdown report from a JSON file.
+- `results/`: the recorded runs.
+
+## Limits
+
+- Results depend on the machine, the operating system's scheduling and the runtimes' versions, all recorded in each file.
+- The kernels are not tuned library calls: NumPy, BLAS and other compiled libraries are not used.
+- The numbers are measurements on the recorded machine, not claims about the languages in general.
+- No Wolfram or MATLAB results are included.
