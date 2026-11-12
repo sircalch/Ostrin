@@ -50,8 +50,17 @@ roots of `x^2 - 8` are `2*2^(1/2)` and `-2*2^(1/2)`, and `2x^2 - 3x - 1` gives `
 whose numerator and denominator product exceeds 10^12 keep the earlier unreduced form `(-b + D^(1/2)) * 1/(2a)`.
 A positive integer to a half-integer power is reduced too: `sqrt(8)` is `2*2^(1/2)`, `sqrt(4)` is `2`, `8^(3/2)` is
 `16*2^(1/2)`, and sums and products of such radicals combine (`sqrt(8) + sqrt(2)` is `3*2^(1/2)`). Complex roots are
-still refused. Not yet implemented: radicals of other exponents or of symbols, and assumptions or positivity beyond the
-existing checks.
+still refused. Not yet implemented: radicals of other exponents or of symbols.
+
+## Assumptions and positivity
+
+A symbol is real unless it is declared `positive`, `nonzero` or `integer`. A simplification fires only when the
+assumptions prove it. With a positive `x`, `(x^2)^(1/2)` is `x`, `(4x^2)^(1/2)` is `2*x`, and with positive `x` and `y`,
+`(x*y)^(1/2)` is `x^(1/2)*y^(1/2)`. With real symbols the same expressions stay as written, because `(x^2)^(1/2)` is
+`|x|` and the split is not valid for negative factors. `symbolic.is_positive` and `symbolic.is_nonzero` expose the
+same proofs, so a caller can check an assumption before relying on a rewrite. `examples/symbolic_assumptions.ostrin`
+checks each case by exact text, the real-symbol negatives and numeric values at chosen points. Not yet implemented: a
+nonnegative assumption, and sign reasoning for sums.
 
 ## Verification run for this note
 

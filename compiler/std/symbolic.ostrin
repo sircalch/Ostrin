@@ -560,7 +560,8 @@ fn pow_ids(s: Store, base: Int, exponent: Int) -> Int {
                 return pow_ids(s, inner_base, num_id(s, rat_mul(s, inner, e)))
             }
         }
-        if s.kinds[base] == 3 and e.d == 1 {
+        // (a*b)^r = a^r * b^r holds for any exponent when every factor is positive; for an integer exponent it always does.
+        if s.kinds[base] == 3 and (e.d == 1 or known_positive(s, base)) {
             mut parts: List<Int> = []
             for i in 0 until s.counts[base] {
                 parts.push(pow_ids(s, arg_of(s, base, i), exponent))
@@ -910,6 +911,17 @@ fn wrap(s: Store, id: Int) -> Expr {
 /// The exact rational n/d (d defaults to 1).
 pub fn number(s: Store, n: Int, d: Int = 1) -> Expr {
     wrap(s, num_id(s, rat(s, n, d)))
+}
+
+/// True when the expression is provably positive under the symbols' assumptions. Numbers, positive symbols, and
+/// products and powers built from them count; a real symbol alone does not.
+pub fn is_positive(a: Expr) -> Bool {
+    known_positive(a.store, a.id)
+}
+
+/// True when the expression is provably nonzero under the symbols' assumptions.
+pub fn is_nonzero(a: Expr) -> Bool {
+    known_nonzero(a.store, a.id)
 }
 
 /// A real symbol. `assumption` is "real" (no assumption), "positive", "nonzero" or "integer".

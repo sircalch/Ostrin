@@ -21062,9 +21062,9 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        // The IR count grows with the module (112 after the radical roots were added); the guarded property
+        // The IR count grows with the module (114 after the positivity rules were added); the guarded property
         // is that no node falls back to the slower HIR or AST lowering.
-        symbolic_source.contains("ir=112")
+        symbolic_source.contains("ir=114")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -21442,7 +21442,7 @@ fn symbolic_units_propagate_dimensions_through_expressions_in_both_backends() {
     // are reported as typed errors; E / E simplifies to the dimensionless 1.
     assert_eq!(
         interpreter_and_native_agree("symbolic_units.ostrin"),
-        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*(L*g^(-1))^(1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
+        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*L^(1/2)*g^(-1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
     );
     let path = example_path("symbolic_units.ostrin");
     let report = run(&["--native-type-report", &path]);
@@ -22039,6 +22039,40 @@ fn std_symbolic_radicals_match_interpreter_and_native_without_leaks() {
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     assert!(report_text.contains("divergences: 0"), "{report_text}");
     let exe = temp_artifact("symbolic_radicals_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_assumptions_match_interpreter_and_native_without_leaks() {
+    // Positive symbols let a radical split over a product and remove a square; real symbols keep the same
+    // radicals; the queries is_positive and is_nonzero follow the assumptions; values are checked at points.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_assumptions.ostrin"),
+        "(x^2)^(1/2), x positive: x\n(4x^2)^(1/2), x positive: 2*x\n(x*y)^(1/2), x and y positive: x^(1/2)*y^(1/2)\n(2x)^(1/2), x positive: x^(1/2)*2^(1/2)\nreal symbols keep their radicals: (x^2)^(1/2) and (x*y)^(1/2)\nqueries: positive x true, real x false, nonzero x true\nall assumption checks passed\n"
+    );
+    let path = example_path("symbolic_assumptions.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_assumptions_leak.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(
         compile.status.success(),
