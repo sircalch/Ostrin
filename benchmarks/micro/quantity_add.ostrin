@@ -1,0 +1,8 @@
+// One physical quantity addition per iteration.
+fn main() -> Void {
+    mut q = 0.0 m
+    for i in 0 until 1000000 {
+        q = q + 0.5 m
+    }
+    print("RESULT quantity_add " + q.value().to_string())
+}

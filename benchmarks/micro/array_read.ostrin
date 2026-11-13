@@ -1,0 +1,9 @@
+// One array element read per iteration.
+fn main() -> Void {
+    v = zeros([16])
+    mut total = 0.0
+    for i in 0 until 10000000 {
+        total = total + v[i % 16]
+    }
+    print("RESULT array_read " + total.to_string())
+}

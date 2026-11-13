@@ -22258,6 +22258,16 @@ fn std_symbolic_chain_matches_interpreter_and_native_without_leaks() {
     );
 }
 
+#[test]
+fn interpreter_range_loops_match_native_and_keep_their_semantics() {
+    // Range loops run lazily in the interpreter: continue and break, negative and zero steps, bounds evaluated once,
+    // nested break and an empty range keep their meaning, and the native build agrees.
+    assert_eq!(
+        interpreter_and_native_agree("interp_lazy_range.ostrin"),
+        "all range checks passed\n"
+    );
+}
+
 fn interpreter_and_native_agree_from(file: &str, dir: &std::path::Path) -> String {
     // Like interpreter_and_native_agree, but the program runs from `dir`, so it can read its data by a relative path.
     let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))

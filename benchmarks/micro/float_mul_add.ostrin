@@ -1,0 +1,8 @@
+// Two float operations per iteration.
+fn main() -> Void {
+    mut f = 1.0
+    for i in 0 until 10000000 {
+        f = f * 0.9999999 + 0.5
+    }
+    print("RESULT float_mul_add " + f.to_string())
+}

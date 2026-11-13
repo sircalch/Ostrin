@@ -456,11 +456,14 @@ impl Env {
     /// si no existe en ninguno, lo define en el frame actual (nuevo binding
     /// inmutable implícito, documento 01 §1.1 / documento 10 §5.1).
     fn assign(&self, name: &str, value: Value) {
-        if self.0.borrow().vars.contains_key(name) {
-            self.0.borrow_mut().vars.insert(name.to_string(), value);
-            return;
-        }
-        let parent = self.0.borrow().parent.clone();
+        let parent = {
+            let mut frame = self.0.borrow_mut();
+            if let Some(slot) = frame.vars.get_mut(name) {
+                *slot = value;
+                return;
+            }
+            frame.parent.clone()
+        };
         match parent {
             Some(p) if p.contains(name) => p.assign(name, value),
             _ => self.define(name, value),
@@ -1791,9 +1794,15 @@ impl Interpreter {
 
     fn eval_block(&mut self, block: &Block, env: &Env) -> EvalResult {
         let inner = env.child();
+        self.eval_block_in(block, &inner)
+    }
+
+    /// Runs a block in the frame it is given. A loop body uses the frame that holds its loop variable, which is created
+    /// fresh for each iteration, so a variable of the body is local to that iteration exactly as before.
+    fn eval_block_in(&mut self, block: &Block, inner: &Env) -> EvalResult {
         for stmt in &block.stmts {
-            self.before_statement(&inner, stmt.span.line)?;
-            self.eval_stmt(&stmt.stmt, &inner)?;
+            self.before_statement(inner, stmt.span.line)?;
+            self.eval_stmt(&stmt.stmt, inner)?;
         }
         match &block.tail {
             Some(e) => {
@@ -1803,9 +1812,9 @@ impl Interpreter {
                 // would never fire. `parse_expr` always wraps its result in
                 // `Expr::Located`, so the source line is right here.
                 if let Expr::Located(_, range) = e.as_ref() {
-                    self.before_statement(&inner, range.start.line)?;
+                    self.before_statement(inner, range.start.line)?;
                 }
-                self.eval_expr(e, &inner)
+                self.eval_expr(e, inner)
             }
             None => Ok(Value::Void),
         }
@@ -2118,16 +2127,18 @@ impl Interpreter {
                 body,
             } => {
                 if matches!(iter.unlocated(), Expr::Range(..)) {
-                    let items = self.eval_iterable(iter, env)?;
-                    for item in items {
+                    let (s, e, step_v, kind) = self.range_plan(iter, env)?;
+                    let mut i = s;
+                    while Self::range_has_next(i, e, step_v, kind) {
                         let loop_env = env.child();
-                        loop_env.define(pattern, item);
-                        match self.eval_block(body, &loop_env) {
+                        loop_env.define(pattern, Value::Int(i));
+                        match self.eval_block_in(body, &loop_env) {
                             Ok(_) => {}
                             Err(RuntimeError::Break(_)) => break,
-                            Err(RuntimeError::Continue) => continue,
+                            Err(RuntimeError::Continue) => {}
                             Err(other) => return Err(other),
                         }
+                        i += step_v;
                     }
                     return Ok(Value::Void);
                 }
@@ -2236,7 +2247,8 @@ impl Interpreter {
         }
     }
 
-    fn eval_iterable(&mut self, expr: &Expr, env: &Env) -> Result<Vec<Value>, RuntimeError> {
+    /// The bounds of a range expression: its start, its end, its step and its kind. Evaluated once, in source order.
+    fn range_plan(&mut self, expr: &Expr, env: &Env) -> Result<(i64, i64, i64, RangeKind), RuntimeError> {
         match expr.unlocated() {
             Expr::Range(start, kind, end, step) => {
                 let sv = self.eval_expr(start, env)?;
@@ -2246,21 +2258,32 @@ impl Interpreter {
                     None => 1,
                 };
                 let (s, e) = (as_i64(&sv)?, as_i64(&ev)?);
+                Ok((s, e, step_v, *kind))
+            }
+            _ => Err(RuntimeError::Error("not a range".to_string())),
+        }
+    }
+
+    /// True while a range with these bounds still has a value to produce. A zero step produces no values.
+    fn range_has_next(i: i64, e: i64, step_v: i64, kind: RangeKind) -> bool {
+        if step_v > 0 {
+            (kind == RangeKind::To && i <= e) || (kind == RangeKind::Until && i < e)
+        } else if step_v < 0 {
+            (kind == RangeKind::To && i >= e) || (kind == RangeKind::Until && i > e)
+        } else {
+            false
+        }
+    }
+
+    fn eval_iterable(&mut self, expr: &Expr, env: &Env) -> Result<Vec<Value>, RuntimeError> {
+        match expr.unlocated() {
+            Expr::Range(..) => {
+                let (s, e, step_v, kind) = self.range_plan(expr, env)?;
                 let mut values = Vec::new();
-                if step_v > 0 {
-                    let mut i = s;
-                    while (*kind == RangeKind::To && i <= e) || (*kind == RangeKind::Until && i < e)
-                    {
-                        values.push(Value::Int(i));
-                        i += step_v;
-                    }
-                } else if step_v < 0 {
-                    let mut i = s;
-                    while (*kind == RangeKind::To && i >= e) || (*kind == RangeKind::Until && i > e)
-                    {
-                        values.push(Value::Int(i));
-                        i += step_v;
-                    }
+                let mut i = s;
+                while Self::range_has_next(i, e, step_v, kind) {
+                    values.push(Value::Int(i));
+                    i += step_v;
                 }
                 Ok(values)
             }
