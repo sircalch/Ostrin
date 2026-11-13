@@ -21062,9 +21062,9 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        // The IR count grows with the module (148 after the abs derivative, sign and built-in assumption checks were added); the guarded property
+        // The IR count grows with the module (157 after the composition of conditional steps was added); the guarded property
         // is that no node falls back to the slower HIR or AST lowering.
-        symbolic_source.contains("ir=148")
+        symbolic_source.contains("ir=157")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
@@ -22207,6 +22207,40 @@ fn std_symbolic_abs_derivative_matches_interpreter_and_native_without_leaks() {
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     assert!(report_text.contains("divergences: 0"), "{report_text}");
     let exe = temp_artifact("symbolic_abs_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_chain_matches_interpreter_and_native_without_leaks() {
+    // Composition of conditional steps: both conditions kept, the value checked against the original at points, the
+    // removable point x = 1 refused, a point outside the context refused, and wrong-context and absent-input steps refused.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_chain.ostrin"),
+        "E = (-1 + x^2)*(-1 + x)^(-1) + (x^2)^(1/2)\nstep 1: applied-conditional, steps 1, value 1 + x + (x^2)^(1/2)\nstep 2: applied-conditional, steps 2, value 1 + x + abs(x)\nkept conditions: 1 unknown: x != 1\nE(2) by the derivation: 5 (original: 3 + 2 = 5)\nE(-2) by the derivation: 1 (original: -1 + 2 = 1)\nat x = 1: outside the domain: x != 1 fails (the expression has the value 1)\nunder x positive: applied-conditional, value 1 + 2*x, pending 1\nx = -2 under x positive: outside the context: x positive fails at x = -2\nstep under another context: refused: the step was computed under another context: x positive (the chain uses no assumptions (every symbol real))\nstep on an absent subexpression: refused: the step was computed on (-1 + x^2)*(-1 + x)^(-1), not on -1 + x\nz / z: applied-conditional, pending 1 (z != 0)\nall chain checks passed\n"
+    );
+    let path = example_path("symbolic_chain.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_chain_leak.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(
         compile.status.success(),

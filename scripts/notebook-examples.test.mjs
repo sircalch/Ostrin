@@ -254,7 +254,7 @@ test("conditional: the table gives each rule's result, status and conditions und
   const find = (rule, context) => rows.find(([r, c]) => r === rule && c === context);
   assert.deepEqual(find("sqrt(x^2)", "no assumptions").slice(2, 4), ["abs(x)", "applied"]);
   assert.deepEqual(find("sqrt(x^2)", "x nonpositive").slice(2, 4), ["-x", "applied"]);
-  assert.deepEqual(find("sqrt(x^2)", "x complex").slice(2, 4), ["sqrt(x^2)", "refused"]);
+  assert.deepEqual(find("sqrt(x^2)", "x complex").slice(2, 4), ["(x^2)^(1/2)", "refused"]);
   assert.deepEqual(find("(x^2 - 1)/(x - 1)", "no assumptions").slice(2, 5), ["1 + x", "applied-conditional", "x != 1; "]);
   assert.deepEqual(find("x / x", "x positive").slice(2, 4), ["1", "applied"]);
   assert.deepEqual(find("x / x", "no assumptions").slice(2, 4), ["1", "applied-conditional"]);

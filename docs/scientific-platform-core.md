@@ -176,3 +176,26 @@ Playwright flow runs in the WASM compiler.
 Not claimed: a general theorem prover; branch analysis of complex logarithms and roots; inequalities between two
 symbols; intervals beyond the sign facts they imply; rules for symbols in more than one variable; simplification of a
 general rational function beyond a linear denominator. Numeric agreement on a finite grid is evidence and is labelled so.
+
+## Composition of conditional steps
+
+A `Chain` is a derivation: the expression, the context it was built under, the steps applied, and the conditions they
+carry. `chain_start(a, c)` begins one; `chain_then(ch, c, input, o)` applies an outcome `o` to `input`, a subexpression of
+the chain's current value. The subexpression is matched by node identity, and the outcome's `original` must be the
+canonical text of that same input (the rules set `original` from their own node), so a step computed on one expression
+cannot be applied to another. The value becomes the value with that subexpression replaced, and no condition is
+dropped: conditions are kept by their text, a condition the context proves is listed as established, and the others as
+unknown. A step computed under another context, a refused step, and conditions that clash on one expression each refuse
+the chain, which then keeps its last valid value and states the reason.
+
+`chain_evaluate(ch, names, values)` gives the value of the chain at points only where its conditions hold: a condition
+that is not established is checked at the point, and a point outside the context's facts is refused. A removable point
+is therefore an error, not a number: `(x^2-1)/(x-1) + sqrt(x^2)` evaluates to 5 at x = 2 and is refused at x = 1, where the
+original is undefined.
+
+Limits: the conditional rules are the four of this document; `Condition` and `Outcome` are built only by rules, so a
+program cannot write a condition by hand, and the clash check is a defence that the current rules cannot trigger. The
+provenance check compares canonical texts, which is exact for distinct nodes of one store and documented as such.
+Verified by `examples/symbolic_chain.ostrin` (both steps, numeric agreement with the original at points, the removable
+point, the context boundary, wrong-context and absent-input refusals, and a pending removable singularity from x / x)
+and its native test with a leak check.

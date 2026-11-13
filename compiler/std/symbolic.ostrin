@@ -2082,8 +2082,22 @@ pub record Context {
 /// original; `established` are those the context proves; `unknown` are those it neither proves nor refutes. `status`
 /// is "applied" (every required condition is established), "applied-conditional" (some are unknown: the result holds
 /// only where they hold, and they are listed), or "refused" (the rule does not apply; `value` is the original).
+/// One condition of a validity: `expr relation bound`, with relation one of !=, >, >=, <, <=. The expression is
+/// kept, so the condition can be checked at points after the rule has been applied. `text` is its readable form.
+pub record Condition {
+    expr: Expr
+    relation: String
+    bound: Float
+    text: String
+}
+
+fn condition(e: Expr, relation: String, bound: Float, text: String) -> Condition {
+    Condition { expr: e, relation: relation, bound: bound, text: text }
+}
+
 pub record Outcome {
     rule: String
+    conditions: List<Condition>
     original: String
     transformed: String
     value: Expr
@@ -2508,30 +2522,30 @@ pub fn sqrt_of_square(c: Context, u: Expr) -> Outcome {
     s = u.store
     square_id = pow_ids(s, u.id, int_id(s, 2))
     root_id = pow_ids(s, square_id, num_id(s, rat(s, 1, 2)))
-    original = "sqrt(" + show(wrap(s, square_id)) + ")"
+    original = show(wrap(s, root_id))
     if s.kinds[u.id] != 1 {
-        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the rule is stated for a symbol; the argument is not a symbol" }
+        return Outcome { conditions: [], rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the rule is stated for a symbol; the argument is not a symbol" }
     }
     name = s.names[u.id]
     if node_conflict(c, s, u.id) != "" {
-        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the built-in assumption of " + name + " contradicts the context: " + node_conflict(c, s, u.id) }
+        return Outcome { conditions: [], rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the built-in assumption of " + name + " contradicts the context: " + node_conflict(c, s, u.id) }
     }
     if holds_node(c, s, u.id, "real") != "true" {
-        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "sqrt(x^2) = abs(x) holds for real x only, and " + name + " is not known to be real" }
+        return Outcome { conditions: [], rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "sqrt(x^2) = abs(x) holds for real x only, and " + name + " is not known to be real" }
     }
     sign = sign_of(c, u)
     if sign == "contradictory" {
-        return Outcome { rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the sign of " + name + " is contradictory in this context" }
+        return Outcome { conditions: [], rule: "sqrt-of-square", original: original, transformed: original, value: wrap(s, root_id), status: "refused", required: [], established: [], unknown: [], reason: "the sign of " + name + " is contradictory in this context" }
     }
     if sign == "positive" or sign == "nonnegative" or sign == "zero" {
-        return Outcome { rule: "sqrt-of-square", original: original, transformed: name, value: u, status: "applied", required: [name + " >= 0"], established: [name + " >= 0"], unknown: [], reason: "the context shows " + name + " >= 0, so sqrt(x^2) = x" }
+        return Outcome { conditions: [condition(u, ">=", 0.0, name + " >= 0")], rule: "sqrt-of-square", original: original, transformed: name, value: u, status: "applied", required: [name + " >= 0"], established: [name + " >= 0"], unknown: [], reason: "the context shows " + name + " >= 0, so sqrt(x^2) = x" }
     }
     if sign == "negative" or sign == "nonpositive" {
         negated = wrap(s, mul_ids(s, [int_id(s, 0 - 1), u.id]))
-        return Outcome { rule: "sqrt-of-square", original: original, transformed: "-" + name, value: negated, status: "applied", required: [name + " <= 0"], established: [name + " <= 0"], unknown: [], reason: "the context shows " + name + " <= 0, so sqrt(x^2) = -x" }
+        return Outcome { conditions: [condition(u, "<=", 0.0, name + " <= 0")], rule: "sqrt-of-square", original: original, transformed: "-" + name, value: negated, status: "applied", required: [name + " <= 0"], established: [name + " <= 0"], unknown: [], reason: "the context shows " + name + " <= 0, so sqrt(x^2) = -x" }
     }
     absolute = wrap(s, intern(s, 5, 0, 1, "abs", [u.id]))
-    Outcome { rule: "sqrt-of-square", original: original, transformed: "abs(" + name + ")", value: absolute, status: "applied", required: [], established: [], unknown: [], reason: "for real " + name + ", sqrt(x^2) = abs(x); the sign of " + name + " is not needed and is not assumed" }
+    Outcome { conditions: [], rule: "sqrt-of-square", original: original, transformed: "abs(" + name + ")", value: absolute, status: "applied", required: [], established: [], unknown: [], reason: "for real " + name + ", sqrt(x^2) = abs(x); the sign of " + name + " is not needed and is not assumed" }
 }
 
 /// Cancels the factor (x - r) of numerator / denominator, when the denominator is linear in the symbol v with root r
@@ -2541,7 +2555,7 @@ pub fn sqrt_of_square(c: Context, u: Expr) -> Outcome {
 pub fn simplify_quotient(c: Context, numerator: Expr, denominator: Expr, v: Expr) -> Outcome {
     s = v.store
     original_expr = div(numerator, denominator)
-    original = "(" + show(numerator) + ") / (" + show(denominator) + ")"
+    original = show(original_expr)
     name = if s.kinds[v.id] == 1 { s.names[v.id] } else { "x" }
     return match coefficients(denominator, v) {
         Err(message) => refusal_outcome("cancel-factor", original, original_expr, "the denominator is not a polynomial in the variable: " + message),
@@ -2560,18 +2574,18 @@ pub fn simplify_quotient(c: Context, numerator: Expr, denominator: Expr, v: Expr
 
 /// A refused rule: the original expression is kept and the reason is stated.
 fn refusal_outcome(rule: String, original: String, value: Expr, reason: String) -> Outcome {
-    Outcome { rule: rule, original: original, transformed: original, value: value, status: "refused", required: [], established: [], unknown: [], reason: reason }
+    Outcome { conditions: [], rule: rule, original: original, transformed: original, value: value, status: "refused", required: [], established: [], unknown: [], reason: reason }
 }
 
 fn cancel_linear(c: Context, s: Store, v: Expr, name: String, original: String, original_expr: Expr, dr: List<Rat>, nr: List<Rat>) -> Outcome {
     if dr.length() != 2 or rat_is_zero(dr[1]) or nr.length() < 2 {
-        return Outcome { rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the denominator is not linear in " + name }
+        return Outcome { conditions: [], rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the denominator is not linear in " + name }
     }
     a = dr[1]
     // denominator = a (x - r) with r = -b / a, where b = dr[0]
     r = rat_mul(s, rat(s, 0 - dr[0].n, dr[0].d), rat(s, a.d, a.n))
     if r.big != "" {
-        return Outcome { rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the root is too large for an exact cancellation" }
+        return Outcome { conditions: [], rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the root is too large for an exact cancellation" }
     }
     // The numerator must vanish at r, evaluated exactly.
     mut total = rat(s, 0, 1)
@@ -2581,7 +2595,7 @@ fn cancel_linear(c: Context, s: Store, v: Expr, name: String, original: String, 
         pw = rat_mul(s, pw, r)
     }
     if not rat_is_zero(total) {
-        return Outcome { rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the numerator does not vanish at the root, so nothing cancels" }
+        return Outcome { conditions: [], rule: "cancel-factor", original: original, transformed: original, value: original_expr, status: "refused", required: [], established: [], unknown: [], reason: "the numerator does not vanish at the root, so nothing cancels" }
     }
     // Synthetic division of the ascending numerator coefficients by (x - r). The quotient coefficients are produced from
     // the highest degree down: descending[i] is the coefficient of x^(deg - 1 - i).
@@ -2607,21 +2621,22 @@ fn cancel_linear(c: Context, s: Store, v: Expr, name: String, original: String, 
     }
     result_id = add_ids(s, terms)
     rtext = rat_text_of(r)
-    condition = name + " != " + rtext
+    condition_text = name + " != " + rtext
     mut unknown: List<String> = []
     mut established: List<String> = []
     if rat_is_zero(r) and holds_node(c, s, v.id, "nonzero") == "true" {
-        established.push(condition)
+        established.push(condition_text)
     } else if r.n < 0 and sign_of(c, v) == "positive" {
-        established.push(condition)
+        established.push(condition_text)
     } else if r.n > 0 and sign_of(c, v) == "negative" {
-        established.push(condition)
+        established.push(condition_text)
     } else {
-        unknown.push(condition)
+        unknown.push(condition_text)
     }
     mut required: List<String> = []
-    required.push(condition)
-    Outcome { rule: "cancel-factor", original: original, transformed: show(wrap(s, result_id)), value: wrap(s, result_id), status: applied_status(unknown), required: required, established: established, unknown: unknown, reason: "the factor " + name + " - " + rtext + " cancels; the original is undefined at " + name + " = " + rtext + ", so the result is kept with that condition" }
+    required.push(condition_text)
+    root_value = (r.n as Float) / (r.d as Float)
+    Outcome { conditions: [condition(v, "!=", root_value, condition_text)], rule: "cancel-factor", original: original, transformed: show(wrap(s, result_id)), value: wrap(s, result_id), status: applied_status(unknown), required: required, established: established, unknown: unknown, reason: "the factor " + name + " - " + rtext + " cancels; the original is undefined at " + name + " = " + rtext + ", so the result is kept with that condition" }
 }
 
 /// x / x for a symbol x. The result 1 requires x != 0. When the context proves it, the rule is applied. When the context
@@ -2630,25 +2645,25 @@ pub fn simplify_self_quotient(c: Context, x: Expr) -> Outcome {
     s = x.store
     name = s.names[x.id]
     original_expr = div(x, x)
-    original = name + " / " + name
-    condition = name + " != 0"
+    original = show(original_expr)
+    condition_text = name + " != 0"
     if node_conflict(c, s, x.id) != "" {
-        return Outcome { rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition], established: [], unknown: [], reason: "the built-in assumption of " + name + " contradicts the context" }
+        return Outcome { conditions: [], rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition_text], established: [], unknown: [], reason: "the built-in assumption of " + name + " contradicts the context" }
     }
     verdict = holds_node(c, s, x.id, "nonzero")
     if verdict == "false" {
-        return Outcome { rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition], established: [], unknown: [], reason: name + " is zero in this context, so " + original + " is undefined" }
+        return Outcome { conditions: [], rule: "self-quotient", original: original, transformed: original, value: original_expr, status: "refused", required: [condition_text], established: [], unknown: [], reason: name + " is zero in this context, so " + name + " / " + name + " is undefined" }
     }
     mut unknown: List<String> = []
     mut established: List<String> = []
     if verdict == "true" {
-        established.push(condition)
+        established.push(condition_text)
     } else {
-        unknown.push(condition)
+        unknown.push(condition_text)
     }
     mut required: List<String> = []
-    required.push(condition)
-    Outcome { rule: "self-quotient", original: original, transformed: "1", value: wrap(s, int_id(s, 1)), status: applied_status(unknown), required: required, established: established, unknown: unknown, reason: original + " = 1 when " + condition + "; the context gives: " + verdict }
+    required.push(condition_text)
+    Outcome { conditions: [condition(x, "!=", 0.0, condition_text)], rule: "self-quotient", original: original, transformed: "1", value: wrap(s, int_id(s, 1)), status: applied_status(unknown), required: required, established: established, unknown: unknown, reason: name + " / " + name + " = 1 when " + condition_text + "; the context gives: " + verdict }
 }
 
 /// ln(a b) = ln(a) + ln(b) is applied only when both a and b are positive in the context. Otherwise it is refused and the
@@ -2656,7 +2671,7 @@ pub fn simplify_self_quotient(c: Context, x: Expr) -> Outcome {
 pub fn expand_log_product(c: Context, a: Expr, b: Expr) -> Outcome {
     s = a.store
     product_id = mul_ids(s, [a.id, b.id])
-    original = "ln(" + show(wrap(s, product_id)) + ")"
+    original = show(wrap(s, intern(s, 5, 0, 1, "ln", [product_id])))
     ca = show(a) + " > 0"
     cb = show(b) + " > 0"
     mut established: List<String> = []
@@ -2683,13 +2698,243 @@ pub fn expand_log_product(c: Context, a: Expr, b: Expr) -> Outcome {
     original_id = intern(s, 5, 0, 1, "ln", [product_id])
     if unknown.length() == 0 {
         split_id = add_ids(s, [intern(s, 5, 0, 1, "ln", [a.id]), intern(s, 5, 0, 1, "ln", [b.id])])
-        return Outcome { rule: "log-of-product", original: original, transformed: show(wrap(s, split_id)), value: wrap(s, split_id), status: "applied", required: required, established: established, unknown: unknown, reason: "both factors are positive in this context, so ln(a b) = ln(a) + ln(b)" }
+        return Outcome { conditions: [condition(a, ">", 0.0, ca), condition(b, ">", 0.0, cb)], rule: "log-of-product", original: original, transformed: show(wrap(s, split_id)), value: wrap(s, split_id), status: "applied", required: required, established: established, unknown: unknown, reason: "both factors are positive in this context, so ln(a b) = ln(a) + ln(b)" }
     }
-    Outcome { rule: "log-of-product", original: original, transformed: original, value: wrap(s, original_id), status: "refused", required: required, established: established, unknown: unknown, reason: "ln(a b) = ln(a) + ln(b) needs a > 0 and b > 0, and the context does not establish both, so the rule is not applied" }
+    Outcome { conditions: [condition(a, ">", 0.0, ca), condition(b, ">", 0.0, cb)], rule: "log-of-product", original: original, transformed: original, value: wrap(s, original_id), status: "refused", required: required, established: established, unknown: unknown, reason: "ln(a b) = ln(a) + ln(b) needs a > 0 and b > 0, and the context does not establish both, so the rule is not applied" }
 }
 
 /// True only when the result holds with no condition: the rule was applied and required nothing. A conditional result
 /// is not an identity of the expression; it is valid only where its required conditions hold.
 pub fn is_identity(o: Outcome) -> Bool {
     o.status == "applied" and o.required.length() == 0
+}
+
+// ---------------------------------------------------------------- composition of conditional steps
+//
+// A Chain is a derivation: an expression, the context it was built under, and the conditional steps applied to its
+// subexpressions. A step is an Outcome computed on `input`, a subexpression of the chain's current value (identified by
+// its node in the store, so only the very same subexpression qualifies). The chain's value becomes the value with that
+// subexpression replaced. The conditions of every step are kept, and no condition is dropped when an expression is
+// produced; a condition the context proves is listed as established, and the others as unknown. A chain is refused
+// when a step is refused, when a step uses another context, when its input is not in the value, or when two of its
+// conditions cannot hold together.
+
+/// A derivation of conditional steps. `status` is "applied" (all conditions established), "applied-conditional" (some
+/// are unknown) or "refused" (the reason is given and the value is the last valid one).
+pub record Chain {
+    input: String
+    value: Expr
+    context: String
+    ctx: Context
+    steps: List<String>
+    conditions: List<Condition>
+    established: List<String>
+    unknown: List<String>
+    status: String
+    reason: String
+}
+
+/// The expression with the subexpression `target` replaced by `replacement`, matched by node identity.
+fn replace_sub_ids(s: Store, id: Int, target: Int, replacement: Int) -> Int {
+    if id == target {
+        return replacement
+    }
+    kind = s.kinds[id]
+    if kind <= 1 {
+        return id
+    }
+    mut parts: List<Int> = []
+    for i in 0 until s.counts[id] {
+        parts.push(replace_sub_ids(s, arg_of(s, id, i), target, replacement))
+    }
+    if kind == 2 {
+        return add_ids(s, parts)
+    }
+    if kind == 3 {
+        return mul_ids(s, parts)
+    }
+    if kind == 4 {
+        return pow_ids(s, parts[0], parts[1])
+    }
+    call_id(s, s.names[id], parts[0])
+}
+
+/// True when `target` occurs in the expression (by node identity).
+fn occurs_in(s: Store, id: Int, target: Int) -> Bool {
+    if id == target {
+        return true
+    }
+    kind = s.kinds[id]
+    if kind <= 1 {
+        return false
+    }
+    for i in 0 until s.counts[id] {
+        if occurs_in(s, arg_of(s, id, i), target) {
+            return true
+        }
+    }
+    false
+}
+
+/// Two conditions on the same expression that cannot hold together: a lower bound above an upper bound, or equal
+/// bounds where one of them is strict.
+fn conditions_clash(a: Condition, b: Condition) -> Bool {
+    if show(a.expr) != show(b.expr) {
+        return false
+    }
+    a_lower = a.relation == ">" or a.relation == ">="
+    a_upper = a.relation == "<" or a.relation == "<="
+    b_lower = b.relation == ">" or b.relation == ">="
+    b_upper = b.relation == "<" or b.relation == "<="
+    if a_lower and b_upper {
+        return a.bound > b.bound or (a.bound == b.bound and (a.relation == ">" or b.relation == "<"))
+    }
+    if b_lower and a_upper {
+        return b.bound > a.bound or (b.bound == a.bound and (b.relation == ">" or a.relation == "<"))
+    }
+    false
+}
+
+fn refuse_chain(ch: Chain, reason: String) -> Chain {
+    Chain { input: ch.input, value: ch.value, context: ch.context, ctx: ch.ctx, steps: ch.steps, conditions: ch.conditions, established: ch.established, unknown: ch.unknown, status: "refused", reason: reason }
+}
+
+/// The chain of the expression a, computed under the context c, with no steps yet.
+pub fn chain_start(a: Expr, c: Context) -> Chain {
+    Chain { input: show(a), value: a, context: describe(c), ctx: c, steps: [], conditions: [], established: [], unknown: [], status: "applied", reason: "" }
+}
+
+/// Applies the outcome o to the subexpression `input` of the chain's value. Refuses the chain (and leaves its value as
+/// it was) when the step is refused, computed under another context, applied to an expression that is not in the
+/// value, or when its conditions clash with those already in the chain.
+pub fn chain_then(ch: Chain, c: Context, input: Expr, o: Outcome) -> Chain {
+    if ch.status == "refused" {
+        return ch
+    }
+    if describe(c) != ch.context {
+        return refuse_chain(ch, "the step was computed under another context: " + describe(c) + " (the chain uses " + ch.context + ")")
+    }
+    s = ch.value.store
+    if not occurs_in(s, ch.value.id, input.id) {
+        return refuse_chain(ch, "the step does not apply: " + show(input) + " is not a subexpression of " + show(ch.value))
+    }
+    if o.status == "refused" {
+        return refuse_chain(ch, "step " + o.rule + " is refused: " + o.reason)
+    }
+    if show(input) != o.original {
+        return refuse_chain(ch, "the step was computed on " + o.original + ", not on " + show(input))
+    }
+    mut conditions: List<Condition> = []
+    for cond in ch.conditions {
+        conditions.push(cond)
+    }
+    for cond in o.conditions {
+        mut known = false
+        for existing in conditions {
+            if existing.text == cond.text {
+                known = true
+            }
+            if conditions_clash(existing, cond) {
+                return refuse_chain(ch, "the conditions " + existing.text + " and " + cond.text + " cannot hold together")
+            }
+        }
+        if not known {
+            conditions.push(cond)
+        }
+    }
+    mut established: List<String> = []
+    for t in ch.established {
+        established.push(t)
+    }
+    for t in o.established {
+        if not text_in(established, t) {
+            established.push(t)
+        }
+    }
+    mut unknown: List<String> = []
+    for cond in conditions {
+        if not text_in(established, cond.text) {
+            unknown.push(cond.text)
+        }
+    }
+    mut steps: List<String> = []
+    for done in ch.steps {
+        steps.push(done)
+    }
+    steps.push(o.rule)
+    replaced = replace_sub_ids(s, ch.value.id, input.id, o.value.id)
+    status = if unknown.length() == 0 { "applied" } else { "applied-conditional" }
+    Chain { input: ch.input, value: wrap(s, replaced), context: ch.context, ctx: ch.ctx, steps: steps, conditions: conditions, established: established, unknown: unknown, status: status, reason: "" }
+}
+
+fn relation_holds(v: Float, relation: String, bound: Float) -> Bool {
+    if relation == "!=" {
+        return v != bound
+    }
+    if relation == ">" {
+        return v > bound
+    }
+    if relation == ">=" {
+        return v >= bound
+    }
+    if relation == "<" {
+        return v < bound
+    }
+    if relation == "<=" {
+        return v <= bound
+    }
+    false
+}
+
+/// The value of the chain at the given symbol values. The chain's value is returned only when every condition holds at
+/// those values, and the context's facts hold too: a point outside the domain is an error that names the condition, not
+/// a number. Established conditions are not checked again, because the context proves them for every value it allows.
+pub fn chain_evaluate(ch: Chain, names: List<String>, values: List<Float>) -> Result<Float, String> {
+    if ch.status == "refused" {
+        return Err("the chain is refused: " + ch.reason)
+    }
+    for f in ch.ctx.facts {
+        mut index = -1
+        for i in 0 until names.length() {
+            if names[i] == f.name {
+                index = i
+            }
+        }
+        if index < 0 {
+            return Err("no value for " + f.name + ", whose context fact " + f.kind + " must be checked")
+        }
+        mut relation = ""
+        mut bound = 0.0
+        if f.kind == "positive" {
+            relation = ">"
+        } else if f.kind == "negative" {
+            relation = "<"
+        } else if f.kind == "nonnegative" {
+            relation = ">="
+        } else if f.kind == "nonpositive" {
+            relation = "<="
+        } else if f.kind == "nonzero" {
+            relation = "!="
+        } else if f.kind == "complex" {
+            return Err("complex values of " + f.name + " are not evaluated here")
+        }
+        if relation != "" and not relation_holds(values[index], relation, bound) {
+            return Err("outside the context: " + f.name + " " + f.kind + " fails at " + f.name + " = " + values[index].to_string())
+        }
+    }
+    for cond in ch.conditions {
+        if not text_in(ch.established, cond.text) {
+            match eval(cond.expr, names, values) {
+                Ok(v) => {
+                    if not relation_holds(v, cond.relation, cond.bound) {
+                        return Err("outside the domain: " + cond.text + " fails (the expression has the value " + v.to_string() + ")")
+                    }
+                },
+                Err(message) => {
+                    return Err("cannot check " + cond.text + ": " + message)
+                },
+            }
+        }
+    }
+    eval(ch.value, names, values)
 }
