@@ -511,8 +511,8 @@ impl Env {
 /// the frame that is already on top, since none of those introduce a new
 /// logical stack frame.
 struct CallFrame {
-    name: String,
-    file: Option<String>,
+    /// The function this frame runs. Shared, so a call records it without copying its name or file.
+    decl: Rc<FunctionDecl>,
     line: usize,
     /// The environment `call_user_function` created for this call (holding
     /// its parameters). `variables` walks from `current_env` up to and
@@ -1696,10 +1696,9 @@ impl Interpreter {
     /// already needed. Not used by `call_callable` (lambdas don't carry a
     /// declared name/source span worth showing as their own frame; their
     /// statements are attributed to whichever named frame called them).
-    fn run_function_body(&mut self, f: &FunctionDecl, call_env: &Env) -> EvalResult {
+    fn run_function_body(&mut self, f: &Rc<FunctionDecl>, call_env: &Env) -> EvalResult {
         self.call_stack.push(CallFrame {
-            name: f.name.clone(),
-            file: f.source_file.clone(),
+            decl: Rc::clone(f),
             line: f.span.line,
             base_env: call_env.clone(),
             current_env: call_env.clone(),
@@ -1718,7 +1717,7 @@ impl Interpreter {
     /// call sites' symmetry with closures.
     fn call_user_function(
         &mut self,
-        f: &FunctionDecl,
+        f: &Rc<FunctionDecl>,
         args: Vec<Value>,
         _caller_env: Env,
     ) -> EvalResult {
@@ -1731,7 +1730,7 @@ impl Interpreter {
 
     fn call_user_function_with_args(
         &mut self,
-        f: &FunctionDecl,
+        f: &Rc<FunctionDecl>,
         args: &[Arg],
         closure_env: Env,
     ) -> EvalResult {
@@ -1742,7 +1741,7 @@ impl Interpreter {
     /// evaluated receiver fills the first parameter (`self`).
     fn call_with_receiver(
         &mut self,
-        f: &FunctionDecl,
+        f: &Rc<FunctionDecl>,
         receiver: Option<Value>,
         args: &[Arg],
         closure_env: Env,
@@ -1899,7 +1898,7 @@ impl Interpreter {
             } else if self
                 .call_stack
                 .last()
-                .and_then(|frame| frame.file.as_deref())
+                .and_then(|frame| frame.decl.source_file.as_deref())
                 .is_some_and(|file| {
                     dbg.breakpoints
                         .get(file)
@@ -2032,10 +2031,10 @@ impl Interpreter {
             .map(|(id, frame)| {
                 json!({
                     "id": id,
-                    "name": frame.name,
+                    "name": frame.decl.name,
                     "line": frame.line,
                     "column": 1,
-                    "source": frame.file.as_ref().map(|file| json!({
+                    "source": frame.decl.source_file.as_ref().map(|file| json!({
                         "path": file,
                         "name": std::path::Path::new(file).file_name().and_then(|n| n.to_str()).unwrap_or(file)
                     }))
@@ -2335,7 +2334,7 @@ impl Interpreter {
             Expr::Located(inner, range) => {
                 if !self.literal_kinds.is_empty() {
                     let key = crate::typeck::ExprKey {
-                        file: self.call_stack.last().and_then(|frame| frame.file.clone()),
+                        file: self.call_stack.last().and_then(|frame| frame.decl.source_file.clone()),
                         start: range.start,
                         end: range.end,
                     };
