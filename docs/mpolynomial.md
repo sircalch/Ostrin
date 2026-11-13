@@ -18,7 +18,8 @@ Implemented and verified:
 Not implemented, and not claimed:
 
 - Multivariate gcd. The univariate gcd of `std.polynomial` is not extended to several variables.
-- Multivariate division with remainder. Only the univariate division of `std.polynomial` exists.
+- Division with remainder by an ordered list of divisors, lexicographic order (see below). A zero remainder with several divisors is not a membership test.
+- Multivariate division is not a gcd: gcd and cancellation are not part of this division.
 - Factorisation of multivariate polynomials.
 
 ## Public API
@@ -44,6 +45,8 @@ Functions:
 | `mpoly_degree_in(p, index)` | `Result<Int, String>` | Degree in one variable; `-1` for the zero polynomial; an index outside the variables is an error. |
 | `mpoly_to_text(p)` | `String` | For example `2*x^2*y - 3*y + 1/2`; the zero polynomial is `0`. |
 | `mpoly_parse(variables, lines)` | `Result<MPoly, String>` | Parses interchange lines (below). |
+| `mpoly_divide(f, divisors)` | `Result<MDivision, String>` | Division with remainder by an ordered list (below). |
+| `mpoly_division_holds(f, divisors, d)` | `Result<Bool, String>` | Checks that `d` is a valid division of `f`. |
 | `mpoly_lines(p)` | `List<String>` | Interchange lines in canonical order. |
 
 Conversions in `std.symbolic`:
@@ -137,6 +140,33 @@ them. Their wording may change within version 1; their presence and the fact of 
 - The record field layout of `Term` and `MPoly` is part of the public API. The module's own functions return canonical
   values. A program that builds an `MPoly` with a record literal bypasses the canonicalisation, so it must use
   `mpoly_from_terms` instead.
+
+## Division with remainder
+
+`mpoly_divide(f, divisors)` divides `f` by an ordered list of divisors and returns `MDivision { quotients, remainder }`.
+
+Algorithm: while `f` has terms left, take its leading term (the largest monomial in lexicographic order). If the leading
+monomial is divisible by the leading monomial of some divisor (the first such divisor in the list), subtract the
+corresponding multiple of that divisor and add the monomial quotient to that divisor's quotient. Otherwise move the term to
+the remainder. Each step lowers the leading monomial of the part not yet divided. Lexicographic order on monomials in a
+fixed number of variables is a well-order, so the leading monomials cannot decrease forever and the division terminates.
+
+Guarantees, checked by the oracle and by `mpoly_division_holds`:
+
+- Identity: `f = q_0 g_0 + ... + q_k g_k + r`, exactly.
+- Remainder property: no term of `r` has a leading monomial divisible by the leading monomial of any divisor.
+- Determinism: the result depends only on the inputs and the order of the divisors.
+
+Not guaranteed: with several divisors, a zero remainder is not a membership test in the ideal they generate, because
+the divisors need not form a Gröbner basis. With one divisor, a zero remainder means `f = q g` exactly. The division is
+not a gcd and does not cancel common factors by itself.
+
+Refused: an empty divisor list, a zero divisor, divisors over different variables. A zero polynomial `f` gives zero
+quotients and a zero remainder. The univariate case agrees with ordinary long division and with
+`std.polynomial.poly_divmod` (checked in the example).
+
+`mpoly_division_holds(f, divisors, d)` returns whether `d` satisfies the identity and the remainder property. It is a
+check of a result, not a second algorithm.
 
 ## Verification
 

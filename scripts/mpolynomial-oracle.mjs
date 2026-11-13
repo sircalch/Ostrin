@@ -19,6 +19,9 @@ const root = join(here, "..");
 const CASES_PATH = join(root, "tests", "oracle", "mpolynomial-cases.json");
 const EXPECTED_PATH = join(root, "tests", "oracle", "mpolynomial-expected.txt");
 const PROGRAM_PATH = join(root, "examples", "mpolynomial_oracle.ostrin");
+const DIVISION_CASES_PATH = join(root, "tests", "oracle", "mpolynomial-division-cases.json");
+const DIVISION_EXPECTED_PATH = join(root, "tests", "oracle", "mpolynomial-division-expected.txt");
+const DIVISION_PROGRAM_PATH = join(root, "examples", "mpolynomial_division_oracle.ostrin");
 
 // The limits of the interchange contract (compiler/std/mpolynomial.ostrin).
 export const LIMITS = { variables: 16, exponent: 1000, terms: 10000, lineLength: 4096 };
@@ -446,33 +449,362 @@ ${calls.join("\n")}
 `;
 }
 
+// ---------------------------------------------------------------- division with remainder (independent)
+
+const rdiv = (a, b) => {
+  if (b.n === 0n) throw new Refusal("division by zero");
+  return rat(a.n * b.d, a.d * b.n);
+};
+
+/**
+ * Division with remainder by an ordered list of divisors, in lexicographic order. The algorithm is written here again,
+ * independently of the Ostrin code, on the rational type above. Returns { quotients, remainder }.
+ */
+export function divide(f, divisors) {
+  if (divisors.length === 0) throw new Refusal("give at least one divisor");
+  for (const g of divisors) {
+    if (!sameVars(f.vars, g.vars)) throw new Refusal("the divisors and the polynomial are over different variables");
+    if (g.terms.length === 0) throw new Refusal("a divisor is the zero polynomial");
+  }
+  const zero = () => ({ vars: f.vars, terms: [] });
+  const quotients = divisors.map(zero);
+  let remainder = zero();
+  let rest = f;
+  while (rest.terms.length > 0) {
+    const lead = rest.terms[0];
+    const term = { vars: f.vars, terms: [lead] };
+    const i = divisors.findIndex((g) => g.terms[0].e.every((x, k) => x <= lead.e[k]));
+    if (i < 0) {
+      remainder = padd(remainder, term);
+      rest = padd(rest, pneg(term));
+    } else {
+      const g = divisors[i];
+      const e = lead.e.map((x, k) => x - g.terms[0].e[k]);
+      const mono = { vars: f.vars, terms: canonical([{ e, c: rdiv(lead.c, g.terms[0].c) }]) };
+      quotients[i] = padd(quotients[i], mono);
+      rest = padd(rest, pneg(pmul(mono, g)));
+    }
+  }
+  return { quotients, remainder };
+}
+
+/** The sum of quotient_i * divisor_i plus the remainder, and whether no remainder term has a divisible leading monomial. */
+export function divisionIsValid(f, divisors, result) {
+  let total = { vars: f.vars, terms: [] };
+  divisors.forEach((g, i) => {
+    total = padd(total, pmul(result.quotients[i], g));
+  });
+  total = padd(total, result.remainder);
+  if (lines(total).join(";") !== lines(f).join(";")) return false;
+  return result.remainder.terms.every((t) => divisors.every((g) => !g.terms[0].e.every((x, k) => x <= t.e[k])));
+}
+
+/** Ordinary long division of univariate polynomials, coefficients lowest degree first. Independent of divide(). */
+export function univariateLongDivision(a, b) {
+  let rem = a.map((c) => rparse(c));
+  const deg = (p) => {
+    for (let k = p.length - 1; k >= 0; k--) if (!isZero(p[k])) return k;
+    return -1;
+  };
+  const db = deg(b.map((c) => rparse(c)));
+  const lb = rparse(b[db]);
+  const quotient = new Array(Math.max(0, rem.length - db)).fill(rat(0n));
+  while (deg(rem) >= db) {
+    const k = deg(rem) - db;
+    const factor = rdiv(rem[deg(rem)], lb);
+    quotient[k] = factor;
+    for (let j = 0; j <= db; j++) {
+      rem[j + k] = radd(rem[j + k], rneg(rmul(factor, rparse(b[j]))));
+    }
+  }
+  return { quotient: quotient.map(rtext), remainder: rem.slice(0, Math.max(db, 0)).map(rtext) };
+}
+
+/** Division properties on seeded random inputs, including a univariate check against long division. */
+export function runDivisionProperties(seed, trials) {
+  const rng = mulberry32(seed);
+  const counts = { trials: 0, checks: 0, failures: [] };
+  const check = (name, ok, detail) => {
+    counts.checks += 1;
+    if (!ok) counts.failures.push(`${name} (seed ${seed}): ${detail}`);
+  };
+  for (let trial = 0; trial < trials; trial++) {
+    counts.trials += 1;
+    const nvars = randInt(rng, 1, 3);
+    const vars = VARIABLE_NAMES.slice(0, nvars);
+    const f = parseLines(vars, randomLines(rng, nvars));
+    const count = randInt(rng, 1, 3);
+    const divisors = [];
+    while (divisors.length < count) {
+      const candidate = parseLines(vars, randomLines(rng, nvars));
+      if (candidate.terms.length > 0) divisors.push(candidate);
+    }
+    const result = divide(f, divisors);
+    const again = divide(f, divisors);
+    check("division identity and remainder property", divisionIsValid(f, divisors, result), `${text(f)}`);
+    check(
+      "division is deterministic",
+      JSON.stringify(result.quotients.map(lines)) === JSON.stringify(again.quotients.map(lines)) &&
+        lines(result.remainder).join(";") === lines(again.remainder).join(";"),
+      text(f),
+    );
+    if (nvars === 1 && divisors.length === 1) {
+      const coefficientsOf = (p) => {
+        const out = Array.from({ length: (p.terms[0]?.e[0] ?? 0) + 1 }, () => "0");
+        for (const t of p.terms) out[t.e[0]] = rtext(t.c);
+        return out;
+      };
+      const reference = univariateLongDivision(coefficientsOf(f), coefficientsOf(divisors[0]));
+      const got = result.quotients[0].terms.length ? coefficientsOf(result.quotients[0]) : [];
+      const gotRemainder = result.remainder.terms.length ? coefficientsOf(result.remainder) : [];
+      const trim = (xs) => {
+        const out = xs.slice();
+        while (out.length > 0 && (out[out.length - 1] === "0" || out[out.length - 1] === undefined)) out.pop();
+        return out;
+      };
+      check(
+        "univariate quotient agrees with long division",
+        JSON.stringify(trim(got)) === JSON.stringify(trim(reference.quotient)),
+        `${text(f)} / ${text(divisors[0])}`,
+      );
+      check(
+        "univariate remainder agrees with long division",
+        JSON.stringify(trim(gotRemainder)) === JSON.stringify(trim(reference.remainder)),
+        `${text(f)} / ${text(divisors[0])}`,
+      );
+    }
+  }
+  return counts;
+}
+
+/** Explicit division cases with known answers, including the hand computations of examples/mpolynomial_division.ostrin. */
+export function divisionEdgeAssertions() {
+  const failures = [];
+  const expect = (name, got, want) => {
+    if (got !== want) failures.push(`${name}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  };
+  const xy = ["x", "y"];
+  const f2 = parseLines(xy, ["1|2,0", "1|0,2"]);
+  const r2 = divide(f2, [parseLines(xy, ["1|1,0", "-1|0,0"]), parseLines(xy, ["1|0,1", "-1|0,0"])]);
+  expect("x^2 + y^2 quotient 0", lines(r2.quotients[0]).join(";"), "1|1,0;1|0,0");
+  expect("x^2 + y^2 quotient 1", lines(r2.quotients[1]).join(";"), "1|0,1;1|0,0");
+  expect("x^2 + y^2 remainder", lines(r2.remainder).join(";"), "2|0,0");
+  const f1 = parseLines(xy, ["1|2,0", "-1|0,2"]);
+  const r1 = divide(f1, [parseLines(xy, ["1|1,0", "1|0,1"])]);
+  expect("x^2 - y^2 quotient", lines(r1.quotients[0]).join(";"), "1|1,0;-1|0,1");
+  expect("x^2 - y^2 remainder", lines(r1.remainder).length, 0);
+  const fu = parseLines(["x"], ["1|3", "-2|1", "5|0"]);
+  const ru = divide(fu, [parseLines(["x"], ["1|2", "1|0"])]);
+  expect("univariate quotient", lines(ru.quotients[0]).join(";"), "1|1");
+  expect("univariate remainder", lines(ru.remainder).join(";"), "-3|1;5|0");
+  expect("zero polynomial divided", lines(divide(parseLines(xy, []), [parseLines(xy, ["1|1,0"])]).remainder).length, 0);
+  return failures;
+}
+
+/** Division cases for the generated Ostrin program. Divisors are lists of lines; an empty divisor list is refused. */
+export function buildDivisionCases() {
+  const cases = [];
+  const valid = (vars, f, divisors) => cases.push({ kind: "valid", vars, f, divisors });
+  const refuse = (vars, f, divisors) => cases.push({ kind: "refuse", vars, f, divisors });
+  valid(["x", "y"], ["1|2,0", "-1|0,2"], [["1|1,0", "1|0,1"]]);
+  valid(["x", "y"], ["1|2,0", "1|0,2"], [["1|1,0", "-1|0,0"], ["1|0,1", "-1|0,0"]]);
+  valid(["x", "y"], ["1|2,1", "1|1,0", "1|0,0"], [["1|1,1", "-1|0,0"]]);
+  valid(["x", "y"], [], [["1|1,0"]]);
+  valid(["x", "y"], ["1/2|1,0", "1/3|0,0"], [["1|1,0"]]);
+  valid(["x"], ["1|3", "-2|1", "5|0"], [["1|2", "1|0"]]);
+  valid(["x", "y", "z"], ["2|2,1,0", "-3|0,1,0", "1/2|0,0,0"], [["1|1,0,1", "-1|0,0,0"], ["1|0,2,0"]]);
+  valid(["x", "y"], ["1|3,0", "1|0,3"], [["1|1,0"], ["1|0,1"]]);
+  refuse(["x", "y"], ["1|1,0"], []);
+  refuse(["x", "y"], ["1|1,0"], [[]]);
+  refuse(["x", "y"], ["1|1,0"], [["1|1"]]);
+  refuse(["x"], ["1|1"], [["1|1,0"]]);
+  const rng = mulberry32(20260801);
+  for (let k = 0; k < 30; k++) {
+    const nvars = randInt(rng, 1, 3);
+    const vars = VARIABLE_NAMES.slice(0, nvars);
+    const f = randomLines(rng, nvars);
+    const divisors = [];
+    const count = randInt(rng, 1, 3);
+    while (divisors.length < count) {
+      const candidate = randomLines(rng, nvars);
+      if (parseLines(vars, candidate).terms.length > 0) divisors.push(candidate);
+    }
+    cases.push({ kind: "valid", vars, f, divisors });
+  }
+  return cases;
+}
+
+/** The expected output of each division case; kind must agree with the rules. */
+export function expectedDivisionOutputs(cases) {
+  return cases.map((c, i) => {
+    const refusal = (() => {
+      if (c.divisors.length === 0) return "no divisors";
+      if (c.divisors.some((d) => d.length === 0)) return "zero divisor";
+      if (c.divisors.some((d) => refusalReason(c.vars, d) !== null)) return "bad divisor";
+      if (refusalReason(c.vars, c.f) !== null) return "bad input";
+      return null;
+    })();
+    if (c.kind === "refuse") {
+      if (refusal === null && refusalReason(c.vars, c.f) === null) {
+        throw new Error(`division case ${i} is marked refuse but the rules accept it`);
+      }
+      return `case ${i}: refused`;
+    }
+    if (refusal !== null) throw new Error(`division case ${i} is marked valid but the rules refuse it: ${refusal}`);
+    const f = parseLines(c.vars, c.f);
+    const divisors = c.divisors.map((d) => parseLines(c.vars, d));
+    const result = divide(f, divisors);
+    if (!divisionIsValid(f, divisors, result)) throw new Error(`division case ${i} violates the identity`);
+    const quotients = result.quotients.map((q) => joinLines(lines(q))).join(" | ");
+    return `case ${i}: quotients=${quotients}; remainder=${joinLines(lines(result.remainder))}`;
+  });
+}
+
+/** The Ostrin program for the division cases. Encoding: lines joined by ";", divisors joined by "#". */
+export function ostrinDivisionProgram(cases) {
+  const quote = (s) => JSON.stringify(s);
+  const list = (xs) => `[${xs.map(quote).join(", ")}]`;
+  const calls = cases.map((c, i) => {
+    const f = c.f.join(";");
+    const ds = c.divisors.map((d) => d.join(";")).join("#");
+    if (c.kind === "refuse") return `    print(refused_division(${i}, ${list(c.vars)}, ${quote(f)}, ${quote(ds)}))`;
+    return `    print(valid_division(${i}, ${list(c.vars)}, ${quote(f)}, ${quote(ds)}))`;
+  });
+  return `// Generated by scripts/mpolynomial-oracle.mjs --write from tests/oracle/mpolynomial-division-cases.json. Do not edit by hand.
+// The expected output is tests/oracle/mpolynomial-division-expected.txt, computed by the independent BigInt oracle.
+import std.mpolynomial
+
+fn lines_of(text: String) -> List<String> {
+    mut items: List<String> = []
+    if text == "" {
+        return items
+    }
+    for piece in text.split(";") {
+        items.push(piece)
+    }
+    items
+}
+
+fn join_lines(items: List<String>) -> String {
+    if items.length() == 0 {
+        return "zero"
+    }
+    mut text = ""
+    for i in 0 until items.length() {
+        if i == 0 {
+            text = items[i]
+        } else {
+            text = text + ";" + items[i]
+        }
+    }
+    text
+}
+
+fn valid_division(index: Int, vars: List<String>, f_text: String, divisors_text: String) -> String {
+    f = mpolynomial.mpoly_parse(vars, lines_of(f_text)).unwrap()
+    parts = divisors_text.split("#")
+    mut divisors = [mpolynomial.mpoly_parse(vars, lines_of(parts[0])).unwrap()]
+    for k in 1 until parts.length() {
+        divisors.push(mpolynomial.mpoly_parse(vars, lines_of(parts[k])).unwrap())
+    }
+    d = mpolynomial.mpoly_divide(f, divisors).unwrap()
+    mut quotients = ""
+    for i in 0 until d.quotients.length() {
+        if i == 0 {
+            quotients = join_lines(mpolynomial.mpoly_lines(d.quotients[i]))
+        } else {
+            quotients = quotients + " | " + join_lines(mpolynomial.mpoly_lines(d.quotients[i]))
+        }
+    }
+    return "case " + index.to_string() + ": quotients=" + quotients + "; remainder=" + join_lines(mpolynomial.mpoly_lines(d.remainder))
+}
+
+fn refused_division(index: Int, vars: List<String>, f_text: String, divisors_text: String) -> String {
+    refused = "case " + index.to_string() + ": refused"
+    if divisors_text == "" {
+        return refused
+    }
+    match mpolynomial.mpoly_parse(vars, lines_of(f_text)) {
+        Err(message) => {
+            return refused
+        },
+        Ok(f) => {
+            parts = divisors_text.split("#")
+            match mpolynomial.mpoly_parse(vars, lines_of(parts[0])) {
+                Err(message) => {
+                    return refused
+                },
+                Ok(first) => {
+                    mut divisors = [first]
+                    mut bad = false
+                    for k in 1 until parts.length() {
+                        match mpolynomial.mpoly_parse(vars, lines_of(parts[k])) {
+                            Err(message) => {
+                                bad = true
+                            },
+                            Ok(g) => {
+                                divisors.push(g)
+                            },
+                        }
+                    }
+                    if bad {
+                        return refused
+                    }
+                    match mpolynomial.mpoly_divide(f, divisors) {
+                        Err(message) => {
+                            return refused
+                        },
+                        Ok(d) => {
+                            return "case " + index.to_string() + ": accepted"
+                        },
+                    }
+                },
+            }
+        },
+    }
+    return refused
+}
+
+fn main() -> Void {
+${calls.join("\n")}
+}
+`;
+}
+
 // ---------------------------------------------------------------- command line
 
 function generated() {
   const cases = buildCases();
+  const divisionCases = buildDivisionCases();
   return {
     cases: JSON.stringify({ format: "mpolynomial-oracle-cases", version: 1, cases }, null, 2) + "\n",
     expected: expectedOutputs(cases).join("\n") + "\n",
     program: ostrinProgram(cases),
+    divisionCases: JSON.stringify({ format: "mpolynomial-division-cases", version: 1, cases: divisionCases }, null, 2) + "\n",
+    divisionExpected: expectedDivisionOutputs(divisionCases).join("\n") + "\n",
+    divisionProgram: ostrinDivisionProgram(divisionCases),
   };
 }
+
+const GENERATED = [
+  [CASES_PATH, "cases"],
+  [EXPECTED_PATH, "expected"],
+  [PROGRAM_PATH, "program"],
+  [DIVISION_CASES_PATH, "divisionCases"],
+  [DIVISION_EXPECTED_PATH, "divisionExpected"],
+  [DIVISION_PROGRAM_PATH, "divisionProgram"],
+];
 
 function main() {
   const mode = process.argv[2] ?? "";
   if (mode === "--write" || mode === "--check") {
     const files = generated();
     if (mode === "--write") {
-      writeFileSync(CASES_PATH, files.cases);
-      writeFileSync(EXPECTED_PATH, files.expected);
-      writeFileSync(PROGRAM_PATH, files.program);
-      console.log("wrote tests/oracle/mpolynomial-cases.json, tests/oracle/mpolynomial-expected.txt and examples/mpolynomial_oracle.ostrin");
+      for (const [path, key] of GENERATED) writeFileSync(path, files[key]);
+      console.log("wrote the interchange and division oracle files under tests/oracle/ and examples/");
       return;
     }
-    const stale = [
-      [CASES_PATH, files.cases],
-      [EXPECTED_PATH, files.expected],
-      [PROGRAM_PATH, files.program],
-    ].filter(([path, text]) => {
+    const stale = GENERATED.map(([path, key]) => [path, files[key]]).filter(([path, text]) => {
       try {
         return readFileSync(path, "utf8").replace(/\r\n/g, "\n") !== text;
       } catch {
@@ -487,7 +819,7 @@ function main() {
     return;
   }
 
-  let failures = edgeAssertions();
+  let failures = edgeAssertions().concat(divisionEdgeAssertions());
   const seeds = [1, 2, 3, 20260731];
   let trials = 0;
   let checks = 0;
@@ -496,10 +828,17 @@ function main() {
     trials += counts.trials;
     checks += counts.checks;
     failures = failures.concat(counts.failures);
+    const division = runDivisionProperties(seed, 100);
+    trials += division.trials;
+    checks += division.checks;
+    failures = failures.concat(division.failures);
   }
   const cases = buildCases();
   expectedOutputs(cases);
-  console.log(`edge assertions: ${edgeAssertions().length === 0 ? "all pass" : "failures"}`);
+  const divisionCases = buildDivisionCases();
+  expectedDivisionOutputs(divisionCases);
+  console.log(`edge assertions: ${failures.length === 0 ? "all pass" : "failures"}`);
+  console.log(`division cases: ${divisionCases.length} (${divisionCases.filter((c) => c.kind === "refuse").length} refused)`);
   console.log(`property trials: ${trials}, checks: ${checks}, seeds: ${seeds.join(", ")}`);
   console.log(`interchange cases: ${cases.length} (${cases.filter((c) => c.kind === "refuse").length} refused)`);
   if (failures.length > 0) {

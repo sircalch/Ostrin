@@ -227,5 +227,5 @@ Verification:
   cancellation, merging and fractions, and the round trip with `std.symbolic` (derivative compared with
   `symbolic.diff`), and the refusals.
 
-Not implemented, and not claimed: multivariate gcd, multivariate division with remainder, multivariate factorisation.
-The univariate division and gcd of `std.polynomial` are the only ones available.
+Not implemented, and not claimed: multivariate gcd, multivariate factorisation.
+Division with remainder by an ordered list of divisors (lexicographic order) is implemented and verified; the univariate gcd and division of `std.polynomial` remain the only gcd.

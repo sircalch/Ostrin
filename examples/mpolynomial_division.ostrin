@@ -1,0 +1,125 @@
+// Division with remainder of multivariate polynomials by an ordered list of divisors (lexicographic order), with
+// hand-computed results, the identity f = q0 g0 + ... + qk gk + r, the remainder property, and a cross-check of the
+// univariate case against std.polynomial.poly_divmod.
+import std.mpolynomial
+import std.polynomial
+
+fn main() -> Void {
+    mut failures = 0
+    xy = ["x", "y"]
+
+    // exact division: (x + y)(x - y) = x^2 - y^2 by x + y gives quotient x - y and remainder 0
+    f1 = mpolynomial.mpoly_parse(xy, ["1|2,0", "-1|0,2"]).unwrap()
+    g1 = mpolynomial.mpoly_parse(xy, ["1|1,0", "1|0,1"]).unwrap()
+    d1 = mpolynomial.mpoly_divide(f1, [g1]).unwrap()
+    if mpolynomial.mpoly_lines(d1.quotients[0]) != ["1|1,0", "-1|0,1"] or mpolynomial.mpoly_lines(d1.remainder).length() != 0 {
+        print("FAIL exact division")
+        failures = failures + 1
+    }
+    if not mpolynomial.mpoly_division_holds(f1, [g1], d1).unwrap() {
+        print("FAIL identity for exact division")
+        failures = failures + 1
+    }
+
+    // several divisors, hand computed: x^2 + y^2 by [x - 1, y - 1] gives q0 = x + 1, q1 = y + 1, r = 2
+    f2 = mpolynomial.mpoly_parse(xy, ["1|2,0", "1|0,2"]).unwrap()
+    g2a = mpolynomial.mpoly_parse(xy, ["1|1,0", "-1|0,0"]).unwrap()
+    g2b = mpolynomial.mpoly_parse(xy, ["1|0,1", "-1|0,0"]).unwrap()
+    d2 = mpolynomial.mpoly_divide(f2, [g2a, g2b]).unwrap()
+    if mpolynomial.mpoly_lines(d2.quotients[0]) != ["1|1,0", "1|0,0"] {
+        print("FAIL quotient for the first divisor")
+        failures = failures + 1
+    }
+    if mpolynomial.mpoly_lines(d2.quotients[1]) != ["1|0,1", "1|0,0"] {
+        print("FAIL quotient for the second divisor")
+        failures = failures + 1
+    }
+    if mpolynomial.mpoly_lines(d2.remainder) != ["2|0,0"] {
+        print("FAIL remainder with several divisors")
+        failures = failures + 1
+    }
+    if not mpolynomial.mpoly_division_holds(f2, [g2a, g2b], d2).unwrap() {
+        print("FAIL identity with several divisors")
+        failures = failures + 1
+    }
+
+    // division with remainder of a polynomial whose terms are not divisible: x^2 y + x + 1 by x y - 1
+    f3 = mpolynomial.mpoly_parse(xy, ["1|2,1", "1|1,0", "1|0,0"]).unwrap()
+    g3 = mpolynomial.mpoly_parse(xy, ["1|1,1", "-1|0,0"]).unwrap()
+    d3 = mpolynomial.mpoly_divide(f3, [g3]).unwrap()
+    if not mpolynomial.mpoly_division_holds(f3, [g3], d3).unwrap() {
+        print("FAIL identity with remainder")
+        failures = failures + 1
+    }
+    if mpolynomial.mpoly_lines(d3.remainder).length() == 0 {
+        print("FAIL the remainder should not be zero here")
+        failures = failures + 1
+    }
+
+    // zero polynomial
+    z = mpolynomial.mpoly_zero(xy)
+    dz = mpolynomial.mpoly_divide(z, [g1]).unwrap()
+    if mpolynomial.mpoly_lines(dz.remainder).length() != 0 or mpolynomial.mpoly_lines(dz.quotients[0]).length() != 0 {
+        print("FAIL the zero polynomial")
+        failures = failures + 1
+    }
+
+    // rational coefficients: (x/2 + 1/3) divided by x, remainder 1/3
+    fr = mpolynomial.mpoly_parse(["x"], ["1/2|1", "1/3|0"]).unwrap()
+    gr = mpolynomial.mpoly_parse(["x"], ["1|1"]).unwrap()
+    dr = mpolynomial.mpoly_divide(fr, [gr]).unwrap()
+    if mpolynomial.mpoly_lines(dr.quotients[0]) != ["1/2|0"] or mpolynomial.mpoly_lines(dr.remainder) != ["1/3|0"] {
+        print("FAIL rational coefficients")
+        failures = failures + 1
+    }
+
+    // univariate cross-check with std.polynomial: x^3 - 2x + 5 by x^2 + 1
+    fu = mpolynomial.mpoly_parse(["x"], ["1|3", "-2|1", "5|0"]).unwrap()
+    gu = mpolynomial.mpoly_parse(["x"], ["1|2", "1|0"]).unwrap()
+    du = mpolynomial.mpoly_divide(fu, [gu]).unwrap()
+    pu = polynomial.poly_divmod(polynomial.poly_from_ints([5, -2, 0, 1]), polynomial.poly_from_ints([1, 0, 1])).unwrap()
+    if mpolynomial.mpoly_lines(du.quotients[0]) != ["1|1"] or mpolynomial.mpoly_lines(du.remainder) != ["-3|1", "5|0"] {
+        print("FAIL the univariate division by hand")
+        failures = failures + 1
+    }
+    // std.polynomial stores coefficients lowest degree first: quotient x is [0, 1], remainder 5 - 3x is [5, -3]
+    if pu.quotient.coeffs != ["0", "1"] or pu.remainder.coeffs != ["5", "-3"] {
+        print("FAIL the univariate division disagrees with std.polynomial")
+        failures = failures + 1
+    }
+
+    // refusals
+    match mpolynomial.mpoly_divide(f1, []) {
+        Ok(v) => {
+            print("FAIL no divisors were refused")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("no divisors: " + message)
+        },
+    }
+    match mpolynomial.mpoly_divide(f1, [mpolynomial.mpoly_zero(xy)]) {
+        Ok(v) => {
+            print("FAIL a zero divisor was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("zero divisor: " + message)
+        },
+    }
+    match mpolynomial.mpoly_divide(f1, [mpolynomial.mpoly_parse(["x"], ["1|1"]).unwrap()]) {
+        Ok(v) => {
+            print("FAIL divisors over other variables were accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("different variables: " + message)
+        },
+    }
+
+    if failures == 0 {
+        print("all division checks passed")
+    } else {
+        print("division checks failed: " + failures.to_string())
+    }
+}

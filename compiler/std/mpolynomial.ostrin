@@ -517,3 +517,229 @@ pub fn mpoly_lines(p: MPoly) -> List<String> {
     }
     lines
 }
+
+// ---------------------------------------------------------------- division with remainder
+
+fn frac_div(a: String, b: String) -> Result<String, String> {
+    return match bigint.fraction_parse(a) {
+        Err(message) => Err(message),
+        Ok(x) => match bigint.fraction_parse(b) {
+            Err(message) => Err(message),
+            Ok(y) => match bigint.fraction_div(x, y) {
+                Err(message) => Err(message),
+                Ok(z) => Ok(bigint.fraction_to_string(z)),
+            },
+        },
+    }
+}
+
+/// The quotients and the remainder of a division with remainder by an ordered list of divisors.
+/// `f = quotients[0] * divisors[0] + ... + quotients[k] * divisors[k] + remainder`.
+pub record MDivision {
+    quotients: List<MPoly>
+    remainder: MPoly
+}
+
+/// The state of the division between steps: the quotients so far, the remainder so far, and the part of f not yet
+/// divided. Every step moves the leading term of `rest` into a quotient or into the remainder.
+record DivState {
+    quotients: List<MPoly>
+    remainder: MPoly
+    rest: MPoly
+}
+
+/// True when every exponent of `divisor` is at most the matching exponent of `monomial`.
+fn monomial_divides(monomial: List<Int>, divisor: List<Int>) -> Bool {
+    for i in 0 until monomial.length() {
+        if divisor[i] > monomial[i] {
+            return false
+        }
+    }
+    true
+}
+
+/// The list with the entry at `index` replaced (lists cannot be assigned by index).
+fn replace_at(items: List<MPoly>, index: Int, value: MPoly) -> List<MPoly> {
+    mut next: List<MPoly> = []
+    for i in 0 until items.length() {
+        if i == index {
+            next.push(value)
+        } else {
+            next.push(items[i])
+        }
+    }
+    next
+}
+
+/// One step of the division. The leading term of `rest` has a leading monomial divisible by the leading monomial of the
+/// first divisor that divides it, or else it goes to the remainder. Either way the leading monomial of `rest` decreases
+/// in lexicographic order, so the division terminates.
+fn divide_step(state: DivState, divisors: List<MPoly>) -> Result<DivState, String> {
+    lead = state.rest.terms[0]
+    mut chosen = -1
+    for i in 0 until divisors.length() {
+        if chosen < 0 and monomial_divides(lead.exponents, divisors[i].terms[0].exponents) {
+            chosen = i
+        }
+    }
+    if chosen < 0 {
+        match mpoly_from_terms(state.rest.variables, [lead]) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(term_poly) => {
+                match mpoly_add(state.remainder, term_poly) {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(new_remainder) => {
+                        match mpoly_subtract(state.rest, term_poly) {
+                            Err(message) => {
+                                return Err(message)
+                            },
+                            Ok(new_rest) => {
+                                return Ok(DivState { quotients: state.quotients, remainder: new_remainder, rest: new_rest })
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    }
+    g = divisors[chosen].terms[0]
+    mut quotient_exponents: List<Int> = []
+    for i in 0 until lead.exponents.length() {
+        quotient_exponents.push(lead.exponents[i] - g.exponents[i])
+    }
+    match frac_div(lead.coefficient, g.coefficient) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(c) => {
+            quotient_term = Term { exponents: quotient_exponents, coefficient: c }
+            match mpoly_from_terms(state.rest.variables, [quotient_term]) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(mono) => {
+                    match mpoly_multiply(mono, divisors[chosen]) {
+                        Err(message) => {
+                            return Err(message)
+                        },
+                        Ok(product) => {
+                            match mpoly_subtract(state.rest, product) {
+                                Err(message) => {
+                                    return Err(message)
+                                },
+                                Ok(new_rest) => {
+                                    match mpoly_add(state.quotients[chosen], mono) {
+                                        Err(message) => {
+                                            return Err(message)
+                                        },
+                                        Ok(new_quotient) => {
+                                            return Ok(DivState {
+                                                quotients: replace_at(state.quotients, chosen, new_quotient),
+                                                remainder: state.remainder,
+                                                rest: new_rest,
+                                            })
+                                        },
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        },
+    }
+    return Err("internal error: a division step did not produce a result")
+}
+
+/// True when `d` is a valid division of `f` by `divisors`: f equals the sum of quotients times divisors plus the remainder
+/// exactly, and no term of the remainder has a leading monomial divisible by the leading monomial of a divisor. Errors
+/// when a divisor is zero or the quotient count differs from the divisor count.
+pub fn mpoly_division_holds(f: MPoly, divisors: List<MPoly>, d: MDivision) -> Result<Bool, String> {
+    if d.quotients.length() != divisors.length() {
+        return Err("the quotient count differs from the divisor count")
+    }
+    for g in divisors {
+        if g.terms.length() == 0 {
+            return Err("a divisor is the zero polynomial")
+        }
+    }
+    mut total = mpoly_zero(f.variables)
+    for i in 0 until divisors.length() {
+        match mpoly_multiply(d.quotients[i], divisors[i]) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(product) => {
+                match mpoly_add(total, product) {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(sum) => {
+                        total = sum
+                    },
+                }
+            },
+        }
+    }
+    match mpoly_add(total, d.remainder) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(all) => {
+            if mpoly_lines(all) != mpoly_lines(f) {
+                return Ok(false)
+            }
+        },
+    }
+    for t in d.remainder.terms {
+        for g in divisors {
+            if monomial_divides(t.exponents, g.terms[0].exponents) {
+                return Ok(false)
+            }
+        }
+    }
+    Ok(true)
+}
+
+/// Division with remainder of `f` by an ordered list of divisors, in lexicographic order of the monomials (the order of
+/// the variables: the first variable is compared first; the canonical term order of this module).
+///
+/// The result satisfies f = q_0 g_0 + ... + q_k g_k + r exactly, and no term of r has a leading monomial divisible by the
+/// leading monomial of any divisor. The result depends on the order of the divisors, and it is deterministic.
+///
+/// With one divisor, a zero remainder means f = q g exactly. With several divisors, a zero remainder is not a test of
+/// membership in the ideal generated by them: the divisors need not form a Gröbner basis, so this function does not claim
+/// it. It is not a gcd either. Refused: no divisors, a zero divisor, divisors over different variables.
+pub fn mpoly_divide(f: MPoly, divisors: List<MPoly>) -> Result<MDivision, String> {
+    if divisors.length() == 0 {
+        return Err("give at least one divisor")
+    }
+    for g in divisors {
+        if not same_variables(f.variables, g.variables) {
+            return Err("the divisors and the polynomial are over different variables")
+        }
+        if g.terms.length() == 0 {
+            return Err("a divisor is the zero polynomial")
+        }
+    }
+    mut zeros: List<MPoly> = []
+    for i in 0 until divisors.length() {
+        zeros.push(mpoly_zero(f.variables))
+    }
+    mut state = DivState { quotients: zeros, remainder: mpoly_zero(f.variables), rest: f }
+    while state.rest.terms.length() > 0 {
+        match divide_step(state, divisors) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(next) => {
+                state = next
+            },
+        }
+    }
+    Ok(MDivision { quotients: state.quotients, remainder: state.remainder })
+}

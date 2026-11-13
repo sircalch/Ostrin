@@ -28,7 +28,7 @@ or MATLAB. No results from those systems are included.
 | Multivariate polynomials: canonical form over exact rationals; add, subtract, multiply, evaluate, derivative, degrees, text | Verified | Lexicographic canonical order; oracle with BigInt and fixed seeds (600 property trials, 58 interchange cases). See `docs/mpolynomial.md`. | `mpolynomial_core`, `mpolynomial_oracle` (interpreter and native) |
 | Conversion between `std.symbolic` expressions and multivariate polynomials (text interchange lines, version 1) | Verified | Refuses non-polynomial terms, negative exponents, repeated names; limits in `docs/mpolynomial.md`. | `mpolynomial_core`, `mpolynomial_oracle` |
 | Multivariate gcd | Not present | Not claimed. | — |
-| Multivariate division with remainder | Not present | Not claimed until its algorithm and order are implemented and verified. | — |
+| Multivariate division with remainder by an ordered list of divisors (lexicographic order) | Verified | Identity and remainder property checked; a zero remainder with several divisors is not a membership test (no Gröbner basis). | `mpolynomial_division`, `mpolynomial_division_oracle` (interpreter and native) |
 | Irreducible polynomial solving over algebraic or complex numbers | Not present | — | — |
 | Rational expressions: cancellation of a factor (linear denominator with a root the numerator vanishes at) | Verified | Linear denominators only; the removed point is kept as a condition. | `symbolic_conditional`, `symbolic_chain` |
 | General rational function simplification (gcd of polynomials, partial fractions) | Not present | — | — |
