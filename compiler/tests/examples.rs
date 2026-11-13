@@ -22268,6 +22268,16 @@ fn interpreter_range_loops_match_native_and_keep_their_semantics() {
     );
 }
 
+#[test]
+fn interpreter_calls_match_native_and_keep_their_semantics() {
+    // Calls: the positional fast path, named and default arguments, recursion, methods and closures, and the
+    // evaluation order of the arguments. The native build agrees.
+    assert_eq!(
+        interpreter_and_native_agree("interp_calls.ostrin"),
+        "all call checks passed\n"
+    );
+}
+
 fn interpreter_and_native_agree_from(file: &str, dir: &std::path::Path) -> String {
     // Like interpreter_and_native_agree, but the program runs from `dir`, so it can read its data by a relative path.
     let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))

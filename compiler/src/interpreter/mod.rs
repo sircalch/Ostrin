@@ -418,8 +418,31 @@ pub enum RuntimeError {
 
 pub type EvalResult = Result<Value, RuntimeError>;
 
+/// FNV-1a: a fast, deterministic hasher for the interpreter's name tables. Names are short, and every variable read,
+/// binding and call looks one up; the standard hasher is much slower on such keys, and it is not needed here because no
+/// security property depends on these tables.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct NameHasher(u64);
+
+impl std::hash::Hasher for NameHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let mut hash = if self.0 == 0 { 0xcbf2_9ce4_8422_2325 } else { self.0 };
+        for byte in bytes {
+            hash ^= *byte as u64;
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        self.0 = hash;
+    }
+}
+
+pub(crate) type NameMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<NameHasher>>;
+
 struct Frame {
-    vars: HashMap<String, Value>,
+    vars: NameMap<String, Value>,
     parent: Option<Env>,
 }
 
@@ -429,14 +452,14 @@ pub struct Env(Rc<RefCell<Frame>>);
 impl Env {
     fn root() -> Self {
         Env(Rc::new(RefCell::new(Frame {
-            vars: HashMap::new(),
+            vars: NameMap::default(),
             parent: None,
         })))
     }
 
     fn child(&self) -> Self {
         Env(Rc::new(RefCell::new(Frame {
-            vars: HashMap::new(),
+            vars: NameMap::default(),
             parent: Some(self.clone()),
         })))
     }
@@ -616,10 +639,10 @@ fn dap_set_breakpoints(dbg: &mut Debugger, arguments: &JsonValue) -> JsonValue {
 }
 
 pub struct Interpreter {
-    functions: HashMap<String, Rc<FunctionDecl>>,
+    functions: NameMap<String, Rc<FunctionDecl>>,
     records: HashMap<String, RecordDecl>,
     enums: HashMap<String, EnumDecl>,
-    variant_to_enum: HashMap<String, String>,
+    variant_to_enum: NameMap<String, String>,
     impls: HashMap<String, Vec<RuntimeImpl>>,
     traits: HashMap<String, TraitDecl>,
     derives: HashMap<String, Vec<String>>,
@@ -656,10 +679,10 @@ impl Interpreter {
     }
 
     pub fn new(items: &[Item]) -> Self {
-        let mut functions = HashMap::new();
+        let mut functions = NameMap::default();
         let mut records = HashMap::new();
         let mut enums = HashMap::new();
-        let mut variant_to_enum = HashMap::new();
+        let mut variant_to_enum = NameMap::default();
         let mut impls: HashMap<String, Vec<RuntimeImpl>> = HashMap::new();
         let mut traits: HashMap<String, TraitDecl> = HashMap::new();
         let mut derives: HashMap<String, Vec<String>> = HashMap::new();
@@ -1681,7 +1704,7 @@ impl Interpreter {
             base_env: call_env.clone(),
             current_env: call_env.clone(),
         });
-        let result = match self.eval_block(&f.body, call_env) {
+        let result = match self.eval_block_in(&f.body, call_env) {
             Ok(v) => Ok(v),
             Err(RuntimeError::Return(v)) => Ok(v),
             other => other,
@@ -1699,7 +1722,7 @@ impl Interpreter {
         args: Vec<Value>,
         _caller_env: Env,
     ) -> EvalResult {
-        let call_env = Env::root().child();
+        let call_env = Env::root();
         for (param, arg) in f.params.iter().zip(args.into_iter()) {
             call_env.define(&param.name, arg);
         }
@@ -1724,6 +1747,19 @@ impl Interpreter {
         args: &[Arg],
         closure_env: Env,
     ) -> EvalResult {
+        // Fast path: a purely positional call with one argument per parameter. The arguments are evaluated in the
+        // caller's environment, in order, and bound directly; this is what the general path below does for such a call.
+        if receiver.is_none()
+            && args.len() == f.params.len()
+            && args.iter().all(|arg| matches!(arg, Arg::Positional(_)))
+        {
+            let call_env = Env::root();
+            for (param, arg) in f.params.iter().zip(args.iter()) {
+                let value = self.eval_arg(arg, &closure_env)?;
+                call_env.define(&param.name, value);
+            }
+            return self.run_function_body(f, &call_env);
+        }
         let mut values: Vec<Option<Value>> = (0..f.params.len()).map(|_| None).collect();
         let mut next_positional = 0usize;
         if let Some(receiver) = receiver {
@@ -1772,7 +1808,7 @@ impl Interpreter {
             }
         }
 
-        let call_env = Env::root().child();
+        let call_env = Env::root();
         for (index, param) in f.params.iter().enumerate() {
             let value = match values[index].take() {
                 Some(value) => value,
