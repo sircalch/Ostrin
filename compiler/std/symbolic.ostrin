@@ -2938,3 +2938,152 @@ pub fn chain_evaluate(ch: Chain, names: List<String>, values: List<Float>) -> Re
     }
     eval(ch.value, names, values)
 }
+
+// ---------------------------------------------------------------- multivariate polynomials and expressions
+//
+// Interchange form: one line per term, "coefficient|e1,e2,...", with one exponent for each variable, in the order of
+// the variables. Other std modules cannot name the types of this module in a signature, so std.mpolynomial parses and
+// formats these lines (mpoly_parse, mpoly_lines).
+
+/// Adds `by` to the exponent at index (a fresh list; lists are not assigned by index).
+fn bump_exponent(exponents: List<Int>, index: Int, by: Int) -> List<Int> {
+    mut next: List<Int> = []
+    for i in 0 until exponents.length() {
+        if i == index {
+            next.push(exponents[i] + by)
+        } else {
+            next.push(exponents[i])
+        }
+    }
+    next
+}
+
+/// The first name that occurs twice in the list, or "" when all names are distinct.
+fn repeated_name(names: List<String>) -> String {
+    for i in 0 until names.length() {
+        for j in 0 until i {
+            if names[j] == names[i] {
+                return names[i]
+            }
+        }
+    }
+    ""
+}
+
+fn symbol_position(names: List<String>, name: String) -> Int {
+    for i in 0 until names.length() {
+        if names[i] == name {
+            return i
+        }
+    }
+    -1
+}
+
+fn exponents_text(exponents: List<Int>) -> String {
+    mut text = ""
+    for i in 0 until exponents.length() {
+        if i == 0 {
+            text = exponents[i].to_string()
+        } else {
+            text = text + "," + exponents[i].to_string()
+        }
+    }
+    text
+}
+
+/// The terms of an expression over the given variable names, as interchange lines. The expression is expanded first;
+/// every term must be a rational number times the variables and non-negative integer powers of them. Anything else (a
+/// function of a variable, a symbol that is not a variable, a negative or symbolic exponent) is refused with the term
+/// that is not polynomial. The expression and its variables must come from the same store.
+pub fn expression_term_lines(a: Expr, names: List<String>) -> Result<List<String>, String> {
+    repeated = repeated_name(names)
+    if repeated != "" {
+        return Err("the variable " + repeated + " is repeated")
+    }
+    s = a.store
+    expanded = expand_ids(s, a.id)
+    mut parts: List<Int> = []
+    if s.kinds[expanded] == 2 {
+        for i in 0 until s.counts[expanded] {
+            parts.push(arg_of(s, expanded, i))
+        }
+    } else {
+        parts.push(expanded)
+    }
+    mut lines: List<String> = []
+    for part in parts {
+        mut factors: List<Int> = []
+        if s.kinds[part] == 3 {
+            for i in 0 until s.counts[part] {
+                factors.push(arg_of(s, part, i))
+            }
+        } else {
+            factors.push(part)
+        }
+        mut coefficient = rat(s, 1, 1)
+        mut exponents: List<Int> = []
+        for i in 0 until names.length() {
+            exponents.push(0)
+        }
+        for f in factors {
+            kind = s.kinds[f]
+            if kind == 0 {
+                coefficient = rat_mul(s, coefficient, rat_of(s, f))
+            } else if kind == 1 {
+                index = symbol_position(names, s.names[f])
+                if index < 0 {
+                    return Err("the expression has the symbol " + s.names[f] + ", which is not one of the variables")
+                }
+                exponents = bump_exponent(exponents, index, 1)
+            } else if kind == 4 and s.kinds[arg_of(s, f, 0)] == 1 and is_int_num(s, arg_of(s, f, 1)) and s.nums[arg_of(s, f, 1)] >= 0 {
+                index = symbol_position(names, s.names[arg_of(s, f, 0)])
+                if index < 0 {
+                    return Err("the expression has the symbol " + s.names[arg_of(s, f, 0)] + ", which is not one of the variables")
+                }
+                exponents = bump_exponent(exponents, index, s.nums[arg_of(s, f, 1)])
+            } else {
+                return Err("not a polynomial in these variables: " + show_ids(s, part))
+            }
+        }
+        lines.push(rat_text_of(coefficient) + "|" + exponents_text(exponents))
+    }
+    Ok(lines)
+}
+
+/// The expression of interchange lines, over the given symbols (one for each variable, in order). Exact: the coefficients
+/// are rationals and the expression is built with the store's canonical forms.
+pub fn expression_of_term_lines(symbols: List<Expr>, lines: List<String>) -> Result<Expr, String> {
+    if symbols.length() == 0 {
+        return Err("give at least one symbol, so that the store is known")
+    }
+    s = symbols[0].store
+    mut total = int_id(s, 0)
+    for line in lines {
+        pieces = line.split("|")
+        if pieces.length() != 2 {
+            return Err("a term line must be coefficient|exponents: " + line)
+        }
+        mut product = num_id(s, rat_from_text(s, pieces[0]))
+        exponent_fields = pieces[1].split(",")
+        if exponent_fields.length() != symbols.length() {
+            return Err("a term has " + exponent_fields.length().to_string() + " exponents for " + symbols.length().to_string() + " variables")
+        }
+        for i in 0 until exponent_fields.length() {
+            match parse_int(exponent_fields[i]) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(e) => {
+                    if e < 0 {
+                        return Err("the exponent " + e.to_string() + " is negative; polynomial exponents are not negative")
+                    }
+                    if e > 0 {
+                        product = mul_ids(s, [product, pow_ids(s, symbols[i].id, int_id(s, e))])
+                    }
+                },
+            }
+        }
+        total = add_ids(s, [total, product])
+    }
+    Ok(wrap(s, total))
+}

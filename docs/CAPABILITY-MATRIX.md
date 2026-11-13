@@ -25,6 +25,10 @@ or MATLAB. No results from those systems are included.
 | Reduced radical form of irrational quadratic roots | Verified | Discriminant within bounds (numerator × denominator ≤ 10¹²); larger keep the old form. | `symbolic_radicals`, `symbolic_solve` |
 | Polynomial roots over the rationals (degree ≤ 2 closed form; cubic and higher when rational roots exist) | Partial | Degree-2 closed form; cubic and higher only by rational factorisation. Complex roots: refused, not represented. | `symbolic_solve` |
 | Rational factorisation of polynomials | Partial | Rational roots only; a factor of degree ≥ 2 without rational roots is reported as not available. | `symbolic_solve` |
+| Multivariate polynomials: canonical form over exact rationals; add, subtract, multiply, evaluate, derivative, degrees, text | Verified | Lexicographic canonical order; oracle with BigInt and fixed seeds (600 property trials, 58 interchange cases). See `docs/mpolynomial.md`. | `mpolynomial_core`, `mpolynomial_oracle` (interpreter and native) |
+| Conversion between `std.symbolic` expressions and multivariate polynomials (text interchange lines, version 1) | Verified | Refuses non-polynomial terms, negative exponents, repeated names; limits in `docs/mpolynomial.md`. | `mpolynomial_core`, `mpolynomial_oracle` |
+| Multivariate gcd | Not present | Not claimed. | — |
+| Multivariate division with remainder | Not present | Not claimed until its algorithm and order are implemented and verified. | — |
 | Irreducible polynomial solving over algebraic or complex numbers | Not present | — | — |
 | Rational expressions: cancellation of a factor (linear denominator with a root the numerator vanishes at) | Verified | Linear denominators only; the removed point is kept as a condition. | `symbolic_conditional`, `symbolic_chain` |
 | General rational function simplification (gcd of polynomials, partial fractions) | Not present | — | — |
@@ -76,7 +80,7 @@ or MATLAB. No results from those systems are included.
 | Backend | Status | Evidence |
 |---|---|---|
 | Interpreter (`ostrinc --run`) | Implemented and verified for every example in the symbolic group | Symbolic tests run the interpreter and compare the output with the native build. |
-| Native (C backend, `--compile`) | Implemented and verified for the symbolic examples above, with leak check and no HIR or AST fallback | 13 symbolic tests pass; IR guard 157 for `std.symbolic` (no HIR or AST fallback). |
+| Native (C backend, `--compile`) | Implemented and verified for the symbolic examples above, with leak check and no HIR or AST fallback | 13 symbolic tests pass; IR guard 163 for `std.symbolic` (no HIR or AST fallback; it grew from 157 with the multivariate conversions). |
 | WASM (browser, WASI) | Verified for the notebook examples A to E | 25 browser tests pass against the rebuilt `website/ostrinc.wasm`; notebook E's derivation runs in the browser. |
 
 The interpreter is substantially slower than native code (see the scientific report). A large program can be impractical

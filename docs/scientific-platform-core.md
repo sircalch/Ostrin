@@ -201,3 +201,31 @@ point, the context boundary, wrong-context and absent-input refusals, and a pend
 and its native test with a leak check.
 
 Notebook E (`conditional`) now has four cells: the rule table under five contexts (c1), the numeric checks with the bridge (c2), the figure of sqrt(x^2) under two contexts (c3), and the derivation of (x^2-1)/(x-1) + sqrt(x^2) step by step, compared with the original at points the reader can edit (c4). Its browser test edits a point, reruns, exports the document and checks the saved state after a reload.
+
+## Block 1: multivariate polynomial engine
+
+`std.mpolynomial` adds exact multivariate polynomials: canonical terms in decreasing lexicographic order, rational
+coefficients, addition, subtraction, multiplication, evaluation, partial derivatives, and degrees. The univariate
+`std.polynomial` is reused unchanged. The conversion to `std.symbolic` expressions goes through text lines
+(`coefficient|exponents`), which is an explicit interoperability boundary of version 1; its contract (variable order,
+monomial order, validation, refusals, limits, compatibility) is in [`docs/mpolynomial.md`](mpolynomial.md).
+
+Hardening done in this block, found while writing the oracle: the module accepted negative exponents and repeated variable
+names, and `mpoly_degree_in` did not check its index. Those are now refused in `mpoly_from_terms` (and so in every
+operation), `mpoly_parse`, `mpoly_degree_in` (now a `Result`), and `expression_term_lines`, and `expression_of_term_lines`
+refuses negative exponents. Size limits: 16 variables, exponent at most 1000, 10000 terms per call, 4096 characters per
+line.
+
+Verification:
+
+- `scripts/mpolynomial-oracle.mjs` is an independent oracle (exact rationals on BigInt, its own polynomial code and
+  text formatter, its own refusal rules). It runs 600 property trials with fixed seeds over commutativity,
+  distributivity, the product rule, additive and multiplicative evaluation, cancellation and the interchange round trip,
+  plus explicit cases with known answers. Its 58 interchange cases are compiled to `examples/mpolynomial_oracle.ostrin`
+  and its output is compared exactly on the interpreter and native backend (`mpolynomial_oracle_cases_match_…` test).
+- `examples/mpolynomial_core.ostrin` checks ring identities, the product rule, evaluation as a homomorphism,
+  cancellation, merging and fractions, and the round trip with `std.symbolic` (derivative compared with
+  `symbolic.diff`), and the refusals.
+
+Not implemented, and not claimed: multivariate gcd, multivariate division with remainder, multivariate factorisation.
+The univariate division and gcd of `std.polynomial` are the only ones available.
