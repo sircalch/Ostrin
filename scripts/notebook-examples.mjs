@@ -708,6 +708,64 @@ fn main() -> Void {
     }
 }`;
 
+const CONDITIONAL_CHAIN = `import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    two = symbolic.number(s, 2)
+    numerator = symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 1))
+    denominator = symbolic.sub(x, symbolic.number(s, 1))
+    quotient = symbolic.div(numerator, denominator)
+    root = symbolic.power(symbolic.power(x, two), symbolic.number(s, 1, 2))
+    whole = symbolic.add(quotient, root)
+    none = symbolic.context()
+    positive = symbolic.assume(none, "x", "positive").unwrap()
+    contexts = [none, positive]
+    names = ["no assumptions", "x positive"]
+    // The points at which the derivation and the original are compared. Edit them and run the cell again.
+    points = [2.0, 0.0 - 2.0, 1.0]
+    mut rows: List<String> = []
+    for k in 0 until 2 {
+        ctx = contexts[k]
+        first = symbolic.chain_then(symbolic.chain_start(whole, ctx), ctx, quotient, symbolic.simplify_quotient(ctx, numerator, denominator, x))
+        second = symbolic.chain_then(first, ctx, root, symbolic.sqrt_of_square(ctx, x))
+        mut pending = ""
+        for u in second.unknown {
+            pending = pending + u + "; "
+        }
+        print("derivation under " + names[k] + ": " + second.status + ", steps " + second.steps.length().to_string() + ", pending " + pending)
+        for p in 0 until points.length() {
+            value = [points[p]]
+            mut original_text = ""
+            match symbolic.eval(whole, ["x"], value) {
+                Ok(v) => {
+                    original_text = v.to_string()
+                },
+                Err(message) => {
+                    original_text = "undefined"
+                },
+            }
+            mut derived_text = ""
+            match symbolic.chain_evaluate(second, ["x"], value) {
+                Ok(v) => {
+                    derived_text = v.to_string()
+                },
+                Err(message) => {
+                    derived_text = "refused: " + message
+                },
+            }
+            rows.push(names[k] + "," + points[p].to_string() + "," + original_text + "," + derived_text)
+        }
+    }
+    print("OSTRIN-TABLE E = (x^2 - 1)/(x - 1) + sqrt(x^2), derived step by step and compared with the original")
+    print("context,x,original,derivation")
+    for row in rows {
+        print(row)
+    }
+    print("OSTRIN-TABLE-END")
+}`;
+
 function build({ id, title, text, cells, resources = [] }) {
   let doc = createNotebook({ id, title, now: NOW });
   doc = addCell(doc, "text", { source: text });
@@ -759,7 +817,7 @@ export function notebooks() {
       id: "conditional",
       title: "E · Assumptions and conditions",
       text: CONDITIONAL_TEXT,
-      cells: [{ source: CONDITIONAL_TABLE }, { source: CONDITIONAL_CHECKS }, { source: CONDITIONAL_FIGURE }],
+      cells: [{ source: CONDITIONAL_TABLE }, { source: CONDITIONAL_CHECKS }, { source: CONDITIONAL_FIGURE }, { source: CONDITIONAL_CHAIN }],
     }),
     numeric: build({
       id: "numeric",

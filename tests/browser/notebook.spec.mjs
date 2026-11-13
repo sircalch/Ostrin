@@ -289,7 +289,7 @@ test("the conditional example shows how a result changes with its context, and a
   await open(page);
   await openFileMenu(page);
   await page.locator("#nb-example").selectOption("conditional");
-  await expect(page.locator(".nb-cell")).toHaveCount(4);
+  await expect(page.locator(".nb-cell")).toHaveCount(5);
   await page.getByRole("button", { name: "Run all" }).click();
   // the table of results under the five contexts
   const table = page.locator('[data-cell-id="c1"] .nb-table').first();
@@ -302,6 +302,26 @@ test("the conditional example shows how a result changes with its context, and a
   await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("20 counterexamples on the grid");
   await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("the original at x = 1 is undefined");
   await expect(page.locator('[data-cell-id="c3"] .nb-figure img')).toBeVisible({ timeout: 240_000 });
+
+  // the derivation of E step by step: refused outside the domain, and refused by the context at x = -2 under x positive
+  const derivation = page.locator('[data-cell-id="c4"] .nb-table').first();
+  await expect(derivation).toBeVisible({ timeout: 240_000 });
+  await expect(derivation).toContainText("no assumptions255");
+  await expect(derivation).toContainText("outside the domain: x != 1 fails");
+  await expect(derivation).toContainText("x positive-21refused: outside the context: x positive fails at x = -2");
+
+  // edit the points in c4 and run it again: the new point appears with the original and the derivation
+  const points = page.locator('[data-cell-id="c4"] textarea.nb-source');
+  await points.fill((await points.inputValue()).replace("points = [2.0, 0.0 - 2.0, 1.0]", "points = [2.0, 0.0 - 2.0, 3.0]"));
+  await expect(page.locator('[data-cell-id="c4"] .nb-chip')).toHaveText(/stale/);
+  await page.locator('[data-cell-id="c4"]').getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator('[data-cell-id="c4"] .nb-table').first()).toContainText("no assumptions377", { timeout: 240_000 });
+
+  // export the document: the downloaded file keeps the edited points
+  await openFileMenu(page);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export…" }).click()]);
+  const exported = await (await download.createReadStream()).toArray();
+  expect(Buffer.concat(exported).toString("utf8")).toContain("points = [2.0, 0.0 - 2.0, 3.0]");
 
   // change the context from nonpositive to negative in c1, and its label: the result of the radical changes to -x
   const source = page.locator('[data-cell-id="c1"] textarea.nb-source');
@@ -321,6 +341,8 @@ test("the conditional example shows how a result changes with its context, and a
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-notebook-ready", "true", { timeout: 30_000 });
   await expect(page.locator('[data-cell-id="c1"] textarea.nb-source')).toHaveValue(/"x", "negative"/);
+  await expect(page.locator('[data-cell-id="c4"] textarea.nb-source')).toHaveValue(/points = \[2\.0, 0\.0 - 2\.0, 3\.0\]/);
+  await expect(page.locator('[data-cell-id="c4"] .nb-table').first()).toContainText("no assumptions377");
 });
 
 // ---------------------------------------------------------------- Markdown in text cells

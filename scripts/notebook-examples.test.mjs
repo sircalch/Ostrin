@@ -277,3 +277,20 @@ test("conditional: the figure of sqrt(x^2) under two contexts is an SVG document
   assert.equal(out.figures.length, 1);
   assert.match(out.figures[0], /^<svg /);
 });
+
+test("conditional: the derivation of E is checked at each point, with its refusals and the original at the same points", { skip: !available }, () => {
+  const out = runCell(load("conditional"), "c4");
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /derivation under no assumptions: applied-conditional, steps 2, pending x != 1;/);
+  assert.match(out.stdout, /derivation under x positive: applied-conditional, steps 2, pending x != 1;/);
+  assert.equal(out.tables.length, 1);
+  const rows = csvRows(out.tables[0].csv).slice(1);
+  const find = (context, x) => rows.find(([c, p]) => c === context && Number(p) === x);
+  assert.deepEqual(find("no assumptions", 2).slice(2), ["5", "5"]);
+  assert.deepEqual(find("no assumptions", -2).slice(2), ["1", "1"]);
+  assert.equal(find("no assumptions", 1)[2], "undefined");
+  assert.match(find("no assumptions", 1)[3], /^refused: outside the domain: x != 1 fails/);
+  assert.deepEqual(find("x positive", 2).slice(2), ["5", "5"]);
+  assert.equal(find("x positive", -2)[2], "1", "the original is defined at -2");
+  assert.match(find("x positive", -2)[3], /^refused: outside the context: x positive fails at x = -2/);
+});

@@ -199,3 +199,5 @@ provenance check compares canonical texts, which is exact for distinct nodes of 
 Verified by `examples/symbolic_chain.ostrin` (both steps, numeric agreement with the original at points, the removable
 point, the context boundary, wrong-context and absent-input refusals, and a pending removable singularity from x / x)
 and its native test with a leak check.
+
+Notebook E (`conditional`) now has four cells: the rule table under five contexts (c1), the numeric checks with the bridge (c2), the figure of sqrt(x^2) under two contexts (c3), and the derivation of (x^2-1)/(x-1) + sqrt(x^2) step by step, compared with the original at points the reader can edit (c4). Its browser test edits a point, reruns, exports the document and checks the saved state after a reload.
