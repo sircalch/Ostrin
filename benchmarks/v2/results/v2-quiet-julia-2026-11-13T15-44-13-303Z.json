@@ -1,0 +1,297 @@
+{
+  "generated": "2026-11-13T15:43:07.742Z",
+  "label": "quiet-julia",
+  "compiler": "C:\\Users\\Andre\\Downloads\\_Ostrin-worktrees\\scientific-platform-core\\compiler\\target\\release\\ostrinc.exe",
+  "config": {
+    "native": {
+      "kBig": 10,
+      "reps": 7
+    },
+    "interp": {
+      "kBig": 2,
+      "reps": 3
+    },
+    "python": {
+      "kBig": 5,
+      "reps": 5
+    },
+    "julia": {
+      "kBig": 5,
+      "reps": 5
+    }
+  },
+  "hardware": {
+    "os": "win32 10.0.26200 x64",
+    "cpuModel": "AMD Ryzen 7 5700X 8-Core Processor",
+    "logicalCores": 16,
+    "memoryGiB": 32,
+    "physicalCores": 8
+  },
+  "versions": {
+    "node": "v24.19.0",
+    "ostrinc": "ostrinc 0.2.0",
+    "python": "Python 3.12.10",
+    "julia": "julia version 1.13.3"
+  },
+  "threads": {
+    "julia": 1,
+    "python": 1,
+    "ostrinNative": "single-threaded unless --native-threads",
+    "envOMP_NUM_THREADS": 1,
+    "envOPENBLAS_NUM_THREADS": 1
+  },
+  "loadBefore": [
+    {
+      "name": "chrome",
+      "cpuSeconds": 35225
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 23485
+    },
+    {
+      "name": "Taskmgr",
+      "cpuSeconds": 22531
+    },
+    {
+      "name": "LeagueClient",
+      "cpuSeconds": 20980
+    },
+    {
+      "name": "LeagueClientUx",
+      "cpuSeconds": 13332
+    },
+    {
+      "name": "EpicGamesLauncher",
+      "cpuSeconds": 8511
+    }
+  ],
+  "cells": [
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "simpson",
+      "incomplete": false,
+      "perRunMs": 15.268875000000008,
+      "uncertaintyMs": 41.45112499999999,
+      "startupEstimateMs": 578.509425,
+      "t1": {
+        "n": 5,
+        "median": 593.7783,
+        "min": 582.1639,
+        "max": 640.1704,
+        "mad": 9.756800000000112
+      },
+      "tk": {
+        "n": 5,
+        "median": 654.8538,
+        "min": 637.6356,
+        "max": 745.4336,
+        "mad": 17.218200000000024
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 23.9304,
+          "min": 21.3993,
+          "max": 25.7206,
+          "mad": 0.8300999999999981
+        },
+        "warm": {
+          "n": 20,
+          "median": 18.0714,
+          "min": 17.0104,
+          "max": 23.3578,
+          "mad": 0.9663500000000003
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "bisect",
+      "incomplete": false,
+      "perRunMs": 17.537050000000022,
+      "uncertaintyMs": 12.112825000000015,
+      "startupEstimateMs": 545.0962499999999,
+      "t1": {
+        "n": 5,
+        "median": 562.6333,
+        "min": 556.8358,
+        "max": 581.503,
+        "mad": 5.624300000000062
+      },
+      "tk": {
+        "n": 5,
+        "median": 632.7815,
+        "min": 625.0339,
+        "max": 648.818,
+        "mad": 6.665899999999965
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 29.5459,
+          "min": 27.7306,
+          "max": 32.4233,
+          "mad": 1.2135999999999996
+        },
+        "warm": {
+          "n": 20,
+          "median": 14.591149999999999,
+          "min": 14.3284,
+          "max": 14.8931,
+          "mad": 0.10834999999999972
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "matmul",
+      "incomplete": false,
+      "perRunMs": 20.98229999999998,
+      "uncertaintyMs": 385.1414500000001,
+      "startupEstimateMs": 574.6566,
+      "t1": {
+        "n": 5,
+        "median": 595.6389,
+        "min": 591.7579,
+        "max": 2029.4437,
+        "mad": 3.8810000000000855
+      },
+      "tk": {
+        "n": 5,
+        "median": 679.5681,
+        "min": 651.3117,
+        "max": 754.1917,
+        "mad": 22.826999999999998
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 48.5373,
+          "min": 47.1711,
+          "max": 49.8207,
+          "mad": 0.8509999999999991
+        },
+        "warm": {
+          "n": 20,
+          "median": 16.6772,
+          "min": 16.3363,
+          "max": 26.97,
+          "mad": 0.16689999999999827
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "regression",
+      "incomplete": false,
+      "perRunMs": 5.329299999999989,
+      "uncertaintyMs": 8.20195000000001,
+      "startupEstimateMs": 544.7969,
+      "t1": {
+        "n": 5,
+        "median": 550.1262,
+        "min": 537.9714,
+        "max": 560.4509,
+        "mad": 3.90300000000002
+      },
+      "tk": {
+        "n": 5,
+        "median": 571.4434,
+        "min": 564.8728,
+        "max": 575.2011,
+        "mad": 2.810299999999984
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 22.783,
+          "min": 22.3124,
+          "max": 25.253,
+          "mad": 0.470600000000001
+        },
+        "warm": {
+          "n": 20,
+          "median": 5.8718,
+          "min": 5.7802,
+          "max": 6.2064,
+          "mad": 0.07624999999999993
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "horner",
+      "incomplete": false,
+      "perRunMs": 73.70622499999999,
+      "uncertaintyMs": 63.015499999999975,
+      "startupEstimateMs": 558.552675,
+      "t1": {
+        "n": 5,
+        "median": 632.2589,
+        "min": 630.3214,
+        "max": 732.0407,
+        "mad": 1.9375
+      },
+      "tk": {
+        "n": 5,
+        "median": 927.0838,
+        "min": 914.9113,
+        "max": 1065.254,
+        "mad": 12.172500000000014
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 111.89,
+          "min": 111.2169,
+          "max": 120.289,
+          "mad": 0.6731000000000051
+        },
+        "warm": {
+          "n": 20,
+          "median": 69.21260000000001,
+          "min": 68.3029,
+          "max": 71.2959,
+          "mad": 0.30930000000000035
+        }
+      }
+    }
+  ],
+  "loadAfter": [
+    {
+      "name": "chrome",
+      "cpuSeconds": 35225
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 23485
+    },
+    {
+      "name": "Taskmgr",
+      "cpuSeconds": 22532
+    },
+    {
+      "name": "LeagueClient",
+      "cpuSeconds": 21019
+    },
+    {
+      "name": "LeagueClientUx",
+      "cpuSeconds": 13349
+    },
+    {
+      "name": "EpicGamesLauncher",
+      "cpuSeconds": 8512
+    }
+  ]
+}

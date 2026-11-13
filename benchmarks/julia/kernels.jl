@@ -127,6 +127,7 @@ end
 
 const KERNELS = Dict("simpson" => simpson, "bisect" => bisect, "matmul" => matmul, "regression" => regression, "horner" => horner)
 
+if !@isdefined(KERNELS_LIBRARY_ONLY)
 name = ARGS[1]
 timed = "--timed" in ARGS
 t0 = time_ns()
@@ -139,4 +140,5 @@ if timed
     KERNELS[name]()
     warm_ms = (time_ns() - t1) / 1.0e6
     println("TIMING cold_ms ", round(cold_ms; digits=3), " warm_ms ", round(warm_ms; digits=3))
+end
 end
