@@ -1,4 +1,6 @@
 mod ast;
+mod ast_scan;
+mod capture_cells;
 mod codegen;
 mod dap;
 mod effects;
@@ -817,6 +819,26 @@ fn real_main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     if emit_c || compile_native {
+        // A closure that captures a `mut` binding needs the binding shared with the closure (design 02 §4).
+        // The native backends copy captured values, so the captured bindings become record cells first.
+        let (items, typed_program) = match capture_cells::rewrite_native(items, &typed_program) {
+            Ok((items, true)) => {
+                let typed = typeck::Checker::new().check_program_typed(&items);
+                if !typed.errors.is_empty() {
+                    eprintln!(
+                        "error: internal: the native capture rewrite produced {} type error(s)",
+                        typed.errors.len()
+                    );
+                    return ExitCode::FAILURE;
+                }
+                (items, typed)
+            }
+            Ok((items, false)) => (items, typed_program),
+            Err(message) => {
+                eprintln!("error: {message}");
+                return ExitCode::FAILURE;
+            }
+        };
         return run_codegen(
             &items,
             &typed_program,

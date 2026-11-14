@@ -21189,11 +21189,132 @@ fn loop_closure_mutation_pins_the_interpreter_semantics() {
 }
 
 #[test]
-#[ignore = "known defect: the native backend gives 0 for a closure that assigns to an outer name (see docs/loop-frames.md)"]
 fn loop_closure_mutation_agrees_on_native_backend() {
+    // The native path compiles and runs the binary: a closure that assigns an outer `mut` must rebind it (6).
     let path = fixture_path("loop_closure_mutation.ostrin");
-    let output = stdout(&run(&["--run", &path]));
-    assert_eq!(output, "closure mutation: 6\n");
+    let exe = temp_artifact("loop_closure_mutation.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "closure mutation: 6\n"
+    );
+}
+
+#[test]
+fn captured_mutable_bindings_share_storage_with_closures_in_both_backends() {
+    // design 02 §4: a closure that captures a `mut` binding reads and reassigns that same binding.
+    // The expected values are worked out by hand from the program; the interpreter and the native backend must agree.
+    let expected = "A read after outer write: 5\nB closure writes: 2\nC mixed writes: 23\ncall through cell: 40\ndirect call: 20\nlog: 12\n";
+    let interpreted = stdout(&run(&["--run", &fixture_path("capture_cells.ostrin")]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("capture_cells.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &fixture_path("capture_cells.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native"
+    );
+    assert!(
+        stderr(&native).contains("live_allocations=0"),
+        "captured cells must not leak: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn loop_body_shadow_is_pinned_on_the_interpreter() {
+    // A body `mut` that shadows an outer `mut` is a new binding: the outer value stays 7.
+    let output = stdout(&run(&["--run", &fixture_path("loop_body_shadow.ostrin")]));
+    assert_eq!(output.replace("\r\n", "\n"), "shadow reads: 21 outer q: 7\n");
+}
+
+#[test]
+#[ignore = "known defect: the native IR lowering maps a loop-body binding onto the outer name's slot (gives 200); see docs/loop-frames.md"]
+fn loop_body_shadow_agrees_on_native_backend() {
+    let path = fixture_path("loop_body_shadow.ostrin");
+    let exe = temp_artifact("loop_body_shadow.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "shadow reads: 21 outer q: 7\n"
+    );
+}
+
+#[test]
+fn captured_loop_frame_reuse_agrees_in_both_backends() {
+    // Frame reuse (interpreter): a body must see a fresh frame each iteration, including a large body and break/continue.
+    let expected = "big frame: 88\nbreak continue total: 22\n";
+    let path = fixture_path("loop_frame_reuse.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("loop_frame_reuse.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native"
+    );
+}
+
+#[test]
+fn captured_mutable_binding_shadowed_in_the_same_function_is_refused_natively() {
+    // Two declarations of one captured name in one function cannot be told apart by name, so the native
+    // backend refuses instead of guessing. The interpreter still runs the program.
+    let path = fixture_path("capture_cells_shadowed.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), "shadow result: 101 outer: 4\n");
+    let exe = temp_artifact("capture_cells_shadowed.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(!compile.status.success(), "the native backend must refuse this program");
+    assert!(
+        stderr(&compile).contains("declared more than once"),
+        "unexpected refusal: {}",
+        stderr(&compile)
+    );
 }
 
 #[test]

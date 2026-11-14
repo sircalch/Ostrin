@@ -1,0 +1,45 @@
+// Loop bodies that reuse one frame across iterations (interpreter) must behave like a fresh frame each time.
+// Expected values are worked out by hand: see captured_loop_frame_reuse_agrees_in_both_backends in tests/examples.rs.
+fn main() -> Void {
+    // 1. a body with more names than the frame index threshold, redefined on every iteration
+    mut big = 0
+    for i in 0 until 4 {
+        a0 = i
+        a1 = i + 1
+        a2 = i + 2
+        a3 = i + 3
+        a4 = i + 4
+        a5 = i + 5
+        a6 = i + 6
+        a7 = i + 7
+        a8 = i + 8
+        a9 = i + 9
+        b0 = i + 10
+        b1 = i + 11
+        b2 = i + 12
+        b3 = i + 13
+        b4 = i + 14
+        b5 = i + 15
+        b6 = i + 16
+        b7 = i + 17
+        b8 = i + 18
+        b9 = i + 19
+        big = big + a0 + b9
+    }
+    print("big frame: " + big.to_string())
+
+    // 3. break and continue leave the frame in the state a fresh frame would have
+    mut total = 0
+    for i in 0 until 6 {
+        t = i * 2
+        if i == 1 {
+            continue
+        }
+        u = t + 1
+        total = total + u
+        if i == 4 {
+            break
+        }
+    }
+    print("break continue total: " + total.to_string())
+}
