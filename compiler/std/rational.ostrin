@@ -546,6 +546,7 @@ pub record RationalSolution {
     excluded: List<String>
     rejected: List<String>
     pending: List<String>
+    complex_roots: List<String>
     exactness: String
     completeness: String
 }
@@ -639,6 +640,7 @@ fn solve_difference(f: RationalFunction, g: RationalFunction, h: RationalFunctio
                     excluded: identity_excluded,
                     rejected: [],
                     pending: [],
+                    complex_roots: [],
                     exactness: "exact",
                     completeness: "complete: the two sides are equal at every admissible point",
                 })
@@ -721,6 +723,7 @@ fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction,
     mut excluded: List<String> = []
     mut rejected: List<String> = []
     mut pending: List<String> = []
+    mut complex_roots: List<String> = []
     for r in roots {
         mut m = 0
         for c in factor_texts {
@@ -806,9 +809,13 @@ fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction,
                 left = fq_mul(fq_eval(f.numerator, alpha, disc), fq_eval(g.denominator, alpha, disc), disc)
                 right = fq_mul(fq_eval(g.numerator, alpha, disc), fq_eval(f.denominator, alpha, disc), disc)
                 if fq_equal(left, right) {
-                    solutions.push(text)
-                    kinds.push(kind)
-                    mults.push(1)
+                    if kind == "complex quadratic" {
+                        complex_roots.push(text)
+                    } else {
+                        solutions.push(text)
+                        kinds.push(kind)
+                        mults.push(1)
+                    }
                 } else {
                     rejected.push("x = " + text + ": the two sides differ in Q(sqrt(" + disc + "))")
                 }
@@ -818,7 +825,10 @@ fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction,
         pending.push("a factor of degree " + deg.to_string() + " without rational roots is not solved by this method")
     }
     mut status = "no_solution"
-    mut completeness = "complete: every root of the difference is classified"
+    mut completeness = "complete: every real root of the difference is classified"
+    if complex_roots.length() > 0 {
+        completeness = "complete over the real numbers: " + complex_roots.length().to_string() + " non-real root(s) are listed separately and are not solutions"
+    }
     if solutions.length() > 0 {
         status = "solved"
     }
@@ -835,6 +845,7 @@ fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction,
         excluded: excluded,
         rejected: rejected,
         pending: pending,
+        complex_roots: complex_roots,
         exactness: "exact (no approximate values are produced)",
         completeness: completeness,
     })

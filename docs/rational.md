@@ -98,6 +98,7 @@ not feed them into that machinery. The exclusion is enforced by `rational_evalua
 | `excluded` | points that are excluded from the domain, with the requirement that vanishes there; includes removable points of the reduced form |
 | `rejected` | candidates that fail the check against the original equation |
 | `pending` | parts of the difference that this method does not solve |
+| `complex_roots` | non-real roots (from a quadratic cofactor with negative discriminant); over the real numbers they are not solutions, and they are listed separately |
 | `exactness` | every value is exact; no approximate value is produced |
 | `completeness` | whether every root of the difference is classified |
 
@@ -119,6 +120,10 @@ Statuses: `identity` when `h` is zero (both sides agree at every admissible poin
 set); `solved` when there is a solution and nothing is pending; `no_solution` when every root is excluded or rejected and
 nothing is pending (a complete answer, such as the contradiction `x = x + 1`); `partial` when a residue of degree three or
 more remains. A partial result never says there are no solutions.
+
+Real domain: the search is over the real numbers. A quadratic cofactor with negative discriminant gives non-real roots, which are reported in `complex_roots`, not in `solutions`; an equation whose only roots are non-real has status `no_solution` over the reals, and its completeness note says so.
+
+The `excluded` list is not exhaustive. It contains the rational roots of each requirement, and the candidates (rational or irrational) that a requirement excludes among the roots of the difference. Irrational roots of a requirement that are not roots of the difference are not enumerated: for `(x^2-2)/(x^2-2) = 1` the points `x = +-sqrt(2)` are excluded by the domain but do not appear in `excluded`. The domain (`domain`) is the complete description.
 
 Limits: no algorithm for cubic and higher residues without rational roots (they are reported as pending, not solved); no
 numerical root approximation (so the exact-verification path is the only one, and a residue that cannot be solved exactly is

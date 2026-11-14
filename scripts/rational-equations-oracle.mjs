@@ -228,6 +228,7 @@ export function expectedSummary(nf, df, ng, dg) {
   const numerator = raw.length === 0 ? [] : polyQuotient(raw, polyGcd(raw, commonDenominator));
   const excludedRationals = new Set();
   let excludedIrrational = 0;
+  let complexCount = 0;
   let rejected = 0;
   const solutions = [];
   let status;
@@ -279,7 +280,9 @@ export function expectedSummary(nf, df, ng, dg) {
         const lhs = fieldMul(fieldEval(nf, alpha, disc), fieldEval(dg, alpha, disc), disc);
         const rhs = fieldMul(fieldEval(ng, alpha, disc), fieldEval(df, alpha, disc), disc);
         if (fieldEqual(lhs, rhs)) {
-          solutions.push({ text, kind: qcmp(disc, q(0n)) < 0 ? "complex" : "irrational", multiplicity: 1 });
+          // over the real numbers a non-real root is not a solution; it is counted separately
+          if (qcmp(disc, q(0n)) < 0) complexCount++;
+          else solutions.push({ text, kind: "irrational", multiplicity: 1 });
         } else {
           rejected++;
         }
@@ -291,7 +294,7 @@ export function expectedSummary(nf, df, ng, dg) {
   }
   const excludedCount = excludedRationals.size + excludedIrrational;
   const solutionText = solutions.length === 0 ? "none" : solutions.map((s) => s.text).join(" | ");
-  return `status=${status}; solutions=${solutionText}; excluded=${excludedCount}; rejected=${rejected}; pending=${pending}; domain=${requirements.length}`;
+  return `status=${status}; solutions=${solutionText}; excluded=${excludedCount}; rejected=${rejected}; pending=${pending}; domain=${requirements.length}; complex=${complexCount}`;
 }
 
 // ---------------------------------------------------------------- deterministic cases
@@ -349,6 +352,8 @@ export function buildCases() {
     { f: [[0, 1], [1]], g: [[1, 1], [1]] },
     { f: [[0, 1], [2]], g: [[1], [3]] },
     { f: [[-2, 0, 0, 1], [1]], g: [[0], [1]] },
+    { f: [[1, 0, 1], [1]], g: [[0], [1]] },
+    { f: [[0, 0, 1], [-2, 0, 1]], g: [[2], [-2, 0, 1]] },
   ];
   for (const c of fixed) cases.push(c);
   for (let k = 0; k < 50; k++) {
@@ -405,7 +410,7 @@ fn summary(index: Int, nf: String, df: String, ng: String, dg: String) -> String
     if s.solutions.length() > 0 {
         sols = s.solutions.join(" | ")
     }
-    return "case " + index.to_string() + ": status=" + s.status + "; solutions=" + sols + "; excluded=" + s.excluded.length().to_string() + "; rejected=" + s.rejected.length().to_string() + "; pending=" + s.pending.length().to_string() + "; domain=" + s.domain.length().to_string()
+    return "case " + index.to_string() + ": status=" + s.status + "; solutions=" + sols + "; excluded=" + s.excluded.length().to_string() + "; rejected=" + s.rejected.length().to_string() + "; pending=" + s.pending.length().to_string() + "; domain=" + s.domain.length().to_string() + "; complex=" + s.complex_roots.length().to_string()
 }
 
 fn main() -> Void {

@@ -10,8 +10,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 test("rational equation oracle cases produce one line per case", () => {
   const cases = buildCases();
   const lines = expectedOutputs(cases);
-  assert.equal(cases.length, 60);
-  assert.equal(lines.length, 60);
+  assert.equal(cases.length, 62);
+  assert.equal(lines.length, 62);
   assert.ok(lines.some((l) => l.includes("status=identity")));
   assert.ok(lines.some((l) => l.includes("status=partial")));
 });

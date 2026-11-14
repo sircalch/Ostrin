@@ -96,6 +96,24 @@ fn main() -> Void {
     }
     print("x^3 - 2 = 0: " + s10.status + "; pending: " + s10.pending.join(" | "))
 
+    // x^2 + 1 = 0: over the real numbers there is no solution; the two non-real roots are listed separately
+    f11 = rational.rational_new(["1", "0", "1"], ["1"]).unwrap()
+    s11 = rational.rational_solve(f11, rational.rational_new([], ["1"]).unwrap()).unwrap()
+    if s11.status != "no_solution" or s11.solutions.length() != 0 or s11.complex_roots.length() != 2 {
+        print("FAIL the non-real roots must not be solutions over the reals")
+        failures = failures + 1
+    }
+
+    // (x^2 - 2)/(x^2 - 2) = 1: an identity on the domain. The points x = +-sqrt(2) are excluded, and they are
+    // irrational, so they are not enumerated in the excluded list (that list is not exhaustive).
+    f12 = rational.rational_new(["-2", "0", "1"], ["-2", "0", "1"]).unwrap()
+    g12 = rational.rational_new(["1"], ["1"]).unwrap()
+    s12 = rational.rational_solve(f12, g12).unwrap()
+    if s12.status != "identity" or s12.domain.length() != 2 {
+        print("FAIL the identity with irrational domain points: " + s12.status)
+        failures = failures + 1
+    }
+
     if failures == 0 {
         print("all rational equation checks passed")
     } else {
