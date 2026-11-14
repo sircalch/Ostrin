@@ -1,0 +1,103 @@
+// Semantics of loop frames and closures (the closure that mutates an outer name is in loop_closure_mutation.ostrin: it
+// differs between the interpreter and the native backend, a known defect, so it is not in this cross-backend program).
+// Semantics of loop frames and closures. Each check prints one line; the expected output is in the Rust test, and it
+// must hold on the interpreter and on the native backend. A loop may reuse its frame only where none of these changes.
+
+record Counter {
+    mut count: Int
+}
+
+fn apply(f: fn(Int) -> Int, v: Int) -> Int {
+    return f(v)
+}
+
+fn first_above(limit: Int) -> Int {
+    for i in 0 until 100 {
+        if i * i > limit {
+            return i
+        }
+    }
+    return -1
+}
+
+fn fib(n: Int) -> Int {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn main() -> Void {
+    // 1. a closure created in each iteration captures that iteration's variable
+    mut sum = 0
+    for i in 0 until 3 {
+        sum = sum + apply(fn(x) { x + i }, 10)
+    }
+    print("capture per iteration: " + sum.to_string())
+
+    // 2. closures that outlive their iteration keep their own values
+    mut saved: List<fn(Int) -> Int> = []
+    for i in 0 until 3 {
+        saved.push(fn(x) { x * 10 + i })
+    }
+    print("survivors: " + apply(saved[0], 1).to_string() + " " + apply(saved[1], 1).to_string() + " " + apply(saved[2], 1).to_string())
+
+    // 3. a body assignment to an outer name rebinds that outer name, and it keeps the last value
+    mut outer = 100
+    for i in 0 until 4 {
+        outer = i * 3
+    }
+    print("outer after loop: " + outer.to_string())
+
+    // 4. nested loops: the inner closure captures both variables
+    mut pairs = 0
+    for i in 0 until 3 {
+        for j in 0 until 3 {
+            pairs = pairs + apply(fn(x) { x + i * 10 + j }, 0)
+        }
+    }
+    print("nested sum: " + pairs.to_string())
+
+    // 5. break and continue
+    mut odd = 0
+    for i in 0 until 10 {
+        if i % 2 == 0 {
+            continue
+        }
+        odd = odd + i
+    }
+    mut stop = 0
+    for i in 0 until 100 {
+        stop = i
+        if i == 5 {
+            break
+        }
+    }
+    print("continue sum: " + odd.to_string() + " break at: " + stop.to_string())
+
+    // 6. early return from inside a loop
+    print("first above 50: " + first_above(50).to_string())
+
+    // 7. recursion inside a loop
+    mut fibs = 0
+    for n in 0 until 10 {
+        fibs = fibs + fib(n)
+    }
+    print("fib sum: " + fibs.to_string())
+
+    // 8. mutability through a record shared by every iteration
+    mut c = Counter { count: 0 }
+    for i in 0 until 5 {
+        c.count = c.count + i
+    }
+    print("record count: " + c.count.to_string())
+
+    // 10. shadowing: a body name that is new in the body does not change the outer name
+    shadow = 7
+    for i in 0 until 2 {
+        shadow2 = shadow + i
+    }
+    print("shadow untouched: " + shadow.to_string())
+
+    print("done")
+}

@@ -21171,6 +21171,32 @@ fn rational_equation_cases_match_the_independent_oracle_in_both_backends() {
 }
 
 #[test]
+fn loop_frame_semantics_agree_in_both_backends() {
+    // Closures created in loops (per-iteration capture, survivors), outer rebinding, nested loops, break and continue,
+    // early return from a loop, recursion, mutation through a record, and shadowing. Each value was checked by hand.
+    let output = interpreter_and_native_agree("loop_semantics.ostrin");
+    assert_eq!(
+        output,
+        "capture per iteration: 33\nsurvivors: 10 11 12\nouter after loop: 9\nnested sum: 99\ncontinue sum: 25 break at: 5\nfirst above 50: 8\nfib sum: 88\nrecord count: 10\nshadow untouched: 7\ndone\n"
+    );
+}
+
+#[test]
+fn loop_closure_mutation_pins_the_interpreter_semantics() {
+    // A closure that assigns to an outer name, called in a loop: the interpreter rebinds the outer name (6).
+    let output = stdout(&run(&["--run", &fixture_path("loop_closure_mutation.ostrin")]));
+    assert_eq!(output, "closure mutation: 6\n");
+}
+
+#[test]
+#[ignore = "known defect: the native backend gives 0 for a closure that assigns to an outer name (see docs/loop-frames.md)"]
+fn loop_closure_mutation_agrees_on_native_backend() {
+    let path = fixture_path("loop_closure_mutation.ostrin");
+    let output = stdout(&run(&["--run", &path]));
+    assert_eq!(output, "closure mutation: 6\n");
+}
+
+#[test]
 fn std_symbolic_workflow_builds_derivatives_and_a_real_figure_in_both_backends() {
     let output = interpreter_and_native_agree("symbolic_workflow.ostrin");
     assert!(

@@ -1,0 +1,13 @@
+// A closure that assigns to a name of its enclosing scope, called inside a loop. The interpreter gives 6 (the closure
+// rebinds the outer name). The native backend gives 0 at the time of writing: a known interpreter/native divergence,
+// recorded as a defect (see docs). This program is run on the interpreter only, to pin the interpreter's semantics.
+fn main() -> Void {
+    // 9. a closure that mutates an outer variable, called inside the loop
+    mut hits = 0
+    bump = fn(x) { hits = hits + x }
+    for i in 0 until 4 {
+        bump(i)
+    }
+    print("closure mutation: " + hits.to_string())
+
+}
