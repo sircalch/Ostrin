@@ -441,8 +441,11 @@ impl std::hash::Hasher for NameHasher {
 
 pub(crate) type NameMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<NameHasher>>;
 
+/// The variables of one frame, in definition order. A frame holds a few names, so a short list with a linear search is
+/// cheaper than a hash map (no hashing, and no table allocation on the first definition). The debugger sorts the names it
+/// reports, so the order is not observable.
 struct Frame {
-    vars: NameMap<String, Value>,
+    vars: Vec<(String, Value)>,
     parent: Option<Env>,
 }
 
@@ -452,24 +455,28 @@ pub struct Env(Rc<RefCell<Frame>>);
 impl Env {
     fn root() -> Self {
         Env(Rc::new(RefCell::new(Frame {
-            vars: NameMap::default(),
+            vars: Vec::new(),
             parent: None,
         })))
     }
 
     fn child(&self) -> Self {
         Env(Rc::new(RefCell::new(Frame {
-            vars: NameMap::default(),
+            vars: Vec::new(),
             parent: Some(self.clone()),
         })))
     }
 
     fn define(&self, name: &str, value: Value) {
-        self.0.borrow_mut().vars.insert(name.to_string(), value);
+        let mut frame = self.0.borrow_mut();
+        match frame.vars.iter_mut().find(|(n, _)| n == name) {
+            Some(slot) => slot.1 = value,
+            None => frame.vars.push((name.to_string(), value)),
+        }
     }
 
     fn get(&self, name: &str) -> Option<Value> {
-        if let Some(v) = self.0.borrow().vars.get(name) {
+        if let Some((_, v)) = self.0.borrow().vars.iter().find(|(n, _)| n == name) {
             return Some(v.clone());
         }
         self.0.borrow().parent.as_ref().and_then(|p| p.get(name))
@@ -481,8 +488,8 @@ impl Env {
     fn assign(&self, name: &str, value: Value) {
         let parent = {
             let mut frame = self.0.borrow_mut();
-            if let Some(slot) = frame.vars.get_mut(name) {
-                *slot = value;
+            if let Some(slot) = frame.vars.iter_mut().find(|(n, _)| n == name) {
+                slot.1 = value;
                 return;
             }
             frame.parent.clone()
@@ -494,7 +501,7 @@ impl Env {
     }
 
     fn contains(&self, name: &str) -> bool {
-        self.0.borrow().vars.contains_key(name)
+        self.0.borrow().vars.iter().any(|(n, _)| n == name)
             || self
                 .0
                 .borrow()
