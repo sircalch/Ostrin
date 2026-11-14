@@ -83,3 +83,50 @@ not feed them into that machinery. The exclusion is enforced by `rational_evalua
   `rational_cases_match_the_independent_oracle_in_both_backends` run both programs on the interpreter and the native
   backend.
 - `node scripts/rational-oracle.mjs --check` fails when the generated files are out of date.
+
+## Rational equations R1(x) = R2(x)
+
+`rational_solve(f, g)` returns a `RationalSolution`:
+
+| Field | Meaning |
+| --- | --- |
+| `status` | `identity`, `solved`, `no_solution`, or `partial` (see below) |
+| `domain` | the requirements of the difference `f - g`; the admissible points are where all of them are nonzero |
+| `solutions` | exact solutions, verified against the original equation; rational roots ascending, then the irrational pair `+`, `-` |
+| `solution_kinds` | `rational`, `quadratic irrational`, or `complex quadratic`, one per solution |
+| `multiplicities` | multiplicity of each solution as a root of the difference (1 for the irrational pair) |
+| `excluded` | points that are excluded from the domain, with the requirement that vanishes there; includes removable points of the reduced form |
+| `rejected` | candidates that fail the check against the original equation |
+| `pending` | parts of the difference that this method does not solve |
+| `exactness` | every value is exact; no approximate value is produced |
+| `completeness` | whether every root of the difference is classified |
+
+Method: the difference `h = f - g` is formed with the merged domain, so reduction cannot remove a requirement. Its
+numerator (reduced) is factored by the rational root finder of `std.polynomial`. Each rational root `r` is then:
+
+- excluded, if a requirement vanishes at `r`;
+- otherwise checked against the original sides: `f(r)` and `g(r)` are computed with `rational_evaluate` and compared
+  exactly, so the multiplication by a denominator cannot introduce a candidate that the original equation rejects;
+- a solution when the two values agree, and rejected otherwise.
+
+A quadratic cofactor `x^2 + b x + c` (made monic) has the irrational roots `-b/2 ± sqrt(b^2 - 4c)/2`. Each root is
+checked exactly in `Q(sqrt(disc))`: a requirement is excluded when it vanishes at the root, and the root is a solution when
+`N_f(r) D_g(r) = N_g(r) D_f(r)` holds in that field. A zero residue in this field is an exact equality, not a numerical
+residual. The rational roots of the requirements are listed as excluded points even when the reduced difference does not
+show them, so that `(x + 1)/(x - 2) = 3/(x - 2)` reports `x = 2` as excluded.
+
+Statuses: `identity` when `h` is zero (both sides agree at every admissible point; the identity is not an empty solution
+set); `solved` when there is a solution and nothing is pending; `no_solution` when every root is excluded or rejected and
+nothing is pending (a complete answer, such as the contradiction `x = x + 1`); `partial` when a residue of degree three or
+more remains. A partial result never says there are no solutions.
+
+Limits: no algorithm for cubic and higher residues without rational roots (they are reported as pending, not solved); no
+numerical root approximation (so the exact-verification path is the only one, and a residue that cannot be solved exactly is
+pending); radicands are not reduced to square-free form (`sqrt(8)` is printed as is); multivariate equations are not
+handled.
+
+Verification: `examples/rational_equations.ostrin` (the examples of the task: `(x^2-1)/(x-1) = 3` keeps `x = 2`,
+`= 2` rejects `x = 1`, the irrational pair, a repeated root, an identity, shared denominators, a zero numerator, a
+contradiction, and a cubic that is partial), and `scripts/rational-equations-oracle.mjs`, which computes 60 seeded and
+fixed equations from the un-reduced formulas using the rational root theorem and its own Q(sqrt d) arithmetic, and the
+expected output must match exactly on the interpreter and the native backend.

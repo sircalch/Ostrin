@@ -21152,6 +21152,25 @@ fn rational_cases_match_the_independent_oracle_in_both_backends() {
 }
 
 #[test]
+fn rational_equation_cases_hold_in_both_backends() {
+    // (x^2 - 1)/(x - 1) = 3 keeps x = 2 and lists x = 1 as an excluded point; = 2 is rejected; x^2 - 2 has two exact
+    // irrational roots; repeated roots keep their multiplicity; identities and contradictions are complete answers; a
+    // cubic residue is partial, never "no solution".
+    let output = interpreter_and_native_agree("rational_equations.ostrin");
+    assert_eq!(output, "(x^2 - 1)/(x - 1) = 2: no_solution; excluded: x = 1: excluded, the requirement [-1, 1] != 0 vanishes there\nx^2 - 2 = 0: 0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8) (exact (no approximate values are produced))\n(x^2 - 1)/(x - 1) = x + 1: identity on the domain [-1, 1] != 0 ; [1] != 0\nx^3 - 2 = 0: partial; pending: a factor of degree 3 without rational roots is not solved by this method\nall rational equation checks passed\n");
+}
+
+#[test]
+fn rational_equation_cases_match_the_independent_oracle_in_both_backends() {
+    // 60 equations (fixed and seeded) from scripts/rational-equations-oracle.mjs, computed from the un-reduced formulas.
+    let output = interpreter_and_native_agree("rational_equations_oracle.ostrin");
+    let expected_path = format!("{}/../tests/oracle/rational-equations-expected.txt", env!("CARGO_MANIFEST_DIR"));
+    let expected = std::fs::read_to_string(&expected_path)
+        .unwrap_or_else(|error| panic!("cannot read {expected_path}: {error}"));
+    assert_eq!(output, expected.replace("\r\n", "\n"));
+}
+
+#[test]
 fn std_symbolic_workflow_builds_derivatives_and_a_real_figure_in_both_backends() {
     let output = interpreter_and_native_agree("symbolic_workflow.ostrin");
     assert!(

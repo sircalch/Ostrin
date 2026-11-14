@@ -34,6 +34,8 @@ or MATLAB. No results from those systems are included.
 | Univariate rational functions in lowest terms (exact gcd of std.polynomial), with monic denominators | Verified | Operations: add, subtract, multiply, divide, negate, derivative, composition. See `docs/rational.md`. | `rational_core`, `rational_oracle` (interpreter and native) |
 | Domain requirements kept through operations, substitution, derivatives, composition and evaluation (a removed factor stays excluded) | Verified | Requirements are polynomials that must not vanish; evaluation names the vanishing one. Oracle checks 92 excluded points out of 528. | `rational_core`, `rational_oracle` |
 | Multivariate rational functions | Not present | Needs a multivariate gcd, which is not implemented. | — |
+| Rational equations R1(x) = R2(x): exact rational roots, quadratic irrational roots verified in Q(sqrt d), excluded points, rejected candidates, identities | Verified | Univariate. Structured result (`RationalSolution`). Oracle: 60 equations. See `docs/rational.md`. | `rational_equations`, `rational_equations_oracle` (interpreter and native) |
+| Rational equations with a residue of degree three or more and no rational root | Partial | Reported as `partial` with the residue pending; no numerical root approximation yet. | `rational_equations` |
 | Partial fractions | Not present | — | — |
 
 ## 2. Assumptions and conditional rules

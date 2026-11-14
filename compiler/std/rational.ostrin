@@ -528,3 +528,314 @@ pub fn rational_denominator_lines(a: RationalFunction) -> List<String> {
     }
     out
 }
+
+// ---------------------------------------------------------------- rational equations R1(x) = R2(x)
+
+/// The result of solving R1(x) = R2(x) on the admissible domain.
+/// status: "identity" (both sides agree at every admissible point), "solved" (every root of the difference is
+/// classified and at least one is a solution), "no_solution" (every root is excluded or rejected, and nothing is
+/// pending), or "partial" (some part of the difference could not be solved by this method; the solutions listed are
+/// exact but may be incomplete). "no_solution" is never reported while part of the difference is unsolved.
+/// Parallel lists: solutions, solution_kinds and multiplicities have the same length.
+pub record RationalSolution {
+    status: String
+    domain: List<String>
+    solutions: List<String>
+    solution_kinds: List<String>
+    multiplicities: List<Int>
+    excluded: List<String>
+    rejected: List<String>
+    pending: List<String>
+    exactness: String
+    completeness: String
+}
+
+// Scalar arithmetic on canonical rational texts. The only division is by a nonzero constant chosen by the caller (2a for
+// a quadratic cofactor with leading coefficient a, or the constant 2).
+fn fr_add(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_add(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()))
+}
+
+fn fr_sub(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_sub(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()))
+}
+
+fn fr_mul(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_mul(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()))
+}
+
+fn fr_div(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_div(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()).unwrap())
+}
+
+fn fr_sign(a: String) -> Int {
+    return bigint.fraction_sign(bigint.fraction_parse(a).unwrap())
+}
+
+// The quadratic field Q(sqrt d): an element is [a, b] for a + b*sqrt(d). d is a rational that is not a square, so sqrt(d)
+// is irrational and a + b*sqrt(d) = 0 exactly when a = 0 and b = 0.
+fn fq_mul(x: List<String>, y: List<String>, d: String) -> List<String> {
+    a = fr_add(fr_mul(x[0], y[0]), fr_mul(fr_mul(x[1], y[1]), d))
+    b = fr_add(fr_mul(x[0], y[1]), fr_mul(x[1], y[0]))
+    return [a, b]
+}
+
+fn fq_add(x: List<String>, y: List<String>) -> List<String> {
+    return [fr_add(x[0], y[0]), fr_add(x[1], y[1])]
+}
+
+fn fq_equal(x: List<String>, y: List<String>) -> Bool {
+    return x[0] == y[0] and x[1] == y[1]
+}
+
+fn fq_is_zero(x: List<String>) -> Bool {
+    return x[0] == "0" and x[1] == "0"
+}
+
+/// The value of a coefficient list (lowest degree first) at an element of Q(sqrt d), by Horner's rule.
+fn fq_eval(coefficients: List<String>, alpha: List<String>, d: String) -> List<String> {
+    mut acc: List<String> = ["0", "0"]
+    mut i = coefficients.length() - 1
+    while i >= 0 {
+        acc = fq_add(fq_mul(acc, alpha, d), [coefficients[i], "0"])
+        i = i - 1
+    }
+    acc
+}
+
+/// "p + q*sqrt(d)", written as a subtraction when q is negative.
+fn sqrt_text(p: String, q: String, d: String) -> String {
+    if q.starts_with("-") {
+        return p + " - " + q.slice(1, q.length()) + "*sqrt(" + d + ")"
+    }
+    return p + " + " + q + "*sqrt(" + d + ")"
+}
+
+/// Solves R1(x) = R2(x) on the domain of both sides. The difference h = f - g carries the merged domain. Its numerator is
+/// factored with the rational root finder of std.polynomial, and each root is classified: excluded by a requirement,
+/// verified against the original equation, or rejected. A quadratic cofactor gives two irrational roots, verified exactly
+/// in Q(sqrt(disc)). A cofactor of degree three or more is reported as pending, never as absent.
+pub fn rational_solve(f: RationalFunction, g: RationalFunction) -> Result<RationalSolution, String> {
+    return match rational_subtract(f, g) {
+        Err(message) => Err(message),
+        Ok(h) => solve_difference(f, g, h),
+    }
+}
+
+fn solve_difference(f: RationalFunction, g: RationalFunction, h: RationalFunction) -> Result<RationalSolution, String> {
+    domain = rational_requirement_texts(h)
+    if h.numerator.length() == 0 {
+        match requirement_roots_excluded(h, []) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(identity_excluded) => {
+                return Ok(RationalSolution {
+                    status: "identity",
+                    domain: domain,
+                    solutions: [],
+                    solution_kinds: [],
+                    multiplicities: [],
+                    excluded: identity_excluded,
+                    rejected: [],
+                    pending: [],
+                    exactness: "exact",
+                    completeness: "complete: the two sides are equal at every admissible point",
+                })
+            },
+        }
+    }
+    match polynomial.poly_from_texts(h.numerator) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(np) => {
+            match polynomial.poly_factor_linear(np) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(fac) => {
+                    mut factor_texts: List<List<String>> = []
+                    for factor in fac.factors {
+                        factor_texts.push(factor.coeffs)
+                    }
+                    return solve_factored(f, g, h, domain, factor_texts, fac.cofactor.coeffs)
+                },
+            }
+        },
+    }
+    return Err("internal error: the factorisation did not produce a result")
+}
+
+/// Excluded points of the domain: the rational roots of each requirement, listed once each, after the given entries.
+fn requirement_roots_excluded(h: RationalFunction, given: List<String>) -> Result<List<String>, String> {
+    mut excluded: List<String> = given
+    for req in h.requirements {
+        match polynomial.poly_from_texts(req) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(rp) => {
+                match polynomial.poly_roots_rational(rp) {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(points) => {
+                        for pt in points {
+                            mut listed = false
+                            for s in excluded {
+                                if s.starts_with("x = " + pt + ":") {
+                                    listed = true
+                                }
+                            }
+                            if not listed {
+                                excluded.push("x = " + pt + ": excluded, the requirement " + list_text(req) + " != 0 vanishes there")
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    }
+    Ok(excluded)
+}
+
+fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction, domain: List<String>, factor_texts: List<List<String>>, cofactor: List<String>) -> Result<RationalSolution, String> {
+    // distinct rational roots, in ascending order (the factors come in ascending order); each root is minus the constant term
+    mut roots: List<String> = []
+    for c in factor_texts {
+        r = fr_mul(c[0], "-1")
+        mut seen = false
+        for s in roots {
+            if s == r {
+                seen = true
+            }
+        }
+        if not seen {
+            roots.push(r)
+        }
+    }
+    mut solutions: List<String> = []
+    mut kinds: List<String> = []
+    mut mults: List<Int> = []
+    mut excluded: List<String> = []
+    mut rejected: List<String> = []
+    mut pending: List<String> = []
+    for r in roots {
+        mut m = 0
+        for c in factor_texts {
+            if fr_mul(c[0], "-1") == r {
+                m = m + 1
+            }
+        }
+        mut blocked = ""
+        for req in h.requirements {
+            match texts_eval(req, r) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(value) => {
+                    if value == "0" and blocked == "" {
+                        blocked = list_text(req)
+                    }
+                },
+            }
+        }
+        if blocked != "" {
+            excluded.push("x = " + r + ": excluded, the requirement " + blocked + " != 0 vanishes there")
+        } else {
+            match rational_evaluate(f, r) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(left) => {
+                    match rational_evaluate(g, r) {
+                        Err(message) => {
+                            return Err(message)
+                        },
+                        Ok(right) => {
+                            if left == right {
+                                solutions.push(r)
+                                kinds.push("rational")
+                                mults.push(m)
+                            } else {
+                                rejected.push("x = " + r + ": the two sides are " + left + " and " + right)
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    }
+    // Excluded points that the numerator does not show: a factor of a requirement can be cancelled in the reduced
+    // difference, so the rational roots of each requirement are listed here as excluded points of the domain.
+    match requirement_roots_excluded(h, excluded) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(listed) => {
+            excluded = listed
+        },
+    }
+    deg = cofactor.length() - 1
+    if deg == 2 {
+        // monic x^2 + b x + c, so that the discriminant and the texts do not depend on the scale of the cofactor
+        lead = cofactor[2]
+        b = fr_div(cofactor[1], lead)
+        c = fr_div(cofactor[0], lead)
+        disc = fr_sub(fr_mul(b, b), fr_mul("4", c))
+        p = fr_div(fr_mul(b, "-1"), "2")
+        qh = fr_div("1", "2")
+        mut kind = "quadratic irrational"
+        if fr_sign(disc) < 0 {
+            kind = "complex quadratic"
+        }
+        for sign in ["1", "-1"] {
+            q = fr_mul(qh, sign)
+            alpha = [p, q]
+            text = sqrt_text(p, q, disc)
+            mut blocked = ""
+            for req in h.requirements {
+                if blocked == "" and fq_is_zero(fq_eval(req, alpha, disc)) {
+                    blocked = list_text(req)
+                }
+            }
+            if blocked != "" {
+                excluded.push("x = " + text + ": excluded, the requirement " + blocked + " != 0 vanishes there")
+            } else {
+                left = fq_mul(fq_eval(f.numerator, alpha, disc), fq_eval(g.denominator, alpha, disc), disc)
+                right = fq_mul(fq_eval(g.numerator, alpha, disc), fq_eval(f.denominator, alpha, disc), disc)
+                if fq_equal(left, right) {
+                    solutions.push(text)
+                    kinds.push(kind)
+                    mults.push(1)
+                } else {
+                    rejected.push("x = " + text + ": the two sides differ in Q(sqrt(" + disc + "))")
+                }
+            }
+        }
+    } else if deg > 0 {
+        pending.push("a factor of degree " + deg.to_string() + " without rational roots is not solved by this method")
+    }
+    mut status = "no_solution"
+    mut completeness = "complete: every root of the difference is classified"
+    if solutions.length() > 0 {
+        status = "solved"
+    }
+    if pending.length() > 0 {
+        status = "partial"
+        completeness = "partial: part of the difference is outside the methods of this module"
+    }
+    return Ok(RationalSolution {
+        status: status,
+        domain: domain,
+        solutions: solutions,
+        solution_kinds: kinds,
+        multiplicities: mults,
+        excluded: excluded,
+        rejected: rejected,
+        pending: pending,
+        exactness: "exact (no approximate values are produced)",
+        completeness: completeness,
+    })
+}

@@ -247,3 +247,18 @@ un-reduced formulas by `scripts/rational-oracle.mjs`. Both run on the interprete
 
 Not implemented: multivariate rational functions (they need a multivariate gcd), partial fractions, equation solving on
 rational functions (Block 3), the advanced notebook (Block 4) and the performance and benchmark blocks.
+
+## Block 3: rational equations
+
+`std.rational.rational_solve(f, g)` solves R1(x) = R2(x) on the admissible domain of both sides. The difference keeps
+the merged domain; rational roots are checked against the original sides; quadratic irrational roots are checked exactly
+in Q(sqrt(disc)); excluded points, rejected candidates, identities, contradictions and pending residues are reported
+distinctly. Details and limits: [`docs/rational.md`](rational.md).
+
+Verification: `examples/rational_equations.ostrin` and `examples/rational_equations_oracle.ostrin` (60 equations, seeded
+and fixed, expected output from `scripts/rational-equations-oracle.mjs`), on the interpreter and the native backend.
+Two defects were found and fixed while writing the oracle: identities did not list their excluded points, and the
+quadratic root text depended on the scale of the residue (now monic).
+
+Not implemented: cubic and higher residues without rational roots (pending), numerical approximation, and multivariate
+equations.
