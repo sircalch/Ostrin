@@ -21131,6 +21131,27 @@ fn mpolynomial_division_cases_match_the_independent_bigint_oracle_in_both_backen
 }
 
 #[test]
+fn rational_hand_cases_keep_excluded_points_in_both_backends() {
+    // (x^2 - 1)/(x - 1) reduces to x + 1, and x = 1 stays excluded through sums, products, quotients, derivatives and
+    // compositions; hand-computed values; refusals with the requirement named.
+    let output = interpreter_and_native_agree("rational_core.ostrin");
+    assert_eq!(
+        output,
+        "division by zero: division by the zero function\nzero denominator: the denominator is the zero polynomial\nexcluded point: undefined at 1: the requirement [-1, 1] != 0 fails there\nall rational checks passed\n"
+    );
+}
+
+#[test]
+fn rational_cases_match_the_independent_oracle_in_both_backends() {
+    // 528 points of 66 generated cases (92 undefined), from un-reduced formulas computed by scripts/rational-oracle.mjs.
+    let output = interpreter_and_native_agree("rational_oracle.ostrin");
+    let expected_path = format!("{}/../tests/oracle/rational-expected.txt", env!("CARGO_MANIFEST_DIR"));
+    let expected = std::fs::read_to_string(&expected_path)
+        .unwrap_or_else(|error| panic!("cannot read {expected_path}: {error}"));
+    assert_eq!(output, expected.replace("\r\n", "\n"));
+}
+
+#[test]
 fn std_symbolic_workflow_builds_derivatives_and_a_real_figure_in_both_backends() {
     let output = interpreter_and_native_agree("symbolic_workflow.ostrin");
     assert!(

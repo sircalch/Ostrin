@@ -1,0 +1,141 @@
+// Univariate rational functions: lowest terms, domains kept as requirements, and hand-computed results.
+// The point x = 1 is excluded from (x^2 - 1)/(x - 1) even though the reduced function x + 1 is defined there, and the
+// exclusion survives addition, multiplication, division, differentiation and composition.
+import std.rational
+
+/// The value at a point, or "undefined" when the point is excluded.
+fn text_of(value: Result<String, String>) -> String {
+    return match value {
+        Err(message) => "undefined",
+        Ok(v) => v,
+    }
+}
+
+fn main() -> Void {
+    mut failures = 0
+
+    // (x^2 - 1)/(x - 1): reduced to x + 1, with the requirement x - 1 != 0 kept
+    f = rational.rational_new(["-1", "0", "1"], ["-1", "1"]).unwrap()
+    if rational.rational_numerator_lines(f) != ["1|0", "1|1"] or rational.rational_denominator_lines(f) != ["1|0"] {
+        print("FAIL lowest terms of (x^2 - 1)/(x - 1)")
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(f, "2")) != "3" {
+        print("FAIL value at 2 is " + text_of(rational.rational_evaluate(f, "2")))
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(f, "1")) != "undefined" {
+        print("FAIL x = 1 must stay excluded")
+        failures = failures + 1
+    }
+
+    // the exclusion survives a sum: f + 1/(x + 2) at 2 is 3 + 1/4, and at 1 it stays undefined
+    g = rational.rational_new(["1"], ["2", "1"]).unwrap()
+    s = rational.rational_add(f, g).unwrap()
+    if text_of(rational.rational_evaluate(s, "2")) != "13/4" {
+        print("FAIL sum at 2 is " + text_of(rational.rational_evaluate(s, "2")))
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(s, "1")) != "undefined" {
+        print("FAIL the exclusion was lost in a sum")
+        failures = failures + 1
+    }
+
+    // the exclusion survives a product: f * (x - 1)/(x + 1) equals x - 1, still undefined at 1
+    h = rational.rational_new(["-1", "1"], ["1", "1"]).unwrap()
+    p = rational.rational_multiply(f, h).unwrap()
+    if text_of(rational.rational_evaluate(p, "3")) != "2" {
+        print("FAIL product at 3 is " + text_of(rational.rational_evaluate(p, "3")))
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(p, "1")) != "undefined" {
+        print("FAIL the exclusion was lost in a product")
+        failures = failures + 1
+    }
+
+    // division by a function that vanishes at 1: (x^2 - 1)/(x - 1) divided by (x - 1) is (x + 1)/(x - 1)
+    k = rational.rational_new(["-1", "1"], ["1"]).unwrap()
+    q = rational.rational_divide(f, k).unwrap()
+    if text_of(rational.rational_evaluate(q, "2")) != "3" {
+        print("FAIL quotient at 2 is " + text_of(rational.rational_evaluate(q, "2")))
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(q, "1")) != "undefined" {
+        print("FAIL the exclusion was lost in a division")
+        failures = failures + 1
+    }
+    match rational.rational_divide(f, rational.rational_new(["0"], ["1"]).unwrap()) {
+        Ok(v) => {
+            print("FAIL division by the zero function was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("division by zero: " + message)
+        },
+    }
+
+    // derivative: d/dx (x^2 - 1)/(x - 1) = 1 wherever it is defined, and x = 1 stays excluded
+    d = rational.rational_derivative(f).unwrap()
+    if text_of(rational.rational_evaluate(d, "2")) != "1" {
+        print("FAIL derivative at 2 is " + text_of(rational.rational_evaluate(d, "2")))
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(d, "1")) != "undefined" {
+        print("FAIL the exclusion was lost in the derivative")
+        failures = failures + 1
+    }
+
+    // the zero function over a nonzero denominator: 0/(x + 1) is 0 except at x = -1
+    z = rational.rational_new([], ["1", "1"]).unwrap()
+    if text_of(rational.rational_evaluate(z, "0")) != "0" or text_of(rational.rational_evaluate(z, "-1")) != "undefined" {
+        print("FAIL the zero function")
+        failures = failures + 1
+    }
+
+    // composition: (1/x) o (x + 1) = 1/(x + 1), excluded at x = -1
+    inv = rational.rational_new(["1"], ["0", "1"]).unwrap()
+    shifted = rational.rational_new(["1", "1"], ["1"]).unwrap()
+    c1 = rational.rational_compose(inv, shifted).unwrap()
+    if text_of(rational.rational_evaluate(c1, "1")) != "1/2" {
+        print("FAIL composition at 1 is " + text_of(rational.rational_evaluate(c1, "1")))
+        failures = failures + 1
+    }
+    if text_of(rational.rational_evaluate(c1, "-1")) != "undefined" {
+        print("FAIL the composition lost the exclusion at -1")
+        failures = failures + 1
+    }
+
+    // composition: x o (1/x) = 1/x, excluded at 0
+    ident = rational.rational_new(["0", "1"], ["1"]).unwrap()
+    c2 = rational.rational_compose(ident, inv).unwrap()
+    if text_of(rational.rational_evaluate(c2, "2")) != "1/2" or text_of(rational.rational_evaluate(c2, "0")) != "undefined" {
+        print("FAIL the composition x o (1/x)")
+        failures = failures + 1
+    }
+
+    // refusals: a zero denominator, and an excluded point reported as an error with the requirement named
+    match rational.rational_new(["1"], []) {
+        Ok(v) => {
+            print("FAIL a zero denominator was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("zero denominator: " + message)
+        },
+    }
+    match rational.rational_evaluate(f, "1") {
+        Ok(v) => {
+            print("FAIL the excluded point was evaluated")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("excluded point: " + message)
+        },
+    }
+
+    if failures == 0 {
+        print("all rational checks passed")
+    } else {
+        print("rational checks failed: " + failures.to_string())
+    }
+}

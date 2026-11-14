@@ -31,7 +31,10 @@ or MATLAB. No results from those systems are included.
 | Multivariate division with remainder by an ordered list of divisors (lexicographic order) | Verified | Identity and remainder property checked; a zero remainder with several divisors is not a membership test (no Gröbner basis). | `mpolynomial_division`, `mpolynomial_division_oracle` (interpreter and native) |
 | Irreducible polynomial solving over algebraic or complex numbers | Not present | — | — |
 | Rational expressions: cancellation of a factor (linear denominator with a root the numerator vanishes at) | Verified | Linear denominators only; the removed point is kept as a condition. | `symbolic_conditional`, `symbolic_chain` |
-| General rational function simplification (gcd of polynomials, partial fractions) | Not present | — | — |
+| Univariate rational functions in lowest terms (exact gcd of std.polynomial), with monic denominators | Verified | Operations: add, subtract, multiply, divide, negate, derivative, composition. See `docs/rational.md`. | `rational_core`, `rational_oracle` (interpreter and native) |
+| Domain requirements kept through operations, substitution, derivatives, composition and evaluation (a removed factor stays excluded) | Verified | Requirements are polynomials that must not vanish; evaluation names the vanishing one. Oracle checks 92 excluded points out of 528. | `rational_core`, `rational_oracle` |
+| Multivariate rational functions | Not present | Needs a multivariate gcd, which is not implemented. | — |
+| Partial fractions | Not present | — | — |
 
 ## 2. Assumptions and conditional rules
 

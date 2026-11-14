@@ -229,3 +229,21 @@ Verification:
 
 Not implemented, and not claimed: multivariate gcd, multivariate factorisation.
 Division with remainder by an ordered list of divisors (lexicographic order) is implemented and verified; the univariate gcd and division of `std.polynomial` remain the only gcd.
+
+## Block 2: division and univariate rational functions
+
+Division with remainder by an ordered list of divisors is in `std.mpolynomial` (`mpoly_divide`): identity and remainder
+property checked, lexicographic order, verified against an independent BigInt oracle (see the Block 1 section). A zero
+remainder with several divisors is not a membership test, and the function does not claim one.
+
+`std.rational` adds univariate rational functions in lowest terms, reduced with the exact gcd of `std.polynomial`. The
+domain is kept as a list of requirements (polynomials that must not vanish), which reduction never removes, so the removed
+point `x = 1` of `(x^2 - 1)/(x - 1)` stays excluded through sums, products, quotients, derivatives, compositions and
+evaluation. Details and limits: [`docs/rational.md`](rational.md).
+
+Verification: `examples/rational_core.ostrin` (hand-computed values and exclusions, refusals) and
+`examples/rational_oracle.ostrin`, which reproduces 528 points of 66 generated cases (92 undefined) computed from the
+un-reduced formulas by `scripts/rational-oracle.mjs`. Both run on the interpreter and the native backend.
+
+Not implemented: multivariate rational functions (they need a multivariate gcd), partial fractions, equation solving on
+rational functions (Block 3), the advanced notebook (Block 4) and the performance and benchmark blocks.
