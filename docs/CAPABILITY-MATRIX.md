@@ -1,6 +1,6 @@
 # Capability matrix: scientific and symbolic capabilities of Ostrin
 
-Branch `horizon/scientific-platform-core`, HEAD `1eb55fc2` at the time of writing.
+Branch `horizon/scientific-platform-core`, verified at `e0d31968` (notebook F); the suite on that state: 40 unit, 6 differential, 465 example tests, none ignored.
 
 Status terms, used exactly:
 
@@ -86,6 +86,9 @@ or MATLAB. No results from those systems are included.
 |---|---|---|
 | Interpreter (`ostrinc --run`) | Implemented and verified for every example in the symbolic group | Symbolic tests run the interpreter and compare the output with the native build. |
 | Native (C backend, `--compile`) | Implemented and verified for the symbolic examples above, with leak check and no HIR or AST fallback | 13 symbolic tests pass; IR guard 163 for `std.symbolic` (no HIR or AST fallback; it grew from 157 with the multivariate conversions). |
+| Native: a closure that captures a `mut` binding shares its storage with the enclosing function (design 02 §4) | Verified | `captured_mutable_bindings_across_scopes_agree_in_both_backends`, `loop_closure_mutation_agrees_on_native_backend`; `--leak-check` reports `live_allocations=0` for the capture fixtures. Limit: a captured function value whose type cannot be inferred is refused with an error (annotate the binding). |
+| Native: shadowing (a declaration in an inner scope never changes an outer binding) | Verified | `shadowing_scopes_agree_in_every_backend_path` runs the IR, forced HIR and forced AST routes; `loop_body_shadow_agrees_on_native_backend`. |
+| Native, AST fallback: closure environments release captures and closures bound in closure bodies | Verified (AST route) | `captured_lambda_env_leak_on_ast_path` (was ignored; active since the AST closure-ownership change). Not verified under AddressSanitizer or UBSan in this phase. |
 | WASM (browser, WASI) | Verified for the notebook examples A to E | 25 browser tests pass against the rebuilt `website/ostrinc.wasm`; notebook E's derivation runs in the browser. |
 
 The interpreter is substantially slower than native code (see the scientific report). A large program can be impractical
@@ -96,7 +99,8 @@ on the interpreter; this is a measured limit, not a design claim.
 | Capability | Status | Evidence |
 |---|---|---|
 | Cells, text (safe Markdown), outputs, tables, figures, persistence, export and import | Implemented | Notebook browser suite: 25 tests |
-| Five example notebooks: A experimental, B physical, C symbolic, D symbolic-to-numeric, E conditional | Verified | Native tests (21) run every code cell against references; browser suite runs A, B, C, D, E end to end |
+| Five example notebooks: A experimental, B physical, C symbolic, D symbolic-to-numeric, E conditional | Verified | Native tests run every code cell against references; browser suite runs A, B, C, D, E end to end (25 browser tests) |
+| Notebook F: exact algebra and rational equations (polynomials, multivariate exact division with the identity checked, rational simplification with the domain kept, the four mandatory equations, verification, an exact table, a figure that never joins values across excluded points) | Verified | `notebook-examples.test.mjs` (28 tests in the file, F checks each printed value by hand); browser `notebook-rational.spec.mjs` (5 tests) against the rebuilt WASM compiler. Limit: the figure marks x = 1 without a value; limits of excluded points are not computed. |
 | Opening a file does not run its code | Verified | Browser import test |
 | Outputs are restored after a reload and marked as not run in the page | Verified | Browser tests for physical and conditional notebooks |
 
@@ -108,6 +112,7 @@ on the interpreter; this is a measured limit, not a design claim.
 | Correctness checked before timing and for every timed run | Verified | `allComplete: true` in run 3 |
 | Scientific report with valid comparisons and stated limits | Verified | `benchmarks/SCIENTIFIC-REPORT.md` |
 | Statistical stability across sessions | Partial | Only one complete run is reported; run-to-run variation is visible and not characterised. |
+| Interpreter A/B across pinned builds (16 workloads: micro loops and calls, frames of 3, 40 and 120 names, scope lookup, closures, nested loops, recursion, records) | Verified (with stated limits) | `benchmarks/v2/interp/`, `benchmarks/v2/INTERP-AB-REPORT.md`. Conclusive: the empty loop 0.165x, frames_small 0.623x, frames_large 0.875x of the first build; one regression of the list-frame build (frames_large 1.83x) was removed by the hybrid frames. Not conclusive: frames_mid, closures, recursion, while loops. Processor load was not captured. |
 | Comparison with optimised libraries (BLAS, NumPy) | Not present | — |
 | Wolfram or MATLAB results | Not present | — |
 
@@ -118,6 +123,11 @@ on the interpreter; this is a measured limit, not a design claim.
 - Assumptions on several variables, inequalities between symbols, and interval arithmetic.
 - Branch-aware reasoning for complex logarithms and roots.
 - Limits, series and integration in closed form.
+- Multivariate gcd, and rational functions in several variables (no multivariate gcd is available to reduce them).
+- Irrational roots of a requirement of degree three or more: the excluded list is not exhaustive, and the solver says so in `completeness`.
+- A general theorem prover, and any membership test in an ideal for divisors that are not a Gröbner basis.
+- Exact limits of an original expression at an excluded point (the figure marks the point without a value).
+- Sanitizer evidence (AddressSanitizer, UBSan) for the native closure-environment change: not run in this phase.
 - A native compile-time cache for `std` modules (compile cost, measured in the scientific report).
 - Interpreter performance (orders of magnitude slower than native on the measured kernels).
 
