@@ -1,0 +1,26 @@
+// Total number of Collatz steps for every start n from 1 to 19999, repeated K times. K is the first command-line argument
+// (default 1). The result is an exact integer.
+fn main() -> Void {
+    values = args()
+    mut repeats = 1
+    if values.length() > 0 {
+        repeats = parse_int(values[0]).unwrap()
+    }
+    mut total = 0
+    for k in 0 until repeats {
+        mut steps = 0
+        for n in 1 until 20000 {
+            mut x = n
+            while x != 1 {
+                if x % 2 == 0 {
+                    x = x / 2
+                } else {
+                    x = 3 * x + 1
+                }
+                steps = steps + 1
+            }
+        }
+        total = steps + k * 0
+    }
+    print("RESULT collatz " + total.to_string())
+}

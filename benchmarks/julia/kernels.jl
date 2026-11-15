@@ -125,7 +125,36 @@ function horner()
     return repr(total)
 end
 
-const KERNELS = Dict("simpson" => simpson, "bisect" => bisect, "matmul" => matmul, "regression" => regression, "horner" => horner)
+function sieve()
+    # Number of primes below 300000 (Sieve of Eratosthenes); composite[k] marks the number k.
+    n = 300000
+    composite = falses(n)
+    count = 0
+    for i in 2:n
+        if !composite[i]
+            count += 1
+            for j in i * i:i:n
+                composite[j] = true
+            end
+        end
+    end
+    return count
+end
+
+function collatz()
+    # Total number of Collatz steps for the starts 1 to 19999.
+    total = 0
+    for n in 1:19999
+        x = n
+        while x != 1
+            x = iseven(x) ? x ÷ 2 : 3x + 1
+            total += 1
+        end
+    end
+    return total
+end
+
+const KERNELS = Dict("simpson" => simpson, "bisect" => bisect, "matmul" => matmul, "regression" => regression, "horner" => horner, "sieve" => sieve, "collatz" => collatz)
 
 if !@isdefined(KERNELS_LIBRARY_ONLY)
 name = ARGS[1]

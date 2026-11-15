@@ -121,7 +121,31 @@ def horner():
     return repr(total)
 
 
-KERNELS = {"simpson": simpson, "bisect": bisect, "matmul": matmul, "regression": regression, "horner": horner}
+def sieve():
+    """Number of primes below 300000 (Sieve of Eratosthenes)."""
+    n = 300000
+    composite = [False] * n
+    count = 0
+    for i in range(2, n):
+        if not composite[i]:
+            count += 1
+            for j in range(i * i, n, i):
+                composite[j] = True
+    return count
+
+
+def collatz():
+    """Total number of Collatz steps for the starts 1 to 19999."""
+    total = 0
+    for n in range(1, 20000):
+        x = n
+        while x != 1:
+            x = x // 2 if x % 2 == 0 else 3 * x + 1
+            total += 1
+    return total
+
+
+KERNELS = {"simpson": simpson, "bisect": bisect, "matmul": matmul, "regression": regression, "horner": horner, "sieve": sieve, "collatz": collatz}
 
 if __name__ == "__main__":
     name = sys.argv[1]
