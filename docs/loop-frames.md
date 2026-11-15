@@ -45,12 +45,23 @@ Tests: `loop_closure_mutation_agrees_on_native_backend` (native, 6); `captured_m
 
 Open limit: per-declaration resolution of shadowed captured names is not implemented; the pass refuses instead.
 
-## Defect (open): a loop-body `mut` that shadows an outer `mut` (compiler/tests/fixtures/loop_body_shadow.ostrin)
+## Shadowing in native code (fixed)
 
-The interpreter gives `outer q: 7`. The native backend gives `outer q: 200`: the IR lowering maps the loop-body binding to
-the outer name's slot. It also happens on HEAD, without closures. `loop_body_shadow_is_pinned_on_the_interpreter` pins
-the interpreter; `loop_body_shadow_agrees_on_native_backend` is `#[ignore]`d until the IR lowering resolves names per
-scope. It is not weakened to the native value.
+The interpreter gives `outer q: 7` for `compiler/tests/fixtures/loop_body_shadow.ostrin`. HEAD's native IR gave `200`.
+
+Cause (`compiler/src/ir.rs`): a declaration (`let`) went through `Builder::bind`, which rebinds the nearest visible binding
+of the same name. A body `mut q` therefore overwrote the outer `q`, and the value survived the block. A second cause:
+`snapshot_visible` flattened the scopes with the innermost value winning, so a body shadow leaked into the loop's and
+the branches' snapshots.
+
+Fix: a declaration uses `Builder::declare` (innermost scope only). An assignment keeps `bind` (nearest visible binding).
+A snapshot keeps the outermost binding of each name, which is the one that persists after a scope ends.
+
+HEAD's native IR also diverged on `compiler/tests/fixtures/shadowing_scopes.ostrin` (`block shadow: 51` instead of 1,
+`early: 6 12` instead of `6 10`, `nested … k: 11` instead of `k: 100`, `bc outer: 3` instead of 0). After the fix the IR,
+the forced HIR path and the forced AST path all give the interpreter's output
+(`shadowing_scopes_agree_in_every_backend_path`). The generated C of the HIR and AST paths emits a `return with no value`
+warning for functions returning from inside a block; the output is correct and the warning predates this change.
 
 ## Frames
 

@@ -652,6 +652,15 @@ impl Builder {
             .find_map(|scope| scope.get(name).copied())
     }
 
+    /// Creates a binding in the innermost scope (a declaration; see `bind` for assignments).
+    fn declare(&mut self, name: &str, value: ValueId) {
+        self.locals
+            .last_mut()
+            .expect("an IR local scope always exists")
+            .insert(name.to_string(), value);
+    }
+
+    /// Rebinds the nearest visible binding of `name` (an assignment), or declares it when none is visible.
     fn bind(&mut self, name: &str, value: ValueId) {
         if let Some(scope) = self
             .locals
@@ -668,10 +677,15 @@ impl Builder {
         }
     }
 
+    /// The binding in effect for each visible name. The outermost scope wins: a name declared again in an inner scope
+    /// (a shadow) is a different binding, and the outer one is the one that survives the scope. A snapshot taken inside
+    /// a body would otherwise carry the shadow's value out to the outer name.
     fn snapshot_visible(&self) -> HashMap<String, ValueId> {
         let mut visible = HashMap::new();
         for scope in &self.locals {
-            visible.extend(scope.iter().map(|(name, value)| (name.clone(), *value)));
+            for (name, value) in scope {
+                visible.entry(name.clone()).or_insert(*value);
+            }
         }
         visible
     }
@@ -915,7 +929,9 @@ impl Builder {
                     name: name.clone(),
                     value,
                 });
-                self.bind(name, value);
+                // A declaration always creates a binding in the innermost scope. It never rebinds an outer name of the
+                // same spelling: that outer binding is still in effect after the block ends.
+                self.declare(name, value);
             }
             HirStmt::Assign { name, value } => {
                 let expected = self

@@ -21257,7 +21257,6 @@ fn loop_body_shadow_is_pinned_on_the_interpreter() {
 }
 
 #[test]
-#[ignore = "known defect: the native IR lowering maps a loop-body binding onto the outer name's slot (gives 200); see docs/loop-frames.md"]
 fn loop_body_shadow_agrees_on_native_backend() {
     let path = fixture_path("loop_body_shadow.ostrin");
     let exe = temp_artifact("loop_body_shadow.exe");
@@ -21272,6 +21271,43 @@ fn loop_body_shadow_agrees_on_native_backend() {
         String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
         "shadow reads: 21 outer q: 7\n"
     );
+}
+
+#[test]
+fn shadowing_scopes_agree_in_every_backend_path() {
+    // Blocks, nested loops, branches, functions with return inside a loop, break/continue. Expected values are by hand.
+    // The default native path is IR; the HIR and AST fallbacks are forced by their environment switches, so the three
+    // native paths and the interpreter are checked against the same output.
+    let expected = "block shadow: 1\nearly: 6 10\nassign outer: 4\nnested: 22 k: 100\nbranch assign: 9\nbranch shadow: 6\nbc outer: 0\n";
+    let path = fixture_path("shadowing_scopes.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let variants: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        ("ast", &[("OSTRIN_NO_IR_CODEGEN", "1"), ("OSTRIN_NO_HIR_CODEGEN", "1")]),
+    ];
+    for (label, env) in variants {
+        let exe = temp_artifact(&format!("shadowing_scopes_{label}.exe"));
+        let mut compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+        compile.args(["--compile", "--out", &exe, &path]);
+        for (key, value) in env {
+            compile.env(key, value);
+        }
+        let compile = compile.output().expect("run ostrinc");
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(compile.status.success(), "{label} compile failed: {}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("run native binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "{label} binary failed");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "{label} native path"
+        );
+    }
 }
 
 #[test]
