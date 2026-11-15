@@ -1,0 +1,98 @@
+[
+  {
+    "name": "micro_empty_loop",
+    "group": "micro",
+    "kind": "int",
+    "file": "programs/micro_empty_loop.ostrin"
+  },
+  {
+    "name": "micro_int_add",
+    "group": "micro",
+    "kind": "int",
+    "file": "programs/micro_int_add.ostrin"
+  },
+  {
+    "name": "micro_while_loop",
+    "group": "micro",
+    "kind": "int",
+    "file": "programs/micro_while_loop.ostrin"
+  },
+  {
+    "name": "micro_function_call",
+    "group": "micro",
+    "kind": "int",
+    "file": "programs/micro_function_call.ostrin"
+  },
+  {
+    "name": "micro_nested_block",
+    "group": "micro",
+    "kind": "int",
+    "file": "programs/micro_nested_block.ostrin"
+  },
+  {
+    "name": "micro_float_mul_add",
+    "group": "micro",
+    "kind": "float",
+    "file": "programs/micro_float_mul_add.ostrin"
+  },
+  {
+    "name": "micro_array_read",
+    "group": "micro",
+    "kind": "float",
+    "file": "programs/micro_array_read.ostrin"
+  },
+  {
+    "name": "micro_quantity_add",
+    "group": "micro",
+    "kind": "float",
+    "file": "programs/micro_quantity_add.ostrin"
+  },
+  {
+    "name": "frames_small",
+    "group": "frames",
+    "kind": "int",
+    "file": "programs/frames_small.ostrin"
+  },
+  {
+    "name": "frames_mid",
+    "group": "frames",
+    "kind": "int",
+    "file": "programs/frames_mid.ostrin"
+  },
+  {
+    "name": "frames_large",
+    "group": "frames",
+    "kind": "int",
+    "file": "programs/frames_large.ostrin"
+  },
+  {
+    "name": "scope_lookup",
+    "group": "scope",
+    "kind": "int",
+    "file": "programs/scope_lookup.ostrin"
+  },
+  {
+    "name": "closures",
+    "group": "closures",
+    "kind": "int",
+    "file": "programs/closures.ostrin"
+  },
+  {
+    "name": "nested_loops",
+    "group": "loops",
+    "kind": "int",
+    "file": "programs/nested_loops.ostrin"
+  },
+  {
+    "name": "recursion_fib",
+    "group": "calls",
+    "kind": "int",
+    "file": "programs/recursion_fib.ostrin"
+  },
+  {
+    "name": "records",
+    "group": "records",
+    "kind": "int",
+    "file": "programs/records.ostrin"
+  }
+]
