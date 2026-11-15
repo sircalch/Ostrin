@@ -419,6 +419,15 @@ fn list_struct_name(elem: &CType) -> String {
 /// variant. Field/method type-checking already happened in `typeck`; this
 /// only picks which concrete C shape a name maps to.
 /// A closure under construction: the scopes of the function around it, and the variables it captured from them.
+/// The ownership stacks of an enclosing body, saved while a closure body is generated.
+struct SavedOwnedContext {
+    owned_locals: Vec<(String, CType)>,
+    owned_block_locals: Vec<Vec<(String, CType)>>,
+    ownership_control_frames: Vec<usize>,
+    ownership_active: bool,
+    owned_context_depth: usize,
+}
+
 struct CaptureFrame {
     outer: Vec<HashMap<String, CType>>,
     captures: Vec<(String, CType)>,
@@ -1875,6 +1884,9 @@ struct Codegen<'a> {
     pending_results: VecDeque<(CType, CType)>,
     current_return: Vec<CType>,
     lambda_depth: usize,
+    /// The lambda depth whose body owns the ownership stacks now in use (0 for a function body). Closure bodies get
+    /// their own stacks (see `enter_owned_context`), so a closure's locals are released at the end of its body.
+    owned_context_depth: usize,
     /// An `Array<Quantity<D>>` appeared: emit the `ostrin_qa_*` helpers.
     uses_quantity_arrays: bool,
     /// Enclosing-function scopes of the closures being generated (innermost last), plus what each captured.
@@ -3053,11 +3065,34 @@ impl<'a> Codegen<'a> {
         self.scopes.pop();
     }
 
+    /// Gives a closure body its own ownership stacks, so that its locals are released by its own cleanup and never by the
+    /// enclosing function's. The enclosing stacks are returned for `leave_owned_context`.
+    fn enter_owned_context(&mut self) -> SavedOwnedContext {
+        let saved = SavedOwnedContext {
+            owned_locals: std::mem::take(&mut self.owned_locals),
+            owned_block_locals: std::mem::take(&mut self.owned_block_locals),
+            ownership_control_frames: std::mem::take(&mut self.ownership_control_frames),
+            ownership_active: self.ownership_active,
+            owned_context_depth: self.owned_context_depth,
+        };
+        self.ownership_active = true;
+        self.owned_context_depth = self.lambda_depth;
+        saved
+    }
+
+    fn leave_owned_context(&mut self, saved: SavedOwnedContext) {
+        self.owned_locals = saved.owned_locals;
+        self.owned_block_locals = saved.owned_block_locals;
+        self.ownership_control_frames = saved.ownership_control_frames;
+        self.ownership_active = saved.ownership_active;
+        self.owned_context_depth = saved.owned_context_depth;
+    }
+
     fn track_owned_local(&mut self, name: &str, ty: &CType, borrowed: bool, out: &mut String) {
         // `scopes[0]` is the generator's outer frame; a callable's direct
         // locals live in the frame pushed by `gen_callable_body`.
         if !self.ownership_active
-            || self.lambda_depth != 0
+            || self.lambda_depth != self.owned_context_depth
             || retain_managed_value(name, ty).is_none()
         {
             return;
@@ -3067,7 +3102,8 @@ impl<'a> Codegen<'a> {
                 out.push_str(&format!("    {retain};\n"));
             }
         }
-        if self.scopes.len() == 2 {
+        // A closure body's locals belong to its block frame: `gen_block_expr` emits their release at the end of the body.
+        if self.scopes.len() == 2 && self.owned_context_depth == 0 {
             if !self
                 .owned_locals
                 .iter()
@@ -3146,7 +3182,7 @@ impl<'a> Codegen<'a> {
     }
 
     fn begin_owned_loop(&mut self) -> Option<usize> {
-        if !self.ownership_active || self.lambda_depth != 0 {
+        if !self.ownership_active || self.lambda_depth != self.owned_context_depth {
             return None;
         }
         let frame = self.owned_block_locals.len();
@@ -3167,7 +3203,7 @@ impl<'a> Codegen<'a> {
     }
 
     fn gen_scoped_block_stmts(&mut self, block: &Block, out: &mut String) -> Result<(), String> {
-        let frame = if self.ownership_active && self.lambda_depth == 0 {
+        let frame = if self.ownership_active && self.lambda_depth == self.owned_context_depth {
             let frame = self.owned_block_locals.len();
             self.owned_block_locals.push(Vec::new());
             Some(frame)
@@ -3307,11 +3343,13 @@ impl<'a> Codegen<'a> {
         }
         let saved_expected = self.expected.take();
         self.lambda_depth += 1;
+        let saved_owned = self.enter_owned_context();
         // A body that is just an expression inherits the expected result type (a nested lambda needs it).
         if body.stmts.is_empty() {
             self.expected = ret_hint;
         }
         let result = self.gen_block_expr(body);
+        self.leave_owned_context(saved_owned);
         self.expected = None;
         self.lambda_depth -= 1;
         self.expected = saved_expected;
@@ -3361,13 +3399,33 @@ impl<'a> Codegen<'a> {
         let env = if frame.captures.is_empty() {
             "NULL".to_string()
         } else {
+            // The environment owns one reference to every managed capture: it retains each one when it is built, and its
+            // drop function releases them. The drop function does not free the environment: `ostrin_release` does.
+            let drop_name = format!("ostrin_lambda_env_drop_{id}");
             let copies: String = frame
                 .captures
                 .iter()
-                .map(|(n, _)| format!("__ce->{n} = {n}; "))
+                .map(|(n, t)| {
+                    let retain = retain_managed_value(&format!("__ce->{n}"), t)
+                        .map(|body| format!("{body}; "))
+                        .unwrap_or_default();
+                    format!("__ce->{n} = {n}; {retain}")
+                })
                 .collect();
+            let releases: String = frame
+                .captures
+                .iter()
+                .filter_map(|(n, t)| release_managed_value(&format!("__e->{n}"), t).map(|body| format!("    {body};
+")))
+                .collect();
+            self.closure_protos.push(format!("static void {drop_name}(void* __env);"));
+            self.closure_bodies.push((
+                format!("static void {drop_name}(void* __env)"),
+                format!("    OstrinEnv_{id}* __e = __env;
+{releases}"),
+            ));
             format!(
-                "({{ OstrinEnv_{id}* __ce = ostrin_alloc(sizeof *__ce); {copies}(void*)__ce; }})"
+                "({{ OstrinEnv_{id}* __ce = ostrin_alloc_with_drop(sizeof *__ce, (void (*)(void*)){drop_name}); {copies}(void*)__ce; }})"
             )
         };
         let ty = CType::Fn(param_types, Box::new(ret));
@@ -3692,7 +3750,7 @@ impl<'a> Codegen<'a> {
 
     fn gen_block_expr(&mut self, block: &Block) -> Result<(String, CType), String> {
         let mut body = String::new();
-        let tracks_ownership = self.ownership_active && self.lambda_depth == 0;
+        let tracks_ownership = self.ownership_active && self.lambda_depth == self.owned_context_depth;
         if tracks_ownership {
             self.owned_block_locals.push(Vec::new());
         }
@@ -3836,7 +3894,7 @@ impl<'a> Codegen<'a> {
                     // bodies): a raw pointer copy there left the target
                     // aliasing a value released at the end of its block.
                     if self.ownership_active
-                        && self.lambda_depth == 0
+                        && self.lambda_depth == self.owned_context_depth
                         && existing
                             .as_ref()
                             .is_some_and(|ty| retain_managed_value(name, ty).is_some())
@@ -5649,7 +5707,7 @@ impl<'a> Codegen<'a> {
                     [(_, Pattern::Ident(b))] => {
                         bindings.push_str(&format!("{} {} = {}.{field}; ", c_type_name(ty), b, scrutinee_var));
                         self.define(b, (**ty).clone());
-                        if self.ownership_active && self.lambda_depth == 0 && is_reference_type(ty) {
+                        if self.ownership_active && self.lambda_depth == self.owned_context_depth && is_reference_type(ty) {
                             owned.push((b.clone(), (**ty).clone()));
                         }
                         Ok(())
@@ -5673,7 +5731,7 @@ impl<'a> Codegen<'a> {
                     [(_, Pattern::Ident(b))] => {
                         bindings.push_str(&format!("{} {} = {}.value; ", c_type_name(inner), b, scrutinee_var));
                         self.define(b, (**inner).clone());
-                        if self.ownership_active && self.lambda_depth == 0 && is_reference_type(inner) {
+                        if self.ownership_active && self.lambda_depth == self.owned_context_depth && is_reference_type(inner) {
                             owned.push((b.clone(), (**inner).clone()));
                         }
                         Ok(())
@@ -9686,6 +9744,7 @@ fn generate_impl(
         pending_results: VecDeque::new(),
         current_return: Vec::new(),
         lambda_depth: 0,
+        owned_context_depth: 0,
         uses_quantity_arrays: false,
         capture_frames: RefCell::new(Vec::new()),
         closure_bodies: Vec::new(),

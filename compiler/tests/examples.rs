@@ -21401,8 +21401,8 @@ fn captured_mutable_bindings_across_scopes_agree_in_both_backends() {
 }
 
 #[test]
-#[ignore = "known defect (AST fallback): a closure created inside a lambda body is not released; see docs/loop-frames.md"]
 fn captured_lambda_env_leak_on_ast_path() {
+    // A closure created inside another closure's body is released by the AST codegen (see docs/loop-frames.md).
     let path = fixture_path("lambda_env_leak.ostrin");
     let exe = temp_artifact("lambda_env_leak.exe");
     let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))

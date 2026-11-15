@@ -47,11 +47,19 @@ Tests: `loop_closure_mutation_agrees_on_native_backend` (native, 6); `captured_m
 (a captured name declared twice in one function); `captured_mutable_bindings_across_scopes_agree_in_both_backends` (independent
 closures, shared cell, a captured name shadowed in a loop, nested captures, a closure that outlives its creator).
 
-Known leak (AST fallback, reproduced on HEAD): a closure created inside another closure's body is not released when the
-program is compiled by the AST codegen, because ownership tracking is disabled in lambda bodies. The IR path releases it.
-The AST path is taken when a lambda's parameter type cannot be inferred (for example `add = fn(d) { ... }` without any
-annotation on the binding). `captured_lambda_env_leak_on_ast_path` is ignored and fails with `live_allocations=1`.
-Annotating the binding (`add: fn(Int) -> Int = fn(d) { ... }`) selects the IR path, and that program has no leak.
+AST fallback leak (fixed). A closure created inside another closure's body was never released on the AST codegen path, and
+the closure environments were not sound either. There were three causes, all in `compiler/src/codegen.rs`:
+
+1. Ownership tracking was off in lambda bodies (`lambda_depth != 0`), so the body's locals were never released. A lambda body
+   now gets its own ownership stacks (`enter_owned_context` / `leave_owned_context`), and its locals are released by the block
+   that owns them.
+2. The environment did not retain its captured managed values, so a captured cell could be freed while a closure still pointed
+   at it (a use-after-free that was hidden on earlier runs).
+3. The environment had no drop function, so a released environment did not release its captures.
+
+The fix retains each managed capture when the environment is built and releases it in the environment's drop function. The
+drop function does not free the environment: `ostrin_release` does that. `captured_lambda_env_leak_on_ast_path` is now an active
+test (`live_allocations=0`). The IR path was already correct.
 
 ## Shadowing in native code (fixed)
 
