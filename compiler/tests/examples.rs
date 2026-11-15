@@ -21334,23 +21334,65 @@ fn captured_loop_frame_reuse_agrees_in_both_backends() {
 }
 
 #[test]
-fn captured_mutable_binding_shadowed_in_the_same_function_is_refused_natively() {
-    // Two declarations of one captured name in one function cannot be told apart by name, so the native
-    // backend refuses instead of guessing. The interpreter still runs the program.
+fn captured_mutable_binding_shadowed_in_the_same_function_agrees_natively() {
+    // The name `w` is declared twice; the closure captures the inner declaration only. Capture is per declaration,
+    // so the native backend agrees with the interpreter.
     let path = fixture_path("capture_cells_shadowed.ostrin");
+    let expected = "shadow result: 101 outer: 4\n";
     let interpreted = stdout(&run(&["--run", &path]));
-    assert_eq!(interpreted.replace("\r\n", "\n"), "shadow result: 101 outer: 4\n");
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
     let exe = temp_artifact("capture_cells_shadowed.exe");
-    let compile = run(&["--compile", "--out", &exe, &path]);
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(!compile.status.success(), "the native backend must refuse this program");
-    assert!(
-        stderr(&compile).contains("declared more than once"),
-        "unexpected refusal: {}",
-        stderr(&compile)
-    );
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native");
+    assert!(stderr(&native).contains("live_allocations=0"), "leak: {}", stderr(&native));
+}
+
+#[test]
+fn captured_mutable_bindings_across_scopes_agree_in_both_backends() {
+    // Independent closures, closures sharing a binding, a captured name shadowed in a loop, nested captures, and a
+    // closure that outlives the function that created it. Expected values are by hand.
+    let expected = "c1 3 c2 1\nshared 9\nshadow total 23 outer 5\nnested 22\n";
+    let path = fixture_path("capture_scopes.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("capture_scopes.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native");
+    assert!(stderr(&native).contains("live_allocations=0"), "leak: {}", stderr(&native));
+}
+
+#[test]
+#[ignore = "known defect (AST fallback): a closure created inside a lambda body is not released; see docs/loop-frames.md"]
+fn captured_lambda_env_leak_on_ast_path() {
+    let path = fixture_path("lambda_env_leak.ostrin");
+    let exe = temp_artifact("lambda_env_leak.exe");
+    let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(["--compile", "--leak-check", "--out", &exe, &path])
+        .env("OSTRIN_NO_IR_CODEGEN", "1")
+        .env("OSTRIN_NO_HIR_CODEGEN", "1")
+        .output()
+        .expect("run ostrinc");
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(stderr(&native).contains("live_allocations=0"), "leak: {}", stderr(&native));
 }
 
 #[test]

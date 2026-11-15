@@ -13,9 +13,10 @@
 //! field directly. The record is a heap object shared by the closure and the enclosing
 //! function, so both see the same storage.
 //!
-//! The analysis is conservative. A name is rewritten only when it has exactly one
-//! declaration in its function and that declaration is a `mut` binding captured by a
-//! closure. Anything it cannot prove is reported as an error, never silently compiled.
+//! Bindings are identified by declaration, not by name. Every use is resolved through the
+//! scope chain to the innermost visible declaration, so a shadowing declaration and the outer
+//! binding of the same name are separate. Only the declarations that are captured are
+//! rewritten. A type the cell cannot name is reported as an error, never compiled silently.
 //! The interpreter does not run this pass.
 
 use crate::ast::{
@@ -28,34 +29,22 @@ use std::collections::HashMap;
 
 #[derive(Clone)]
 struct Decl {
+    name: String,
     /// A `let`-style binding (`name = value` or `mut name = value`); false for parameters,
-    /// loop variables, lambda parameters and pattern variables.
+    /// loop variables, lambda parameters, pattern variables and implicit bindings.
     binding: bool,
     mutable: bool,
-    block: usize,
+    /// Lambda nesting depth of the declaration.
     lambda_depth: usize,
     declared: Option<Type>,
     value_ty: Option<Ty>,
-}
-
-#[derive(Clone)]
-struct Use {
-    name: String,
-    lambda_depth: usize,
-    stack: Vec<usize>,
-}
-
-#[derive(Default)]
-struct Analysis {
-    decls: HashMap<String, Vec<Decl>>,
-    uses: Vec<Use>,
-    assigns: Vec<Use>,
+    /// Set when a use inside a deeper lambda resolves to this declaration.
+    captured: bool,
 }
 
 #[derive(Clone)]
 struct Cell {
     record: String,
-    decl_block: usize,
     helper: Option<String>,
 }
 
@@ -68,54 +57,67 @@ enum Mode {
 struct Walker<'a> {
     mode: Mode,
     typed: &'a TypedProgram,
-    stack: Vec<usize>,
-    next_block: usize,
+    /// One frame per open block, parameter list or match arm: name → declaration id.
+    frames: Vec<HashMap<String, usize>>,
+    decls: Vec<Decl>,
     lambda_depth: usize,
-    analysis: Analysis,
-    cells: HashMap<String, Cell>,
+    /// Cells of the captured declarations, by declaration id (rewrite mode only).
+    cells: HashMap<usize, Cell>,
 }
 
 impl<'a> Walker<'a> {
-    fn new(mode: Mode, typed: &'a TypedProgram, cells: HashMap<String, Cell>) -> Self {
+    fn new(mode: Mode, typed: &'a TypedProgram, cells: HashMap<usize, Cell>) -> Self {
         Walker {
             mode,
             typed,
-            stack: Vec::new(),
-            next_block: 0,
+            frames: Vec::new(),
+            decls: Vec::new(),
             lambda_depth: 0,
-            analysis: Analysis::default(),
             cells,
         }
     }
 
+    fn declare(
+        &mut self,
+        name: &str,
+        binding: bool,
+        mutable: bool,
+        declared: Option<Type>,
+        value_ty: Option<Ty>,
+    ) -> usize {
+        let id = self.decls.len();
+        self.decls.push(Decl {
+            name: name.to_string(),
+            binding,
+            mutable,
+            lambda_depth: self.lambda_depth,
+            declared,
+            value_ty,
+            captured: false,
+        });
+        self.frames
+            .last_mut()
+            .expect("a frame is open")
+            .insert(name.to_string(), id);
+        id
+    }
+
+    fn resolve(&self, name: &str) -> Option<usize> {
+        self.frames
+            .iter()
+            .rev()
+            .find_map(|frame| frame.get(name).copied())
+    }
+
     fn enter(&mut self, names: &[String]) {
-        let id = self.next_block;
-        self.next_block += 1;
-        self.stack.push(id);
-        if self.mode == Mode::Analyze {
-            for name in names {
-                self.analysis
-                    .decls
-                    .entry(name.clone())
-                    .or_default()
-                    .push(Decl {
-                        binding: false,
-                        mutable: false,
-                        block: id,
-                        lambda_depth: self.lambda_depth,
-                        declared: None,
-                        value_ty: None,
-                    });
-            }
+        self.frames.push(HashMap::new());
+        for name in names {
+            self.declare(name, false, false, None, None);
         }
     }
 
     fn leave(&mut self) {
-        self.stack.pop();
-    }
-
-    fn current_block(&self) -> usize {
-        *self.stack.last().expect("a block is open")
+        self.frames.pop();
     }
 
     fn block(&mut self, b: &mut Block, names: &[String]) {
@@ -133,25 +135,21 @@ impl<'a> Walker<'a> {
         }
     }
 
-    fn record_use(&mut self, name: &str) {
-        if self.mode == Mode::Analyze {
-            self.analysis.uses.push(Use {
-                name: name.to_string(),
-                lambda_depth: self.lambda_depth,
-                stack: self.stack.clone(),
-            });
+    /// Records a use of `name`: marks the declaration captured when the use is in a deeper lambda.
+    fn use_of(&mut self, name: &str) -> Option<usize> {
+        let id = self.resolve(name)?;
+        if self.decls[id].lambda_depth < self.lambda_depth {
+            self.decls[id].captured = true;
         }
+        Some(id)
     }
 
-    /// The cell of `name` when this use sits inside the scope of its declaration.
+    /// The cell of the declaration `name` resolves to, in rewrite mode.
     fn live_cell(&self, name: &str) -> Option<Cell> {
         if self.mode != Mode::Rewrite {
             return None;
         }
-        self.cells
-            .get(name)
-            .filter(|cell| self.stack.contains(&cell.decl_block))
-            .cloned()
+        self.resolve(name).and_then(|id| self.cells.get(&id).cloned())
     }
 
     fn stmt(&mut self, s: &mut Stmt) {
@@ -163,41 +161,29 @@ impl<'a> Walker<'a> {
                 value,
             } => {
                 self.expr(value);
-                if self.mode == Mode::Analyze {
-                    let key = &*value as *const Expr as usize;
-                    let value_ty = self.typed.node_types.get(&key).cloned();
-                    let block = self.current_block();
-                    self.analysis
-                        .decls
-                        .entry(name.clone())
-                        .or_default()
-                        .push(Decl {
-                            binding: true,
-                            mutable: *mut_,
-                            block,
-                            lambda_depth: self.lambda_depth,
-                            declared: ty.clone(),
-                            value_ty,
-                        });
-                } else if let Some(cell) = self.cells.get(name.as_str()).cloned() {
-                    let inner = std::mem::replace(value, Expr::BoolLiteral(false));
-                    *value = Expr::RecordLiteral(
-                        cell.record.clone(),
-                        vec![("value".to_string(), inner)],
-                    );
-                    *ty = Some(Type::Named(cell.record, Vec::new()));
+                let key = &*value as *const Expr as usize;
+                let value_ty = self.typed.node_types.get(&key).cloned();
+                let id = self.declare(name, true, *mut_, ty.clone(), value_ty);
+                if self.mode == Mode::Rewrite {
+                    if let Some(cell) = self.cells.get(&id).cloned() {
+                        let inner = std::mem::replace(value, Expr::BoolLiteral(false));
+                        *value = Expr::RecordLiteral(
+                            cell.record.clone(),
+                            vec![("value".to_string(), inner)],
+                        );
+                        *ty = Some(Type::Named(cell.record, Vec::new()));
+                    }
                 }
                 None
             }
             Stmt::Assign { name, value } => {
                 self.expr(value);
                 if self.mode == Mode::Analyze {
-                    let stack = self.stack.clone();
-                    self.analysis.assigns.push(Use {
-                        name: name.clone(),
-                        lambda_depth: self.lambda_depth,
-                        stack,
-                    });
+                    // A reassignment of a visible binding; with no visible binding this declares a new
+                    // (immutable) one in the innermost scope, as the interpreter does.
+                    if self.use_of(name).is_none() {
+                        self.declare(name, false, false, None, None);
+                    }
                     None
                 } else if self.live_cell(name).is_some() {
                     let value = std::mem::replace(value, Expr::BoolLiteral(false));
@@ -206,6 +192,9 @@ impl<'a> Walker<'a> {
                         value,
                     })
                 } else {
+                    if self.resolve(name).is_none() {
+                        self.declare(name, false, false, None, None);
+                    }
                     None
                 }
             }
@@ -260,19 +249,19 @@ impl<'a> Walker<'a> {
             }
             Expr::Ident(name) => {
                 let name = name.clone();
-                self.record_use(&name);
+                self.use_of(&name);
                 self.live_cell(&name)
                     .map(|_| field_value(Expr::Ident(name)))
             }
             Expr::Call(callee, args) => {
                 if let Some(name) = ident_of(callee).map(str::to_string) {
-                    self.record_use(&name);
+                    self.use_of(&name);
                     for arg in args.iter_mut() {
                         self.arg(arg);
                     }
                     if let Some(cell) = self.live_cell(&name) {
                         let helper = cell.helper.expect(
-                            "a captured binding called as a function has a helper (checked by the analysis)",
+                            "a captured binding called as a function has a helper (checked when the cell was made)",
                         );
                         let mut new_args = vec![Arg::Positional(Expr::Ident(name))];
                         new_args.append(args);
@@ -507,44 +496,21 @@ fn push_helper(
 }
 
 fn compute_cells(
-    analysis: &Analysis,
+    decls: &[Decl],
     counter: &mut usize,
     extra: &mut Vec<Item>,
-) -> Result<HashMap<String, Cell>, String> {
-    let mut names: Vec<&String> = analysis.decls.keys().collect();
-    names.sort();
+) -> Result<HashMap<usize, Cell>, String> {
     let mut cells = HashMap::new();
-    for name in names {
-        let decls = &analysis.decls[name];
-        let captured = analysis.uses.iter().any(|u| {
-            &u.name == name
-                && decls.iter().any(|d| {
-                    d.binding && d.mutable && u.lambda_depth > d.lambda_depth && u.stack.contains(&d.block)
-                })
-        });
-        if !captured {
+    for (id, decl) in decls.iter().enumerate() {
+        if !(decl.binding && decl.mutable && decl.captured) {
             continue;
         }
-        if decls.len() != 1 {
-            return Err(format!(
-                "native backend: the mutable binding '{name}' is captured by a closure, but the name is declared more than once in the same function; give the bindings different names"
-            ));
-        }
-        let decl = &decls[0];
-        if analysis
-            .assigns
-            .iter()
-            .any(|a| &a.name == name && !a.stack.contains(&decl.block))
-        {
-            return Err(format!(
-                "native backend: the mutable binding '{name}' is captured by a closure and also assigned where it is not in scope; give the bindings different names"
-            ));
-        }
+        let name = &decl.name;
         let ty = match &decl.declared {
             Some(declared) => declared.clone(),
             None => {
                 let checked = decl.value_ty.as_ref().ok_or_else(|| {
-                    format!("native backend: the type of the mutable binding '{name}' captured by a closure is unknown")
+                    format!("native backend: the type of the mutable binding '{name}' captured by a closure is unknown; annotate it")
                 })?;
                 ty_to_type(checked).ok_or_else(|| {
                     format!(
@@ -576,14 +542,7 @@ fn compute_cells(
             Type::Fn(params, ret) => Some(push_helper(k, &record, params, ret, extra)),
             _ => None,
         };
-        cells.insert(
-            name.clone(),
-            Cell {
-                record,
-                decl_block: decl.block,
-                helper,
-            },
-        );
+        cells.insert(id, Cell { record, helper });
     }
     Ok(cells)
 }
@@ -599,7 +558,7 @@ fn rewrite_function(
     let names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
     let mut analyze = Walker::new(Mode::Analyze, typed, HashMap::new());
     analyze.block(body, &names);
-    let cells = compute_cells(&analyze.analysis, counter, extra)?;
+    let cells = compute_cells(&analyze.decls, counter, extra)?;
     if cells.is_empty() {
         return Ok(());
     }

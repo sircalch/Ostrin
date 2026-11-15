@@ -4648,6 +4648,90 @@ fn convert(value: f64, from_unit: &str, to_unit: &str) -> Result<f64, RuntimeErr
 }
 
 #[cfg(test)]
+mod frame_tests {
+    //! Stale slots of a reused loop frame must never answer a lookup, and the name index must stay consistent with the
+    //! live part of the frame across truncations, shadowing and redefinitions.
+    use super::*;
+
+    fn int(value: i64) -> Value {
+        Value::Int(value)
+    }
+
+    fn read(env: &Env, name: &str) -> Option<i64> {
+        match env.get(name) {
+            Some(Value::Int(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn small_frame_lookup_and_truncation() {
+        let env = Env::root().child();
+        env.define("a", int(1));
+        env.define("b", int(2));
+        env.0.borrow_mut().truncate_to(1);
+        assert_eq!(read(&env, "a"), Some(1));
+        assert_eq!(read(&env, "b"), None, "a stale slot must not be visible");
+        env.define("c", int(3));
+        assert_eq!(read(&env, "c"), Some(3));
+        assert_eq!(read(&env, "b"), None);
+    }
+
+    #[test]
+    fn indexed_frame_stale_entries_never_answer() {
+        let env = Env::root().child();
+        for k in 0..40 {
+            env.define(&format!("v{k}"), int(k));
+        }
+        assert!(env.0.borrow().index.is_some(), "a frame of 40 names is indexed");
+        env.0.borrow_mut().truncate_to(1);
+        for k in 1..40 {
+            assert_eq!(read(&env, &format!("v{k}")), None, "v{k} is stale");
+        }
+        // redefine in a different order: the stale index entries point at slots now holding other names
+        env.define("w", int(100));
+        env.define("v5", int(55));
+        assert_eq!(read(&env, "w"), Some(100));
+        assert_eq!(read(&env, "v5"), Some(55));
+        assert_eq!(read(&env, "v6"), None);
+        assert_eq!(read(&env, "v0"), Some(0), "the kept slot is untouched");
+    }
+
+    #[test]
+    fn redefinition_updates_the_existing_slot() {
+        let env = Env::root().child();
+        for k in 0..20 {
+            env.define(&format!("x{k}"), int(k));
+        }
+        env.define("x3", int(333));
+        assert_eq!(read(&env, "x3"), Some(333));
+        assert_eq!(env.0.borrow().live, 20, "a redefinition does not add a slot");
+    }
+
+    #[test]
+    fn shadowed_name_in_the_parent_is_found_only_when_not_in_the_frame() {
+        let parent = Env::root().child();
+        parent.define("q", int(7));
+        let child = parent.child();
+        assert_eq!(read(&child, "q"), Some(7));
+        child.define("q", int(9));
+        assert_eq!(read(&child, "q"), Some(9));
+        assert_eq!(read(&parent, "q"), Some(7), "the parent keeps its own binding");
+    }
+
+    #[test]
+    fn live_vars_excludes_stale_slots() {
+        let env = Env::root().child();
+        for k in 0..5 {
+            env.define(&format!("s{k}"), int(k));
+        }
+        env.0.borrow_mut().truncate_to(2);
+        let names: Vec<String> = env.0.borrow().live_vars().iter().map(|(n, _)| n.clone()).collect();
+        assert_eq!(names, vec!["s0".to_string(), "s1".to_string()]);
+    }
+}
+
+#[cfg(test)]
 mod affine_temperature_runtime_tests {
     use super::*;
 

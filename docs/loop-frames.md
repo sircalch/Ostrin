@@ -34,16 +34,24 @@ binding. Before the fix the native backends copied the value into the environmen
 
 Fix: `compiler/src/capture_cells.rs` runs only on the native path, after the original program type-checks. Each captured
 `mut` binding becomes a one-field record cell (`OstrinCell<k>`), and the rewritten program is type-checked again. The
-interpreter does not run the pass. The pass refuses, with an explicit error, the cases it cannot represent:
+interpreter does not run the pass.
 
-- a captured name declared more than once in one function (it cannot be matched to one binding by name);
-- a captured function value whose type is unknown (for example a lambda with unannotated parameters: `mut op: fn(Int) -> Int = ...`).
+Bindings are identified by declaration: each use is resolved through the scope chain to the innermost visible declaration,
+so a shadowing declaration and the outer binding of the same name are separate. Only captured `mut` declarations get a
+cell. The pass refuses, with an explicit error, the one case it cannot represent: a captured function value whose type is
+unknown (for example a lambda whose binding has no annotation, such as `mut op = fn(k) { ... }`; annotate it as
+`mut op: fn(Int) -> Int = ...`). The language has no lambda-parameter annotations, so the annotation goes on the binding.
 
 Tests: `loop_closure_mutation_agrees_on_native_backend` (native, 6); `captured_mutable_bindings_share_storage_with_closures_in_both_backends`
-(native and interpreter, including `--leak-check` with `live_allocations=0`); and
-`captured_mutable_binding_shadowed_in_the_same_function_is_refused_natively` (the refusal is pinned).
+(native and interpreter, `--leak-check`, `live_allocations=0`); `captured_mutable_binding_shadowed_in_the_same_function_agrees_natively`
+(a captured name declared twice in one function); `captured_mutable_bindings_across_scopes_agree_in_both_backends` (independent
+closures, shared cell, a captured name shadowed in a loop, nested captures, a closure that outlives its creator).
 
-Open limit: per-declaration resolution of shadowed captured names is not implemented; the pass refuses instead.
+Known leak (AST fallback, reproduced on HEAD): a closure created inside another closure's body is not released when the
+program is compiled by the AST codegen, because ownership tracking is disabled in lambda bodies. The IR path releases it.
+The AST path is taken when a lambda's parameter type cannot be inferred (for example `add = fn(d) { ... }` without any
+annotation on the binding). `captured_lambda_env_leak_on_ast_path` is ignored and fails with `live_allocations=1`.
+Annotating the binding (`add: fn(Int) -> Int = fn(d) { ... }`) selects the IR path, and that program has no leak.
 
 ## Shadowing in native code (fixed)
 
@@ -73,4 +81,12 @@ warning for functions returning from inside a block; the output is correct and t
 - Loop frame reuse for range `for` loops: when the body contains no closure (`fn`) and no `spawn`/`spawn scope`, one frame
   serves every iteration; after each iteration the frame is cut back to the loop variable. Tests:
   `captured_loop_frame_reuse_agrees_in_both_backends` (interpreter and native) and `loop_frame_semantics_agree_in_both_backends`.
+- Audit of the reuse condition (`compiler/src/ast_scan.rs`): the only interpreter values that hold an environment are
+  `Value::Closure` (created only by `Expr::Lambda`) and `TaskState` (created only by `spawn`/`spawn scope`). A callee
+  starts from a root environment, so it cannot see the caller's frame. A body containing a lambda or a spawn, at any depth
+  (closure in a branch, match arm, guard, record field, list, call argument, nested loop), is therefore never reused.
+  `ast_scan` tests cover twelve positions. The debugger's `current_env` points to the frame of the statement it executes,
+  which is replaced at the next statement, so it never exposes a stale frame.
+- Stale slots: lookups read only the live part of a frame; an index entry is trusted only when its position is live and
+  holds that name. Frame unit tests are in `interpreter::frame_tests`.
 - Not done: slot-based lexical resolution (would change variable lookup in every function; needs its own measured change).
