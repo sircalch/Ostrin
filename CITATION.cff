@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use Ostrin in your work, please cite it using the metadata below."
+title: "Ostrin"
+abstract: "Ostrin is an experimental general-purpose programming language focused on readability, physically meaningful types (quantities with dimensions) and safe-by-default concurrency. This repository contains a design-validation compiler and interpreter written in Rust."
+type: software
+version: 0.2.0
+date-released: 2026-10-15
+license: MIT
+repository-code: "https://github.com/sircalch/Ostrin"
+keywords:
+  - programming language
+  - scientific computing
+  - physical units
+  - Rust
+authors:
+  - family-names: "Monreal Hernández"
+    given-names: "Andrés"
+    orcid: "https://orcid.org/0009-0009-1207-8597"
