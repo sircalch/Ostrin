@@ -294,3 +294,98 @@ test("conditional: the derivation of E is checked at each point, with its refusa
   assert.equal(find("x positive", -2)[2], "1", "the original is defined at -2");
   assert.match(find("x positive", -2)[3], /^refused: outside the context: x positive fails at x = -2/);
 });
+
+// The rational notebook (F): exact algebra and rational equations. Every expected value below was worked out by hand
+// from the definitions (see the cell texts and the notes in notebook-f-cells.mjs); none of them is copied from a run.
+test("rational: the notebook is valid and carries no recorded outputs", () => {
+  const doc = load("rational");
+  assert.deepEqual(doc.runs, {});
+  assert.equal(doc.cells.filter((cell) => cell.kind === "code").length, 12);
+});
+
+test("rational: the polynomials and the multivariate division are exact, and F = q1 g1 + q2 g2 + r holds", { skip: !available }, () => {
+  const poly = runCell(load("rational"), "c2");
+  assert.equal(poly.status, 0, poly.stdout);
+  assert.match(poly.stdout, /F\(x, y\) = x\^2\*y \+ x\*y\^2 \+ y\^2/);
+  assert.match(poly.stdout, /total degree of F: 3/);
+  const div = runCell(load("rational"), "c3");
+  assert.equal(div.status, 0, div.stdout);
+  // lexicographic division, x > y: q1 = x + y, q2 = 1, r = x + y + 1 (checked by hand: the sum is x^2 y + x y^2 + y^2)
+  assert.match(div.stdout, /q1 = x \+ y\n/);
+  assert.match(div.stdout, /q2 = 1\n/);
+  assert.match(div.stdout, /r = x \+ y \+ 1\n/);
+  assert.match(div.stdout, /holds exactly: true/);
+});
+
+test("rational: the simplified form keeps the domain requirement, and the excluded point is not evaluated", { skip: !available }, () => {
+  const construction = runCell(load("rational"), "c4");
+  assert.equal(construction.status, 0, construction.stdout);
+  assert.match(construction.stdout, /domain requirements kept: \[-1, 1\] != 0/);
+  const domain = runCell(load("rational"), "c5");
+  assert.equal(domain.status, 0, domain.stdout);
+  assert.match(domain.stdout, /f\(2\) = 3/);
+  assert.match(domain.stdout, /f\(1\) is not evaluated: undefined at 1/);
+});
+
+test("rational: the valid equation, the excluded candidate, the identity and the partial case have their own statuses", { skip: !available }, () => {
+  const valid = runCell(load("rational"), "c6");
+  assert.equal(valid.status, 0, valid.stdout);
+  assert.match(valid.stdout, /\(x\^2 - 1\)\/\(x - 1\) = 3: solved/);
+  assert.match(valid.stdout, /solutions: 2\n/);
+  assert.match(valid.stdout, /excluded: x = 1: excluded, the requirement \[-1, 1\] != 0 vanishes there/);
+  const excluded = runCell(load("rational"), "c7");
+  assert.equal(excluded.status, 0, excluded.stdout);
+  assert.match(excluded.stdout, /\(x\^2 - 1\)\/\(x - 1\) = 2: no_solution/);
+  assert.match(excluded.stdout, /excluded: x = 1/);
+  const identity = runCell(load("rational"), "c8");
+  assert.equal(identity.status, 0, identity.stdout);
+  assert.match(identity.stdout, /\(x\^2 - 2\)\/\(x\^2 - 2\) = 1: identity/);
+  assert.match(identity.stdout, /domain: \[-2, 0, 1\] != 0 ; \[1\] != 0/);
+  assert.match(identity.stdout, /x = 0 \+ 1\/2\*sqrt\(8\): excluded/);
+  const partial = runCell(load("rational"), "c9");
+  assert.equal(partial.status, 0, partial.stdout);
+  assert.match(partial.stdout, /x\^3 \+ x \+ 1 = 0: partial/);
+  assert.match(partial.stdout, /pending: a factor of degree 3 without rational roots is not solved by this method/);
+});
+
+test("rational: the verification and the table agree with the exact values, and mark x = 1 as excluded", { skip: !available }, () => {
+  const verify = runCell(load("rational"), "c10");
+  assert.equal(verify.status, 0, verify.stdout);
+  assert.match(verify.stdout, /x = 2: f = 3, g = 3, equal: true/);
+  assert.match(verify.stdout, /x = 1 is excluded and not evaluated/);
+  const table = runCell(load("rational"), "c11");
+  assert.equal(table.status, 0, table.stdout);
+  assert.equal(table.tables.length, 1);
+  const rows = csvRows(table.tables[0].csv).slice(1);
+  const find = (x) => rows.find(([p]) => p === x);
+  assert.deepEqual(find("2"), ["2", "3", "defined"]);
+  assert.deepEqual(find("1"), ["1", "", "excluded"]);
+  assert.deepEqual(find("-3/2"), ["-3/2", "-1/2", "defined"]);
+});
+
+test("rational: the figure draws f and g in separate segments, never across an excluded point, and marks x = 1 without a value", { skip: !available }, () => {
+  const out = runCell(load("rational"), "c12");
+  assert.equal(out.status, 0, out.stdout);
+  assert.equal(out.figures.length, 1);
+  const svg = out.figures[0];
+  assert.match(svg, /^<svg /);
+  assert.match(svg, /removable at x = 1/);
+  assert.match(svg, /a pole at x = 1/);
+  assert.match(svg, /no value is plotted/);
+  // four curve segments: f on each side of x = 1 and g on each side of x = 1, one subpath each
+  const paths = [...svg.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(paths.length, 4);
+  for (const path of paths) assert.equal((path.match(/M/g) ?? []).length, 1, "a segment is one subpath");
+});
+
+test("rational: changing the parameter in c1 changes the next run of the equations that use it", { skip: !available }, () => {
+  let doc = load("rational");
+  const before = runCell(doc, "c6");
+  assert.match(before.stdout, /= 3: solved/);
+  const parameters = doc.cells.find((cell) => cell.id === "c1");
+  doc = setSource(doc, "c1", parameters.source.replace('return "3"', 'return "5"'));
+  const after = runCell(doc, "c6");
+  assert.equal(after.status, 0, after.stdout);
+  assert.match(after.stdout, /= 5: solved/);
+  assert.match(after.stdout, /solutions: 4\n/, "x + 1 = 5 has the solution 4");
+});

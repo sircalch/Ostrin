@@ -1,0 +1,102 @@
+{
+  "format": "ostrin.notebook",
+  "version": 1,
+  "id": "rational",
+  "title": "F · Exact algebra and rational equations",
+  "created": "2026-11-11T09:00:00.000Z",
+  "updated": "2026-11-11T09:00:00.000Z",
+  "cells": [
+    {
+      "id": "t1",
+      "kind": "text",
+      "source": "# Exact algebra and rational equations\n\nThis notebook works in exact arithmetic. Polynomials and rational functions are built from exact coefficient texts, and\nevery number printed by a cell comes from an Ostrin program running in the page.\n\n- f(x) = (x^2 - 1)/(x - 1) equals x + 1 wherever it is defined. x = 1 is not in its domain, and the domain keeps that\n  condition: a simplification does not remove it.\n- An equation R1(x) = R2(x) is solved on the domain of both sides. Each solution is checked against the original\n  expressions, and each excluded point is listed with the requirement that excludes it.\n- \"partial\" means that part of the equation is outside the exact methods of the library. It is not a complete solution.\n\nThe parameters are in c1. Change a value there and run the cells that import c1: their outputs become stale and must be\nrun again.",
+      "deps": []
+    },
+    {
+      "id": "c1",
+      "kind": "code",
+      "source": "// The parameters of the equations. Change a value, then run the cells that import c1 again.\npub fn rhs_valid() -> String {\n    return \"3\"\n}\n\npub fn rhs_excluded() -> String {\n    return \"2\"\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c2",
+      "kind": "code",
+      "source": "import std.polynomial\nimport std.mpolynomial\n\nfn main() -> Void {\n    p = polynomial.poly_from_texts([\"-1\", \"0\", \"1\"]).unwrap()\n    q = polynomial.poly_from_texts([\"-1\", \"1\"]).unwrap()\n    print(\"p, coefficients from the lowest degree: \" + polynomial.poly_to_string(p) + \"   degree \" + polynomial.poly_degree(p).to_string())\n    print(\"q, coefficients from the lowest degree: \" + polynomial.poly_to_string(q) + \"   degree \" + polynomial.poly_degree(q).to_string())\n    big = mpolynomial.mpoly_parse([\"x\", \"y\"], [\"1|2,1\", \"1|1,2\", \"1|0,2\"]).unwrap()\n    print(\"F(x, y) = \" + mpolynomial.mpoly_to_text(big))\n    print(\"total degree of F: \" + mpolynomial.mpoly_total_degree(big).to_string())\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c3",
+      "kind": "code",
+      "source": "import std.mpolynomial\n\nfn main() -> Void {\n    big = mpolynomial.mpoly_parse([\"x\", \"y\"], [\"1|2,1\", \"1|1,2\", \"1|0,2\"]).unwrap()\n    g1 = mpolynomial.mpoly_parse([\"x\", \"y\"], [\"1|1,1\", \"-1|0,0\"]).unwrap()\n    g2 = mpolynomial.mpoly_parse([\"x\", \"y\"], [\"1|0,2\", \"-1|0,0\"]).unwrap()\n    divisors = [g1, g2]\n    print(\"F = \" + mpolynomial.mpoly_to_text(big))\n    print(\"divisors, in this order (lexicographic, x > y): g1 = \" + mpolynomial.mpoly_to_text(g1) + \" ; g2 = \" + mpolynomial.mpoly_to_text(g2))\n    match mpolynomial.mpoly_divide(big, divisors) {\n        Ok(d) => {\n            print(\"q1 = \" + mpolynomial.mpoly_to_text(d.quotients[0]))\n            print(\"q2 = \" + mpolynomial.mpoly_to_text(d.quotients[1]))\n            print(\"r = \" + mpolynomial.mpoly_to_text(d.remainder))\n            match mpolynomial.mpoly_division_holds(big, divisors, d) {\n                Ok(holds) => print(\"F = q1 g1 + q2 g2 + r holds exactly: \" + holds.to_string()),\n                Err(message) => print(\"check refused: \" + message),\n            }\n        },\n        Err(message) => print(\"division refused: \" + message),\n    }\n    print(\"a zero remainder with several divisors is not, by itself, a test of membership in the ideal they generate\")\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c4",
+      "kind": "code",
+      "source": "import std.rational\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    print(\"f(x) = (x^2 - 1)/(x - 1), as entered\")\n    print(\"numerator in lowest terms (coefficient|degree): \" + rational.rational_numerator_lines(f).join(\" | \"))\n    print(\"denominator in lowest terms (coefficient|degree): \" + rational.rational_denominator_lines(f).join(\" | \"))\n    print(\"domain requirements kept: \" + rational.rational_requirement_texts(f).join(\" ; \"))\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c5",
+      "kind": "code",
+      "source": "import std.rational\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    print(\"requirements that stay with the simplified form: \" + rational.rational_requirement_texts(f).join(\" and \"))\n    match rational.rational_evaluate(f, \"2\") {\n        Ok(v) => print(\"f(2) = \" + v),\n        Err(message) => print(\"f(2): \" + message),\n    }\n    match rational.rational_evaluate(f, \"1\") {\n        Ok(v) => print(\"f(1) = \" + v),\n        Err(message) => print(\"f(1) is not evaluated: \" + message),\n    }\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c6",
+      "kind": "code",
+      "source": "import std.rational\nimport c1\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    g = rational.rational_new([c1.rhs_valid()], [\"1\"]).unwrap()\n    s = rational.rational_solve(f, g).unwrap()\n    print(\"(x^2 - 1)/(x - 1) = \" + c1.rhs_valid() + \": \" + s.status)\n    print(\"  solutions: \" + s.solutions.join(\" | \"))\n    print(\"  excluded: \" + s.excluded.join(\" | \"))\n    print(\"  pending: \" + s.pending.join(\" | \"))\n    print(\"  completeness: \" + s.completeness)\n}\n",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c7",
+      "kind": "code",
+      "source": "import std.rational\nimport c1\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    g = rational.rational_new([c1.rhs_excluded()], [\"1\"]).unwrap()\n    s = rational.rational_solve(f, g).unwrap()\n    print(\"(x^2 - 1)/(x - 1) = \" + c1.rhs_excluded() + \": \" + s.status)\n    print(\"  solutions: \" + s.solutions.join(\" | \"))\n    print(\"  rejected: \" + s.rejected.join(\" | \"))\n    print(\"  excluded: \" + s.excluded.join(\" | \"))\n    print(\"  completeness: \" + s.completeness)\n}\n",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c8",
+      "kind": "code",
+      "source": "import std.rational\n\nfn main() -> Void {\n    f = rational.rational_new([\"-2\", \"0\", \"1\"], [\"-2\", \"0\", \"1\"]).unwrap()\n    g = rational.rational_new([\"1\"], [\"1\"]).unwrap()\n    s = rational.rational_solve(f, g).unwrap()\n    print(\"(x^2 - 2)/(x^2 - 2) = 1: \" + s.status)\n    print(\"  domain: \" + s.domain.join(\" ; \"))\n    print(\"  excluded (not enumerated when irrational): \" + s.excluded.join(\" | \"))\n    print(\"  completeness: \" + s.completeness)\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c9",
+      "kind": "code",
+      "source": "import std.rational\n\nfn main() -> Void {\n    f = rational.rational_new([\"1\", \"1\", \"0\", \"1\"], [\"1\"]).unwrap()\n    g = rational.rational_new([], [\"1\"]).unwrap()\n    s = rational.rational_solve(f, g).unwrap()\n    print(\"x^3 + x + 1 = 0: \" + s.status)\n    print(\"  solutions: \" + s.solutions.join(\" | \"))\n    print(\"  pending: \" + s.pending.join(\" | \"))\n    print(\"  completeness: \" + s.completeness)\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c10",
+      "kind": "code",
+      "source": "import std.rational\nimport c1\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    g = rational.rational_new([c1.rhs_valid()], [\"1\"]).unwrap()\n    s = rational.rational_solve(f, g).unwrap()\n    for root in s.solutions {\n        lhs = rational.rational_evaluate(f, root).unwrap()\n        rhs = rational.rational_evaluate(g, root).unwrap()\n        print(\"x = \" + root + \": f = \" + lhs + \", g = \" + rhs + \", equal: \" + (lhs == rhs).to_string())\n    }\n    match rational.rational_evaluate(f, \"1\") {\n        Ok(v) => print(\"x = 1: f = \" + v),\n        Err(message) => print(\"x = 1 is excluded and not evaluated: \" + message),\n    }\n    print(\"exclusions listed by the solver: \" + s.excluded.join(\" | \"))\n}\n",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c11",
+      "kind": "code",
+      "source": "import std.rational\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    print(\"OSTRIN-TABLE f(x) = (x^2 - 1)/(x - 1) at exact sample points\")\n    print(\"x,f(x),status\")\n    for i in 0 until 13 {\n        k = i - 4\n        mut text = k.to_string() + \"/2\"\n        if k % 2 == 0 {\n            text = (k / 2).to_string()\n        }\n        match rational.rational_evaluate(f, text) {\n            Ok(v) => print(text + \",\" + v + \",defined\"),\n            Err(message) => print(text + \",,excluded\"),\n        }\n    }\n    print(\"OSTRIN-TABLE-END\")\n}\n",
+      "deps": []
+    },
+    {
+      "id": "c12",
+      "kind": "code",
+      "source": "import std.rational\nimport std.viz\nimport std.arrays\nimport std.strings\n\nfn value_of(text: String) -> Float {\n    parts = strings.split(text, \"/\")\n    if parts.length() == 1 {\n        return (parse_int(parts[0]).unwrap()) as Float\n    }\n    return (parse_int(parts[0]).unwrap() as Float) / (parse_int(parts[1]).unwrap() as Float)\n}\n\nfn main() -> Void {\n    f = rational.rational_new([\"-1\", \"0\", \"1\"], [\"-1\", \"1\"]).unwrap()\n    g = rational.rational_new([\"1\"], [\"-1\", \"1\"]).unwrap()\n    n = 41\n    mut xs = zeros([n])\n    mut yf = zeros([n])\n    mut yg = zeros([n])\n    mut okf = zeros([n])\n    mut okg = zeros([n])\n    for i in 0 until n {\n        xs.set(i, (i as Float) / 4.0 - 5.0)\n        text = (i - 20).to_string() + \"/4\"\n        match rational.rational_evaluate(f, text) {\n            Ok(v) => {\n                yf.set(i, value_of(v))\n                okf.set(i, 1.0)\n            },\n            Err(message) => {\n                yf.set(i, 0.0)\n            },\n        }\n        match rational.rational_evaluate(g, text) {\n            Ok(v) => {\n                yg.set(i, value_of(v))\n                okg.set(i, 1.0)\n            },\n            Err(message) => {\n                yg.set(i, 0.0)\n            },\n        }\n    }\n    mut fig = viz.figure(\"f(x) = (x^2 - 1)/(x - 1) and g(x) = 1/(x - 1): no curve crosses an excluded point\")\n    fig = fig.labels(\"x\", \"value\")\n    mut start = 0\n    mut inside = false\n    mut first = true\n    for i in 0 until n + 1 {\n        mut defined = false\n        if i < n {\n            defined = okf[i] > 0.5\n        }\n        if defined and not inside {\n            start = i\n            inside = true\n        }\n        if inside and not defined {\n            mut seg: List<Int> = []\n            for j in start until i {\n                seg.push(j)\n            }\n            mut label = \"\"\n            if first {\n                label = \"f(x) = (x^2 - 1)/(x - 1), removable at x = 1\"\n                first = false\n            }\n            fig = fig.line(arrays.take(xs, seg).unwrap(), arrays.take(yf, seg).unwrap(), label: label)\n            inside = false\n        }\n    }\n    mut start_g = 0\n    mut inside_g = false\n    mut first_g = true\n    for i in 0 until n + 1 {\n        mut defined_g = false\n        if i < n {\n            defined_g = okg[i] > 0.5\n        }\n        if defined_g and not inside_g {\n            start_g = i\n            inside_g = true\n        }\n        if inside_g and not defined_g {\n            mut seg_g: List<Int> = []\n            for j in start_g until i {\n                seg_g.push(j)\n            }\n            mut label_g = \"\"\n            if first_g {\n                label_g = \"g(x) = 1/(x - 1), a pole at x = 1\"\n                first_g = false\n            }\n            fig = fig.line(arrays.take(xs, seg_g).unwrap(), arrays.take(yg, seg_g).unwrap(), label: label_g, dash: \"6 4\")\n            inside_g = false\n        }\n    }\n    mut marker_x = zeros([1])\n    mut marker_y = zeros([1])\n    marker_x.set(0, 1.0)\n    fig = fig.scatter(marker_x, marker_y, label: \"x = 1: excluded, no value is plotted\")\n    print(fig.svg())\n}\n",
+      "deps": []
+    },
+    {
+      "id": "t2",
+      "kind": "text",
+      "source": "# Interpretation\n\n- The division is exact: F = q1 g1 + q2 g2 + r, and the program checks it. A zero remainder would not prove that F is in the\n  ideal generated by g1 and g2 unless the divisors form a Gröbner basis; this notebook does not compute one.\n- (x^2 - 1)/(x - 1) simplifies to x + 1, but x = 1 stays excluded. (x^2 - 1)/(x - 1) = 3 has the valid solution x = 2.\n  (x^2 - 1)/(x - 1) = 2 has the candidate x = 1, which is excluded: it is rejected, not a solution.\n- (x^2 - 2)/(x^2 - 2) = 1 is an identity only on the domain x^2 - 2 != 0. The points ±√2 are excluded. The list of excluded\n  points is not exhaustive for requirements of degree above two, and the solver says so.\n- x^3 + x + 1 = 0 has no rational root and the method has no exact algorithm for it: its status is partial, not solved.\n- The figure never joins two defined values across an excluded point, and the excluded point is marked without a value.\n",
+      "deps": []
+    }
+  ],
+  "resources": [],
+  "runs": {}
+}

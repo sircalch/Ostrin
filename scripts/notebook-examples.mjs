@@ -12,6 +12,22 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  RATIONAL_TEXT,
+  RATIONAL_PARAMETERS,
+  RATIONAL_POLYNOMIALS,
+  RATIONAL_DIVISION,
+  RATIONAL_CONSTRUCTION,
+  RATIONAL_DOMAIN,
+  RATIONAL_SOLVE,
+  RATIONAL_SOLVE_EXCLUDED,
+  RATIONAL_IDENTITY,
+  RATIONAL_PARTIAL,
+  RATIONAL_VERIFY,
+  RATIONAL_TABLE,
+  RATIONAL_FIGURE,
+  RATIONAL_INTERPRETATION,
+} from "./notebook-f-cells.mjs";
+import {
   addCell,
   attachResource,
   createNotebook,
@@ -766,14 +782,15 @@ fn main() -> Void {
     print("OSTRIN-TABLE-END")
 }`;
 
-function build({ id, title, text, cells, resources = [] }) {
+function build({ id, title, text, cells, resources = [], closing = null }) {
   let doc = createNotebook({ id, title, now: NOW });
   doc = addCell(doc, "text", { source: text });
   for (const cell of cells) {
-    doc = addCell(doc, "code", { source: cell.source });
+    doc = addCell(doc, cell.kind === "text" ? "text" : "code", { source: cell.source });
     const added = doc.cells[doc.cells.length - 1];
     if (cell.deps) doc = setDeps(doc, added.id, cell.deps);
   }
+  if (closing) doc = addCell(doc, "text", { source: closing });
   for (const resource of resources) doc = attachResource(doc, resource.path, resource.text);
   const problems = validateNotebook(doc);
   if (problems.length > 0) throw new Error(`notebook ${id} is invalid: ${problems.join("; ")}`);
@@ -805,6 +822,26 @@ export function notebooks() {
         { source: PHYSICAL_DECAY_FIGURE, deps: ["c1"] },
         { source: PHYSICAL_OSCILLATOR, deps: ["c1"] },
         { source: PHYSICAL_OSCILLATOR_FIGURE, deps: ["c1"] },
+      ],
+    }),
+    rational: build({
+      id: "rational",
+      title: "F · Exact algebra and rational equations",
+      text: RATIONAL_TEXT,
+      closing: RATIONAL_INTERPRETATION,
+      cells: [
+        { source: RATIONAL_PARAMETERS },
+        { source: RATIONAL_POLYNOMIALS },
+        { source: RATIONAL_DIVISION },
+        { source: RATIONAL_CONSTRUCTION },
+        { source: RATIONAL_DOMAIN },
+        { source: RATIONAL_SOLVE, deps: ["c1"] },
+        { source: RATIONAL_SOLVE_EXCLUDED, deps: ["c1"] },
+        { source: RATIONAL_IDENTITY },
+        { source: RATIONAL_PARTIAL },
+        { source: RATIONAL_VERIFY, deps: ["c1"] },
+        { source: RATIONAL_TABLE },
+        { source: RATIONAL_FIGURE },
       ],
     }),
     symbolic: build({
@@ -839,6 +876,7 @@ const FILES = {
   physical: "physical.ostrin.notebook.json",
   symbolic: "symbolic.ostrin.notebook.json",
   numeric: "numeric.ostrin.notebook.json",
+  rational: "rational.ostrin.notebook.json",
   conditional: "conditional.ostrin.notebook.json",
 };
 
