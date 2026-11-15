@@ -1,6 +1,6 @@
 # Capability matrix: scientific and symbolic capabilities of Ostrin
 
-Branch `horizon/scientific-platform-core`, verified at `e0d31968` (notebook F); the suite on that state: 40 unit, 6 differential, 465 example tests, none ignored.
+Branch `horizon/scientific-platform-core`, verified at `cd214885` (compiler sources unchanged since `df851303`); the suite on that state: 40 unit, 6 differential, 467 example tests, none ignored. The browser suites run on WASM rebuilt from those sources: 30 tests (A to F).
 
 Status terms, used exactly:
 
@@ -9,6 +9,8 @@ Status terms, used exactly:
   where the capability is supported there. The test is named.
 - **Partial**: implemented for a stated family only; the limit is stated.
 - **Not present**: not implemented.
+- **Not tested**: implemented or claimed, but a check that would cover it could not run here (the reason is given).
+- **Blocked**: a check cannot run because of an environment limit (the limit is given).
 
 "Verified" does not mean general: each row names the family it covers. Nothing here is a claim of parity with Wolfram
 or MATLAB. No results from those systems are included.
@@ -34,7 +36,7 @@ or MATLAB. No results from those systems are included.
 | Univariate rational functions in lowest terms (exact gcd of std.polynomial), with monic denominators | Verified | Operations: add, subtract, multiply, divide, negate, derivative, composition. See `docs/rational.md`. | `rational_core`, `rational_oracle` (interpreter and native) |
 | Domain requirements kept through operations, substitution, derivatives, composition and evaluation (a removed factor stays excluded) | Verified | Requirements are polynomials that must not vanish; evaluation names the vanishing one. Oracle checks 92 excluded points out of 528. | `rational_core`, `rational_oracle` |
 | Multivariate rational functions | Not present | Needs a multivariate gcd, which is not implemented. | — |
-| Rational equations R1(x) = R2(x): exact rational roots, quadratic irrational roots verified in Q(sqrt d), excluded points, rejected candidates, identities | Verified | Univariate. Structured result (`RationalSolution`). Oracle: 60 equations. See `docs/rational.md`. | `rational_equations`, `rational_equations_oracle` (interpreter and native) |
+| Rational equations R1(x) = R2(x): exact rational roots, quadratic irrational roots verified in Q(sqrt d), excluded points, rejected candidates, identities | Verified | Univariate. Structured result (`RationalSolution`). Oracle: 71 equations, nine of them with hand-derived references (cases 12 to 20). See `docs/rational.md`. | `rational_equations`, `rational_equations_oracle` (interpreter and native) |
 | Rational equations with a residue of degree three or more and no rational root | Partial | Reported as `partial` with the residue pending; no numerical root approximation yet. | `rational_equations` |
 | Partial fractions | Not present | — | — |
 
@@ -89,7 +91,7 @@ or MATLAB. No results from those systems are included.
 | Native: a closure that captures a `mut` binding shares its storage with the enclosing function (design 02 §4) | Verified | `captured_mutable_bindings_across_scopes_agree_in_both_backends`, `loop_closure_mutation_agrees_on_native_backend`; `--leak-check` reports `live_allocations=0` for the capture fixtures. Limit: a captured function value whose type cannot be inferred is refused with an error (annotate the binding). |
 | Native: shadowing (a declaration in an inner scope never changes an outer binding) | Verified | `shadowing_scopes_agree_in_every_backend_path` runs the IR, forced HIR and forced AST routes; `loop_body_shadow_agrees_on_native_backend`. |
 | Native, AST fallback: closure environments release captures and closures bound in closure bodies | Verified (AST route) | `captured_lambda_env_leak_on_ast_path` (was ignored; active since the AST closure-ownership change). Not verified under AddressSanitizer or UBSan in this phase. |
-| WASM (browser, WASI) | Verified for the notebook examples A to E | 25 browser tests pass against the rebuilt `website/ostrinc.wasm`; notebook E's derivation runs in the browser. |
+| WASM (browser, WASI) | Verified for the notebook examples A to F | 30 browser tests pass against the rebuilt `website/ostrinc.wasm` (`notebook.spec.mjs` 25, `notebook-rational.spec.mjs` 5). |
 
 The interpreter is substantially slower than native code (see the scientific report). A large program can be impractical
 on the interpreter; this is a measured limit, not a design claim.
@@ -111,6 +113,7 @@ on the interpreter; this is a measured limit, not a design claim.
 | Reproducible suite: five kernels, four runtime modes | Implemented | `benchmarks/run.mjs`, `benchmarks/README.md` |
 | Correctness checked before timing and for every timed run | Verified | `allComplete: true` in run 3 |
 | Scientific report with valid comparisons and stated limits | Verified | `benchmarks/SCIENTIFIC-REPORT.md` |
+| Historical scientific comparison: pinned interpreter builds (7a38ee8b, ffe90033, HEAD) on seven kernels, native, CPython and Julia cold and warm | Partial | `benchmarks/v2/results/compare-scientific-2026-11-15T06-41-52-032Z.json` (horner from `compare-scientific-2026-11-15T17-07-10-793Z.json`). Load was 28 to 68 % in the first run and 12 to 32 % in the horner rerun; interpreter conclusions use non-overlapping ranges only. Python and Julia are internal timers and are not directly comparable with the external figures. |
 | Statistical stability across sessions | Partial | Only one complete run is reported; run-to-run variation is visible and not characterised. |
 | Interpreter A/B across pinned builds (16 workloads: micro loops and calls, frames of 3, 40 and 120 names, scope lookup, closures, nested loops, recursion, records) | Verified (with stated limits) | `benchmarks/v2/interp/`, `benchmarks/v2/INTERP-AB-REPORT.md`. Conclusive: the empty loop 0.165x, frames_small 0.623x, frames_large 0.875x of the first build; one regression of the list-frame build (frames_large 1.83x) was removed by the hybrid frames. Not conclusive: frames_mid, closures, recursion, while loops. Processor load was not captured. |
 | Comparison with optimised libraries (BLAS, NumPy) | Not present | — |
@@ -127,8 +130,21 @@ on the interpreter; this is a measured limit, not a design claim.
 - Irrational roots of a requirement of degree three or more: the excluded list is not exhaustive, and the solver says so in `completeness`.
 - A general theorem prover, and any membership test in an ideal for divisors that are not a Gröbner basis.
 - Exact limits of an original expression at an excluded point (the figure marks the point without a value).
-- Sanitizer evidence (AddressSanitizer, UBSan) for the native closure-environment change: not run in this phase.
+- Clang sanitizer runs (not installed here): NOT_TESTED. GCC 13 under WSL is the only sanitizer toolchain used.
+- A native backend for untyped closure parameters that hold function values: Blocked by inference; the compiler refuses with a diagnostic.
 - A native compile-time cache for `std` modules (compile cost, measured in the scientific report).
 - Interpreter performance (orders of magnitude slower than native on the measured kernels).
 
 These are gaps, not planned claims: none is implemented, and none is claimed.
+
+## 9. Ownership, capture and the C boundary (native)
+
+| Capability | Status | Scope and limit | Verified by |
+|---|---|---|---|
+| Native ownership of closures, fresh values, print and field assignment, checked with AddressSanitizer, LeakSanitizer and UBSan at -O0 and -O1 (GCC 13.3, WSL) | Verified | Eleven ownership programs on three codegen routes: 60 of 66 runs verified; the 6 others are the intentional refusal of an untyped closure parameter (BLOCKED). Evidence: `docs/sanitizer-evidence.md`, rules: `docs/native-ownership.md`. | `ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation`; `scripts/native-sanitize.mjs` |
+| Use-after-free, double free and leak detection in this toolchain | Verified (control) | A negative control with the same flags reports each defect; the fixtures reported none. | `docs/sanitizer-evidence.md` (controls) |
+| Identifiers that are C keywords (`double`, `int`, `struct`) as locals, captures, record fields and functions | Verified | Lexer escape while native output is built; the map is injective. | `own_c_keyword_names` on IR, HIR and AST |
+| Capture by declaration: several bindings named `x` in different scopes, each closure capturing the binding its declaration refers to | Verified | Loops, nested blocks, a shadow inside the same lambda, and a lambda's own `mut x`; checked on the interpreter and on all three native routes. | `capture_declarations` fixture; the ownership test above |
+| Function values that capture other function values and mutable bindings, with parameter types from annotated signatures | Verified | Function values passed to `compose`, with the captured `mut x` read at call time. | `function_value_capture` fixture |
+| Untyped closure parameter holding a function value, on the native backend | Blocked | The interpreter runs it; the native backend cannot infer the type and refuses with an explicit diagnostic. | `untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic` |
+| Clang as a second C compiler | Not tested | Not installed on this machine. | — |
