@@ -694,12 +694,53 @@ fn requirement_roots_excluded(h: RationalFunction, given: List<String>) -> Resul
                                 excluded.push("x = " + pt + ": excluded, the requirement " + list_text(req) + " != 0 vanishes there")
                             }
                         }
+                        // The irrational roots of a requirement of degree two without rational roots: p +- q sqrt(disc),
+                        // with the same exact text as a solution. A requirement of degree above two is not enumerated here.
+                        if rp.coeffs.length() == 3 and points.length() == 0 {
+                            lead = rp.coeffs[2]
+                            b = fr_div(rp.coeffs[1], lead)
+                            c = fr_div(rp.coeffs[0], lead)
+                            disc = fr_sub(fr_mul(b, b), fr_mul("4", c))
+                            if fr_sign(disc) >= 0 {
+                                p = fr_div(fr_mul(b, "-1"), "2")
+                                for sign in ["1", "-1"] {
+                                    text = sqrt_text(p, fr_div(sign, "2"), disc)
+                                    mut listed_root = false
+                                    for s in excluded {
+                                        if s.starts_with("x = " + text + ":") {
+                                            listed_root = true
+                                        }
+                                    }
+                                    if not listed_root {
+                                        excluded.push("x = " + text + ": excluded, the requirement " + list_text(req) + " != 0 vanishes there")
+                                    }
+                                }
+                            }
+                        }
                     },
                 }
             },
         }
     }
     Ok(excluded)
+}
+
+/// True when every requirement has degree at most two, so that `requirement_roots_excluded` lists all of its real roots.
+fn requirements_enumerated(h: RationalFunction) -> Bool {
+    mut all = true
+    for req in h.requirements {
+        match polynomial.poly_from_texts(req) {
+            Err(message) => {
+                all = false
+            },
+            Ok(rp) => {
+                if rp.coeffs.length() > 3 {
+                    all = false
+                }
+            },
+        }
+    }
+    all
 }
 
 fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction, domain: List<String>, factor_texts: List<List<String>>, cofactor: List<String>) -> Result<RationalSolution, String> {
@@ -835,6 +876,9 @@ fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction,
     if pending.length() > 0 {
         status = "partial"
         completeness = "partial: part of the difference is outside the methods of this module"
+    }
+    if not requirements_enumerated(h) {
+        completeness = completeness + "; the excluded list is not exhaustive: a requirement of degree above two may have irrational roots that are not listed"
     }
     return Ok(RationalSolution {
         status: status,

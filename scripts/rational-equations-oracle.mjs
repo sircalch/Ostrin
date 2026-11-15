@@ -227,7 +227,9 @@ export function expectedSummary(nf, df, ng, dg) {
   const commonDenominator = polyMul(df, dg);
   const numerator = raw.length === 0 ? [] : polyQuotient(raw, polyGcd(raw, commonDenominator));
   const excludedRationals = new Set();
-  let excludedIrrational = 0;
+  // irrational excluded points: the two roots p +- q sqrt(disc) of each requirement of degree two without rational roots,
+  // keyed by their exact value (monic), so that a root shared by two requirements is counted once
+  const excludedIrrationalKeys = new Set();
   let complexCount = 0;
   let rejected = 0;
   const solutions = [];
@@ -236,7 +238,18 @@ export function expectedSummary(nf, df, ng, dg) {
 
   // requirement roots are excluded points, whether or not they are candidates
   for (const r of requirements) {
-    for (const { root } of rationalRoots(r).roots) excludedRationals.add(qtext(root));
+    const found = rationalRoots(r).roots;
+    for (const { root } of found) excludedRationals.add(qtext(root));
+    if (found.length === 0 && r.length === 3) {
+      const lead = r[2];
+      const b = qdiv(r[1], lead);
+      const c = qdiv(r[0], lead);
+      const disc = qsub(qmul(b, b), qmul(q(4n), c));
+      if (qcmp(disc, q(0n)) > 0) {
+        const p = qdiv(qmul(b, q(-1n)), q(2n));
+        for (const sign of [1n, -1n]) excludedIrrationalKeys.add(`${qtext(p)}|${qtext(qdiv(q(sign), q(2n)))}|${qtext(disc)}`);
+      }
+    }
   }
 
   if (numerator.length === 0) {
@@ -274,7 +287,7 @@ export function expectedSummary(nf, df, ng, dg) {
         const text = qv.n < 0n ? `${qtext(p)} - ${qtext(q(-qv.n, qv.d))}*sqrt(${qtext(disc)})` : `${qtext(p)} + ${qtext(qv)}*sqrt(${qtext(disc)})`;
         const excluded = requirements.some((r) => fieldZero(fieldEval(r, alpha, disc)));
         if (excluded) {
-          excludedIrrational++;
+          excludedIrrationalKeys.add(`${qtext(p)}|${qtext(qv)}|${qtext(disc)}`);
           continue;
         }
         const lhs = fieldMul(fieldEval(nf, alpha, disc), fieldEval(dg, alpha, disc), disc);
@@ -292,7 +305,7 @@ export function expectedSummary(nf, df, ng, dg) {
     }
     status = pending > 0 ? "partial" : solutions.length > 0 ? "solved" : "no_solution";
   }
-  const excludedCount = excludedRationals.size + excludedIrrational;
+  const excludedCount = excludedRationals.size + excludedIrrationalKeys.size;
   const solutionText = solutions.length === 0 ? "none" : solutions.map((s) => s.text).join(" | ");
   return `status=${status}; solutions=${solutionText}; excluded=${excludedCount}; rejected=${rejected}; pending=${pending}; domain=${requirements.length}; complex=${complexCount}`;
 }

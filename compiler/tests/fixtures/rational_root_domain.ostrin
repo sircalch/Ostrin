@@ -1,0 +1,13 @@
+// R1(x) = (x - 3)(x^2 - 2) / (x^2 - 2) and R2 = 0. On the domain x^2 - 2 != 0 the equation is x - 3 = 0, so the solution
+// is 3. The candidates +-sqrt(2) come from the factor x^2 - 2 and are excluded by the original denominator: they must not
+// be solutions, and the solver must verify them against the original requirement exactly in Q(sqrt(8)).
+import std.rational
+fn main() -> Void {
+    f = rational.rational_new(["6", "-2", "-3", "1"], ["-2", "0", "1"]).unwrap()
+    g = rational.rational_new([], ["1"]).unwrap()
+    s = rational.rational_solve(f, g).unwrap()
+    print("status: " + s.status)
+    print("solutions: " + s.solutions.join(" | "))
+    print("kinds: " + s.solution_kinds.join(" | "))
+    print("excluded: " + s.excluded.join(" | "))
+}

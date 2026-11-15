@@ -123,7 +123,7 @@ more remains. A partial result never says there are no solutions.
 
 Real domain: the search is over the real numbers. A quadratic cofactor with negative discriminant gives non-real roots, which are reported in `complex_roots`, not in `solutions`; an equation whose only roots are non-real has status `no_solution` over the reals, and its completeness note says so.
 
-The `excluded` list is not exhaustive. It contains the rational roots of each requirement, and the candidates (rational or irrational) that a requirement excludes among the roots of the difference. Irrational roots of a requirement that are not roots of the difference are not enumerated: for `(x^2-2)/(x^2-2) = 1` the points `x = +-sqrt(2)` are excluded by the domain but do not appear in `excluded`. The domain (`domain`) is the complete description.
+The `excluded` list contains the rational roots of each requirement, the irrational roots `p ± q√disc` of each requirement of degree two that has real irrational roots (listed once, in the same exact text as a solution), and the candidates that a requirement excludes. It is **not exhaustive** for requirements of degree above two: their irrational roots are not enumerated, and `completeness` says so (`rational_solver_states_when_the_excluded_list_is_not_exhaustive`). The domain (`domain`) is the complete description of the requirements. `(x^2-2)/(x^2-2) = 1` lists `x = ±√2` as excluded (`±1/2·√8` in the exact text); `(x^3-2)` requirements do not.
 
 Limits: no algorithm for cubic and higher residues without rational roots (they are reported as pending, not solved); no
 numerical root approximation (so the exact-verification path is the only one, and a residue that cannot be solved exactly is

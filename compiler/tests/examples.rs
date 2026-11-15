@@ -21311,6 +21311,31 @@ fn shadowing_scopes_agree_in_every_backend_path() {
 }
 
 #[test]
+fn rational_roots_excluded_by_a_denominator_are_listed_exactly_and_are_not_solutions() {
+    // R1 = (x-3)(x^2-2)/(x^2-2), R2 = 0. The solution 3 is valid; +-sqrt(2) vanish the original denominator x^2-2 and are
+    // excluded, written exactly as +-1/2*sqrt(8) (the same text as a solution).
+    let output = stdout(&run(&["--run", &fixture_path("rational_root_domain.ostrin")]));
+    assert_eq!(
+        output.replace("\r\n", "\n"),
+        "status: solved\nsolutions: 3\nkinds: rational\nexcluded: x = 0 + 1/2*sqrt(8): excluded, the requirement [-2, 0, 1] != 0 vanishes there | x = 0 - 1/2*sqrt(8): excluded, the requirement [-2, 0, 1] != 0 vanishes there\n"
+    );
+}
+
+#[test]
+fn rational_solver_states_when_the_excluded_list_is_not_exhaustive() {
+    // A requirement of degree three: +-sqrt(2) do not vanish x^3 - 2, so they are solutions; the excluded list is not
+    // claimed exhaustive, and the completeness field says so.
+    let output = stdout(&run(&["--run", &fixture_path("rational_root_domain_cubic.ostrin")]));
+    let output = output.replace("\r\n", "\n");
+    assert!(output.contains("solutions: 3 | 0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8)\n"), "{output}");
+    assert!(output.contains("excluded: \n"), "{output}");
+    assert!(
+        output.contains("the excluded list is not exhaustive"),
+        "completeness must say the excluded list is not exhaustive: {output}"
+    );
+}
+
+#[test]
 fn captured_loop_frame_reuse_agrees_in_both_backends() {
     // Frame reuse (interpreter): a body must see a fresh frame each iteration, including a large body and break/continue.
     let expected = "big frame: 88\nbreak continue total: 22\n";
