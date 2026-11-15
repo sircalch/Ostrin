@@ -19,6 +19,13 @@ import {
   setEntry,
 } from "./workbench-controller.js";
 import { renderExplorer } from "./workbench-explorer.js";
+import { createHistory, recordRun as recordHistoryEntry } from "./workbench-history.js";
+import { captureRun, sha256Hex } from "./workbench-history-capture.js";
+import { createHistoryStore } from "./workbench-history-idb.js";
+import { classifyStorageError, mergeHistory } from "./workbench-history-storage.js";
+import { buildPackage, LIMITS, packageFileName, PACKAGE_MIME, referencesOf, verifyPackage } from "./workbench-evidence.js";
+import { findRun } from "./workbench-history.js";
+import { renderHistoryPanel } from "./workbench-history-panel.js";
 import { createExecutor } from "./workbench-execution.js";
 import { orderedLines } from "./workbench-protocol.js";
 import { parseResults, resultsTable, resultsExportText, RESULTS_PREFIX } from "./workbench-results.js";
@@ -814,6 +821,177 @@ const importProjectInput = $("import-project-file");
 let workbench = createWorkbench(projectFromSourceFile("main.ostrin", EXAMPLES[Object.keys(EXAMPLES)[0]]));
 let compilerIdentityPromise = null;
 const cancelRunButton = $("cancel-run");
+// Scientific run history of this page. Entries are kept in memory; each one is an immutable record of one run.
+let history = createHistory();
+let historySelectedId = null;
+const historyPanel = $("run-history");
+const projectIdOf = (project) => project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+// Comparison selection: at most two runs. Choosing a third replaces the older of the two.
+let historySelection = [];
+let historyComparison = null;
+// Persistence in IndexedDB. The store is separate from the history model: a failed write never changes `history`
+// or the open project; it only marks the run as not saved. `historyStorage.state` is "loading" until the saved
+// runs are read, then "ready", or "unavailable" with the reason.
+const historyStore = createHistoryStore({ digestOf: sha256Hex });
+let historyStorage = { state: "loading", reason: null, quarantined: [], altered: [] };
+const historyRunState = {}; // id -> { state: "saving" | "saved" | "not-saved", reason }
+const historyVerification = {}; // id -> verification of the stored content
+const historyOrigin = {}; // id -> { kind: "local" } or { kind: "imported", source, at }: never mixed up in a comparison
+let historyNotice = null; // outcome of the last export or import: { kind: "ok" | "error", text }
+function renderHistory() {
+  const persistence = { storage: historyStorage, runs: historyRunState, verification: historyVerification, origins: historyOrigin };
+  renderHistoryPanel(historyPanel, history, { selectedId: historySelectedId, selection: historySelection, comparison: historyComparison, persistence, notice: historyNotice }, {
+    onExport: (ids) => exportHistory(ids),
+    onImport: (file) => importHistoryFile(file),
+    onSelect: (id) => {
+      historySelectedId = id;
+      historyComparison = null;
+      renderHistory();
+    },
+    onClose: () => {
+      historySelectedId = null;
+      renderHistory();
+    },
+    onToggle: (id) => {
+      historySelection = historySelection.includes(id)
+        ? historySelection.filter((x) => x !== id)
+        : [...historySelection, id].slice(-2);
+      renderHistory();
+    },
+    onCompare: () => {
+      if (historySelection.length !== 2) return;
+      historyComparison = { a: historySelection[0], b: historySelection[1] };
+      renderHistory();
+    },
+    onCloseCompare: () => {
+      historyComparison = null;
+      renderHistory();
+    },
+  });
+}
+// Restores the saved runs of this browser. Runs already recorded on this page are kept; the saved ones are added.
+// It runs after the editor and compiler are set up and never blocks them. Failure leaves the page working in memory.
+async function loadStoredHistory() {
+  try {
+    const restored = await historyStore.load();
+    const merged = mergeHistory(history, restored);
+    history = merged.history;
+    Object.assign(historyOrigin, merged.origins);
+    for (const [id, verification] of Object.entries(merged.verification)) {
+      historyRunState[id] = { state: "saved", reason: null };
+      historyVerification[id] = verification;
+    }
+    historyStorage = {
+      state: "ready",
+      reason: null,
+      quarantined: restored.quarantined,
+      altered: restored.altered,
+    };
+  } catch (error) {
+    historyStorage = { state: "unavailable", reason: classifyStorageError(error).message, quarantined: [], altered: [] };
+  }
+  renderHistory();
+}
+const textBytes = (text) => new TextEncoder().encode(text);
+
+// Exports the selected runs as one evidence package. Every byte comes from the store, or from the figure in memory
+// when it was never saved; each one is hashed again before it is packaged, and a mismatch withholds it.
+async function exportHistory(ids) {
+  const entries = ids.map((id) => findRun(history, id)).filter(Boolean);
+  if (entries.length === 0) return;
+  try {
+    const digests = entries.flatMap((entry) => referencesOf(entry).map((ref) => ref.digest));
+    const stored = await historyStore.readContents(digests).catch(() => new Map());
+    const contents = new Map();
+    for (const entry of entries) {
+      for (const ref of referencesOf(entry)) {
+        if (contents.has(ref.digest)) continue;
+        let bytes = stored.get(ref.digest) ?? null;
+        if (!bytes && ref.kind === "figure" && history.figures[ref.digest]) bytes = textBytes(history.figures[ref.digest]);
+        if (bytes) contents.set(ref.digest, { kind: ref.kind, bytes });
+      }
+    }
+    const built = await buildPackage({
+      runs: entries.map((entry) => ({ entry })),
+      contents,
+      createdAt: new Date().toISOString(),
+      producer: { name: "ostrin playground" },
+      digestOf: sha256Hex,
+    });
+    const notes = [];
+    const withheld = built.pkg.withheld.length;
+    const digestOnly = built.pkg.runs.reduce((n, run) => n + Object.values(run.contentStatus.sources).concat([run.contentStatus.stdout, run.contentStatus.stderr, run.contentStatus.figure]).filter((s) => s === "digest-only").length, 0);
+    if (withheld) notes.push(`${withheld} content(s) withheld: their stored bytes do not match their SHA-256`);
+    if (digestOnly) notes.push(`${digestOnly} digest(s) exported without their bytes (not stored here)`);
+    download(packageFileName(ids), built.text, PACKAGE_MIME);
+    historyNotice = {
+      kind: "ok",
+      text: `Exported ${entries.length} run(s) as evidence. ${built.pkg.coverage.complete} complete, ${built.pkg.coverage.partialContent} partial, ${built.pkg.coverage.incompleteRun + built.pkg.coverage.incompleteResults} incomplete.` + (notes.length ? " " + notes.join("; ") + "." : ""),
+    };
+  } catch (error) {
+    historyNotice = { kind: "error", text: "Export not created: " + (error.message ?? error) };
+  }
+  renderHistory();
+}
+
+// Imports an evidence package. The whole file is verified before anything is written; a refused package changes
+// nothing. A valid package is committed in one transaction and then read back from the store.
+async function importHistoryFile(file) {
+  if (file.size > LIMITS.maxPackageChars * 4) {
+    historyNotice = { kind: "error", text: `Import refused: the file is ${file.size} bytes; the limit is ${LIMITS.maxPackageChars * 4}. Nothing was imported.` };
+    renderHistory();
+    return;
+  }
+  try {
+    const verified = await verifyPackage(await file.text(), sha256Hex);
+    const summary = await historyStore.importPackage(verified);
+    const added = summary.added.length;
+    historyNotice = {
+      kind: "ok",
+      text: `Imported ${added} new run(s); ${summary.identical.length} already present and identical, not duplicated; ${summary.contentsAdded} content(s) stored, ${summary.contentsReused} reused by digest. No program was run.`,
+    };
+    await loadStoredHistory();
+  } catch (error) {
+    const reason = error.code && error.name === "PackageError" ? error.message : classifyStorageError(error).message;
+    historyNotice = { kind: "error", text: `Import refused: ${reason}. Nothing was imported and the saved history is unchanged.` };
+    renderHistory();
+  }
+}
+
+// Records a finished run. It is shown at once, marked "saving", and marked "saved" only after the transaction has
+// committed. A failure marks it "not saved" with the reason; the run stays visible and nothing else changes.
+async function persistRunHistory(options) {
+  let captured;
+  try {
+    captured = await captureRun(options);
+  } catch (error) {
+    reportError("Run history not saved: " + (error.message ?? error));
+    return;
+  }
+  const { entry, figureSvg, contents } = captured;
+  try {
+    history = recordHistoryEntry(history, entry, figureSvg);
+  } catch (error) {
+    reportError("Run history not saved: " + (error.message ?? error));
+    return;
+  }
+  historyRunState[entry.id] = { state: "saving", reason: null };
+  historyOrigin[entry.id] = { kind: "local" };
+  renderHistory();
+  try {
+    const stored = await historyStore.record(entry, contents);
+    historyRunState[entry.id] = { state: "saved", reason: null };
+    historyVerification[entry.id] = stored.verification;
+    historyStorage = { ...historyStorage, writeError: null };
+  } catch (error) {
+    const storageError = classifyStorageError(error);
+    historyRunState[entry.id] = { state: "not-saved", reason: storageError.message };
+    historyStorage = { ...historyStorage, writeError: `run ${entry.id} was not saved permanently: ${storageError.message}` };
+  }
+  renderHistory();
+}
+renderHistory();
+loadStoredHistory();
 const outputDecoder = new TextDecoder();
 // Runs of the project execute in a Worker, so the page stays responsive. One run is active at a time.
 const executor = createExecutor({
@@ -1229,6 +1407,8 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
   controls.forEach((b) => (b.disabled = true));
   statusNode.textContent = "running…";
   const started = performance.now();
+  const startedAt = new Date().toISOString();
+  let runId = null;
   try {
     const flags = ["--check", "--run"].includes(flag) ? [flag, "--json"] : [flag];
     const isWorkbench = sourceNode === source;
@@ -1246,6 +1426,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
       // The previous results are no longer the ones on screen once a new run starts.
       clearResultsExport();
       const outcome = await executor.run({ command: args, entry: runInputSnapshot.entry, files: runInputSnapshot.files });
+      runId = outcome.id;
       if (!current()) return;
       if (outcome.state !== "completed") {
         // Cancelled, timed-out or failed runs show no results; the editor keeps its text.
@@ -1259,6 +1440,18 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
           clearResultsExport();
           outputNode.textContent = message;
           statusNode.textContent = runStateMessages[outcome.state] ?? outcome.state;
+          // An incomplete run is recorded as incomplete evidence: no output, no results, no figure.
+          if (isWorkbench) {
+            persistRunHistory({
+              id: outcome.id,
+              input: runInputSnapshot,
+              status: outcome.state,
+              command,
+              startedAt,
+              durationMs: performance.now() - started,
+              projectId: projectIdOf(runInputSnapshot.project),
+            });
+          }
         });
         return;
       }
@@ -1306,12 +1499,28 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
           compilerIdentity: identity,
         });
         refreshExplorer();
+        persistRunHistory({
+          id: runId,
+          input: runInputSnapshot,
+          status: "completed",
+          command,
+          startedAt,
+          durationMs: performance.now() - started,
+          exitCode: code,
+          compilerIdentity: identity,
+          lines,
+          stdoutBytes: rawRun.stdout,
+          stderrBytes: rawRun.stderr,
+          figureSvg: figure ? figure.svg : null,
+          projectId: projectIdOf(runInputSnapshot.project),
+        });
       }
       if (flag === "--fmt" && code === 0) {
         sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
       }
       outputNode.innerHTML = html || '<span class="dim">(no output)</span>';
-      renderResultsTable(outputNode, isWorkbench && flag === "--run" ? lines : []);
+      // Only Workbench runs own the results export; a standalone demo run never touches it.
+      if (isWorkbench) renderResultsTable(outputNode, flag === "--run" ? lines : []);
       // Measurement hook for the benchmark harness: the timing of the last Workbench run, read-only for pages.
       if (rawRun) window.__ostrinLastRun = { ...rawRun.timing, wallMs: performance.now() - started, command };
       statusNode.textContent = `${summary} · ${elapsed} ms`;
@@ -1322,7 +1531,7 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     // An exception from a stale run must not replace the output or status of a newer one.
     publish(() => {
       figureStore.delete(outputNode);
-      clearResultsExport();
+      if (sourceNode === source) clearResultsExport();
       outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
       statusNode.textContent = "failed to start";
       clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
@@ -1456,6 +1665,7 @@ async function loadDemo(documentPath, label) {
 }
 $("demo-project")?.addEventListener("click", () => loadDemo("workbench-demos/cubic-root.ostrin.project.json", "the cubic root demonstration"));
 $("demo-sweep")?.addEventListener("click", () => loadDemo("workbench-demos/parameter-sweep.ostrin.project.json", "the parameter sweep"));
+$("demo-sweep-even")?.addEventListener("click", () => loadDemo("workbench-demos/parameter-sweep-even.ostrin.project.json", "the parameter sweep for c = 2, 4, 6, 8"));
 $("download-results")?.addEventListener("click", () => {
   if (!lastResultsDocument) return;
   // The file is the exact payload of the RESULTS line that was validated and shown.
