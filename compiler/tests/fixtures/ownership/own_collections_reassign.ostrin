@@ -1,0 +1,31 @@
+// Reassignment of managed values (String, List, record) that closures read, closures in a list, and functions passed as
+// values. Expected (worked out by hand):
+//   name before ann
+//   name after bo
+//   list 3 3
+//   applied 12
+record Box {
+    label: String
+    items: List<Int>
+}
+
+fn apply(f: fn(Int) -> Int, value: Int) -> Int {
+    return f(value)
+}
+
+fn main() -> Void {
+    mut name = "ann"
+    show = fn() { name }
+    print("name before " + show())
+    name = "bo"
+    print("name after " + show())
+
+    mut box = Box { label: "first", items: [1, 2] }
+    size = fn() { box.items.length() }
+    box = Box { label: "second", items: [1, 2, 3] }
+    print("list " + size().to_string() + " " + box.items.length().to_string())
+
+    double = fn(v) { v * 2 }
+    plus = fn(v) { v + 4 }
+    print("applied " + apply(fn(v) { plus(double(v)) }, 4).to_string())
+}

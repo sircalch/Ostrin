@@ -1,0 +1,23 @@
+// Recursion that creates closures and strings at every level. Each closure captures the parameter of its own level and the
+// closure of the level below it. Expected (worked out by hand): recursion 10, then the label built by the recursion.
+fn build(n: Int) -> fn() -> Int {
+    if n == 0 {
+        return fn() { 0 }
+    }
+    below = build(n - 1)
+    return fn() { n + below() }
+}
+
+fn label(n: Int) -> String {
+    if n == 0 {
+        return "end"
+    }
+    text = "l" + n.to_string()
+    tail = label(n - 1)
+    return text + ">" + tail
+}
+
+fn main() -> Void {
+    print("recursion " + build(4)().to_string())
+    print(label(3))
+}

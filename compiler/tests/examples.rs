@@ -21421,6 +21421,91 @@ fn captured_lambda_env_leak_on_ast_path() {
 }
 
 #[test]
+fn ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation() {
+    // The ownership programs under tests/fixtures/ownership. Each one runs on the IR, HIR and AST native routes: every route
+    // must print what the interpreter prints and must end with no live allocation (--leak-check). Sanitizers are not part of
+    // this test; scripts/native-sanitize.mjs runs them under WSL gcc with AddressSanitizer and UndefinedBehaviorSanitizer.
+    const PROGRAMS: &[&str] = &[
+        "own_immutable_capture.ostrin",
+        "own_mutable_capture.ostrin",
+        "own_nested_closure.ostrin",
+        "own_return_survive.ostrin",
+        "own_early_return_error.ostrin",
+        "own_recursion.ostrin",
+        "own_collections_reassign.ostrin",
+        "own_c_keyword_names.ostrin",
+        "capture_declarations.ostrin",
+        "function_value_capture.ostrin",
+    ];
+    let routes: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        ("ast", &[("OSTRIN_NO_IR_CODEGEN", "1"), ("OSTRIN_NO_HIR_CODEGEN", "1")]),
+    ];
+    for program in PROGRAMS {
+        let path = fixture_path(&format!("ownership/{program}"));
+        let interpreted = run(&["--run", &path]);
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed on {program}: {}",
+            stderr(&interpreted)
+        );
+        let expected = stdout(&interpreted);
+        for (route, env) in routes {
+            let exe = temp_artifact(&format!("{route}_{program}.exe"));
+            let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+            command.args(["--compile", "--leak-check", "--out", &exe, &path]);
+            for (key, value) in env.iter().copied() {
+                command.env(key, value);
+            }
+            let compile = command.output().expect("run ostrinc");
+            if skip_if_no_c_compiler(&compile) {
+                return;
+            }
+            assert!(
+                compile.status.success(),
+                "{program} on the {route} route: compile failed: {}",
+                stderr(&compile)
+            );
+            let native = Command::new(&exe).output().expect("run native binary");
+            let _ = fs::remove_file(&exe);
+            assert_eq!(
+                stdout(&native).replace("\r\n", "\n"),
+                expected.replace("\r\n", "\n"),
+                "{program} on the {route} route: native output differs from the interpreter"
+            );
+            assert!(
+                stderr(&native).contains("live_allocations=0"),
+                "{program} on the {route} route leaks: {}",
+                stderr(&native)
+            );
+        }
+    }
+}
+
+#[test]
+fn untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic() {
+    // The interpreter runs this program, but the native backend cannot infer the type of the untyped parameter `f`. It must
+    // refuse with a diagnostic that names the limitation; it must never emit code for the call.
+    let path = fixture_path("ownership/untyped_closure_parameter.ostrin");
+    let exe = temp_artifact("untyped_closure_parameter.exe");
+    let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(["--compile", "--out", &exe, &path])
+        .output()
+        .expect("run ostrinc");
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    let _ = fs::remove_file(&exe);
+    assert!(!compile.status.success(), "the native backend must refuse this program");
+    assert!(
+        stderr(&compile).contains("cannot determine the type of the function value 'f'"),
+        "unexpected diagnostic: {}",
+        stderr(&compile)
+    );
+}
+
+#[test]
 fn std_symbolic_workflow_builds_derivatives_and_a_real_figure_in_both_backends() {
     let output = interpreter_and_native_agree("symbolic_workflow.ostrin");
     assert!(

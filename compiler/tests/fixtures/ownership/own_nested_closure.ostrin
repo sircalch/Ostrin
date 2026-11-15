@@ -1,0 +1,23 @@
+// Closures nested at three levels. The innermost closure captures a String of the outer function, an Int of the middle one
+// and a mutable total of the closure that encloses it. Expected (worked out by hand; the last call of middle sets the result):
+//   nested label-0 level 2 total 3
+//   nested label-2-0 level 2 total 3
+fn outer(label: String, level: Int) -> fn() -> String {
+    return fn() {
+        mut total = 0
+        middle = fn(by) {
+            total = total + by
+            inner = fn() { label + "-" + by.to_string() + " level " + level.to_string() + " total " + total.to_string() }
+            inner()
+        }
+        middle(1)
+        middle(2)
+        middle(0)
+    }
+}
+
+fn main() -> Void {
+    first = outer("label", 2)()
+    print("nested " + first)
+    print("nested " + outer("label-2", 2)())
+}

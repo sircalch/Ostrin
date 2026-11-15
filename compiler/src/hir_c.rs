@@ -1669,7 +1669,11 @@ impl Emitter<'_> {
                         Ty::Bool => Ok(format!(
                             "printf(\"%s\\n\", (({code}) ? \"true\" : \"false\"))"
                         )),
-                        Ty::String => Ok(format!("printf(\"%s\\n\", {code})")),
+                        Ty::String if Self::borrowed_expr(arg) => Ok(format!("printf(\"%s\\n\", {code})")),
+                        // A fresh string (a concatenation or a call result) is owned by this statement: it is released after printing.
+                        Ty::String => Ok(format!(
+                            "({{ const char* __print_value = {code}; printf(\"%s\\n\", __print_value); ostrin_release((void*)__print_value); }})"
+                        )),
                         _ => Err(()),
                     };
                 }

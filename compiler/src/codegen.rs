@@ -2197,7 +2197,9 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
 /// produced at the call site must be released by the caller afterwards. A
 /// local/field/index is already owned elsewhere and must stay borrowed.
 fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
+    // A function value owns its environment (see gen_closure): a fresh closure passed as an argument is released by the caller.
     if !is_reference_type(ty)
+        && !matches!(ty, CType::Fn(..))
         && !contains_by_value_enum(ty)
         && !matches!(ty, CType::Option(..) | CType::Result(..))
     {
@@ -2217,6 +2219,7 @@ fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
         expr.unlocated(),
         Expr::Call(..)
             | Expr::GenericCall(..)
+            | Expr::Lambda(..)
             | Expr::ListLiteral(..)
             | Expr::SetLiteral(..)
             | Expr::MapLiteral(..)
@@ -3605,6 +3608,7 @@ impl<'a> Codegen<'a> {
         params: &[CType],
         ret: &CType,
         args: &[Arg],
+        release_callee: bool,
     ) -> Result<(String, CType), String> {
         if args.len() != params.len() {
             return Err(format!(
@@ -3620,9 +3624,25 @@ impl<'a> Codegen<'a> {
         let temp = self.next_temp();
         let rest: String = owned.codes.iter().map(|c| format!(", {c}")).collect();
         let fn_type = Self::closure_fn_type(params, ret);
-        let call = format!(
-            "({{ OstrinClosure {temp} = {callee}; (({fn_type}){temp}.fn)({temp}.env{rest}); }})"
-        );
+        let call = if release_callee {
+            // A fresh function value (a call result or a literal) owns its environment: release it after the call.
+            // The result is kept in a temporary so the environment can be released before the value is used.
+            if *ret == CType::Void {
+                format!(
+                    "({{ OstrinClosure {temp} = {callee}; (({fn_type}){temp}.fn)({temp}.env{rest}); ostrin_release_owned((void*){temp}.env); }})"
+                )
+            } else {
+                let result = self.next_temp();
+                format!(
+                    "({{ OstrinClosure {temp} = {callee}; {} {result} = (({fn_type}){temp}.fn)({temp}.env{rest}); ostrin_release_owned((void*){temp}.env); {result}; }})",
+                    c_type_name(ret)
+                )
+            }
+        } else {
+            format!(
+                "({{ OstrinClosure {temp} = {callee}; (({fn_type}){temp}.fn)({temp}.env{rest}); }})"
+            )
+        };
         Ok(self.finish_owned_call(owned, call, ret.clone()))
     }
 
@@ -3990,15 +4010,21 @@ impl<'a> Codegen<'a> {
                 let (value_code, value_ty) = self.gen_expr_hint(value, Some(field_ty.clone()))?;
                 let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
                 if retain_managed_value(&format!("{obj_code}->{field_name}"), &field_ty).is_some() {
+                    // Same rule as local assignment: a borrowed value (a local, field or index) gains a reference for the
+                    // field. A fresh value (a literal or a call result) already carries one and transfers it to the field.
                     let temp = self.next_temp();
-                    let retain = retain_managed_value(&temp, &field_ty).unwrap();
+                    let retain = if borrowed_reference_expr(value) {
+                        format!("{}; ", retain_managed_value(&temp, &field_ty).unwrap())
+                    } else {
+                        String::new()
+                    };
                     let release = release_owned_managed_value(
                         &format!("{obj_code}->{field_name}"),
                         &field_ty,
                     )
                     .unwrap();
                     out.push_str(&format!(
-                        "    {} {temp} = {value_code}; {retain}; {release}; {obj_code}->{field_name} = {temp};\n",
+                        "    {} {temp} = {value_code}; {retain}{release}; {obj_code}->{field_name} = {temp};\n",
                         c_type_name(&field_ty),
                     ));
                 } else {
@@ -7282,8 +7308,9 @@ impl<'a> Codegen<'a> {
             }
             _ => {
                 let (code, ty) = self.gen_expr(callee)?;
+                let fresh = owned_call_argument(callee, &ty);
                 match ty {
-                    CType::Fn(params, ret) => self.gen_closure_call(&code, &params, &ret, args),
+                    CType::Fn(params, ret) => self.gen_closure_call(&code, &params, &ret, args, fresh),
                     _ => Err("only a direct function call, a function value or 'record.method(...)' is supported by the native backend yet".to_string()),
                 }
             }
@@ -7328,7 +7355,7 @@ impl<'a> Codegen<'a> {
     ) -> Result<(String, CType), String> {
         let call_key = self.current_call_key.take();
         if let Some(CType::Fn(params, ret)) = self.lookup(name) {
-            return self.gen_closure_call(name, &params, &ret, args);
+            return self.gen_closure_call(name, &params, &ret, args, false);
         }
         if self.generic_variant_owner.contains_key(name) {
             return self.gen_generic_variant(name, type_args, args, hint);
@@ -7529,6 +7556,13 @@ impl<'a> Codegen<'a> {
             return Ok(self.finish_owned_call(owned, code, ty));
         }
         let Some((param_types, return_type)) = self.signatures.get(name).cloned() else {
+            // A local that is called but has no function type was declared without a type the native backend can infer
+            // (typically a closure parameter). That is a limitation of inference, so the message says so.
+            if self.lookup(name).is_some() {
+                return Err(format!(
+                    "cannot determine the type of the function value '{name}': the native backend cannot infer it here; add type annotations to the parameters that hold it"
+                ));
+            }
             return Err(format!("unknown function '{name}' (the native backend only sees other top-level 'fn' declarations)"));
         };
         if param_types.len() != owned.codes.len() {

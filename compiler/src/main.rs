@@ -48,6 +48,8 @@ fn main() -> ExitCode {
 
 fn real_main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
+    // Native output needs C-safe identifiers. Set before any source file (entry or module) is lexed.
+    lexer::set_c_identifier_escape(args.iter().any(|a| a == "--emit-c" || a == "--compile"));
     let tokens_only = args.iter().any(|a| a == "--tokens");
     let fmt_mode = args.iter().any(|a| a == "--fmt");
     let ast_only = args.iter().any(|a| a == "--ast");

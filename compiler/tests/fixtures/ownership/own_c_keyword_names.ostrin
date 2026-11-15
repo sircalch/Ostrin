@@ -1,0 +1,26 @@
+// Identifiers that are C keywords (double, int, struct, switch) used as locals, as a closure capture, as a record field and as
+// a function name. The native output must escape them. Expected (worked out by hand):
+//   7
+//   8
+//   7
+//   1.5
+record Pair {
+    int: Int
+    double: Float
+}
+
+fn switch(n: Int) -> Int {
+    return n * 2
+}
+
+fn main() -> Void {
+    double = 3.5
+    int = 2
+    struct = 4
+    scale = fn(v) { v * double }
+    print(scale(int))
+    print(switch(struct))
+    pair = Pair { int: 7, double: 1.5 }
+    print(pair.int)
+    print(pair.double)
+}

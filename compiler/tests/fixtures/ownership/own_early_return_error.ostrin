@@ -1,0 +1,39 @@
+// Early returns and error paths around closures that own managed values. Expected (worked out by hand):
+//   ok n=4 alpha
+//   err n=-1 negative
+//   early 0
+//   early 6
+fn checked(n: Int) -> Result<String, String> {
+    label = "n=" + n.to_string()
+    if n < 0 {
+        return Err(label + " negative")
+    }
+    describe = fn() { label + " alpha" }
+    return Ok(describe())
+}
+
+fn early(n: Int) -> Int {
+    values = [1, 2, 3]
+    scale = fn(v) { v * n }
+    if n == 0 {
+        return 0
+    }
+    mut total = 0
+    for v in values {
+        total = total + scale(v)
+    }
+    return total
+}
+
+fn main() -> Void {
+    match checked(4) {
+        Ok(text) => print("ok " + text),
+        Err(message) => print("err " + message),
+    }
+    match checked(-1) {
+        Ok(text) => print("ok " + text),
+        Err(message) => print("err " + message),
+    }
+    print("early " + early(0).to_string())
+    print("early " + early(1).to_string())
+}
