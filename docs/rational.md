@@ -135,3 +135,25 @@ Verification: `examples/rational_equations.ostrin` (the examples of the task: `(
 contradiction, and a cubic that is partial), and `scripts/rational-equations-oracle.mjs`, which computes 60 seeded and
 fixed equations from the un-reduced formulas using the rational root theorem and its own Q(sqrt d) arithmetic, and the
 expected output must match exactly on the interpreter and the native backend.
+
+## Hand-derived equation cases
+
+The oracle (`scripts/rational-equations-oracle.mjs`, cases 12 to 20 of `tests/oracle/rational-equations-expected.txt`) also
+contains nine cases whose result is worked out by hand from the definitions, not only by the oracle. The oracle computes the
+same statuses independently, and the Ostrin program reproduces every line.
+
+| Case | Equation `f = g` | Hand result |
+| --- | --- | --- |
+| 12 | `1/(x-1) = 0` | `no_solution`; `x = 1` is a pole, so it is excluded |
+| 13 | `(x^3-3x+2)/(x-3) = 0` | `solved`: `-2` and `1` (a double root of the numerator); `x = 3` excluded |
+| 14 | `x/(x-1) = (x+2)/(x-1)` | `no_solution`; both sides are undefined at `x = 1`, and `x = x+2` never holds |
+| 15 | `0/(x-1) = 0` | `identity` on every point except `x = 1` |
+| 16 | `1000000007 x/(x-1) = 1000000007` | `no_solution`; `x = 1` excluded |
+| 17 | `(x^5-x-1)/(x-2) = 0` | `partial`: the quintic has no rational root (only `±1` are candidates and neither is one); the quintic stays pending |
+| 18 | `(x+1)/(x-1)^2 = 0` | `solved`: `-1`; `x = 1` excluded (repeated denominator factor) |
+| 19 | `(x^2-4)/(x-2) = 0` | `solved`: `-2`; `x = 2` excluded because the original denominator vanishes there (removable singularity) |
+| 20 | `(x^2-2)/(x-1) = 0` | `solved`: `±√2` (exact text `0 ± 1/2*sqrt(8)`); `x = 1` excluded |
+
+A point is excluded whenever an original denominator vanishes there, even when the reduced form is defined at that point (case 19). The list is not claimed to be exhaustive
+when a denominator has no rational root that the solver can locate; `rational_solver_states_when_the_excluded_list_is_not_exhaustive`
+checks that case.

@@ -367,6 +367,18 @@ export function buildCases() {
     { f: [[-2, 0, 0, 1], [1]], g: [[0], [1]] },
     { f: [[1, 0, 1], [1]], g: [[0], [1]] },
     { f: [[0, 0, 1], [-2, 0, 1]], g: [[2], [-2, 0, 1]] },
+    // Hand-derived references (see docs/rational.md, section "Oracle cases"): pole, repeated root with a pole, both sides
+    // undefined, degenerate zero numerator, large coefficients, quintic with no rational root, repeated denominator factor,
+    // removable singularity at a numerator root, and irrational roots with an excluded point.
+    { f: [[1], [-1, 1]], g: [[0], [1]] },
+    { f: [[2, -3, 0, 1], [-3, 1]], g: [[0], [1]] },
+    { f: [[0, 1], [-1, 1]], g: [[2, 1], [-1, 1]] },
+    { f: [[0], [-1, 1]], g: [[0], [1]] },
+    { f: [[0, 1000000007], [-1, 1]], g: [[1000000007], [1]] },
+    { f: [[-1, -1, 0, 0, 0, 1], [-2, 1]], g: [[0], [1]] },
+    { f: [[1, 1], [1, -2, 1]], g: [[0], [1]] },
+    { f: [[-4, 0, 1], [-2, 1]], g: [[0], [1]] },
+    { f: [[-2, 0, 1], [-1, 1]], g: [[0], [1]] },
   ];
   for (const c of fixed) cases.push(c);
   for (let k = 0; k < 50; k++) {

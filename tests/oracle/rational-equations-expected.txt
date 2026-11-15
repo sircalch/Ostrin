@@ -10,53 +10,62 @@ case 8: status=solved; solutions=2/3; excluded=0; rejected=0; pending=0; domain=
 case 9: status=partial; solutions=none; excluded=0; rejected=0; pending=1; domain=1; complex=0
 case 10: status=no_solution; solutions=none; excluded=0; rejected=0; pending=0; domain=1; complex=2
 case 11: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=1; complex=0
-case 12: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 13: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 14: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 15: status=partial; solutions=0; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 16: status=solved; solutions=0; excluded=0; rejected=0; pending=0; domain=2; complex=0
-case 17: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 18: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
-case 19: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 20: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 12: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 13: status=solved; solutions=-2 | 1; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 14: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=1; complex=0
+case 15: status=identity; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 16: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 17: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 18: status=solved; solutions=-1; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 19: status=solved; solutions=-2; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 20: status=solved; solutions=0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8); excluded=1; rejected=0; pending=0; domain=2; complex=0
 case 21: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 22: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 23: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 24: status=solved; solutions=-1; excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 25: status=identity; solutions=none; excluded=1; rejected=0; pending=0; domain=1; complex=0
-case 26: status=solved; solutions=0 + 1/2*sqrt(12) | 0 - 1/2*sqrt(12); excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 27: status=solved; solutions=-3/2 | 2; excluded=1; rejected=0; pending=0; domain=2; complex=2
-case 28: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 29: status=solved; solutions=1/2 + 1/2*sqrt(5) | 1/2 - 1/2*sqrt(5); excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 30: status=solved; solutions=5/2; excluded=1; rejected=0; pending=0; domain=1; complex=0
-case 31: status=solved; solutions=-2; excluded=3; rejected=0; pending=0; domain=2; complex=0
-case 32: status=solved; solutions=1/2 + 1/2*sqrt(13) | 1/2 - 1/2*sqrt(13); excluded=3; rejected=0; pending=0; domain=2; complex=0
-case 33: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 34: status=no_solution; solutions=none; excluded=3; rejected=0; pending=0; domain=2; complex=0
-case 35: status=solved; solutions=-1; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 36: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 37: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
-case 38: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 39: status=solved; solutions=-2 | 2; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 40: status=no_solution; solutions=none; excluded=0; rejected=0; pending=0; domain=1; complex=2
-case 41: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 42: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 43: status=identity; solutions=none; excluded=3; rejected=0; pending=0; domain=2; complex=0
-case 44: status=solved; solutions=0; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 45: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 22: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
+case 23: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 24: status=partial; solutions=0; excluded=3; rejected=0; pending=1; domain=2; complex=0
+case 25: status=solved; solutions=0; excluded=0; rejected=0; pending=0; domain=2; complex=0
+case 26: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
+case 27: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
+case 28: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
+case 29: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 30: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 31: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 32: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 33: status=solved; solutions=-1; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 34: status=identity; solutions=none; excluded=1; rejected=0; pending=0; domain=1; complex=0
+case 35: status=solved; solutions=0 + 1/2*sqrt(12) | 0 - 1/2*sqrt(12); excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 36: status=solved; solutions=-3/2 | 2; excluded=1; rejected=0; pending=0; domain=2; complex=2
+case 37: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 38: status=solved; solutions=1/2 + 1/2*sqrt(5) | 1/2 - 1/2*sqrt(5); excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 39: status=solved; solutions=5/2; excluded=1; rejected=0; pending=0; domain=1; complex=0
+case 40: status=solved; solutions=-2; excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 41: status=solved; solutions=1/2 + 1/2*sqrt(13) | 1/2 - 1/2*sqrt(13); excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 42: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 43: status=no_solution; solutions=none; excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 44: status=solved; solutions=-1; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 45: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
 case 46: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
-case 47: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 48: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 49: status=solved; solutions=0 | 1/2; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 50: status=solved; solutions=-6 | 0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8); excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 51: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=2
-case 52: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 53: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
-case 54: status=solved; solutions=-2; excluded=2; rejected=0; pending=0; domain=2; complex=0
-case 55: status=solved; solutions=1; excluded=1; rejected=0; pending=0; domain=2; complex=0
-case 56: status=solved; solutions=1/2 + 1/2*sqrt(17) | 1/2 - 1/2*sqrt(17); excluded=3; rejected=0; pending=0; domain=2; complex=0
-case 57: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 58: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
-case 59: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
-case 60: status=no_solution; solutions=none; excluded=3; rejected=0; pending=0; domain=2; complex=0
-case 61: status=solved; solutions=1; excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 47: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 48: status=solved; solutions=-2 | 2; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 49: status=no_solution; solutions=none; excluded=0; rejected=0; pending=0; domain=1; complex=2
+case 50: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 51: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 52: status=identity; solutions=none; excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 53: status=solved; solutions=0; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 54: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 55: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
+case 56: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 57: status=no_solution; solutions=none; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 58: status=solved; solutions=0 | 1/2; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 59: status=solved; solutions=-6 | 0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8); excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 60: status=no_solution; solutions=none; excluded=2; rejected=0; pending=0; domain=2; complex=2
+case 61: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
+case 62: status=partial; solutions=none; excluded=2; rejected=0; pending=1; domain=2; complex=0
+case 63: status=solved; solutions=-2; excluded=2; rejected=0; pending=0; domain=2; complex=0
+case 64: status=solved; solutions=1; excluded=1; rejected=0; pending=0; domain=2; complex=0
+case 65: status=solved; solutions=1/2 + 1/2*sqrt(17) | 1/2 - 1/2*sqrt(17); excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 66: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 67: status=partial; solutions=none; excluded=1; rejected=0; pending=1; domain=2; complex=0
+case 68: status=partial; solutions=none; excluded=3; rejected=0; pending=1; domain=2; complex=0
+case 69: status=no_solution; solutions=none; excluded=3; rejected=0; pending=0; domain=2; complex=0
+case 70: status=solved; solutions=1; excluded=3; rejected=0; pending=0; domain=2; complex=0
