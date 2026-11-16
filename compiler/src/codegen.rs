@@ -1522,16 +1522,48 @@ static void ostrin_expand_exp(const char* t_in, char* buf, size_t n) {\n\
 static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
     if (isnan(v)) { snprintf(buf, n, \"NaN\"); return; }\n\
     if (isinf(v)) { snprintf(buf, n, \"%sinf\", signbit(v) ? \"-\" : \"\"); return; }\n\
-    int prec;\n\
-    for (prec = 1; prec <= 17; prec++) {\n\
-        snprintf(buf, n, \"%.*g\", prec, v);\n\
-        if (strtod(buf, NULL) == v) break;\n\
-    }\n\
-    if (strchr(buf, 'e')) {\n\
+    if (v == 0.0) { snprintf(buf, n, \"%g\", v); return; }\n\
+    /* The shortest decimal that reads back as |v|, as the interpreter prints it. At each length the correctly rounded\n\
+       digits are tried, then the digits one unit above and below; among the candidates that read back, the closest to\n\
+       |v| is kept. Plain notation is then written out in full. */\n\
+    double a = fabs(v);\n\
+    long double exact = (long double)a;\n\
+    char best[96];\n\
+    int found = 0;\n\
+    for (int prec = 1; prec <= 17 && !found; prec++) {\n\
         char t[64];\n\
-        snprintf(t, sizeof t, \"%.*e\", prec - 1, v);\n\
-        ostrin_expand_exp(t, buf, n);\n\
+        snprintf(t, sizeof t, \"%.*e\", prec - 1, a);\n\
+        unsigned long long digits = 0;\n\
+        const char* p = t;\n\
+        for (; *p != 'e'; p++) {\n\
+            if (*p >= '0' && *p <= '9') digits = digits * 10ULL + (unsigned long long)(*p - '0');\n\
+        }\n\
+        int exponent = atoi(p + 1);\n\
+        unsigned long long lo = 1;\n\
+        for (int i = 1; i < prec; i++) lo *= 10ULL;\n\
+        long double best_gap = 0.0L;\n\
+        for (int k = 0; k < 3; k++) {\n\
+            long long cand = (long long)digits + (k == 0 ? 0 : (k == 1 ? 1 : -1));\n\
+            int e = exponent;\n\
+            if (cand < (long long)lo) { cand = (long long)lo * 10 - 1; e = exponent - 1; }\n\
+            if (cand >= (long long)lo * 10) { cand = (long long)lo; e = exponent + 1; }\n\
+            char s[32];\n\
+            snprintf(s, sizeof s, \"%lld\", cand);\n\
+            char text[96];\n\
+            snprintf(text, sizeof text, \"%c.%se%+d\", s[0], s + 1, e);\n\
+            if ((double)strtod(text, NULL) != a) continue;\n\
+            long double gap = fabsl(strtold(text, NULL) - exact);\n\
+            if (!found || gap < best_gap) {\n\
+                snprintf(best, sizeof best, \"%s\", text);\n\
+                best_gap = gap;\n\
+                found = 1;\n\
+            }\n\
+        }\n\
     }\n\
+    if (!found) { snprintf(buf, n, \"%.17g\", v); return; }\n\
+    char plain[512];\n\
+    ostrin_expand_exp(best, plain, sizeof plain);\n\
+    snprintf(buf, n, \"%s%s\", signbit(v) ? \"-\" : \"\", plain);\n\
 }\n\
 \n\
 static void ostrin_fmt_single(float v, char* buf, size_t n) {\n\
