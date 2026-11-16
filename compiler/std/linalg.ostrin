@@ -25,6 +25,11 @@ fn max_float(a: Float, b: Float) -> Float {
     if a > b { a } else { b }
 }
 
+/// True for a finite value. NaN and the infinities compare false with every bound, so they fail this test.
+fn is_finite_value(v: Float) -> Bool {
+    abs(v) <= 1.7976931348623157e308
+}
+
 /// Condition numbers at or above this value are reported as ill-conditioned.
 pub fn condition_limit() -> Float {
     1.0e12
@@ -147,8 +152,33 @@ pub record CheckedSolution {
     status: String
 }
 
-/// Solves A x = b by LU factorization with partial pivoting, then checks the answer. (Named `solve_checked` because the
-/// built-in `solve` returns only the vector.)
+/// The power of two nearest to 1/m from below: multiplying by it moves m into [1, 2). Scaling by a power of two is exact, so
+/// equilibration introduces no rounding. A zero magnitude (an empty row or column) is left unscaled and is reported singular.
+fn power_of_two_scale(m: Float) -> Float {
+    if m <= 0.0 {
+        return 1.0
+    }
+    mut t = m
+    mut s = 1.0
+    while t >= 2.0 {
+        t = t / 2.0
+        s = s / 2.0
+    }
+    while t < 1.0 {
+        t = t * 2.0
+        s = s * 2.0
+    }
+    s
+}
+
+/// Solves A x = b by equilibration and LU factorization with partial pivoting, then checks the answer. (Named `solve_checked`
+/// because the built-in `solve` returns only the vector.)
+///
+/// Equilibration scales each row, then each column, by a power of two so that the largest entry of every row and column of
+/// the scaled matrix B is in [1, 2). The system B y = D_r b is solved, and x = D_c y. Row and column scaling by powers of two
+/// does not change the rounding of the entries, so B is exact, and the result is independent of the units or magnitudes in
+/// which the rows and columns are written. Singularity is tested relative to ||B||_inf, and the reported condition number and
+/// status are those of B. The residual is measured on the original A and b.
 pub fn solve_checked(a: Array<Float>, b: Array<Float>) -> Result<CheckedSolution, String> {
     shape = a.shape()
     if shape.length() != 2 or shape[0] != shape[1] {
@@ -158,14 +188,54 @@ pub fn solve_checked(a: Array<Float>, b: Array<Float>) -> Result<CheckedSolution
     if b.length() != n {
         return Err("solve_checked: the right-hand side needs one entry per row of the matrix")
     }
-    // The factorization rejects only exact zero pivots; the singularity test below is relative to the size of A, so the
-    // same matrix is accepted or refused whatever the unit it is written in.
-    factors = numeric.lu(a, 0.0)
+    // A NaN or an infinite entry would reach the pivots and the comparisons silently: such input is refused first.
+    for i in 0 until n {
+        for j in 0 until n {
+            if is_finite_value(a.get(i, j)) {
+            } else {
+                return Err("solve_checked: the matrix has a non-finite entry")
+            }
+        }
+        if is_finite_value(b[i]) {
+        } else {
+            return Err("solve_checked: the right-hand side has a non-finite entry")
+        }
+    }
+    mut row_factor: List<Float> = []
+    for i in 0 until n {
+        mut m = 0.0
+        for j in 0 until n {
+            if abs(a.get(i, j)) > m {
+                m = abs(a.get(i, j))
+            }
+        }
+        row_factor.push(power_of_two_scale(m))
+    }
+    mut col_factor: List<Float> = []
+    for j in 0 until n {
+        mut m = 0.0
+        for i in 0 until n {
+            if abs(a.get(i, j)) * row_factor[i] > m {
+                m = abs(a.get(i, j)) * row_factor[i]
+            }
+        }
+        col_factor.push(power_of_two_scale(m))
+    }
+    mut scaled = zeros([n, n])
+    mut scaled_rhs: List<Float> = []
+    for i in 0 until n {
+        for j in 0 until n {
+            scaled.set(i, j, a.get(i, j) * row_factor[i] * col_factor[j])
+        }
+        scaled_rhs.push(b[i] * row_factor[i])
+    }
+    // The factorization rejects only exact zero pivots; the singularity test below is relative to the size of the scaled matrix.
+    factors = numeric.lu(scaled, 0.0)
     if factors.is_err() {
         return Err("solve_checked: the matrix is singular")
     }
     lu = factors.unwrap()
-    scale = matrix_norm_inf(a).unwrap()
+    scale = matrix_norm_inf(scaled).unwrap()
     mut smallest = abs(lu.u.get(0, 0))
     for k in 0 until n {
         if abs(lu.u.get(k, k)) < smallest {
@@ -175,9 +245,14 @@ pub fn solve_checked(a: Array<Float>, b: Array<Float>) -> Result<CheckedSolution
     if smallest <= (n as Float) * 2.220446049250313e-16 * scale {
         return Err("solve_checked: the matrix is singular to working precision")
     }
-    x = lu.solve(b)
-    residual = residual_inf(a, x, b).unwrap()
-    scale_xb = scale * vector_norm_inf(x) + vector_norm_inf(b)
+    y = lu.solve(array(scaled_rhs))
+    mut x: List<Float> = []
+    for j in 0 until n {
+        x.push(y[j] * col_factor[j])
+    }
+    solution = array(x)
+    residual = residual_inf(a, solution, b).unwrap()
+    scale_xb = matrix_norm_inf(a).unwrap() * vector_norm_inf(solution) + vector_norm_inf(b)
     relative = if scale_xb > 0.0 { residual / scale_xb } else { 0.0 }
     mut inverse_norm = 0.0
     for j in 0 until n {
@@ -187,9 +262,9 @@ pub fn solve_checked(a: Array<Float>, b: Array<Float>) -> Result<CheckedSolution
         }
         inverse_norm = max_float(inverse_norm, vector_norm1(lu.solve(array(e))))
     }
-    condition = matrix_norm1(a).unwrap() * inverse_norm
+    condition = matrix_norm1(scaled).unwrap() * inverse_norm
     status = if condition >= condition_limit() { "ill_conditioned" } else { "ok" }
-    Ok(CheckedSolution { x: x, residual: residual, relative_residual: relative, condition: condition, status: status })
+    Ok(CheckedSolution { x: solution, residual: residual, relative_residual: relative, condition: condition, status: status })
 }
 
 // ---------------------------------------------------------------- unit-preserving products

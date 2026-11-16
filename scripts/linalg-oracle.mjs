@@ -165,6 +165,39 @@ const REFUSALS = [
 
 // ---------------------------------------------------------------- expected output and program
 
+// Equilibration as std.linalg.solve_checked defines it: each row, then each column, is multiplied by the power of two that
+// brings its largest entry into [1, 2). That power is determined by the interval, so it is computed here by exact rational
+// comparisons, and every scaled entry is exact (a power-of-two multiple of a double).
+function powerOfTwoScale(m) {
+  if (isZero(m)) return R(1n);
+  const pow = (k) => (k >= 0n ? R(1n << k) : R(1n, 1n << -k));
+  let e = BigInt(m.n.toString(2).length - m.d.toString(2).length);
+  while (less(m, pow(e))) e -= 1n;
+  while (!less(m, pow(e + 1n))) e += 1n;
+  return pow(-e);
+}
+function equilibrate(a) {
+  const n = a.length;
+  const rowMax = a.map((row) => row.reduce((best, v) => (less(best, abs(v)) ? abs(v) : best), R(0n)));
+  const rf = rowMax.map(powerOfTwoScale);
+  const cf = Array.from({ length: n }, (_, j) =>
+    powerOfTwoScale(a.reduce((best, row, i) => {
+      const t = abs(mul(row[j], rf[i]));
+      return less(best, t) ? t : best;
+    }, R(0n))),
+  );
+  const B = a.map((row, i) => row.map((v, j) => mul(mul(v, rf[i]), cf[j])));
+  return { B, rf, cf, rowMax };
+}
+// The condition number of the equilibrated matrix (1-norm), or null when it is singular.
+function equilibratedCondition(a) {
+  const eq = equilibrate(a);
+  const n = a.length;
+  const inv = exactSolve(eq.B, Array.from({ length: n }, () => R(0n)));
+  if (inv.singular) return { eq, cond: null };
+  return { eq, cond: toNumber(mul(exactNorm1(eq.B), exactNorm1(inv.inverse))) };
+}
+
 function evaluate(c) {
   const exactA = c.a.map((row) => row.map(exactOf));
   const exactB = c.b.map(exactOf);
@@ -172,8 +205,9 @@ function evaluate(c) {
   const n = c.a.length;
   if (solved.singular) return { kind: "singular" };
   const normA = exactNorm1(exactA);
-  const invNorm = exactNorm1(solved.inverse);
-  const cond = toNumber(mul(normA, invNorm));
+  const eqc = equilibratedCondition(exactA);
+  if (eqc.cond === null) return { kind: "singular" };
+  const cond = eqc.cond;
   const xs = solved.x.map(toNumber);
   const scaleXB = Math.max(...xs.map(Math.abs), 1e-300) * toNumber(exactNormInf(exactA)) + Math.max(...c.b.map(Math.abs));
   return {

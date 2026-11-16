@@ -2242,6 +2242,23 @@ fn fresh_object(expr: &Expr) -> bool {
     }
 }
 
+/// Whether the first positional or named argument is a fresh value that the call does not keep.
+fn arg_is_fresh(args: &[Arg], ty: &CType) -> bool {
+    match args.first() {
+        Some(Arg::Positional(e)) | Some(Arg::Named(_, e)) => owned_call_argument(e, ty),
+        None => false,
+    }
+}
+
+/// Calls a runtime function that only reads one argument and returns a value that does not share the argument's storage.
+/// A fresh argument is released after the call; a borrowed one is passed as it is.
+fn with_released_argument(fresh: bool, code: &str, arg_c: &str, result_c: &str, call: impl Fn(&str) -> String) -> String {
+    if !fresh {
+        return call(code);
+    }
+    format!("({{ {arg_c} __released_arg = {code}; {result_c} __released_result = {}; ostrin_release_owned((void*)__released_arg); __released_result; }})", call("__released_arg"))
+}
+
 fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
     // A unit conversion of an array returns a new array (ostrin_qa_as copies), so the value is fresh.
     if matches!(ty, CType::Array(_)) && matches!(expr.unlocated(), Expr::As(..)) {
@@ -8528,11 +8545,23 @@ impl<'a> Codegen<'a> {
                     }
                     "dot" => {
                         one(self, 1)?;
-                        Ok((format!("{n}_dot({obj_code}, {})", codes[0]), t))
+                        let fresh = arg_is_fresh(args, &types[0]);
+                        Ok((
+                            with_released_argument(fresh, &codes[0], &c_type_name(&types[0]), &c_type_name(&t), |a| {
+                                format!("{n}_dot({obj_code}, {a})")
+                            }),
+                            t,
+                        ))
                     }
                     "matmul" => {
                         one(self, 1)?;
-                        Ok((format!("{n}_matmul({obj_code}, {})", codes[0]), obj_ty.clone()))
+                        let fresh = arg_is_fresh(args, &types[0]);
+                        Ok((
+                            with_released_argument(fresh, &codes[0], &c_type_name(&types[0]), &c_type_name(&obj_ty), |a| {
+                                format!("{n}_matmul({obj_code}, {a})")
+                            }),
+                            obj_ty.clone(),
+                        ))
                     }
                     "get" if !codes.is_empty() => Ok((format!("{n}_get({obj_code}, (int64_t[]){{ {} }}, {})", codes.join(", "), codes.len()), t)),
                     "set" if codes.len() >= 2 => {
