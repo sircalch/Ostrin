@@ -492,7 +492,10 @@ impl Emitter<'_> {
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
         match &expr.kind {
-            HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..) => true,
+            HirKind::Local(_) => true,
+            // A field or element read from a temporary container is an owned value: the read retains it and releases the
+            // container (see the Field and Index emitters), so consumers must treat it as fresh.
+            HirKind::Field(obj, _) | HirKind::Index(obj, _) => Self::borrowed_expr(obj),
             // A by-value wrapper does not create another payload reference.
             // Unwrapping a borrowed wrapper borrows its payload; binding or
             // returning that payload must retain it, and iteration must not
@@ -507,6 +510,19 @@ impl Emitter<'_> {
             }
             _ => false,
         }
+    }
+
+    /// `unwrap` of an Option or a Result. A borrowed wrapper lends its payload, as before. A fresh wrapper (a call result)
+    /// belongs to this expression: its payload is retained, the wrapper is released, and the caller owns the payload.
+    fn unwrap_payload(&mut self, recv: &HirExpr, e: &HirExpr, recv_code: &str, rc: &str, temp: &str, check: &str, message: &str) -> Bail<String> {
+        if Self::borrowed_expr(recv) {
+            return Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.{check}) {{ fprintf(stderr, \"ostrin: {message}\\n\"); exit(1); }} {temp}.value; }})"));
+        }
+        let payload_c = self.c_type(&e.ty)?;
+        let value = self.next_temp();
+        let retain = self.retain_managed_value(&value, &e.ty).map(|r| format!("{r}; ")).unwrap_or_default();
+        let release = self.release_managed_value(temp, &recv.ty).map(|r| format!("{r}; ")).unwrap_or_default();
+        Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.{check}) {{ fprintf(stderr, \"ostrin: {message}\\n\"); exit(1); }} {payload_c} {value} = {temp}.value; {retain}{release}{value}; }})"))
     }
 
     fn contains_enum(&self, ty: &Ty) -> bool {
@@ -1347,7 +1363,16 @@ impl Emitter<'_> {
                 if field_ty != self.c_type(&e.ty)? {
                     return Err(());
                 }
-                Ok(format!("{}->{field}", self.expr(obj)?))
+                if Self::borrowed_expr(obj) {
+                    return Ok(format!("{}->{field}", self.expr(obj)?));
+                }
+                let object = self.expr(obj)?;
+                let object_c = self.c_type(&obj.ty)?;
+                let owner = self.next_temp();
+                let value = self.next_temp();
+                let retain = self.retain_managed_value(&value, &e.ty).map(|r| format!("{r}; ")).unwrap_or_default();
+                let release = self.release_managed_value(&owner, &obj.ty).map(|r| format!("{r}; ")).unwrap_or_default();
+                Ok(format!("({{ {object_c} {owner} = {object}; {field_ty} {value} = {owner}->{field}; {retain}{release}{value}; }})"))
             }
             HirKind::DynCoerce(value) => {
                 let code = self.expr(value)?;
@@ -1422,7 +1447,17 @@ impl Emitter<'_> {
                 let list_name = self.mangle_type(&obj.ty)?;
                 let obj_code = self.expr(obj)?;
                 let index_code = self.expr(index)?;
-                Ok(format!("{list_name}_get({obj_code}, {index_code})"))
+                if Self::borrowed_expr(obj) {
+                    return Ok(format!("{list_name}_get({obj_code}, {index_code})"));
+                }
+                // A fresh container is read through a temporary: the element is retained and the container released.
+                let owner = self.next_temp();
+                let value = self.next_temp();
+                let owner_c = self.c_type(&obj.ty)?;
+                let value_c = self.c_type(&e.ty)?;
+                let retain = self.retain_managed_value(&value, &e.ty).map(|r| format!("{r}; ")).unwrap_or_default();
+                let release = self.release_managed_value(&owner, &obj.ty).map(|r| format!("{r}; ")).unwrap_or_default();
+                Ok(format!("({{ {owner_c} {owner} = {obj_code}; {value_c} {value} = {list_name}_get({owner}, {index_code}); {retain}{release}{value}; }})"))
             }
             HirKind::MethodCall {
                 recv,
@@ -1830,7 +1865,7 @@ impl Emitter<'_> {
         match method {
             "is_some" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.has; }})")),
             "is_none" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; !{temp}.has; }})")),
-            "unwrap" if args.is_empty() && e.ty == inner => Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} {temp}.value; }})")),
+            "unwrap" if args.is_empty() && e.ty == inner => self.unwrap_payload(recv, e, &recv_code, &rc, &temp, "has", "unwrap on None"),
             "unwrap_or" if args.len() == 1 && e.ty == inner && args[0].value.ty == inner => {
                 let fallback = self.expr(&args[0].value)?;
                 Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.has ? {temp}.value : ({fallback}); }})"))
@@ -1866,7 +1901,7 @@ impl Emitter<'_> {
         match method {
             "is_ok" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.ok; }})")),
             "is_err" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; !{temp}.ok; }})")),
-            "unwrap" if args.is_empty() && e.ty == ok => Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} {temp}.value; }})")),
+            "unwrap" if args.is_empty() && e.ty == ok => self.unwrap_payload(recv, e, &recv_code, &rc, &temp, "ok", "unwrap on Err"),
             "unwrap_or" if args.len() == 1 && e.ty == ok && args[0].value.ty == ok => {
                 let fallback = self.expr(&args[0].value)?;
                 Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.ok ? {temp}.value : ({fallback}); }})"))

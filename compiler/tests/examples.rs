@@ -21437,6 +21437,23 @@ fn ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation() {
         "capture_declarations.ostrin",
         "function_value_capture.ostrin",
         "native_round_regressions.ostrin",
+    "residual/r10_field_array_receiver.ostrin",
+            "residual/r11_field_into_list.ostrin",
+            "residual/r12_field_through_function.ostrin",
+            "residual/r13_payload_kept_after_unwrap.ostrin",
+            "residual/r14_reassign_from_own_field.ostrin",
+            "residual/r15_option_field.ostrin",
+            "residual/r16_is_ok_on_fresh_result.ostrin",
+            "residual/r17_index_then_field.ostrin",
+            "residual/r1_temp_field.ostrin",
+            "residual/r2_temp_field_method.ostrin",
+            "residual/r3_chained_fields.ostrin",
+            "residual/r4_result_unwrap_field.ostrin",
+            "residual/r5_stored_then_field.ostrin",
+            "residual/r6_field_used_twice.ostrin",
+            "residual/r7_field_outlives_temp.ostrin",
+            "residual/r8_solve_chain.ostrin",
+            "residual/r9_fresh_array_receiver.ostrin",
     ];
     let routes: [(&str, &[(&str, &str)]); 3] = [
         ("ir", &[]),
@@ -21453,7 +21470,7 @@ fn ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation() {
         );
         let expected = stdout(&interpreted);
         for (route, env) in routes {
-            let exe = temp_artifact(&format!("{route}_{program}.exe"));
+            let exe = temp_artifact(&format!("{route}_{}.exe", program.replace('/', "_")));
             let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
             command.args(["--compile", "--leak-check", "--out", &exe, &path]);
             for (key, value) in env.iter().copied() {

@@ -1,0 +1,11 @@
+record Box {
+    tag: String
+}
+
+fn make() -> Box {
+    Box { tag: "alpha" }
+}
+
+fn main() -> Void {
+    print(make().tag)
+}

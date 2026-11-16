@@ -1,0 +1,11 @@
+record Box {
+    tag: String
+}
+
+fn make_list() -> List<Box> {
+    [Box { tag: "first" }, Box { tag: "second" }]
+}
+
+fn main() -> Void {
+    print(make_list()[1].tag)
+}

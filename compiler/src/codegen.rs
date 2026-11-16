@@ -2223,7 +2223,9 @@ fn ctype_subst_to_hir(subst: &HashMap<String, CType>) -> HashMap<String, Ty> {
 /// in another owned local or returned from a function.
 fn borrowed_reference_expr(expr: &Expr) -> bool {
     match expr.unlocated() {
-        Expr::Ident(_) | Expr::FieldAccess(..) | Expr::Index(..) => true,
+        Expr::Ident(_) => true,
+        // A field or element of a temporary is an owned value (the read retains it and releases the container).
+        Expr::FieldAccess(obj, _) | Expr::Index(obj, _) => borrowed_reference_expr(obj),
         _ => false,
     }
 }
@@ -2231,6 +2233,15 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
 /// A call argument is borrowed by the callee, so a fresh native reference
 /// produced at the call site must be released by the caller afterwards. A
 /// local/field/index is already owned elsewhere and must stay borrowed.
+/// An expression that produces a new record or container value, so that a field or element read from it is fresh.
+fn fresh_object(expr: &Expr) -> bool {
+    match expr.unlocated() {
+        Expr::Call(..) | Expr::GenericCall(..) | Expr::RecordLiteral(..) | Expr::GenericRecordLiteral(..) => true,
+        Expr::FieldAccess(inner, _) | Expr::Index(inner, _) => fresh_object(inner),
+        _ => false,
+    }
+}
+
 fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
     // A unit conversion of an array returns a new array (ostrin_qa_as copies), so the value is fresh.
     if matches!(ty, CType::Array(_)) && matches!(expr.unlocated(), Expr::As(..)) {
@@ -2254,6 +2265,10 @@ fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
     // Every array operator allocates a new array.
     if matches!(ty, CType::Array(_)) && fresh_array_expr(expr) {
         return true;
+    }
+    // A field or element read from a fresh container is itself fresh: the read retains it and releases the container.
+    if let Expr::FieldAccess(inner, _) | Expr::Index(inner, _) = expr.unlocated() {
+        return fresh_object(inner);
     }
     matches!(
         expr.unlocated(),
@@ -8032,7 +8047,10 @@ impl<'a> Codegen<'a> {
         args: &[Arg],
     ) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
-        if matches!(obj_ty, CType::Array(_)) && fresh_array_expr(obj) {
+        // A fresh receiver (a call result, a field or element of a fresh container) is released once the method has run,
+        // when the method cannot return it: array methods never return their receiver, and neither do the scalar list methods.
+        let scalar_list_method = matches!(obj_ty, CType::List(_)) && args.is_empty() && matches!(method_name, "length" | "count" | "is_empty");
+        if (matches!(obj_ty, CType::Array(_)) || scalar_list_method) && owned_call_argument(obj, &obj_ty) {
             // `(x * 2.0).sum()`: array methods never return their receiver, so a
             // fresh one is released once the method has run.
             let receiver = self.next_temp();

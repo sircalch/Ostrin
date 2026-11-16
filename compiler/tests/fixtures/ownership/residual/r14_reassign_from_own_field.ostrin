@@ -1,0 +1,13 @@
+record Box {
+    tag: String
+}
+
+fn make() -> Box {
+    Box { tag: "old" }
+}
+
+fn main() -> Void {
+    mut b = make()
+    b = Box { tag: b.tag + "+new" }
+    print(b.tag)
+}

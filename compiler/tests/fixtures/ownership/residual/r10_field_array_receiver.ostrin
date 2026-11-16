@@ -1,0 +1,11 @@
+record Holder {
+    values: Array<Float>
+}
+
+fn make() -> Holder {
+    Holder { values: array([3.0, 4.0]) }
+}
+
+fn main() -> Void {
+    print(make().values.to_string())
+}
