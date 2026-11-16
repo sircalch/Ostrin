@@ -8454,7 +8454,23 @@ impl<'a> Codegen<'a> {
                     "transpose" => Ok((format!("{n}_transpose({obj_code})"), obj_ty.clone())),
                     "reshape" => {
                         one(self, 1)?;
-                        Ok((format!("{n}_reshape({obj_code}, {})", codes[0]), obj_ty.clone()))
+                        // The runtime copies the data and only reads the shape, so a fresh shape list (a literal) is released
+                        // after the call. The receiver is released by the method-call wrapper that produced it.
+                        let shape_expr = match &args[0] {
+                            Arg::Positional(e) | Arg::Named(_, e) => e,
+                        };
+                        let shape_fresh = owned_call_argument(shape_expr, &types[0]);
+                        if shape_fresh {
+                            let shape = self.next_temp();
+                            let result = self.next_temp();
+                            let release = release_owned_managed_value(&shape, &types[0]).unwrap_or_default();
+                            Ok((
+                                format!("({{ {} {shape} = {}; {} {result} = {n}_reshape({obj_code}, {shape}); {release}; {result}; }})", c_type_name(&types[0]), codes[0], c_type_name(&obj_ty)),
+                                obj_ty.clone(),
+                            ))
+                        } else {
+                            Ok((format!("{n}_reshape({obj_code}, {})", codes[0]), obj_ty.clone()))
+                        }
                     }
                     "sum_axis" => {
                         one(self, 1)?;

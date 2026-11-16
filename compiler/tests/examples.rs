@@ -21633,6 +21633,16 @@ fn linalg_oracle_agrees_in_both_backends_and_leaves_no_allocation() {
 }
 
 #[test]
+fn linalg_regression_example_recovers_the_exact_quadratic_on_both_backends() {
+    // Normal equations of an exact quadratic fit, solved by std.linalg.solve_checked. The expected coefficients are 1, 2, 0.5.
+    let output = interpreter_and_native_agree("linalg_regression.ostrin");
+    assert_eq!(
+        output.replace("\r\n", "\n"),
+        "c0 1\nc1 2\nc2 0.5\nstatus ok\nresidual below 1e-9: true\n"
+    );
+}
+
+#[test]
 fn untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic() {
     // The interpreter runs this program, but the native backend cannot infer the type of the untyped parameter `f`. It must
     // refuse with a diagnostic that names the limitation; it must never emit code for the call.
