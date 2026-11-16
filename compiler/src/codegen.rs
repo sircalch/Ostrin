@@ -1572,8 +1572,11 @@ static const char* ostrin_uint_to_string(uint64_t v) {\n\
 }\n\
 \n\
 static const char* ostrin_float_to_string(double v) {\n\
-    char* out = (char*)ostrin_alloc(64);\n\
-    ostrin_fmt_double(v, out, 64);\n\
+    /* A double has up to 309 integer digits and 324 fraction digits in plain notation: 512 bytes hold every value. */\n\
+    char tmp[512];\n\
+    ostrin_fmt_double(v, tmp, sizeof tmp);\n\
+    char* out = (char*)ostrin_alloc(strlen(tmp) + 1);\n\
+    strcpy(out, tmp);\n\
     return out;\n\
 }\n\
 \n\
@@ -1587,7 +1590,7 @@ static const char* ostrin_float_format(double v, int64_t digits) {\n\
 }\n\
 \n\
 static void ostrin_print_float(double v) {\n\
-    char buf[64];\n\
+    char buf[512];\n\
     ostrin_fmt_double(v, buf, sizeof buf);\n\
     printf(\"%s\\n\", buf);\n\
 }\n\
@@ -2197,9 +2200,14 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
 /// produced at the call site must be released by the caller afterwards. A
 /// local/field/index is already owned elsewhere and must stay borrowed.
 fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
+    // A unit conversion of an array returns a new array (ostrin_qa_as copies), so the value is fresh.
+    if matches!(ty, CType::Array(_)) && matches!(expr.unlocated(), Expr::As(..)) {
+        return true;
+    }
     // A function value owns its environment (see gen_closure): a fresh closure passed as an argument is released by the caller.
+    // A quantity owns its unit label (ostrin_unit_combine allocates it), so a fresh quantity is an owned value too.
     if !is_reference_type(ty)
-        && !matches!(ty, CType::Fn(..))
+        && !matches!(ty, CType::Fn(..) | CType::Quantity(_))
         && !contains_by_value_enum(ty)
         && !matches!(ty, CType::Option(..) | CType::Result(..))
     {
@@ -3502,11 +3510,12 @@ impl<'a> Codegen<'a> {
             "NULL".to_string()
         } else {
             let drop_name = format!("ostrin_task_env_drop_{id}");
+            // Each managed capture is released with the helper of its own type (a `dyn Trait` value is a struct, not a
+            // pointer, so a raw cast of it does not compile).
             let releases: String = frame
                 .captures
                 .iter()
-                .filter(|(_, t)| is_reference_type(t))
-                .map(|(n, _)| format!("    ostrin_release((void*)__e->{n});\n"))
+                .filter_map(|(n, t)| release_managed_value(&format!("__e->{n}"), t).map(|body| format!("    {body};\n")))
                 .collect();
             self.closure_protos
                 .push(format!("static void {drop_name}(void* __env);"));
@@ -3526,11 +3535,9 @@ impl<'a> Codegen<'a> {
                 .captures
                 .iter()
                 .map(|(n, t)| {
-                    let retain = if is_reference_type(t) {
-                        format!("ostrin_retain((void*)__ce->{n}); ")
-                    } else {
-                        String::new()
-                    };
+                    let retain = retain_managed_value(&format!("__ce->{n}"), t)
+                        .map(|body| format!("{body}; "))
+                        .unwrap_or_default();
                     format!("__ce->{n} = {n}; {retain}")
                 })
                 .collect();
@@ -5255,6 +5262,15 @@ impl<'a> Codegen<'a> {
                 if matches!(ty, CType::Array(_)) {
                     let array_ty = CType::Array(Box::new(CType::Quantity(dim)));
                     self.register_list_types(&array_ty);
+                    // `ostrin_qa_as` returns a new array. A fresh operand (a call result, a literal or another conversion)
+                    // belongs to this expression only, so it is released here; a borrowed operand is left alone.
+                    let fresh = owned_call_argument(inner, &ty) || matches!(inner.unlocated(), Expr::As(..));
+                    if fresh {
+                        return Ok((
+                            format!("({{ Array_Float* __as_source = {code}; Array_Float* __as_result = ostrin_qa_as(__as_source, {unit}); ostrin_release_owned((void*)__as_source); __as_result; }})"),
+                            array_ty,
+                        ));
+                    }
                     return Ok((format!("ostrin_qa_as({code}, {unit})"), array_ty));
                 }
                 if matches!(ty, CType::Quantity(_)) {
@@ -5353,10 +5369,11 @@ impl<'a> Codegen<'a> {
                     if matches!(&idx_ty, CType::Array(m) if **m == CType::Bool) {
                         return Ok((format!("{n}_mask({obj_code}, {idx_code})"), obj_ty.clone()));
                     }
-                    return Ok((
-                        format!("{n}_index1({obj_code}, {idx_code})"),
-                        (**elem).clone(),
-                    ));
+                    let elem_ty = (**elem).clone();
+                    let read = self.element_read(obj, &obj_code, &obj_ty, &elem_ty, |t| {
+                        format!("{n}_index1({t}, {idx_code})")
+                    });
+                    return Ok((read, elem_ty));
                 }
                 let CType::List(elem_ty) = obj_ty else {
                     return Err(
@@ -5367,10 +5384,11 @@ impl<'a> Codegen<'a> {
                 let elem_ty = *elem_ty;
                 let struct_name = self.ensure_list(&elem_ty);
                 let (idx_code, _) = self.gen_expr(idx)?;
-                Ok((
-                    format!("{struct_name}_get({obj_code}, {idx_code})"),
-                    elem_ty,
-                ))
+                let list_ty = CType::List(Box::new(elem_ty.clone()));
+                let read = self.element_read(obj, &obj_code, &list_ty, &elem_ty, |t| {
+                    format!("{struct_name}_get({t}, {idx_code})")
+                });
+                Ok((read, elem_ty))
             }
             other => Err(format!(
                 "this expression isn't supported by the native backend yet: {other:?}"
@@ -5430,6 +5448,43 @@ impl<'a> Codegen<'a> {
     /// other element must match it exactly (no implicit widening, same as
     /// everywhere else in this backend). An empty literal (`[]`) has no
     /// element to infer from and isn't supported.
+    /// A value stored in a wrapper (`Ok`, `Err`, `Some`) keeps its own reference. A borrowed managed value (a local, a field
+    /// or an index) gains one, so the wrapper stays valid when that local is released; a fresh value is transferred as it is.
+    fn retained_payload(&mut self, arg: &Arg, code: &str, ty: &CType) -> String {
+        let expr = match arg {
+            Arg::Positional(e) | Arg::Named(_, e) => e,
+        };
+        match retain_managed_value("__payload", ty) {
+            Some(retain) if borrowed_reference_expr(expr) => {
+                format!("({{ {} __payload = {code}; {retain}; __payload; }})", c_type_name(ty))
+            }
+            _ => code.to_string(),
+        }
+    }
+
+    /// Reads one element of a list or array through a temporary. A fresh container (a call result, such as `shape()[0]`)
+    /// belongs to this expression: a managed element is retained, and the container is released after the read, so the
+    /// element outlives it. A borrowed container is read in place, as before.
+    fn element_read(&mut self, obj: &Expr, obj_code: &str, obj_ty: &CType, elem_ty: &CType, read: impl Fn(&str) -> String) -> String {
+        let container = self.next_temp();
+        let element = self.next_temp();
+        let fresh = owned_call_argument(obj, obj_ty);
+        let retain = match retain_managed_value(&element, elem_ty).filter(|_| fresh) {
+            Some(retain) => format!("{retain}; "),
+            None => String::new(),
+        };
+        let release = match release_owned_managed_value(&container, obj_ty).filter(|_| fresh) {
+            Some(release) => format!("{release}; "),
+            None => String::new(),
+        };
+        format!(
+            "({{ {} {container} = {obj_code}; {} {element} = {}; {retain}{release}{element}; }})",
+            c_type_name(obj_ty),
+            c_type_name(elem_ty),
+            read(&container)
+        )
+    }
+
     fn gen_list_literal(
         &mut self,
         items: &[Expr],
@@ -6816,7 +6871,35 @@ impl<'a> Codegen<'a> {
             return result;
         }
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
-            return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
+            // A fresh quantity operand (a product, a call result) owns its unit label. The operation does not consume its
+            // operands, so such an operand is held in a temporary and released after the result is computed. Add and
+            // subtract copy the unit of the left operand into the result, so that copy outlives the release.
+            let left_owned = matches!(lt, CType::Quantity(_)) && owned_call_argument(l, &lt);
+            let right_owned = matches!(rt, CType::Quantity(_)) && owned_call_argument(r, &rt);
+            if !left_owned && !right_owned {
+                return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
+            }
+            let left_temp = self.next_temp();
+            let right_temp = self.next_temp();
+            let left_name = if left_owned { left_temp.clone() } else { lc.clone() };
+            let right_name = if right_owned { right_temp.clone() } else { rc.clone() };
+            let (code, ty) = self.gen_quantity_binary(op, &left_name, &lt, &right_name, &rt)?;
+            let result = self.next_temp();
+            let mut body = String::new();
+            if left_owned {
+                body.push_str(&format!("Qty {left_temp} = {lc}; "));
+            }
+            if right_owned {
+                body.push_str(&format!("Qty {right_temp} = {rc}; "));
+            }
+            body.push_str(&format!("{} {result} = {code}; ", c_type_name(&ty)));
+            if left_owned {
+                body.push_str(&format!("ostrin_qty_release({left_temp}); "));
+            }
+            if right_owned {
+                body.push_str(&format!("ostrin_qty_release({right_temp}); "));
+            }
+            return Ok((format!("({{ {body} {result}; }})"), ty));
         }
         if matches!(lt, CType::Array(_)) || matches!(rt, CType::Array(_)) {
             let arithmetic = match op {
@@ -7456,22 +7539,24 @@ impl<'a> Codegen<'a> {
         }
         if (name == "Ok" || name == "Err") && args.len() == 1 {
             let (codes, types) = self.gen_args(args)?;
+            let payload = self.retained_payload(&args[0], &codes[0], &types[0]);
             let ty = if name == "Ok" {
                 CType::OkLit(Box::new(types[0].clone()))
             } else {
                 CType::ErrLit(Box::new(types[0].clone()))
             };
-            return Ok((codes[0].clone(), ty));
+            return Ok((payload, ty));
         }
         if name == "Some" && args.len() == 1 {
             let (codes, types) = self.gen_args(args)?;
             let ty = CType::Option(Box::new(types[0].clone()));
             self.register_list_types(&ty);
+            let payload = self.retained_payload(&args[0], &codes[0], &types[0]);
             return Ok((
                 format!(
                     "(({}){{ .has = true, .value = {} }})",
                     c_type_name(&ty),
-                    codes[0]
+                    payload
                 ),
                 ty,
             ));
@@ -8157,20 +8242,38 @@ impl<'a> Codegen<'a> {
                 let (arg_codes, arg_types) = self.gen_args(args)?;
                 let temp = self.next_temp();
                 let rc = c_type_name(&obj_ty);
+                // A fresh receiver (a call result) belongs to this expression. Its payload is retained before the wrapper is
+                // released, so a returned payload keeps one reference of its own; the wrapper is released after the test.
+                let fresh = owned_call_argument(obj, &obj_ty);
+                let drop_receiver = match release_owned_managed_value(&temp, &obj_ty).filter(|_| fresh) {
+                    Some(release) => format!("{release}; "),
+                    None => String::new(),
+                };
+                let keep_payload = |access: &str| match retain_managed_value(access, &ok).filter(|_| fresh) {
+                    Some(retain) => format!("{retain}; "),
+                    None => String::new(),
+                };
                 match method_name {
-                    "is_ok" => Ok((format!("({{ {rc} {temp} = {obj_code}; {temp}.ok; }})"), CType::Bool)),
-                    "is_err" => Ok((format!("({{ {rc} {temp} = {obj_code}; !{temp}.ok; }})"), CType::Bool)),
-                    "unwrap" => Ok((
-                        format!("({{ {rc} {temp} = {obj_code}; if (!{temp}.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} {temp}.value; }})"),
-                        ok,
-                    )),
+                    "is_ok" => Ok((format!("({{ {rc} {temp} = {obj_code}; bool __is = {temp}.ok; {drop_receiver}__is; }})"), CType::Bool)),
+                    "is_err" => Ok((format!("({{ {rc} {temp} = {obj_code}; bool __is = !{temp}.ok; {drop_receiver}__is; }})"), CType::Bool)),
+                    "unwrap" => {
+                        let keep = keep_payload("__payload");
+                        Ok((
+                            format!("({{ {rc} {temp} = {obj_code}; if (!{temp}.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} {} __payload = {temp}.value; {keep}{drop_receiver}__payload; }})", c_type_name(&ok)),
+                            ok,
+                        ))
+                    }
                     "unwrap_or" => {
                         if arg_codes.len() != 1 {
                             return Err("'unwrap_or' expects one argument".to_string());
                         }
                         let d = self.coerce(&arg_codes[0], &arg_types[0], &ok)?;
                         let _ = err;
-                        Ok((format!("({{ {rc} {temp} = {obj_code}; {temp}.ok ? {temp}.value : ({d}); }})"), ok))
+                        let keep = keep_payload("__payload");
+                        Ok((
+                            format!("({{ {rc} {temp} = {obj_code}; {} __payload = {temp}.ok ? {temp}.value : ({d}); {keep}{drop_receiver}__payload; }})", c_type_name(&ok)),
+                            ok,
+                        ))
                     }
                     "ok" => {
                         let opt = CType::Option(Box::new(ok.clone()));
@@ -11855,7 +11958,8 @@ fn generate_impl(
         out.push_str("    ostrin_mem_report();\n");
     }
     out.push_str("    return ostrin_exit_status;\n}\n");
-    if out.contains("Qty") || out.contains("ostrin_temperature_point_") {
+    // The quantity-array helpers call the unit table of the scalar quantity runtime (ostrin_unit_expr_factor), so they need it too.
+    if out.contains("Qty") || out.contains("ostrin_temperature_point_") || out.contains("ostrin_qa_") {
         // Declared units join the runtime's table; a simple one (one base dimension, exponent 1)
         // gets the same base code as the built-in units, so `ft * m` folds like `km * m`.
         let mut user = String::new();

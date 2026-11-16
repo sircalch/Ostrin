@@ -88,12 +88,16 @@ function checkProgram(program) {
       timeout: 300_000,
     });
     if (emit.status !== 0) {
-      rows.push({ program: name, route: `${route.name} ${opt}`, verdict: "BLOCKED", detail: `emit-c failed: ${(emit.stderr || emit.stdout).trim().split("\n").slice(-3).join(" | ")}` });
+      // A refusal by the compiler is not a sanitizer result: the program never reached the C compiler. Type-inference limits
+      // are labelled REJECTED_TYPE; any other refusal is REJECTED_COMPILER. Neither is counted as memory-safe.
+      const message = (emit.stderr || emit.stdout).trim();
+      const typeLimit = /cannot determine the type|cannot infer|add type annotations|cannot determine the parameter types/.test(message);
+      rows.push({ program: name, route: `${route.name} ${opt}`, verdict: typeLimit ? "REJECTED_TYPE" : "REJECTED_COMPILER", detail: `compiler refused: ${message.split("\n").slice(-2).join(" | ")}` });
       continue;
     }
     const build = wsl(`cd ${wslPath(work)} && gcc ${sanitizerFlags(opt).join(" ")} ${wslPath(c)} -o ${wslPath(exe)} -lm 2>&1`);
     if (build.status !== 0) {
-      rows.push({ program: name, route: `${route.name} ${opt}`, verdict: "BLOCKED", detail: `gcc failed: ${build.stdout.trim().split("\n").slice(-3).join(" | ")}` });
+      rows.push({ program: name, route: `${route.name} ${opt}`, verdict: "FAILED", detail: `generated C does not compile: ${build.stdout.trim().split("\n").slice(-3).join(" | ")}` });
       continue;
     }
     const run = wsl(
@@ -153,7 +157,10 @@ if (reportPath) {
   lines.push(`- Flags: \`${toolchain.flags}\``);
   lines.push(`- Runtime options: \`ASAN_OPTIONS=detect_leaks=1:abort_on_error=0\`, \`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1\``);
   lines.push("");
-  lines.push(`## Result: ${summary.verified} of ${summary.total} VERIFIED, ${summary.failed} not verified`);
+  const tally = (v) => rows.filter((r) => r.verdict === v).length;
+  lines.push(`## Result: ${tally("VERIFIED")} VERIFIED, ${tally("FAILED")} FAILED (memory or output), ${tally("REJECTED_TYPE")} REJECTED_TYPE (type inference limit), ${tally("REJECTED_COMPILER")} REJECTED_COMPILER, ${tally("BLOCKED")} BLOCKED (environment)`);
+  lines.push("");
+  lines.push("A REJECTED row was never compiled to C, so it says nothing about memory safety. Only VERIFIED rows passed the sanitizers.");
   lines.push("");
   lines.push("| Program | Route | Verdict | live_allocations | Detail |");
   lines.push("|---|---|---|---|---|");

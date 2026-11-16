@@ -169,6 +169,7 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("polynomial", include_str!("../std/polynomial.ostrin")),
     ("mpolynomial", include_str!("../std/mpolynomial.ostrin")),
     ("rational", include_str!("../std/rational.ostrin")),
+    ("linalg", include_str!("../std/linalg.ostrin")),
     ("solve", include_str!("../std/solve.ostrin")),
     ("autodiff", include_str!("../std/autodiff.ostrin")),
     ("data", include_str!("../std/data.ostrin")),

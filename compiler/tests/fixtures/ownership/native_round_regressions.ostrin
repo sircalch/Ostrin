@@ -1,0 +1,24 @@
+// Regressions found while building std.linalg, each one reproduced here on the interpreter and on every native route. Expected
+// (worked out by hand):
+//   n 2         a unit conversion of a quantity array inside an expression compiles (it used to call an undeclared helper)
+//   1e150 text  a large double prints in full natively (the native buffer used to cut it at 63 characters)
+//   10 J        a quantity returned inside Ok keeps its unit after the local that held it is released
+//   8           shape()[0] on a fresh list is read and the list is released; 4 * 2 = 8
+import std.linalg
+
+fn main() -> Void {
+    f = array([2.0, 4.0]) as N
+    print("n " + (f as N).length().to_string())
+
+    big = 1.0e150
+    print(big.to_string())
+
+    a = array([3.0, 4.0]) as N
+    b = array([2.0, 1.0]) as m
+    match linalg.unit_dot(a, b) {
+        Ok(w) => print((w as J).to_string()),
+        Err(message) => print(message),
+    }
+
+    print((array([1.0, 2.0, 3.0, 4.0]).shape()[0] * 2).to_string())
+}

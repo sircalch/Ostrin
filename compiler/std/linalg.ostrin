@@ -1,0 +1,226 @@
+// std.linalg — norms, residuals and a checked linear solve on top of std.numeric's LU factorization.
+//
+// This module adds what the built-ins and std.numeric do not give directly:
+//   - matrix norms by name (1, infinity and Frobenius) and vector norms (1, 2 and infinity);
+//   - the residual of a computed solution, in the infinity norm;
+//   - `solve`, which returns the solution together with its residual, a relative residual and an estimate of the
+//     1-norm condition number, and states whether the system is ill-conditioned.
+//   - unit-preserving dot products and matrix-vector products for arrays of quantities (the dimension of the result is
+//     the product of the operand dimensions, as for unit_trapz).
+//
+// Nothing here calls an external library. The factorization is std.numeric's partial-pivoting LU, and every number is
+// computed by the Ostrin code in this file, so the interpreter, the native build and the WASI build agree.
+//
+// Failure is reported with Result, never with a runtime abort: a non-square matrix, a size mismatch, and a singular matrix
+// each return a message that names the problem. A solution is never returned for a singular matrix.
+//
+// The ill-conditioning threshold is CONDITION_LIMIT (1e12 in the 1-norm). Above it, about twelve of the sixteen decimal
+// digits of a double can be lost in x, so `status` is "ill_conditioned" and the caller must not treat x as accurate.
+// The condition number is an estimate in the sense that the inverse is formed column by column from the LU factors; it is
+// exact for the factorization that was computed, not a bound on the rounding error of the solution.
+
+import std.numeric
+
+fn max_float(a: Float, b: Float) -> Float {
+    if a > b { a } else { b }
+}
+
+/// Condition numbers at or above this value are reported as ill-conditioned.
+pub fn condition_limit() -> Float {
+    1.0e12
+}
+
+// ---------------------------------------------------------------- norms
+
+/// Sum of absolute values: the 1-norm of a vector.
+pub fn vector_norm1(v: Array<Float>) -> Float {
+    mut total = 0.0
+    for i in 0 until v.length() {
+        total = total + abs(v[i])
+    }
+    total
+}
+
+/// Largest absolute value: the infinity norm of a vector.
+pub fn vector_norm_inf(v: Array<Float>) -> Float {
+    mut best = 0.0
+    for i in 0 until v.length() {
+        if abs(v[i]) > best {
+            best = abs(v[i])
+        }
+    }
+    best
+}
+
+/// Largest absolute column sum of a matrix: the 1-norm.
+pub fn matrix_norm1(a: Array<Float>) -> Result<Float, String> {
+    shape = a.shape()
+    if shape.length() != 2 {
+        return Err("matrix_norm1 needs a matrix")
+    }
+    mut best = 0.0
+    for j in 0 until shape[1] {
+        mut total = 0.0
+        for i in 0 until shape[0] {
+            total = total + abs(a.get(i, j))
+        }
+        if total > best {
+            best = total
+        }
+    }
+    Ok(best)
+}
+
+/// Largest absolute row sum of a matrix: the infinity norm.
+pub fn matrix_norm_inf(a: Array<Float>) -> Result<Float, String> {
+    shape = a.shape()
+    if shape.length() != 2 {
+        return Err("matrix_norm_inf needs a matrix")
+    }
+    mut best = 0.0
+    for i in 0 until shape[0] {
+        mut total = 0.0
+        for j in 0 until shape[1] {
+            total = total + abs(a.get(i, j))
+        }
+        if total > best {
+            best = total
+        }
+    }
+    Ok(best)
+}
+
+/// Square root of the sum of squares of all entries: the Frobenius norm.
+pub fn matrix_norm_frobenius(a: Array<Float>) -> Result<Float, String> {
+    shape = a.shape()
+    if shape.length() != 2 {
+        return Err("matrix_norm_frobenius needs a matrix")
+    }
+    mut total = 0.0
+    for i in 0 until shape[0] {
+        for j in 0 until shape[1] {
+            total = total + a.get(i, j) * a.get(i, j)
+        }
+    }
+    Ok(sqrt(total))
+}
+
+// ---------------------------------------------------------------- residuals
+
+/// The infinity norm of b - A x for a square matrix A of size n, a vector x of length n and b of length n.
+pub fn residual_inf(a: Array<Float>, x: Array<Float>, b: Array<Float>) -> Result<Float, String> {
+    shape = a.shape()
+    if shape.length() != 2 or shape[0] != shape[1] {
+        return Err("residual_inf needs a square matrix")
+    }
+    n = shape[0]
+    if x.length() != n or b.length() != n {
+        return Err("residual_inf: x and b must have one entry per row of the matrix")
+    }
+    mut worst = 0.0
+    for i in 0 until n {
+        mut ax = 0.0
+        for j in 0 until n {
+            ax = ax + a.get(i, j) * x[j]
+        }
+        r = abs(b[i] - ax)
+        if r > worst {
+            worst = r
+        }
+    }
+    Ok(worst)
+}
+
+// ---------------------------------------------------------------- checked solve
+
+/// The result of `solve_checked`.
+///   x                  the computed solution;
+///   residual           the infinity norm of b - A x;
+///   relative_residual  residual / (||A||_inf ||x||_inf + ||b||_inf), 0 when the denominator is 0;
+///   condition          the 1-norm condition number ||A||_1 ||A^-1||_1 computed from the LU factors;
+///   status             "ok" or "ill_conditioned".
+pub record CheckedSolution {
+    x: Array<Float>
+    residual: Float
+    relative_residual: Float
+    condition: Float
+    status: String
+}
+
+/// Solves A x = b by LU factorization with partial pivoting, then checks the answer. (Named `solve_checked` because the
+/// built-in `solve` returns only the vector.)
+pub fn solve_checked(a: Array<Float>, b: Array<Float>) -> Result<CheckedSolution, String> {
+    shape = a.shape()
+    if shape.length() != 2 or shape[0] != shape[1] {
+        return Err("solve_checked needs a square matrix")
+    }
+    n = shape[0]
+    if b.length() != n {
+        return Err("solve_checked: the right-hand side needs one entry per row of the matrix")
+    }
+    // The factorization rejects only exact zero pivots; the singularity test below is relative to the size of A, so the
+    // same matrix is accepted or refused whatever the unit it is written in.
+    factors = numeric.lu(a, 0.0)
+    if factors.is_err() {
+        return Err("solve_checked: the matrix is singular")
+    }
+    lu = factors.unwrap()
+    scale = matrix_norm_inf(a).unwrap()
+    mut smallest = abs(lu.u.get(0, 0))
+    for k in 0 until n {
+        if abs(lu.u.get(k, k)) < smallest {
+            smallest = abs(lu.u.get(k, k))
+        }
+    }
+    if smallest <= (n as Float) * 2.220446049250313e-16 * scale {
+        return Err("solve_checked: the matrix is singular to working precision")
+    }
+    x = lu.solve(b)
+    residual = residual_inf(a, x, b).unwrap()
+    scale_xb = scale * vector_norm_inf(x) + vector_norm_inf(b)
+    relative = if scale_xb > 0.0 { residual / scale_xb } else { 0.0 }
+    mut inverse_norm = 0.0
+    for j in 0 until n {
+        mut e: List<Float> = []
+        for i in 0 until n {
+            e.push(if i == j { 1.0 } else { 0.0 })
+        }
+        inverse_norm = max_float(inverse_norm, vector_norm1(lu.solve(array(e))))
+    }
+    condition = matrix_norm1(a).unwrap() * inverse_norm
+    status = if condition >= condition_limit() { "ill_conditioned" } else { "ok" }
+    Ok(CheckedSolution { x: x, residual: residual, relative_residual: relative, condition: condition, status: status })
+}
+
+// ---------------------------------------------------------------- unit-preserving products
+
+/// Dot product of two vectors of quantities: `Quantity<X * Y>`. The lengths must match.
+pub fn unit_dot<X: Dimension, Y: Dimension>(a: Array<Quantity<X>>, b: Array<Quantity<Y>>) -> Result<Quantity<X * Y>, String> {
+    if a.length() != b.length() {
+        return Err("unit_dot needs vectors of the same length")
+    }
+    mut total = a[0] * b[0] * 0.0
+    for i in 0 until a.length() {
+        total = total + a[i] * b[i]
+    }
+    Ok(total)
+}
+
+/// Matrix times vector for quantities: element i is `Quantity<X * Y>`, where X is the unit of the matrix and Y of the vector.
+pub fn unit_matvec<X: Dimension, Y: Dimension>(a: Array<Quantity<X>>, shape_rows: Int, shape_cols: Int, v: Array<Quantity<Y>>) -> Result<Array<Quantity<X * Y>>, String> {
+    if a.length() != shape_rows * shape_cols {
+        return Err("unit_matvec: the matrix data does not match its shape")
+    }
+    if v.length() != shape_cols {
+        return Err("unit_matvec: the vector needs one entry per column of the matrix")
+    }
+    mut out: List<Quantity<X * Y>> = []
+    for i in 0 until shape_rows {
+        mut total = a[0] * v[0] * 0.0
+        for j in 0 until shape_cols {
+            total = total + a[i * shape_cols + j] * v[j]
+        }
+        out.push(total)
+    }
+    Ok(array(out))
+}
