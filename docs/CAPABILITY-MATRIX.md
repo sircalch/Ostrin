@@ -1,6 +1,6 @@
 # Capability matrix: scientific and symbolic capabilities of Ostrin
 
-Branch `horizon/scientific-platform-core`, verified at `cd214885` (compiler sources unchanged since `df851303`); the suite on that state: 40 unit, 6 differential, 467 example tests, none ignored. The browser suites run on WASM rebuilt from those sources: 30 tests (A to F).
+Branch `horizon/scientific-platform-core`, verified at `ca5c93ea` (compiler sources unchanged since `547e01f6`); the suite on that state: 40 unit, 6 differential, 470 example tests, none ignored. The browser suites run on WASM rebuilt from those sources: 30 tests (A to F).
 
 Status terms, used exactly:
 
@@ -141,10 +141,30 @@ These are gaps, not planned claims: none is implemented, and none is claimed.
 
 | Capability | Status | Scope and limit | Verified by |
 |---|---|---|---|
-| Native ownership of closures, fresh values, print and field assignment, checked with AddressSanitizer, LeakSanitizer and UBSan at -O0 and -O1 (GCC 13.3, WSL) | Verified | Eleven ownership programs on three codegen routes: 60 of 66 runs verified; the 6 others are the intentional refusal of an untyped closure parameter (BLOCKED). Evidence: `docs/sanitizer-evidence.md`, rules: `docs/native-ownership.md`. | `ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation`; `scripts/native-sanitize.mjs` |
+| Native ownership: closures, captures, tasks, quantities, lists, arrays, Results and records, checked with AddressSanitizer, LeakSanitizer and UBSan at -O0 and -O1 (GCC 13.3, WSL) | Verified | 25 programs on three codegen routes, 150 runs: 144 VERIFIED (no sanitizer report, zero live allocations, output equal to the interpreter); 6 REJECTED_TYPE (the untyped-parameter refusal, never compiled, so not a memory result). Evidence: `docs/sanitizer-evidence.md`, rules: `docs/native-ownership.md`. | `scripts/native-sanitize.mjs`; `ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation`; `existing_closure_fixtures_agree_on_every_codegen_route_and_leave_no_allocation` |
 | Use-after-free, double free and leak detection in this toolchain | Verified (control) | A negative control with the same flags reports each defect; the fixtures reported none. | `docs/sanitizer-evidence.md` (controls) |
 | Identifiers that are C keywords (`double`, `int`, `struct`) as locals, captures, record fields and functions | Verified | Lexer escape while native output is built; the map is injective. | `own_c_keyword_names` on IR, HIR and AST |
 | Capture by declaration: several bindings named `x` in different scopes, each closure capturing the binding its declaration refers to | Verified | Loops, nested blocks, a shadow inside the same lambda, and a lambda's own `mut x`; checked on the interpreter and on all three native routes. | `capture_declarations` fixture; the ownership test above |
 | Function values that capture other function values and mutable bindings, with parameter types from annotated signatures | Verified | Function values passed to `compose`, with the captured `mut x` read at call time. | `function_value_capture` fixture |
 | Untyped closure parameter holding a function value, on the native backend | Blocked | The interpreter runs it; the native backend cannot infer the type and refuses with an explicit diagnostic. | `untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic` |
 | Clang as a second C compiler | Not tested | Not installed on this machine. | — |
+| Native float text: the interpreter's shortest round-tripping decimal, reproduced by the native formatter | Verified | Every example agrees by text in the differential gate; a byte comparison covers 0.1, 1e150, 1e-7, 4.9e-324, 5.684341886080802e-14. | `compiler/tests/differential.rs`; `linalg_oracle_agrees_in_both_backends_and_leaves_no_allocation` |
+
+## 10. Numerical core and linear algebra (this phase)
+
+| Capability | Status | Scope and limit | Verified by |
+|---|---|---|---|
+| Matrix norms by name: 1, infinity and Frobenius; vector norms 1 and infinity (`std.linalg`) | Verified | Shape checked; the 2-norm of a vector is the built-in `norm`. | `linalg_oracle` (exact rational norms, 61 lines on every route) |
+| Residual of a computed solution, infinity norm (`residual_inf`) | Verified | Square matrices only; reported as a value, not as a proof. | `linalg_oracle` (bound `<=4 n eps (||A|| ||x|| + ||b||)`) |
+| Checked solve (`solve_checked`): LU with partial pivoting, singularity relative to ||A||_inf, residual, relative residual, 1-norm condition estimate, status | Verified | Singular when a pivot is at most n*eps*||A||_inf; status `ill_conditioned` when the 1-norm condition estimate is at least 1e12. Dense, double precision, square only. | `linalg_oracle` (Hilbert 3 to 10, mixed scales, random integer systems, singular and zero matrices, non-square and mismatched inputs) |
+| Condition estimate | Partial | Exact for the computed LU factors (the inverse is formed column by column); not a rigorous bound on the rounding error of x. | `linalg_oracle` (cond1 tolerance 4 n^2 kappa eps kappa) |
+| Unit-preserving dot product and matrix-vector product for arrays of quantities (`unit_dot`, `unit_matvec`) | Verified | Result unit is the product of the operand units; shapes are checked and reported with Result. Matrix is row-major flat data with an explicit shape. | `examples/linalg_regression.ostrin`; `native_round_regressions` (interpreter and native) |
+| `@` (matrix product) on quantity arrays | Not present | The compiler refuses it: `matmul expects Array<Float>`. Use `unit_matvec`. | — |
+| Linear regression through the normal equations (transpose, @, solve_checked) | Verified | Exact quadratic fit recovers 1, 2, 0.5; example `examples/linalg_regression.ostrin`. | `linalg_regression_example_recovers_the_exact_quadratic_on_both_backends` |
+| N-dimensional arrays (rank above 2), strides, non-copying views | Not present | The runtime is dense and row-major; `reshape`, `transpose`, `row` and `col` copy. | — |
+| Broadcasting and axis reductions beyond the existing `std.arrays` | Partial | Existing operations only (see design note 19 section 5.1). | existing examples |
+| Dimension errors for `@` and `reshape` | Partial | Reported at run time with the shapes; not checked statically. | runtime message tests in `examples` |
+| Benchmarks of the new operations against Python (pure and NumPy/BLAS) and Julia (pure and BLAS) | Not tested | Not run in this phase; see the report. | — |
+| BLAS/LAPACK integration inside Ostrin | Not present | No external library is linked or claimed. | — |
+| Contextual inference for unannotated function parameters on the native backends | Blocked | Needs inference variables and a unification layer; see `docs/higher-order-inference.md`. The native compiler refuses such programs with an explicit diagnostic. | `untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic` |
+| Known native leak on the HIR and AST routes: a field of a fresh record used as a method receiver (`f().unwrap().x.to_string()`) | Partial | Measured: 3 allocations on HIR and AST; zero on IR (the default). Not in the linalg examples. | probe recorded in this phase; not yet a test |
