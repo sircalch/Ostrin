@@ -165,3 +165,12 @@ A REJECTED row was never compiled to C, so it says nothing about memory safety. 
 | linalg_oracle | ir -O1 | VERIFIED | 0 |  |
 | linalg_oracle | hir -O1 | VERIFIED | 0 |  |
 | linalg_oracle | ast -O1 | VERIFIED | 0 |  |
+
+## V4 targeted run: residual and linear-algebra programs
+
+Run on commit `d6a69f60` with `node scripts/native-sanitize.mjs --report docs/sanitizer-evidence-v4-linalg.md` over
+the 17 residual fixtures (`compiler/tests/fixtures/ownership/residual/r1..r17`), the four `std.linalg` examples
+(`linalg_oracle`, `linalg_properties`, `linalg_regression`, `linalg_units`) and the four benchmark programs
+(`matmul`, `lu_solve`, `norms`, `solve_checked`). Result: **150 VERIFIED, 0 FAILED**: 25 programs × 3 codegen routes ×
+2 optimisation levels (-O0, -O1), each with zero live allocations and output equal to the interpreter. Full table:
+`docs/sanitizer-evidence-v4-linalg.md`. This is a targeted run, not a repeat of the full ownership set above.

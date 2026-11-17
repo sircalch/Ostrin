@@ -262,3 +262,64 @@ quadratic root text depended on the scale of the residue (now monic).
 
 Not implemented: cubic and higher residues without rational roots (pending), numerical approximation, and multivariate
 equations.
+
+## Scientific Core V4: linear algebra, ownership and benchmark
+
+This section records the V4 phase on `docs/design-34-polished-figures` (commits `0f38af69`, `16249f49`, `d6a69f60`
+and the documentation commit that adds this section). The states follow the terms in `docs/CAPABILITY-MATRIX.md`.
+
+### Ownership: the residual leak (VERIFIED)
+
+`solve_checked(...).unwrap().x.to_string()` read a field of a fresh record through a temporary that was not released on
+every route. The fix is general: a field or element read from a fresh object is taken as an owned value on the IR, HIR
+and AST routes, and the receiver is released after use. The regression set is 17 programs
+(`compiler/tests/fixtures/ownership/residual/r1..r17`): temporary fields, field then method, chained fields, `Result`
+unwrap, stored values, multiple use, a field outliving its temporary, fresh array receivers, fields into lists, and
+`Option` fields. Each agrees on the interpreter and on all three native routes with zero live allocations
+(`ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation`).
+
+Other fixes in the same phase: `ostrin_fmt_double` now prints the shortest round-tripping decimal on the native route
+(the differential gate caught a one-digit difference); C keyword identifiers are escaped; quantity runtime helpers are
+linked when quantity arrays are used.
+
+### std.linalg (VERIFIED for the stated family)
+
+`std.linalg` provides `vector_norm1`, `vector_norm_inf`, `matrix_norm1`, `matrix_norm_inf`, `matrix_norm_frobenius`,
+`residual_inf`, `solve_checked` (returns the `CheckedSolution` record with the solution, residual, relative residual,
+1-norm condition estimate and a status), `unit_dot` and `unit_matvec` for quantity arrays. `solve_checked` equilibrates
+rows and columns by powers of two, refuses non-finite input, and reports singularity relative to ||A||_inf.
+
+Evidence:
+
+- Exact-rational oracle: `scripts/linalg-oracle.mjs --check`, 61 lines in `tests/oracle/linalg-expected.txt`
+  (`linalg_oracle_agrees_in_both_backends_and_leaves_no_allocation`).
+- Property program: `scripts/linalg-properties.mjs --check`, 44 checks with tolerances from rounding bounds
+  (`linalg_properties_agree_in_both_backends_and_leave_no_allocation`).
+- Regression example: an exact quadratic fit recovers 1, 2, 0.5
+  (`linalg_regression_example_recovers_the_exact_quadratic_on_both_backends`).
+- WASM: `scripts/linalg-wasm-check.mjs` runs the real compiler module under `node:wasi`; 6 of 6 checks pass
+  (`docs/linalg-wasm-evidence.json`). This is WASI execution, not a browser run.
+
+Limits: dense `Float64`, square matrices for solve and residual, no BLAS, no N-dimensional arrays, no strides or views.
+The condition estimate is exact for the computed factors and is not a rigorous bound on the error of x.
+
+One gap found by the native type report: a `match` arm that calls `.to_string()` on a quantity array takes the AST
+route. The example was rewritten to `print(f as N)`; the construct itself remains open (PARTIAL).
+
+### Benchmark (VERIFIED with stated limits)
+
+`benchmarks/v2/linalg/compare-linalg.mjs` runs matmul, LU solve and norms at n = 100 and 200 on Ostrin native and
+interpreter, CPython (pure and NumPy), and Julia (pure and OpenBLAS). `solve_checked` is measured for Ostrin only.
+Every sample is checked against `benchmarks/v2/linalg/reference.mjs`; no cell is incomplete. The full method, numbers,
+versions, hardware and limitations are in `benchmarks/v2/linalg/REPORT.md`.
+
+Main finding: Ostrin native is faster than CPython pure in every cell, and it is about 10x slower than OpenBLAS on
+matmul at n = 200 (4.78 ms against 0.48 ms, single-threaded). Julia pure is comparable to Ostrin native. This is a
+measured comparison of single kernels on one machine, not a general claim about speed. The interpreter `lu_solve`
+n = 200 cell has an inconsistent start-up estimate and is reported with that caveat.
+
+### Not verified in this phase
+
+- Browser (Playwright) run of the linalg examples: not run here.
+- MATLAB and Wolfram: not available; no results are included.
+- Benchmarks of residual and fit kernels as separate operations: not measured.
