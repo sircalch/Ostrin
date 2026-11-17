@@ -174,3 +174,16 @@ the 17 residual fixtures (`compiler/tests/fixtures/ownership/residual/r1..r17`),
 (`matmul`, `lu_solve`, `norms`, `solve_checked`). Result: **150 VERIFIED, 0 FAILED**: 25 programs × 3 codegen routes ×
 2 optimisation levels (-O0, -O1), each with zero live allocations and output equal to the interpreter. Full table:
 `docs/sanitizer-evidence-v4-linalg.md`. This is a targeted run, not a repeat of the full ownership set above.
+
+## V4 final: full ownership set and default configuration
+
+- Full ownership set (`compiler/tests/fixtures/ownership/*.ostrin` and `residual/*.ostrin`, 33 programs, three routes,
+  -O0 and -O1, 198 rows): **192 VERIFIED, 0 FAILED, 6 REJECTED_TYPE** (the untyped-parameter refusal, never compiled).
+  Command: `node scripts/native-sanitize.mjs --report docs/sanitizer-evidence-v4-ownership.md compiler/tests/fixtures/ownership/*.ostrin compiler/tests/fixtures/ownership/residual/*.ostrin`.
+  Compiler and toolchain: `ostrinc 0.2.0` built from the V4 final sources; gcc 13.3.0 under WSL Ubuntu-24.04 with
+  `-fsanitize=address,undefined -fno-sanitize-recover=all`.
+- Before the fixes of this phase, the same set gave **2 FAILED**: `r19_early_return_temp_field` on HIR at -O0 and -O1,
+  1 live allocation each. Record: `docs/sanitizer-evidence-v4-ownership-before-fix.md`.
+- Default configuration (`node scripts/native-sanitize.mjs`, which covers the top-level ownership fixtures only, the
+  residual directory is not included by default): see `docs/sanitizer-evidence-v4-default.md`. Its exit status is 1
+  when any row is not VERIFIED, and the 6 intentional REJECTED_TYPE rows are counted in that; they are not failures.

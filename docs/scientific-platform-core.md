@@ -323,3 +323,64 @@ n = 200 cell has an inconsistent start-up estimate and is reported with that cav
 - Browser (Playwright) run of the linalg examples: not run here.
 - MATLAB and Wolfram: not available; no results are included.
 - Benchmarks of residual and fit kernels as separate operations: not measured.
+
+## V4 validation closure
+
+Branch: `horizon/scientific-platform-core`. The earlier sections of this note describe the state before this closure;
+the matrix in `docs/CAPABILITY-MATRIX.md` is the authority for each state.
+
+### Defects found and fixed in this closure (ownership)
+
+- The `solve_checked(...).unwrap().x.to_string()` chain: 3 live allocations on HIR and AST before the V4 fixes, 0 after
+  (reproduced with the compiler at `7ebad3de^` and the current compiler).
+- A fresh `Result` used as a receiver of `is_ok`/`is_err` was not released on HIR; the AST route released it.
+- A fresh `Option` used as a receiver of `is_some`/`is_none` was not released on HIR and AST.
+- `ok()` on a fresh `Result` did not retain its payload nor release the wrapper (HIR and AST).
+- `unwrap_or` on AST retained an owned fallback, which then leaked.
+- An early `return` inside a function that tests a fresh `Result` (`r19`) left one allocation on HIR.
+
+Regression programs: `compiler/tests/fixtures/ownership/residual/r1..r21`, including closures that capture a field of a
+temporary (`r18`), early returns (`r19`), `break` inside a loop with temporaries (`r20`), and the fresh `Result`/`Option`
+method set (`r21`). All run on the interpreter and the three native routes with zero live allocations
+(`ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation`).
+
+### Sanitizers
+
+Full ownership set (33 programs, three routes, -O0 and -O1): 192 VERIFIED, 0 FAILED, 6 REJECTED_TYPE
+(`docs/sanitizer-evidence-v4-ownership.md`). Before the fixes the same set had 2 FAILED
+(`docs/sanitizer-evidence-v4-ownership-before-fix.md`). Default configuration: `docs/sanitizer-evidence-v4-default.md`.
+
+### Rational-equation oracle
+
+The 71 cases are in `tests/oracle/rational-equations-cases.json` (71 entries) and `tests/oracle/rational-equations-expected.txt`
+(71 lines). The nine hand-derived cases (12 to 20) match the hand results in `docs/rational.md` one by one. The oracle
+script uses BigInt arithmetic. The test assertion was 62 cases until commit `0d837243`, when it was updated to 71 after
+`d2035687` added the nine cases.
+
+### `linalg_units`
+
+The example keeps its three operations: `unit_dot` (10 J), `unit_matvec` ([2, 2] N) and the length mismatch error. The
+interpreter and the native build print the same values; the only difference is the line ending (CRLF in native output
+on Windows). The label `force:` was removed to avoid an AST-route construct, so the example's output is less
+descriptive than before. The construct that falls back (`to_string()` on a quantity array inside a `match` arm) is
+still open and is recorded as PARTIAL in the matrix.
+
+### Experiment bundles
+
+`scripts/experiment-bundle-determinism.mjs`: 30 fixtures, each rendered six times (3 repetitions, two independent
+directories, working directory, time zone and locale varied) gives byte-identical output, equal to the committed files.
+Enabling the CI host capture changes five JSON paths, which confirms the check can see environment-dependent fields.
+The local bundle is byte-reproducible; the CI-captured bundle is not, by design.
+
+### Benchmark audit
+
+`benchmarks/v2/linalg/audit-interp-startup.mjs` (12 repetitions, random order, all runs verified): the direct fixed cost
+is 113 ms; the first repetition of a process is about 10 % faster than a steady one, so the start-up intercept is
+INCONCLUSIVE. The steady repetition is about 2.24 s. The per-run figures from the earlier campaigns are reported with
+their range, not as a single value.
+
+### Not done in this closure
+
+- The browser run of the linalg examples (only WASI execution was checked).
+- A fix for `to_string()` on quantity arrays in the AST route.
+- MATLAB and Wolfram: not available.

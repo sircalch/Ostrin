@@ -1,0 +1,404 @@
+{
+  "schema": "ostrin.experiment-determinism/v0",
+  "generated": "2026-11-17T23:13:11.685Z",
+  "node": "v24.19.0",
+  "platform": "win32 10.0.26200 x64",
+  "repetitions": 3,
+  "directories": [
+    "A",
+    "B"
+  ],
+  "environments": [
+    {
+      "TZ": "UTC",
+      "LANG": "C",
+      "LC_ALL": "C"
+    },
+    {
+      "TZ": "Europe/Madrid",
+      "LANG": "es_ES.UTF-8",
+      "LC_ALL": "es_ES.UTF-8"
+    },
+    {
+      "TZ": "America/Los_Angeles",
+      "LANG": "en_US.UTF-8",
+      "LC_ALL": "en_US.UTF-8"
+    }
+  ],
+  "fixtures": [
+    {
+      "fixture": "lines",
+      "bytes": 309500,
+      "sha256": "96e0e9fc66a631a60cbdda2a1d106e060b5da21a986be696047b4fbee3ddae18",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/lines.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "surface",
+      "bytes": 570132,
+      "sha256": "c53ded3ad2003699c50ef232b35dc32ebd9e35336892fcdbdd945bde33804306",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/surface.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "heatmap",
+      "bytes": 466804,
+      "sha256": "615e1ef16b55d3221209a52cfc12a38f15ea22efed5d153585c55d8a2d711d48",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/heatmap.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "contourf",
+      "bytes": 737446,
+      "sha256": "71920eb13fb15d49d046f100bd5bb6dfdc9e6b81e6eff1466c1c8db13f649ec4",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/contourf.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "quiver",
+      "bytes": 302700,
+      "sha256": "4dfdd2b255cbc8bc1dcf505d1e8c87fd959f709aadee8b8975c5fdd2f97d796b",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/quiver.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "streamplot",
+      "bytes": 303866,
+      "sha256": "1e6c9f048961a4f088ad63e9575eff4e94ef192acfc4716fa9ee4c102fc614d7",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/streamplot.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "provenance",
+      "bytes": 236875,
+      "sha256": "c01bc82a5d997d4ef3cdac88d0a60acf0da532d2e2e4392353bd6dea8e8010f8",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/provenance.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "lorenz",
+      "bytes": 299156,
+      "sha256": "9d21c1e790df46d24f3aee2ec174ca39edf37c2c4445755b393617de824b91a8",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/lorenz.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "histogram",
+      "bytes": 308229,
+      "sha256": "44449cbfadbf9826d1d96d5928cf200a07178eca58a086666a4c30a35ddba00a",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/histogram.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "boxplot",
+      "bytes": 298958,
+      "sha256": "00bcf02abf28a1ef9724fb70688a1dbc9d425fb4a38f40327aace938970daef2",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/boxplot.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "violin",
+      "bytes": 301606,
+      "sha256": "a25e2386c27a9fe9b09fb536f4b4c8d3e4bb9b5ffdb9fa18341f540ed9b420c3",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/violin.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "hexbin",
+      "bytes": 359747,
+      "sha256": "ecd60782fe17275811bafb23d1a09f221e79635c90e37dacf3d462768d86914c",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/hexbin.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "point-cloud",
+      "bytes": 341876,
+      "sha256": "b11e563041cc16b1e14716aae8ea54ca6e84bbaca9667c294421e60a7d2a9a9f",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/point-cloud.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "vector-field",
+      "bytes": 241559,
+      "sha256": "0520217c7d49efe8a0c5c0dd5884a2b18aeccbe34e4d51a335082f1a63c893f7",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/vector-field.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "volume-slices",
+      "bytes": 389798,
+      "sha256": "996aec3d5ea4cacc9c036c142e6bdd9c025841277367d1a1bd2643715809dfe0",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/volume-slices.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "isosurface",
+      "bytes": 1133218,
+      "sha256": "8000ec5fd531dc0ded611144dbec8a3c5e58aa21c5934387ea9f7d89dd143922",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/isosurface.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "scatter-fit",
+      "bytes": 305411,
+      "sha256": "821db6c89cbf356f2313beed11c039612615b22cc37897431c50c5b99f8e5242",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/scatter-fit.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "pendulum-calibration",
+      "bytes": 556193,
+      "sha256": "41ba26a63623c8e9110a1bd381898702e2479e86f39dc6ec8d361c6454446561",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/pendulum-calibration.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "units",
+      "bytes": 236703,
+      "sha256": "2e945b8e4cb25eaee255e3cc31d959472afd64415ff7860f3352b651d1f65dcc",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/units.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "bars",
+      "bytes": 488051,
+      "sha256": "3913008cebb563e623b7a36626459192eeff7de29940b96d6b9e4c4c18f0f344",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/bars.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "ode",
+      "bytes": 338438,
+      "sha256": "a460b079fcc8eebf3115feec765e3b6a24f9ea9b1e0d4bf19e8a802825d79452",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/ode.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "fft",
+      "bytes": 399615,
+      "sha256": "6f79771d9c3588dabe4cd0a388c1277c4fddc5752c65f7423f89f08d18c4c6ef",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/fft.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "spline",
+      "bytes": 322296,
+      "sha256": "d31c35bdb5dfef29c993ae76f16bf744b777a88a8381de716c84b67c04e20fe5",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/spline.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "double-pendulum",
+      "bytes": 384674,
+      "sha256": "a050f761f93b5b3999f5824d6e06e6904638728a844d59c939c45bfde603f153",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/double-pendulum.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "orbits",
+      "bytes": 416379,
+      "sha256": "6def5733994fba3029480e15a83cde0b096b8e35a21cb59b5f69edf6adf0fd8b",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/orbits.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "string",
+      "bytes": 351523,
+      "sha256": "9194fdd8a37a057c40b00741949b42158f62ac95bea3d74e18c7ea96f957d8fd",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/string.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "animation",
+      "bytes": 523314,
+      "sha256": "1bdd4af6080f0b0bb2c8b4c719aa0c721c7dbbe873ea1193fa49af57b59fee2a",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/animation.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "table",
+      "bytes": 235450,
+      "sha256": "f70b5dcfc79df2271df781fa0b9fbd163c82020e0507307971e08167bfeb6228",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/table.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "linked-data",
+      "bytes": 249272,
+      "sha256": "37c3b44118c22e0c8a4dee04a47a0e43665a9917a8a11a12d850682b1d7df630",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/linked-data.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    },
+    {
+      "fixture": "dashboard",
+      "bytes": 563826,
+      "sha256": "57cdbf41de45cebfcbefade453a765fbde239b6e2c817ba890bc362f3efb542f",
+      "outputs": 6,
+      "distinctHashes": 1,
+      "byteIdentical": true,
+      "committedPath": "website/assets/experiments/dashboard.ostrin-experiment.json",
+      "committedMatches": true,
+      "differences": []
+    }
+  ],
+  "control": {
+    "fixture": "lines",
+    "switch": "OSTRIN_CAPTURE_HOST=1 (set by the CI workflow; embeds runner identity, hardware and node version)",
+    "differs": true,
+    "differingPaths": 5,
+    "examples": [
+      {
+        "path": "files.provenance.json",
+        "a": "{\"schema\":\"ostrin.provenance/v0\",\"level\":\"R2\",\"reproducibility\":{\"level\":\"R2\",\"l",
+        "b": "{\"schema\":\"ostrin.provenance/v0\",\"level\":\"R2\",\"reproducibility\":{\"level\":\"R2\",\"l",
+        "class": "scientific or serialisation content"
+      },
+      {
+        "path": "manifest.files.2.bytes",
+        "a": "93725",
+        "b": "94250",
+        "class": "scientific or serialisation content"
+      },
+      {
+        "path": "manifest.files.2.sha256",
+        "a": "sha256:1a0f0363bc0e4c4bd0f16cdde05b2dab45a96cbe7de6b995ecbfe2b75753a428",
+        "b": "sha256:9a00baab080d6515328a167dd771b939d29417b8c9b6d265573e60cc293e79d3",
+        "class": "scientific or serialisation content"
+      },
+      {
+        "path": "provenance.runtime.host",
+        "a": "undefined",
+        "b": "{\"schema\":\"ostrin.host/v1\",\"source\":\"github-actions\",\"ci_run\":{\"schema\":\"ostrin.",
+        "class": "environment metadata"
+      },
+      {
+        "path": "provenance.runtime.missing.0",
+        "a": "\"captured host and hardware metadata\"",
+        "b": "undefined",
+        "class": "scientific or serialisation content"
+      }
+    ]
+  },
+  "summary": {
+    "fixtures": 30,
+    "allByteIdentical": true,
+    "allCommittedMatch": true,
+    "controlDetectsEnvironment": true
+  }
+}
