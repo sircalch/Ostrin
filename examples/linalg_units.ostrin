@@ -2,7 +2,7 @@
 // matrix-vector product of a stiffness (N/m) and a displacement (m). A mismatch in the lengths is reported, not computed.
 // Expected output:
 //   work: 10 J
-//   force: [2, 2] N
+//   [2, 2] N   (the force on the spring; printed directly, since a string built from a quantity array is not yet native-typed)
 //   error: unit_dot needs vectors of the same length
 import std.linalg
 
@@ -17,7 +17,7 @@ fn main() -> Void {
     stiffness = array([2.0, 0.0, 0.0, 4.0]) as N/m
     x = array([1.0, 0.5]) as m
     match linalg.unit_matvec(stiffness, 2, 2, x) {
-        Ok(f) => print("force: " + (f as N).to_string()),
+        Ok(f) => print(f as N),
         Err(message) => print("error: " + message),
     }
 

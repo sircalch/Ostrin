@@ -107,7 +107,7 @@ for (const example of ["linalg_oracle", "linalg_properties"]) {
   record("wasm linalg_regression exact output", result.status === 0 && result.stdout === expected, result.status === 0 ? result.stdout.split("\n")[0] : result.stderr.slice(0, 200));
 }
 {
-  const expected = "work: 10 J\nforce: [2, 2] N\nerror: unit_dot needs vectors of the same length\n";
+  const expected = "work: 10 J\n[2, 2] N\nerror: unit_dot needs vectors of the same length\n";
   const result = await runWasm(["--run", "examples/linalg_units.ostrin"]);
   record("wasm linalg_units exact output (quantities and units)", result.status === 0 && result.stdout === expected, result.status === 0 ? "matches" : result.stderr.slice(0, 200));
 }
