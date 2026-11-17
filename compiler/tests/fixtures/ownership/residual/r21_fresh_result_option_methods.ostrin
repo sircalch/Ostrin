@@ -1,0 +1,23 @@
+record Box {
+    tag: String
+}
+
+fn make(ok: Bool) -> Result<Box, String> {
+    if ok {
+        Ok(Box { tag: "early" })
+    } else {
+        Err("refused")
+    }
+}
+
+fn main() -> Void {
+    print(make(true).ok().is_some())
+    print(make(false).ok().is_none())
+    print(make(true).ok().unwrap().tag)
+    print(make(false).ok().unwrap_or(Box { tag: "fallback" }).tag)
+    print(make(true).ok().unwrap_or(Box { tag: "fallback" }).tag)
+    print(make(false).ok().ok_or("missing").is_err())
+    print(make(false).is_err())
+    print(make(true).is_ok())
+    print(make(false).unwrap_or(Box { tag: "fallback" }).tag)
+}

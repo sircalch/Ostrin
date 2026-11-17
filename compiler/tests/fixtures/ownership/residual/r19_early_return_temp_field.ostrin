@@ -1,0 +1,23 @@
+record Box {
+    tag: String
+}
+
+fn make(ok: Bool) -> Result<Box, String> {
+    if ok {
+        Ok(Box { tag: "early" })
+    } else {
+        Err("refused")
+    }
+}
+
+fn label(ok: Bool) -> String {
+    if make(ok).is_ok() == false {
+        return "none"
+    }
+    return make(ok).unwrap().tag
+}
+
+fn main() -> Void {
+    print(label(false))
+    print(label(true))
+}

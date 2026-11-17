@@ -1,0 +1,14 @@
+record Box {
+    tag: String
+}
+
+fn make(label: String) -> Box {
+    Box { tag: label }
+}
+
+fn main() -> Void {
+    prefix = "closure "
+    show = fn() { prefix + make("captured").tag }
+    print(show())
+    print(show())
+}

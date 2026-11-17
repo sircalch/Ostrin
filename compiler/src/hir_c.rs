@@ -1863,8 +1863,16 @@ impl Emitter<'_> {
         let recv_code = self.expr(recv)?;
         let temp = self.next_temp();
         match method {
-            "is_some" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.has; }})")),
-            "is_none" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; !{temp}.has; }})")),
+            // A boolean answer keeps no part of the receiver, so a fresh receiver is released after it is read.
+            "is_some" | "is_none" if args.is_empty() && e.ty == Ty::Bool => {
+                let release = if Self::borrowed_expr(recv) {
+                    String::new()
+                } else {
+                    self.release_managed_value(&temp, &recv.ty).map(|r| format!("{r}; ")).unwrap_or_default()
+                };
+                let answer = if method == "is_some" { format!("{temp}.has") } else { format!("!{temp}.has") };
+                Ok(format!("({{ {rc} {temp} = {recv_code}; bool __is = {answer}; {release}__is; }})"))
+            }
             "unwrap" if args.is_empty() && e.ty == inner => self.unwrap_payload(recv, e, &recv_code, &rc, &temp, "has", "unwrap on None"),
             "unwrap_or" if args.len() == 1 && e.ty == inner && args[0].value.ty == inner => {
                 let fallback = self.expr(&args[0].value)?;
@@ -1899,8 +1907,16 @@ impl Emitter<'_> {
         let recv_code = self.expr(recv)?;
         let temp = self.next_temp();
         match method {
-            "is_ok" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.ok; }})")),
-            "is_err" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; !{temp}.ok; }})")),
+            // A boolean answer keeps no part of the receiver, so a fresh receiver is released after it is read.
+            "is_ok" | "is_err" if args.is_empty() && e.ty == Ty::Bool => {
+                let release = if Self::borrowed_expr(recv) {
+                    String::new()
+                } else {
+                    self.release_managed_value(&temp, &recv.ty).map(|r| format!("{r}; ")).unwrap_or_default()
+                };
+                let answer = if method == "is_ok" { format!("{temp}.ok") } else { format!("!{temp}.ok") };
+                Ok(format!("({{ {rc} {temp} = {recv_code}; bool __is = {answer}; {release}__is; }})"))
+            }
             "unwrap" if args.is_empty() && e.ty == ok => self.unwrap_payload(recv, e, &recv_code, &rc, &temp, "ok", "unwrap on Err"),
             "unwrap_or" if args.len() == 1 && e.ty == ok && args[0].value.ty == ok => {
                 let fallback = self.expr(&args[0].value)?;
@@ -1912,7 +1928,11 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 let option_c = self.c_type(&option)?;
-                Ok(format!("({{ {rc} {temp} = {recv_code}; {option_c} __hir_o; memset(&__hir_o, 0, sizeof __hir_o); if ({temp}.ok) {{ __hir_o.has = true; __hir_o.value = {temp}.value; }} __hir_o; }})"))
+                // A fresh receiver: the option takes a reference of its own, then the wrapper is released.
+                let fresh = !Self::borrowed_expr(recv);
+                let keep = if fresh { self.retain_managed_value("__hir_o.value", &ok).map(|r| format!("{r}; ")).unwrap_or_default() } else { String::new() };
+                let drop_receiver = if fresh { self.release_managed_value(&temp, &recv.ty).map(|r| format!("{r}; ")).unwrap_or_default() } else { String::new() };
+                Ok(format!("({{ {rc} {temp} = {recv_code}; {option_c} __hir_o; memset(&__hir_o, 0, sizeof __hir_o); if ({temp}.ok) {{ __hir_o.has = true; __hir_o.value = {temp}.value; {keep}}} {drop_receiver}__hir_o; }})"))
             }
             _ => Err(()),
         }

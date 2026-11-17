@@ -21454,6 +21454,10 @@ fn ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation() {
             "residual/r7_field_outlives_temp.ostrin",
             "residual/r8_solve_chain.ostrin",
             "residual/r9_fresh_array_receiver.ostrin",
+            "residual/r18_closure_captures_temp_field.ostrin",
+            "residual/r19_early_return_temp_field.ostrin",
+            "residual/r20_loop_temp_field_break.ostrin",
+            "residual/r21_fresh_result_option_methods.ostrin",
     ];
     let routes: [(&str, &[(&str, &str)]); 3] = [
         ("ir", &[]),

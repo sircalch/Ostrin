@@ -8336,9 +8336,16 @@ impl<'a> Codegen<'a> {
                         }
                         let d = self.coerce(&arg_codes[0], &arg_types[0], &ok)?;
                         let _ = err;
-                        let keep = keep_payload("__payload");
+                        // The payload is retained only when it is shared with storage that outlives this expression: the
+                        // receiver's payload when the receiver is fresh is released with it, and an owned fallback passes through.
+                        let fallback_owned = matches!(args.first(), Some(Arg::Positional(e)) if owned_call_argument(e, &ok));
+                        let keep_ok = keep_payload("__payload");
+                        let keep_fallback = retain_managed_value("__payload", &ok)
+                            .filter(|_| !fallback_owned)
+                            .map(|r| format!("{r}; "))
+                            .unwrap_or_default();
                         Ok((
-                            format!("({{ {rc} {temp} = {obj_code}; {} __payload = {temp}.ok ? {temp}.value : ({d}); {keep}{drop_receiver}__payload; }})", c_type_name(&ok)),
+                            format!("({{ {rc} {temp} = {obj_code}; {} __payload = {temp}.ok ? {temp}.value : ({d}); if ({temp}.ok) {{ {keep_ok}}} else {{ {keep_fallback}}} {drop_receiver}__payload; }})", c_type_name(&ok)),
                             ok,
                         ))
                     }
@@ -8346,7 +8353,9 @@ impl<'a> Codegen<'a> {
                         let opt = CType::Option(Box::new(ok.clone()));
                         self.register_list_types(&opt);
                         let oc = c_type_name(&opt);
-                        Ok((format!("({{ {rc} {temp} = {obj_code}; {oc} __r; memset(&__r, 0, sizeof __r); if ({temp}.ok) {{ __r.has = true; __r.value = {temp}.value; }} __r; }})"), opt))
+                        // A fresh receiver gives the option a reference of its own, then its wrapper is released.
+                        let keep = keep_payload("__r.value");
+                        Ok((format!("({{ {rc} {temp} = {obj_code}; {oc} __r; memset(&__r, 0, sizeof __r); if ({temp}.ok) {{ __r.has = true; __r.value = {temp}.value; {keep}}} {drop_receiver}__r; }})"), opt))
                     }
                     other => Err(format!("Result has no method '{other}' the native backend supports yet")),
                 }
@@ -8356,19 +8365,43 @@ impl<'a> Codegen<'a> {
                 let (arg_codes, arg_types) = self.gen_args(args)?;
                 let temp = self.next_temp();
                 let oc = c_type_name(&obj_ty);
+                // A fresh receiver is released by this expression; a payload it returns keeps a reference of its own.
+                let fresh = owned_call_argument(obj, &obj_ty);
+                let drop_receiver = match release_owned_managed_value(&temp, &obj_ty).filter(|_| fresh) {
+                    Some(release) => format!("{release}; "),
+                    None => String::new(),
+                };
+                let keep_payload = |access: &str| match retain_managed_value(access, &inner).filter(|_| fresh) {
+                    Some(retain) => format!("{retain}; "),
+                    None => String::new(),
+                };
+                let inner_c = c_type_name(&inner);
                 match method_name {
-                    "is_some" => Ok((format!("({{ {oc} {temp} = {obj_code}; {temp}.has; }})"), CType::Bool)),
-                    "is_none" => Ok((format!("({{ {oc} {temp} = {obj_code}; !{temp}.has; }})"), CType::Bool)),
-                    "unwrap" => Ok((
-                        format!("({{ {oc} {temp} = {obj_code}; if (!{temp}.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} {temp}.value; }})"),
-                        inner,
-                    )),
+                    "is_some" => Ok((format!("({{ {oc} {temp} = {obj_code}; bool __is = {temp}.has; {drop_receiver}__is; }})"), CType::Bool)),
+                    "is_none" => Ok((format!("({{ {oc} {temp} = {obj_code}; bool __is = !{temp}.has; {drop_receiver}__is; }})"), CType::Bool)),
+                    "unwrap" => {
+                        let keep = keep_payload("__payload");
+                        Ok((
+                            format!("({{ {oc} {temp} = {obj_code}; if (!{temp}.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} {inner_c} __payload = {temp}.value; {keep}{drop_receiver}__payload; }})"),
+                            inner,
+                        ))
+                    }
                     "unwrap_or" => {
                         if arg_codes.len() != 1 {
                             return Err("'unwrap_or' expects one argument".to_string());
                         }
                         let d = self.coerce(&arg_codes[0], &arg_types[0], &inner)?;
-                        Ok((format!("({{ {oc} {temp} = {obj_code}; {temp}.has ? {temp}.value : ({d}); }})"), inner))
+                        // Same rule as Result::unwrap_or: a shared payload is retained, an owned fallback passes through.
+                        let fallback_owned = matches!(args.first(), Some(Arg::Positional(e)) if owned_call_argument(e, &inner));
+                        let keep_some = keep_payload("__payload");
+                        let keep_fallback = retain_managed_value("__payload", &inner)
+                            .filter(|_| !fallback_owned)
+                            .map(|r| format!("{r}; "))
+                            .unwrap_or_default();
+                        Ok((
+                            format!("({{ {oc} {temp} = {obj_code}; {inner_c} __payload = {temp}.has ? {temp}.value : ({d}); if ({temp}.has) {{ {keep_some}}} else {{ {keep_fallback}}} {drop_receiver}__payload; }})"),
+                            inner,
+                        ))
                     }
                     "ok_or" => {
                         if arg_codes.len() != 1 {
