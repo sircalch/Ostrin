@@ -48,45 +48,9 @@ async function runWasm(args) {
   return result;
 }
 
-// ---------------------------------------------------------------- token rules (the oracle header)
+// ---------------------------------------------------------------- token rules (shared with the browser test)
 
-const oracleTokenMatches = (expected, actual) => {
-  if (expected.startsWith("<=")) {
-    const bound = Number(expected.slice(2));
-    const x = Number(actual);
-    return actual !== "" && Number.isFinite(x) && x <= bound;
-  }
-  if (expected.includes("|")) {
-    const [left, right] = expected.split("|");
-    const value = Number(left);
-    const tolerance = Number(right);
-    if (left !== "" && right !== "" && Number.isFinite(value) && Number.isFinite(tolerance)) {
-      const x = Number(actual);
-      return actual !== "" && Number.isFinite(x) && Math.abs(x - value) <= tolerance;
-    }
-    return actual === left || actual === right;
-  }
-  return expected === actual;
-};
-
-function compareLines(actualText, expectedText) {
-  const actual = actualText.split("\n").filter((line) => line !== "");
-  const expected = expectedText.split("\n").filter((line) => line !== "");
-  if (actual.length !== expected.length) {
-    return { ok: false, lines: expected.length, failure: `line count ${actual.length} vs ${expected.length}` };
-  }
-  for (let index = 0; index < expected.length; index += 1) {
-    const got = actual[index].split(" ");
-    const want = expected[index].split(" ");
-    if (got.length !== want.length) return { ok: false, lines: expected.length, failure: `line ${index}: token count` };
-    for (let t = 0; t < want.length; t += 1) {
-      if (!oracleTokenMatches(want[t], got[t])) {
-        return { ok: false, lines: expected.length, failure: `line ${index}: token ${JSON.stringify(got[t])} does not match ${JSON.stringify(want[t])}` };
-      }
-    }
-  }
-  return { ok: true, lines: expected.length };
-}
+import { compareLines } from "./oracle-tokens.mjs";
 
 // ---------------------------------------------------------------- checks
 
@@ -107,7 +71,7 @@ for (const example of ["linalg_oracle", "linalg_properties"]) {
   record("wasm linalg_regression exact output", result.status === 0 && result.stdout === expected, result.status === 0 ? result.stdout.split("\n")[0] : result.stderr.slice(0, 200));
 }
 {
-  const expected = "work: 10 J\n[2, 2] N\nerror: unit_dot needs vectors of the same length\n";
+  const expected = "work: 10 J\nforce:\n[2, 2] N\nerror: unit_dot needs vectors of the same length\n";
   const result = await runWasm(["--run", "examples/linalg_units.ostrin"]);
   record("wasm linalg_units exact output (quantities and units)", result.status === 0 && result.stdout === expected, result.status === 0 ? "matches" : result.stderr.slice(0, 200));
 }
