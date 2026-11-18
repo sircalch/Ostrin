@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.experiment-determinism/v0",
-  "generated": "2026-11-17T23:58:07.505Z",
+  "generated": "2026-11-18T04:26:39.303Z",
   "node": "v24.19.0",
   "platform": "win32 10.0.26200 x64",
   "repetitions": 3,
@@ -29,7 +29,7 @@
     {
       "fixture": "lines",
       "bytes": 309500,
-      "sha256": "96e0e9fc66a631a60cbdda2a1d106e060b5da21a986be696047b4fbee3ddae18",
+      "sha256": "fe1a273f21c7758c371c7c6b5ff5e76f3ce6c65ef05138c7eeee347754458075",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -40,7 +40,7 @@
     {
       "fixture": "surface",
       "bytes": 570132,
-      "sha256": "c53ded3ad2003699c50ef232b35dc32ebd9e35336892fcdbdd945bde33804306",
+      "sha256": "5f310b8cb1cb96e7bb95366895c27bbcea59a4c1059371246b52a8c29a36182a",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -51,7 +51,7 @@
     {
       "fixture": "heatmap",
       "bytes": 466804,
-      "sha256": "615e1ef16b55d3221209a52cfc12a38f15ea22efed5d153585c55d8a2d711d48",
+      "sha256": "39b975de2f6660d788b89f03062c8c59df6ce4bb242ac8bfd3ff595e88119ebf",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -62,7 +62,7 @@
     {
       "fixture": "contourf",
       "bytes": 737446,
-      "sha256": "71920eb13fb15d49d046f100bd5bb6dfdc9e6b81e6eff1466c1c8db13f649ec4",
+      "sha256": "9ede46b89f2859c637f410d048b4bf853b2dbe1e518577fdc0e1877e3d62bf12",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -73,7 +73,7 @@
     {
       "fixture": "quiver",
       "bytes": 302700,
-      "sha256": "4dfdd2b255cbc8bc1dcf505d1e8c87fd959f709aadee8b8975c5fdd2f97d796b",
+      "sha256": "365a9543c74bb4e72ff4bbc79b391daa516b6711838278396eb39570f7611763",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -84,7 +84,7 @@
     {
       "fixture": "streamplot",
       "bytes": 303866,
-      "sha256": "1e6c9f048961a4f088ad63e9575eff4e94ef192acfc4716fa9ee4c102fc614d7",
+      "sha256": "ef2a31e0b0adddb2f08b6da942fb7ab7e20a96355b239c7e0c116d76865d7132",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -95,7 +95,7 @@
     {
       "fixture": "provenance",
       "bytes": 236875,
-      "sha256": "c01bc82a5d997d4ef3cdac88d0a60acf0da532d2e2e4392353bd6dea8e8010f8",
+      "sha256": "3edc22c4cb33980fffbb9f336747a2edb7224f5f3d15891ae926ed1ec517eea2",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -106,7 +106,7 @@
     {
       "fixture": "lorenz",
       "bytes": 299156,
-      "sha256": "9d21c1e790df46d24f3aee2ec174ca39edf37c2c4445755b393617de824b91a8",
+      "sha256": "c5413c864af8a4c49a829016e196fc8a3d9fc55a8faf349a74e39ddb5ff2d84d",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -117,7 +117,7 @@
     {
       "fixture": "histogram",
       "bytes": 308229,
-      "sha256": "44449cbfadbf9826d1d96d5928cf200a07178eca58a086666a4c30a35ddba00a",
+      "sha256": "13f0c9b8ce7cdc1f8f7223fab609cfa5c22062ad288b1e0d77144fe35028ea72",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -128,7 +128,7 @@
     {
       "fixture": "boxplot",
       "bytes": 298958,
-      "sha256": "00bcf02abf28a1ef9724fb70688a1dbc9d425fb4a38f40327aace938970daef2",
+      "sha256": "8428a2b41c1fda6d9a374adf3fe75adbae12d875121f88593e5109f19454a76f",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -139,7 +139,7 @@
     {
       "fixture": "violin",
       "bytes": 301606,
-      "sha256": "a25e2386c27a9fe9b09fb536f4b4c8d3e4bb9b5ffdb9fa18341f540ed9b420c3",
+      "sha256": "7c58a89426f700f98771ae065496596e48f80616610d9036b0a7b1bddd962fe4",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -150,7 +150,7 @@
     {
       "fixture": "hexbin",
       "bytes": 359747,
-      "sha256": "ecd60782fe17275811bafb23d1a09f221e79635c90e37dacf3d462768d86914c",
+      "sha256": "f5111c24c6a4b1beb18da56d5c8ff6295b60312e02acc6a2d81418c19a60c75f",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -161,7 +161,7 @@
     {
       "fixture": "point-cloud",
       "bytes": 341876,
-      "sha256": "b11e563041cc16b1e14716aae8ea54ca6e84bbaca9667c294421e60a7d2a9a9f",
+      "sha256": "24a4e6321cba004e90898c6a5d7ec6f84df21f2437761cecc140f249f0eae6a4",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -172,7 +172,7 @@
     {
       "fixture": "vector-field",
       "bytes": 241559,
-      "sha256": "0520217c7d49efe8a0c5c0dd5884a2b18aeccbe34e4d51a335082f1a63c893f7",
+      "sha256": "a51d0105723cb3429f7ac51dfde6c6e8aa1d8554e7dc6cc725d4c9e381c97884",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -183,7 +183,7 @@
     {
       "fixture": "volume-slices",
       "bytes": 389798,
-      "sha256": "996aec3d5ea4cacc9c036c142e6bdd9c025841277367d1a1bd2643715809dfe0",
+      "sha256": "4e7c12ec618bf08090e74692e6a93e11631b8a61a2ba5e9c96e34ecda039db7e",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -194,7 +194,7 @@
     {
       "fixture": "isosurface",
       "bytes": 1133218,
-      "sha256": "8000ec5fd531dc0ded611144dbec8a3c5e58aa21c5934387ea9f7d89dd143922",
+      "sha256": "24d0bffd31bd863d9c2389f86c558c5ba3c45f0694d65b4eae6e1b97d498d8d6",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -205,7 +205,7 @@
     {
       "fixture": "scatter-fit",
       "bytes": 305411,
-      "sha256": "821db6c89cbf356f2313beed11c039612615b22cc37897431c50c5b99f8e5242",
+      "sha256": "4cb9840e9f8c9fe996e54f65cd9ad5c08fbc5eeb9847b2444fa2798072c508c9",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -216,7 +216,7 @@
     {
       "fixture": "pendulum-calibration",
       "bytes": 556193,
-      "sha256": "41ba26a63623c8e9110a1bd381898702e2479e86f39dc6ec8d361c6454446561",
+      "sha256": "4c0929c34d05a1272076e83ba26578f39fb0dc9868a4ec16d0746930f2ab048e",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -227,7 +227,7 @@
     {
       "fixture": "units",
       "bytes": 236703,
-      "sha256": "2e945b8e4cb25eaee255e3cc31d959472afd64415ff7860f3352b651d1f65dcc",
+      "sha256": "e8fdd79d3b8b029bf759d4c98ff78a2c6df4bf03f377a556496341f75991212a",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -238,7 +238,7 @@
     {
       "fixture": "bars",
       "bytes": 488051,
-      "sha256": "3913008cebb563e623b7a36626459192eeff7de29940b96d6b9e4c4c18f0f344",
+      "sha256": "434e6e7bcdad98bbf101b5c12e50fd3769ca79f8d57ff1089c2138903877d1a4",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -249,7 +249,7 @@
     {
       "fixture": "ode",
       "bytes": 338438,
-      "sha256": "a460b079fcc8eebf3115feec765e3b6a24f9ea9b1e0d4bf19e8a802825d79452",
+      "sha256": "1ca2ada8ab441e333b5661151d69615bd896fea3f429480f8f536b273c1b0358",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -260,7 +260,7 @@
     {
       "fixture": "fft",
       "bytes": 399615,
-      "sha256": "6f79771d9c3588dabe4cd0a388c1277c4fddc5752c65f7423f89f08d18c4c6ef",
+      "sha256": "6b2740390117de8fc0bdab14a8ee66e9e04d4d510c633cb3b8ab4c1688f13989",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -271,7 +271,7 @@
     {
       "fixture": "spline",
       "bytes": 322296,
-      "sha256": "d31c35bdb5dfef29c993ae76f16bf744b777a88a8381de716c84b67c04e20fe5",
+      "sha256": "ea7a84e74750f72c1f57b7a4e0de26216beaf80e760932038d81b57905414606",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -282,7 +282,7 @@
     {
       "fixture": "double-pendulum",
       "bytes": 384674,
-      "sha256": "a050f761f93b5b3999f5824d6e06e6904638728a844d59c939c45bfde603f153",
+      "sha256": "271288b764f4ffc0d6f19942520bd81754568310d24b18ade99fbc977a56c074",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -293,7 +293,7 @@
     {
       "fixture": "orbits",
       "bytes": 416379,
-      "sha256": "6def5733994fba3029480e15a83cde0b096b8e35a21cb59b5f69edf6adf0fd8b",
+      "sha256": "0f3ff94adb1b0077af28d2369976ce7871bc03d4166a4bdcf22a0390b1d83c65",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -304,7 +304,7 @@
     {
       "fixture": "string",
       "bytes": 351523,
-      "sha256": "9194fdd8a37a057c40b00741949b42158f62ac95bea3d74e18c7ea96f957d8fd",
+      "sha256": "37ea7aaa1fffbe95c39ee643da24a2b9ade9908f751b99b97b670e8669cd5d50",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -315,7 +315,7 @@
     {
       "fixture": "animation",
       "bytes": 523314,
-      "sha256": "1bdd4af6080f0b0bb2c8b4c719aa0c721c7dbbe873ea1193fa49af57b59fee2a",
+      "sha256": "af1948820316f44c2ee40da1442d7469fd78cd4478f3dec73df6a3a5ef45813a",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -326,7 +326,7 @@
     {
       "fixture": "table",
       "bytes": 235450,
-      "sha256": "f70b5dcfc79df2271df781fa0b9fbd163c82020e0507307971e08167bfeb6228",
+      "sha256": "77f9c4db369ffd4787f001ae8328ddd41b1a4993c7420378444f1dce55f5862f",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -337,7 +337,7 @@
     {
       "fixture": "linked-data",
       "bytes": 249272,
-      "sha256": "37c3b44118c22e0c8a4dee04a47a0e43665a9917a8a11a12d850682b1d7df630",
+      "sha256": "9ff5267bc5541cd84f68c2e91bb9ecd635eec4b428c84d525015ec043858a7d0",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -348,7 +348,7 @@
     {
       "fixture": "dashboard",
       "bytes": 563826,
-      "sha256": "57cdbf41de45cebfcbefade453a765fbde239b6e2c817ba890bc362f3efb542f",
+      "sha256": "4ce21732144971b7fbd8be32793fef6749e47c14f9bf9e3e04f9df86f16fd20b",
       "outputs": 6,
       "distinctHashes": 1,
       "byteIdentical": true,
@@ -390,8 +390,8 @@
       },
       {
         "path": "manifest.files.2.sha256",
-        "a": "sha256:1a0f0363bc0e4c4bd0f16cdde05b2dab45a96cbe7de6b995ecbfe2b75753a428",
-        "b": "sha256:9a00baab080d6515328a167dd771b939d29417b8c9b6d265573e60cc293e79d3",
+        "a": "sha256:ae706c2fc22a0be715858160e8d69022f04f90353323611dcf54a84824d98eb0",
+        "b": "sha256:80b23cb94616fee5b960810acc132c025e5881d07dc1bb348620f5f011fad61b",
         "class": "provenance file and its manifest entry"
       },
       {
