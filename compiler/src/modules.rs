@@ -247,8 +247,12 @@ fn load_module_file(
             1,
             1,
             format!(
-                "could not read module '{}' ({}): {e}",
-                module_path.join("."),
+                "could not read {} ({}): {e}",
+                if module_path.is_empty() {
+                    "the main source file".to_string()
+                } else {
+                    format!("module '{}'", module_path.join("."))
+                },
                 file_path.display()
             ),
         )

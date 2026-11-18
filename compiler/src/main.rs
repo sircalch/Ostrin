@@ -1049,6 +1049,9 @@ fn run_codegen(
         // to these helpers, so WASI programs that use task cancellation must
         // link it explicitly.
         command.arg("-lsetjmp");
+        // The generated float printer calls strtold, which wasi-libc only provides with this
+        // library: without it the program traps at run time ("long double formatting is disabled").
+        command.arg("-lc-printscan-long-double");
         if let Ok(sysroot) = env::var("OSTRIN_WASI_SYSROOT") {
             command.arg(format!("--sysroot={sysroot}"));
         }
