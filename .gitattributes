@@ -1,0 +1,9 @@
+# Files that scripts compare byte for byte (notebook staleness, experiment bundles, data
+# fixtures and figures). Their committed form is LF. On Windows with core.autocrlf=true a
+# checkout would write CRLF, which changes the bytes and makes those checks fail. eol=lf
+# keeps the working copy identical to the committed bytes on every platform.
+website/notebooks/*.json text eol=lf
+website/assets/experiments/*.json text eol=lf
+docs/experiment-bundle-determinism.json text eol=lf
+examples/data/**/*.csv text eol=lf
+examples/data/**/*.svg text eol=lf
