@@ -184,6 +184,8 @@ the 17 residual fixtures (`compiler/tests/fixtures/ownership/residual/r1..r17`),
   `-fsanitize=address,undefined -fno-sanitize-recover=all`.
 - Before the fixes of this phase, the same set gave **2 FAILED**: `r19_early_return_temp_field` on HIR at -O0 and -O1,
   1 live allocation each. Record: `docs/sanitizer-evidence-v4-ownership-before-fix.md`.
-- Default configuration (`node scripts/native-sanitize.mjs`, which covers the top-level ownership fixtures only, the
-  residual directory is not included by default): see `docs/sanitizer-evidence-v4-default.md`. Its exit status is 1
-  when any row is not VERIFIED, and the 6 intentional REJECTED_TYPE rows are counted in that; they are not failures.
+- Default configuration (`node scripts/native-sanitize.mjs`, top-level ownership fixtures only; the `residual/` directory is
+  not included by default): 72 rows, 66 VERIFIED, 6 EXPECTED_TYPE_REJECTION, 0 of every other category, exit status 0.
+  Earlier runs counted the 6 rejections as failures (exit status 1). The exit semantics are now defined in
+  `scripts/native-sanitize-classify.mjs`, and the rejections are checked against
+  `scripts/native-sanitize-expected-rejections.json`. See `docs/sanitizer-evidence-v4-default.md`.

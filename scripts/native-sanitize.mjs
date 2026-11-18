@@ -8,16 +8,25 @@
 //   4. runs the binary and requires: exit 0, no sanitizer report, `live_allocations=0`, and stdout equal to step 1.
 //
 // Usage: node scripts/native-sanitize.mjs [--distro Ubuntu-24.04] [--report docs/sanitizer-evidence.md] [files...]
-// Without files, every tests/ownership and compiler/tests/fixtures/ownership program is used.
+// Without files, every top-level program in compiler/tests/fixtures/ownership is used (subdirectories such as residual/
+// are not included by default; pass them as files).
 // The script writes intermediate files to a temporary directory and never modifies the fixtures.
+//
+// Exit status (see scripts/native-sanitize-classify.mjs for the categories):
+//   0  every row is VERIFIED or EXPECTED_TYPE_REJECTION, and every expected rejection of a program in the run was observed;
+//   1  any row is UNEXPECTED_TYPE_REJECTION, COMPILER_REFUSAL, BUILD_FAILURE, EXECUTION_FAILURE, MEMORY_FAILURE or BLOCKED,
+//      or an expected rejection (scripts/native-sanitize-expected-rejections.json) was not observed.
+// The printed JSON gives the count of every category, so an EXPECTED_TYPE_REJECTION is never counted as VERIFIED.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { summarise, CATEGORIES } from "./native-sanitize-classify.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const expectedRejections = JSON.parse(readFileSync(join(repo, "scripts", "native-sanitize-expected-rejections.json"), "utf8"));
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(name);
@@ -97,7 +106,7 @@ function checkProgram(program) {
     }
     const build = wsl(`cd ${wslPath(work)} && gcc ${sanitizerFlags(opt).join(" ")} ${wslPath(c)} -o ${wslPath(exe)} -lm 2>&1`);
     if (build.status !== 0) {
-      rows.push({ program: name, route: `${route.name} ${opt}`, verdict: "FAILED", detail: `generated C does not compile: ${build.stdout.trim().split("\n").slice(-3).join(" | ")}` });
+      rows.push({ program: name, route: `${route.name} ${opt}`, verdict: "FAILED", reason: "build", detail: `generated C does not compile: ${build.stdout.trim().split("\n").slice(-3).join(" | ")}` });
       continue;
     }
     const run = wsl(
@@ -116,21 +125,26 @@ function checkProgram(program) {
     const leakLine = stderr.match(/live_allocations=(\d+)/);
     const sameOutput = nativeStdout.trimEnd() === expected.stdout.trimEnd();
     let verdict = "VERIFIED";
+    let reason = null;
     let detail = "";
-    if (status !== 0) {
+    if (sanitizerLines.length) {
       verdict = "FAILED";
-      detail = `exit ${status}; ${sanitizerLines[0] ?? stderr.trim().slice(0, 200)}`;
-    } else if (sanitizerLines.length) {
-      verdict = "FAILED";
+      reason = "memory";
       detail = sanitizerLines[0];
+    } else if (status !== 0) {
+      verdict = "FAILED";
+      reason = "execution";
+      detail = `exit ${status}; ${stderr.trim().slice(0, 200)}`;
     } else if (!leakLine || leakLine[1] !== "0") {
       verdict = "FAILED";
+      reason = "memory";
       detail = `leak report: ${leakLine ? "live_allocations=" + leakLine[1] : "missing"}`;
     } else if (!sameOutput) {
       verdict = "FAILED";
+      reason = "execution";
       detail = "native output differs from the interpreter";
     }
-    rows.push({ program: name, route: `${route.name} ${opt}`, verdict, detail, liveAllocations: leakLine ? Number(leakLine[1]) : null });
+    rows.push({ program: name, route: `${route.name} ${opt}`, verdict, reason, detail, liveAllocations: leakLine ? Number(leakLine[1]) : null });
   }
   return rows;
 }
@@ -141,8 +155,17 @@ for (const program of programs) {
   rows.push(...checkProgram(program));
 }
 
-const failed = rows.filter((r) => r.verdict !== "VERIFIED");
-const summary = { toolchain, total: rows.length, verified: rows.length - failed.length, failed: failed.length, rows };
+const result = summarise(rows, expectedRejections);
+const summary = {
+  toolchain,
+  total: result.total,
+  counts: result.counts,
+  verified: result.counts.VERIFIED,
+  failing: result.failing,
+  missingExpectedRejections: result.missing,
+  exitCode: result.exitCode,
+  rows: result.rows,
+};
 
 if (reportPath) {
   const lines = [];
@@ -157,19 +180,21 @@ if (reportPath) {
   lines.push(`- Flags: \`${toolchain.flags}\``);
   lines.push(`- Runtime options: \`ASAN_OPTIONS=detect_leaks=1:abort_on_error=0\`, \`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1\``);
   lines.push("");
-  const tally = (v) => rows.filter((r) => r.verdict === v).length;
-  lines.push(`## Result: ${tally("VERIFIED")} VERIFIED, ${tally("FAILED")} FAILED (memory or output), ${tally("REJECTED_TYPE")} REJECTED_TYPE (type inference limit), ${tally("REJECTED_COMPILER")} REJECTED_COMPILER, ${tally("BLOCKED")} BLOCKED (environment)`);
+  const c = result.counts;
+  lines.push(`## Result: ${c.VERIFIED} VERIFIED, ${c.MEMORY_FAILURE} MEMORY_FAILURE, ${c.EXECUTION_FAILURE + c.BUILD_FAILURE} EXECUTION/BUILD_FAILURE, ${c.EXPECTED_TYPE_REJECTION} EXPECTED_TYPE_REJECTION (type inference limit, expected list), ${c.UNEXPECTED_TYPE_REJECTION + c.COMPILER_REFUSAL} unexpected refusals, ${c.BLOCKED} BLOCKED (environment), ${c.MISSING_EXPECTED_REJECTION} missing expected rejections`);
   lines.push("");
-  lines.push("A REJECTED row was never compiled to C, so it says nothing about memory safety. Only VERIFIED rows passed the sanitizers.");
+  lines.push(`Exit status of the run: ${result.exitCode}.`);
   lines.push("");
-  lines.push("| Program | Route | Verdict | live_allocations | Detail |");
-  lines.push("|---|---|---|---|---|");
-  for (const r of rows) {
-    lines.push(`| ${r.program} | ${r.route} | ${r.verdict} | ${r.liveAllocations ?? "n/a"} | ${(r.detail || "").replace(/\|/g, "/")} |`);
+  lines.push("A rejected row was never compiled to C, so it says nothing about memory safety. Only VERIFIED rows passed the sanitizers. Categories are defined in `scripts/native-sanitize-classify.mjs`.");
+  lines.push("");
+  lines.push("| Program | Route | Verdict | Category | live_allocations | Detail |");
+  lines.push("|---|---|---|---|---|---|");
+  for (const r of result.rows) {
+    lines.push(`| ${r.program} | ${r.route} | ${r.verdict} | ${r.category} | ${r.liveAllocations ?? "n/a"} | ${(r.detail || "").replace(/\|/g, "/")} |`);
   }
   lines.push("");
   writeFileSync(reportPath, lines.join("\n"), "utf8");
 }
 
-console.log(JSON.stringify(summary, null, 2));
-process.exitCode = failed.length ? 1 : 0;
+console.log(JSON.stringify({ ...summary, categories: CATEGORIES }, null, 2));
+process.exitCode = result.exitCode;
