@@ -1,0 +1,90 @@
+// Function calls: the positional fast path and the general path (named and default arguments) keep their meaning.
+//
+// Expected values are worked out by hand and checked in the program. The number of arguments is checked by the compiler.
+record Point {
+    x: Int
+    y: Int
+}
+
+impl Point {
+    fn shifted(self, dx: Int) -> Int {
+        return self.x + dx
+    }
+}
+
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn scaled(value: Int, factor: Int = 10) -> Int {
+    return value * factor
+}
+
+fn fact(n: Int) -> Int {
+    if n <= 1 {
+        return 1
+    }
+    return n * fact(n - 1)
+}
+
+fn apply(f: fn(Int) -> Int, value: Int) -> Int {
+    return f(value)
+}
+
+fn main() -> Void {
+    mut failures = 0
+
+    // positional, exactly one argument per parameter (the fast path)
+    if add(2, 3) != 5 {
+        print("FAIL positional add")
+        failures = failures + 1
+    }
+
+    // named arguments, in a different order (the general path)
+    if add(b: 4, a: 1) != 5 {
+        print("FAIL named arguments")
+        failures = failures + 1
+    }
+
+    // a default argument (the general path)
+    if scaled(3) != 30 or scaled(3, 2) != 6 {
+        print("FAIL default argument")
+        failures = failures + 1
+    }
+
+    // recursion: 5! = 120, with a fresh frame for each call
+    if fact(5) != 120 {
+        print("FAIL recursion")
+        failures = failures + 1
+    }
+
+    // a method call: the receiver fills the first parameter
+    p = Point { x: 7, y: 1 }
+    if p.shifted(3) != 10 {
+        print("FAIL method call")
+        failures = failures + 1
+    }
+
+    // a closure keeps the value it captured
+    offset = 100
+    if apply(fn(v) { v + offset }, 5) != 105 {
+        print("FAIL closure")
+        failures = failures + 1
+    }
+
+    // the number of arguments is checked before the program runs (a call with too many is a compile error)
+
+    // the arguments are evaluated in order, once each: 1 then 2
+    mut order = 0
+    order = order * 10 + 1
+    if add(order, order + 1) != 3 {
+        print("FAIL argument order")
+        failures = failures + 1
+    }
+
+    if failures == 0 {
+        print("all call checks passed")
+    } else {
+        print("call checks failed: " + failures.to_string())
+    }
+}

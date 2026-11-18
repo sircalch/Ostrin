@@ -1,0 +1,127 @@
+// Composition of conditional steps: a derivation keeps every condition, and its value is checked against the original.
+//
+// E = (x^2 - 1)/(x - 1) + sqrt(x^2). Two steps act on two subexpressions: the cancellation of the quotient (which needs
+// x != 1, a removable point of the original) and the rule for sqrt(x^2). Each step's conditions are kept in the chain.
+// The composed value is evaluated and compared with the original at points away from the removable point. At x = 1 the
+// original is undefined, so the composed value must refuse there, and a point outside the context must be refused too.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    two = symbolic.number(s, 2)
+    mut failures = 0
+
+    numerator = symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 1))
+    denominator = symbolic.sub(x, symbolic.number(s, 1))
+    quotient = symbolic.div(numerator, denominator)
+    root = symbolic.power(symbolic.power(x, two), symbolic.number(s, 1, 2))
+    whole = symbolic.add(quotient, root)
+    print("E = " + symbolic.show(whole))
+
+    // 1. Under no assumptions: the cancellation keeps x != 1, and sqrt(x^2) = abs(x) needs no condition.
+    none = symbolic.context()
+    chain0 = symbolic.chain_start(whole, none)
+    chain1 = symbolic.chain_then(chain0, none, quotient, symbolic.simplify_quotient(none, numerator, denominator, x))
+    print("step 1: " + chain1.status + ", steps " + chain1.steps.length().to_string() + ", value " + symbolic.show(chain1.value))
+    chain2 = symbolic.chain_then(chain1, none, root, symbolic.sqrt_of_square(none, x))
+    print("step 2: " + chain2.status + ", steps " + chain2.steps.length().to_string() + ", value " + symbolic.show(chain2.value))
+    print("kept conditions: " + chain2.unknown.length().to_string() + " unknown: " + chain2.unknown[0])
+    if chain2.status != "applied-conditional" or chain2.unknown.length() != 1 or chain2.unknown[0] != "x != 1" {
+        print("FAIL the derivation must keep x != 1 as its only pending condition")
+        failures = failures + 1
+    }
+    if chain2.steps.length() != 2 {
+        print("FAIL both steps must be recorded")
+        failures = failures + 1
+    }
+
+    // The composed value matches the original at points away from 1, where both are defined.
+    match symbolic.chain_evaluate(chain2, ["x"], [2.0]) {
+        Ok(v) => {
+            print("E(2) by the derivation: " + v.to_string() + " (original: 3 + 2 = 5)")
+            if v != 5.0 {
+                print("FAIL the derivation disagrees with the original at x = 2")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+    match symbolic.chain_evaluate(chain2, ["x"], [0.0 - 2.0]) {
+        Ok(v) => {
+            print("E(-2) by the derivation: " + v.to_string() + " (original: -1 + 2 = 1)")
+            if v != 1.0 {
+                print("FAIL the derivation disagrees with the original at x = -2")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+
+    // The removable point x = 1 is refused, not evaluated as the cancelled form.
+    match symbolic.chain_evaluate(chain2, ["x"], [1.0]) {
+        Ok(v) => {
+            print("FAIL the derivation returned " + v.to_string() + " at x = 1")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("at x = 1: " + message)
+        },
+    }
+
+    // 2. Under x positive: sqrt(x^2) = x is shown (x >= 0), and x = -2 lies outside the context.
+    positive = symbolic.assume(none, "x", "positive").unwrap()
+    pchain0 = symbolic.chain_start(whole, positive)
+    pchain1 = symbolic.chain_then(pchain0, positive, quotient, symbolic.simplify_quotient(positive, numerator, denominator, x))
+    pchain2 = symbolic.chain_then(pchain1, positive, root, symbolic.sqrt_of_square(positive, x))
+    print("under x positive: " + pchain2.status + ", value " + symbolic.show(pchain2.value) + ", pending " + pchain2.unknown.length().to_string())
+    if pchain2.status != "applied-conditional" or symbolic.show(pchain2.value) != "x + (1 + x)" and symbolic.show(pchain2.value) != "1 + 2*x" and symbolic.show(pchain2.value) != "(1 + x) + x" {
+        print("FAIL under x positive the root is x; the value is " + symbolic.show(pchain2.value))
+        failures = failures + 1
+    }
+    match symbolic.chain_evaluate(pchain2, ["x"], [0.0 - 2.0]) {
+        Ok(v) => {
+            print("FAIL a point outside the context was evaluated: " + v.to_string())
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("x = -2 under x positive: " + message)
+        },
+    }
+
+    // 3. A step computed under another context, or applied to an expression that is not in the value, refuses the chain.
+    wrong_context = symbolic.chain_then(chain0, positive, quotient, symbolic.simplify_quotient(none, numerator, denominator, x))
+    print("step under another context: " + wrong_context.status + ": " + wrong_context.reason)
+    if wrong_context.status != "refused" {
+        print("FAIL a step computed under another context must refuse the chain")
+        failures = failures + 1
+    }
+    absent = symbolic.chain_then(chain0, none, denominator, symbolic.simplify_quotient(none, numerator, denominator, x))
+    print("step on an absent subexpression: " + absent.status + ": " + absent.reason)
+    if absent.status != "refused" {
+        print("FAIL a step whose input is not in the value must refuse the chain")
+        failures = failures + 1
+    }
+
+    // 4. Removable singularities are recorded, not dropped: x / x keeps x != 0 until the context proves it.
+    selfq = symbolic.chain_start(symbolic.div(symbolic.symbol(s, "z"), symbolic.symbol(s, "z")), none)
+    z = symbolic.symbol(s, "z")
+    selfq1 = symbolic.chain_then(selfq, none, symbolic.div(z, z), symbolic.simplify_self_quotient(none, z))
+    print("z / z: " + selfq1.status + ", pending " + selfq1.unknown.length().to_string() + " (" + selfq1.unknown[0] + ")")
+    if selfq1.status != "applied-conditional" or selfq1.unknown[0] != "z != 0" {
+        print("FAIL z / z keeps z != 0 as pending")
+        failures = failures + 1
+    }
+
+    if failures == 0 {
+        print("all chain checks passed")
+    } else {
+        print("chain checks failed: " + failures.to_string())
+    }
+}

@@ -1,0 +1,27 @@
+// Horner evaluation of a degree-50 polynomial with integer coefficients at 2,000,000 points; the sum of the values,
+// repeated K times (K is the first command-line argument, default 1).
+fn main() -> Void {
+    values = args()
+    mut repeats = 1
+    if values.length() > 0 {
+        repeats = parse_int(values[0]).unwrap()
+    }
+    degree = 50
+    mut coefficients = zeros([degree + 1])
+    for k in 0 until degree + 1 {
+        coefficients.set(k, ((k % 5) - 2) as Float)
+    }
+    mut total = 0.0
+    for r in 0 until repeats {
+        total = 0.0
+        for i in 0 until 2000000 {
+            x = ((i % 1000) as Float) / 1000.0
+            mut value = 0.0
+            for k in 0 until degree + 1 {
+                value = value * x + coefficients[degree - k]
+            }
+            total = total + value
+        }
+    }
+    print("RESULT horner " + total.to_string())
+}

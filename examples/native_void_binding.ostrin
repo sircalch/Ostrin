@@ -1,0 +1,28 @@
+// A match on a Result whose Ok payload is Void, with the Ok binding named and unused.
+// This program used to fail in the native backend: the binding was assigned without a declaration.
+fn announce() -> Void {
+    print("announced")
+}
+
+fn check(flag: Bool) -> Result<Void, String> {
+    if flag {
+        Ok(announce())
+    } else {
+        Err("refused")
+    }
+}
+
+fn main() -> Void {
+    match check(true) {
+        Ok(done) => print("named binding: passed"),
+        Err(message) => print("named binding: " + message),
+    }
+    match check(false) {
+        Ok(done) => print("named binding: passed"),
+        Err(message) => print("named binding: " + message),
+    }
+    match check(true) {
+        Ok(_) => print("wildcard: passed"),
+        Err(message) => print("wildcard: " + message),
+    }
+}

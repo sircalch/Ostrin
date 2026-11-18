@@ -1,0 +1,7 @@
+// Composite Simpson rule for the integral of sin over [0, pi] with 4,000,000 panels pairs (exact value 2).
+import std.numeric
+
+fn main() -> Void {
+    value = numeric.simpson(fn(x) { sin(x) }, 0.0, 3.141592653589793, 4000000)
+    print("RESULT simpson " + value.to_string())
+}

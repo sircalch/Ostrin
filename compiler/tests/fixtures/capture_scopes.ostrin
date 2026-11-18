@@ -1,0 +1,52 @@
+// Closures and captured `mut` bindings across scopes. Each line is worked out by hand. The interpreter and the native
+// backend must agree, and the native run must leave no live allocation.
+
+// a closure that outlives the function that created it, with its own counter
+fn make_counter() -> fn() -> Int {
+    mut n = 0
+    return fn() {
+        n = n + 1
+        n
+    }
+}
+
+fn main() -> Void {
+    // independent closures keep independent bindings
+    c1 = make_counter()
+    c2 = make_counter()
+    c1()
+    c1()
+    print("c1 " + c1().to_string() + " c2 " + c2().to_string())
+
+    // closures created together share one binding
+    mut shared = 0
+    add: fn(Int) -> Void = fn(d) { shared = shared + d }
+    read = fn() { shared }
+    add(4)
+    add(5)
+    print("shared " + read().to_string())
+
+    // a captured name shadowed in a loop: the closure outside sees the outer binding, the one inside the inner
+    mut p = 1
+    get_p = fn() { p }
+    mut total = 0
+    for i in 0 until 2 {
+        mut p = i + 10
+        bump_inner = fn() { p = p + 1 }
+        bump_inner()
+        total = total + p
+    }
+    p = 5
+    print("shadow total " + total.to_string() + " outer " + get_p().to_string())
+
+    // nested closures capture the same binding through their enclosing closure
+    mut depth = 0
+    outer_f = fn() {
+        inner_f = fn() { depth = depth + 10 }
+        inner_f()
+        depth = depth + 1
+    }
+    outer_f()
+    outer_f()
+    print("nested " + depth.to_string())
+}

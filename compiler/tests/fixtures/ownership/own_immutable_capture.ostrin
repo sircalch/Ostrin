@@ -1,0 +1,31 @@
+// Closures that capture immutable values: an Int, a String, a record and a list. Each closure is called several times and
+// the values it reads must stay valid. Expected (worked out by hand):
+//   greet hello, world!
+//   greet hello, world! again
+//   sum 6 point 3,4
+//   sum 15
+fn make_greeter(word: String) -> fn() -> String {
+    name = "world"
+    return fn() { word + ", " + name + "!" }
+}
+
+record Point {
+    x: Int
+    y: Int
+}
+
+fn main() -> Void {
+    greeter = make_greeter("hello")
+    print("greet " + greeter())
+    print("greet " + greeter() + " again")
+
+    items = [1, 2, 3]
+    origin = Point { x: 3, y: 4 }
+    summary = fn() {
+        mut total = 0
+        for v in items { total = total + v }
+        "sum " + total.to_string() + " point " + origin.x.to_string() + "," + origin.y.to_string()
+    }
+    print(summary())
+    print("sum " + summary().length().to_string())
+}

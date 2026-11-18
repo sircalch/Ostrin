@@ -1,0 +1,18 @@
+record Box {
+    tag: String
+}
+
+fn make(i: Int) -> Box {
+    Box { tag: "item" + i.to_string() }
+}
+
+fn main() -> Void {
+    mut last = ""
+    for i in 0 until 5 {
+        if i == 3 {
+            break
+        }
+        last = make(i).tag
+    }
+    print(last)
+}

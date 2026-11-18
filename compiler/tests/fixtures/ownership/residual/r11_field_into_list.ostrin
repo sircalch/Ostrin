@@ -1,0 +1,12 @@
+record Box {
+    tag: String
+}
+
+fn make() -> Box {
+    Box { tag: "listed" }
+}
+
+fn main() -> Void {
+    names = [make().tag, make().tag]
+    print(names[0] + " " + names[1])
+}

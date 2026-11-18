@@ -1,0 +1,34 @@
+// std.linalg with physical quantities: work is the dot product of forces and displacements, and the force on a spring is a
+// matrix-vector product of a stiffness (N/m) and a displacement (m). A mismatch in the lengths is reported, not computed.
+// Expected output:
+//   work: 10 J
+//   force:
+//   [2, 2] N
+//   error: unit_dot needs vectors of the same length
+// The label and the value are printed on two lines: a string built from a quantity array with to_string() takes the AST
+// route in the native backend, while printing the label and the array separately does not (see docs/CAPABILITY-MATRIX.md).
+import std.linalg
+
+fn main() -> Void {
+    force = array([3.0, 4.0]) as N
+    displacement = array([2.0, 1.0]) as m
+    match linalg.unit_dot(force, displacement) {
+        Ok(w) => print("work: " + (w as J).to_string()),
+        Err(message) => print("error: " + message),
+    }
+
+    stiffness = array([2.0, 0.0, 0.0, 4.0]) as N/m
+    x = array([1.0, 0.5]) as m
+    match linalg.unit_matvec(stiffness, 2, 2, x) {
+        Ok(f) => {
+            print("force:")
+            print(f as N)
+        },
+        Err(message) => print("error: " + message),
+    }
+
+    match linalg.unit_dot(force, array([1.0, 2.0, 3.0]) as m) {
+        Ok(w) => print("unexpected: " + (w as J).to_string()),
+        Err(message) => print("error: " + message),
+    }
+}

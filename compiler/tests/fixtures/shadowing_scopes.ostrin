@@ -1,0 +1,78 @@
+// Shadowing in blocks, loops, branches and functions. A declaration in an inner scope is a new binding: the outer
+// binding is unchanged after the scope ends. An assignment reaches the nearest visible binding. Each line is worked
+// out by hand; the interpreter and the native backend must agree.
+
+fn block_value() -> Int {
+    mut v = 1
+    if v == 1 {
+        mut v = 50
+        v = v + 1
+    }
+    return v
+}
+
+fn early(limit: Int) -> Int {
+    mut x = 10
+    for i in 0 until 5 {
+        mut x = i * 3
+        if x > limit {
+            return x
+        }
+    }
+    return x
+}
+
+fn main() -> Void {
+    print("block shadow: " + block_value().to_string())
+    print("early: " + early(5).to_string() + " " + early(100).to_string())
+
+    // with no shadow in the loop, the assignment reaches the outer binding
+    mut a = 1
+    for i in 0 until 3 {
+        a = a + i
+    }
+    print("assign outer: " + a.to_string())
+
+    // nested loops: the inner declaration does not change the outer one
+    mut total = 0
+    mut k = 100
+    for i in 0 until 2 {
+        for j in 0 until 2 {
+            mut k = i * 10 + j
+            total = total + k
+        }
+    }
+    print("nested: " + total.to_string() + " k: " + k.to_string())
+
+    // a branch that assigns the outer binding
+    mut c = 5
+    if c > 0 {
+        c = 9
+    } else {
+        mut c = 0
+    }
+    print("branch assign: " + c.to_string())
+
+    // a branch that declares a shadow, and the other branch that assigns the outer one
+    mut d = 5
+    if d > 100 {
+        mut d = 0
+        d = 1
+    } else {
+        d = d + 1
+    }
+    print("branch shadow: " + d.to_string())
+
+    // break and continue do not change which binding a name refers to
+    mut bc = 0
+    for i in 0 until 6 {
+        mut bc = i
+        if i == 1 {
+            continue
+        }
+        if i == 3 {
+            break
+        }
+    }
+    print("bc outer: " + bc.to_string())
+}

@@ -1,0 +1,489 @@
+{
+  "schema": "ostrin.interpreter-startup-audit/v0",
+  "generated": "2026-11-17T23:12:23.974Z",
+  "program": "benchmarks/v2/linalg/ostrin/lu_solve.ostrin",
+  "n": 200,
+  "reps": 12,
+  "seed": 20261117,
+  "levels": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "orderPerRepetition": [
+    [
+      2,
+      1,
+      0,
+      3
+    ],
+    [
+      1,
+      2,
+      3,
+      0
+    ],
+    [
+      3,
+      0,
+      1,
+      2
+    ],
+    [
+      3,
+      0,
+      1,
+      2
+    ],
+    [
+      1,
+      2,
+      3,
+      0
+    ],
+    [
+      2,
+      1,
+      0,
+      3
+    ],
+    [
+      2,
+      3,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      3,
+      2
+    ],
+    [
+      3,
+      2,
+      1,
+      0
+    ],
+    [
+      3,
+      2,
+      1,
+      0
+    ],
+    [
+      3,
+      2,
+      0,
+      1
+    ],
+    [
+      3,
+      0,
+      1,
+      2
+    ]
+  ],
+  "runs": [
+    {
+      "rep": 0,
+      "k": 2,
+      "ms": 4342.8482,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 0,
+      "k": 1,
+      "ms": 2129.7054,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 0,
+      "k": 0,
+      "ms": 113.0508,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 0,
+      "k": 3,
+      "ms": 6736.7978,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 1,
+      "ms": 2154.7765,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 2,
+      "ms": 4797.6747,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 3,
+      "ms": 7190.1082,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 0,
+      "ms": 113.513,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 2,
+      "k": 3,
+      "ms": 6469.5225,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 2,
+      "k": 0,
+      "ms": 119.8184,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 2,
+      "k": 1,
+      "ms": 2126.5558,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 2,
+      "k": 2,
+      "ms": 4210.2665,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 3,
+      "ms": 6748.5209,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 0,
+      "ms": 115.0454,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 1,
+      "ms": 2157.2661,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 2,
+      "ms": 4239.8975,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 1,
+      "ms": 2177.2034,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 2,
+      "ms": 4270.8305,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 3,
+      "ms": 6414.1693,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 0,
+      "ms": 116.7792,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 5,
+      "k": 2,
+      "ms": 4202.1066,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 5,
+      "k": 1,
+      "ms": 2089.7129,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 5,
+      "k": 0,
+      "ms": 109.848,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 5,
+      "k": 3,
+      "ms": 6421.9418,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 2,
+      "ms": 4366.6199,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 3,
+      "ms": 6611.9949,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 0,
+      "ms": 105.9861,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 1,
+      "ms": 2112.9982,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 1,
+      "ms": 2070.8536,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 0,
+      "ms": 109.8091,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 3,
+      "ms": 6461.577,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 2,
+      "ms": 4334.7791,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 3,
+      "ms": 6591.748,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 2,
+      "ms": 4241.6847,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 1,
+      "ms": 2149.1863,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 0,
+      "ms": 112.1269,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 3,
+      "ms": 6476.7991,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 2,
+      "ms": 4313.1113,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 1,
+      "ms": 2078.5563,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 0,
+      "ms": 109.6609,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 10,
+      "k": 3,
+      "ms": 6503.7599,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 10,
+      "k": 2,
+      "ms": 4274.3084,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 10,
+      "k": 0,
+      "ms": 119.2396,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 10,
+      "k": 1,
+      "ms": 2096.9443,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 3,
+      "ms": 6581.6818,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 0,
+      "ms": 115.9949,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 1,
+      "ms": 2155.4258,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 2,
+      "ms": 4224.6256,
+      "verified": true,
+      "message": null
+    }
+  ],
+  "allVerified": true,
+  "directK0": {
+    "samples": [
+      113.0508,
+      113.513,
+      119.8184,
+      115.0454,
+      116.7792,
+      109.848,
+      105.9861,
+      109.8091,
+      112.1269,
+      109.6609,
+      119.2396,
+      115.9949
+    ],
+    "mean": 113.40602499999999,
+    "sd": 4.181884449106864,
+    "interval95": [
+      110.74896447029084,
+      116.06308552970913
+    ]
+  },
+  "fit": {
+    "intercept": 41.0362925000004,
+    "interceptSe": 36.292169158596366,
+    "interceptInterval95": [
+      -31.98986352868829,
+      114.06244852868909
+    ],
+    "slope": 2165.5234591666667,
+    "slopeSe": 19.3989804020445,
+    "slopeInterval95": [
+      2126.489336862031,
+      2204.5575814713025
+    ],
+    "residualSd": 150.26385606104483,
+    "dof": 46,
+    "t": 2.0121739130434784
+  },
+  "pairedIncrements": {
+    "firstRepetition_K1_minus_K0": {
+      "n": 12,
+      "mean": 2011.526025,
+      "sd": 33.343691571518995,
+      "se": 9.625494652296174
+    },
+    "steady_K2_minus_K1": {
+      "n": 12,
+      "mean": 2193.297366666666,
+      "sd": 159.37792907082843,
+      "se": 46.00844512596394
+    },
+    "steady_K3_minus_K2": {
+      "n": 12,
+      "mean": 2282.489016666667,
+      "sd": 117.60739652013105,
+      "se": 33.95033101979436
+    },
+    "firstDiffersFromSteady": true
+  },
+  "classification": "INCONCLUSIVE",
+  "reason": "the first repetition of a process differs from steady repetitions (2012 ms against 2238 ms), so the linear start-up model does not hold"
+}

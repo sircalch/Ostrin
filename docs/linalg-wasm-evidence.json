@@ -1,0 +1,39 @@
+{
+  "compiler": "website/ostrinc.wasm (wasm32-wasip1, executed by node:wasi)",
+  "sourceRevision": "821f9665",
+  "node": "v24.19.0",
+  "checks": [
+    {
+      "name": "wasm linalg_oracle against tests/oracle/linalg-expected.txt",
+      "ok": true,
+      "detail": "61 lines match"
+    },
+    {
+      "name": "wasm linalg_properties against tests/oracle/linalg-properties-expected.txt",
+      "ok": true,
+      "detail": "44 lines match"
+    },
+    {
+      "name": "wasm linalg_regression exact output",
+      "ok": true,
+      "detail": "c0 1"
+    },
+    {
+      "name": "wasm linalg_units exact output (quantities and units)",
+      "ok": true,
+      "detail": "matches"
+    },
+    {
+      "name": "wasm diagnostic: type error reported with an OSTRIN code",
+      "ok": true,
+      "detail": "error OSTRIN-E1041: Argument 'b' expects 'Array<Float>', got 'Int'."
+    },
+    {
+      "name": "wasm runtime dimension error in a matrix product",
+      "ok": true,
+      "detail": "runtime error: matmul needs (m, k) x (k, n) matrices (or a matrix and a vector), got [2, 2] and [3]"
+    }
+  ],
+  "passed": 6,
+  "total": 6
+}

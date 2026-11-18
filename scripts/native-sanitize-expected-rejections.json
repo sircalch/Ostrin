@@ -1,0 +1,10 @@
+[
+  {
+    "program": "untyped_closure_parameter",
+    "verdict": "REJECTED_TYPE",
+    "routes": ["ir", "hir", "ast"],
+    "opts": ["-O0", "-O1"],
+    "message": "cannot determine the type of the function value 'f'",
+    "reason": "A closure parameter that holds a function value has no type annotation. The native backend cannot infer it (Blocked: contextual inference, docs/higher-order-inference.md). The interpreter runs the program; the native backend refuses it with this diagnostic on every route."
+  }
+]

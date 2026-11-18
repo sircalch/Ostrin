@@ -1,0 +1,117 @@
+// Assumptions decide which simplifications are valid.
+//
+// A symbol is real by default. A radical or a logarithm rule fires only when the assumptions prove it: (x^2)^(1/2)
+// is x for a positive x and stays as written for a real x, where it would be |x|. The checks are: the exact text of
+// each case, the negative case for a real symbol, the queries is_positive and is_nonzero, and the numeric value of
+// each result at chosen points, compared with the value worked out by hand.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    xp = symbolic.symbol(s, "x", "positive")
+    yp = symbolic.symbol(s, "y", "positive")
+    xr = symbolic.symbol(s, "x")
+    yr = symbolic.symbol(s, "y")
+    xn = symbolic.symbol(s, "x", "nonzero")
+    two = symbolic.number(s, 2)
+    half = symbolic.number(s, 1, 2)
+    mut failures = 0
+
+    // Positive symbols: the radical splits over the factors and the square is removed.
+    sq_square = symbolic.power(symbolic.power(xp, two), half)
+    print("(x^2)^(1/2), x positive: " + symbolic.show(sq_square))
+    if symbolic.show(sq_square) != "x" {
+        print("FAIL (x^2)^(1/2) with positive x")
+        failures = failures + 1
+    }
+    scaled = symbolic.power(symbolic.mul(symbolic.number(s, 4), symbolic.power(xp, two)), half)
+    print("(4x^2)^(1/2), x positive: " + symbolic.show(scaled))
+    if symbolic.show(scaled) != "2*x" {
+        print("FAIL (4x^2)^(1/2)")
+        failures = failures + 1
+    }
+    split = symbolic.power(symbolic.mul(xp, yp), half)
+    print("(x*y)^(1/2), x and y positive: " + symbolic.show(split))
+    if symbolic.show(split) != "x^(1/2)*y^(1/2)" {
+        print("FAIL (x*y)^(1/2) with positive x and y")
+        failures = failures + 1
+    }
+    coefficient = symbolic.power(symbolic.mul(two, xp), half)
+    print("(2x)^(1/2), x positive: " + symbolic.show(coefficient))
+    if symbolic.show(coefficient) != "x^(1/2)*2^(1/2)" {
+        print("FAIL (2x)^(1/2)")
+        failures = failures + 1
+    }
+
+    // Real symbols: the same expressions are not simplified, because (x^2)^(1/2) is |x| and (xy)^(1/2) may be
+    // negative under a root.
+    real_square = symbolic.power(symbolic.power(xr, two), half)
+    if symbolic.show(real_square) != "(x^2)^(1/2)" {
+        print("FAIL (x^2)^(1/2) with a real x was simplified: " + symbolic.show(real_square))
+        failures = failures + 1
+    }
+    real_split = symbolic.power(symbolic.mul(xr, yr), half)
+    if symbolic.show(real_split) != "(x*y)^(1/2)" {
+        print("FAIL (x*y)^(1/2) with real x and y was simplified: " + symbolic.show(real_split))
+        failures = failures + 1
+    }
+    print("real symbols keep their radicals: " + symbolic.show(real_square) + " and " + symbolic.show(real_split))
+
+    // Nonzero symbols: x / x is 1, and for a real x it stays as written.
+    if symbolic.show(symbolic.div(xn, xn)) != "1" {
+        print("FAIL x / x with nonzero x")
+        failures = failures + 1
+    }
+    if symbolic.show(symbolic.div(xr, xr)) == "1" {
+        print("FAIL x / x with real x was simplified to 1")
+        failures = failures + 1
+    }
+
+    // The queries follow the assumptions.
+    if not symbolic.is_positive(xp) or symbolic.is_positive(xr) or symbolic.is_positive(yr) {
+        print("FAIL is_positive")
+        failures = failures + 1
+    }
+    if not symbolic.is_positive(scaled) {
+        print("FAIL is_positive of 4x^2 with positive x")
+        failures = failures + 1
+    }
+    if not symbolic.is_nonzero(xn) or symbolic.is_nonzero(xr) {
+        print("FAIL is_nonzero")
+        failures = failures + 1
+    }
+    print("queries: positive x " + symbolic.is_positive(xp).to_string() + ", real x " + symbolic.is_positive(xr).to_string() + ", nonzero x " + symbolic.is_nonzero(xn).to_string())
+
+    // Numeric values at chosen points. (4x^2)^(1/2) at x = 3 is 6; (x*y)^(1/2) at x = 4, y = 9 is 6; (2x)^(1/2) at
+    // x = 8 is 4, since 16 has square root 4. The comparison allows for rounding.
+    names = ["x", "y"]
+    checks = [scaled, split, coefficient]
+    points = [[3.0, 1.0], [4.0, 9.0], [8.0, 1.0]]
+    expected = [6.0, 6.0, 4.0]
+    mut k = 0
+    while k < checks.length() {
+        match symbolic.eval(checks[k], names, points[k]) {
+            Ok(value) => {
+                mut gap = value - expected[k]
+                if gap < 0.0 {
+                    gap = 0.0 - gap
+                }
+                if gap > 0.000000000001 {
+                    print("FAIL numeric value " + value.to_string() + " for case " + k.to_string())
+                    failures = failures + 1
+                }
+            },
+            Err(message) => {
+                print("FAIL eval: " + message)
+                failures = failures + 1
+            },
+        }
+        k = k + 1
+    }
+
+    if failures == 0 {
+        print("all assumption checks passed")
+    } else {
+        print("assumption checks failed: " + failures.to_string())
+    }
+}

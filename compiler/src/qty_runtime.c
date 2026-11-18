@@ -362,7 +362,7 @@ static void ostrin_print_temperature_point(OstrinTemperaturePoint point) {
         point.scale == OSTRIN_TEMP_C ? "degC" :
         point.scale == OSTRIN_TEMP_F ? "degF" : NULL;
     if (!scale) OSTRIN_FAIL("invalid absolute temperature scale tag");
-    char formatted[64];
+    char formatted[512];
     ostrin_fmt_double(point.value, formatted, sizeof formatted);
     printf("%s %s (absolute)\n", formatted, scale);
 }
@@ -410,14 +410,14 @@ static int ostrin_qty_cmp(Qty a, Qty b) {
 }
 
 static void ostrin_print_qty(Qty q) {
-    char buf[64];
+    char buf[512];
     ostrin_fmt_double(q.v, buf, sizeof buf);
     if (*q.u) printf("%s %s\n", buf, q.u);
     else printf("%s\n", buf);
 }
 
 static const char* ostrin_qty_to_string(Qty q) {
-    char buf[64];
+    char buf[512];
     ostrin_fmt_double(q.v, buf, sizeof buf);
     if (!*q.u) return ostrin_unit_cat(buf, "", "");
     const char* spaced = ostrin_unit_cat(buf, " ", "");

@@ -1,0 +1,166 @@
+/* Ostrin Scientific Notebook. Uses the site's tokens from styles.css; no new colours beyond the status chips. */
+
+.notebook { padding-bottom: 3rem; }
+
+.notebook-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+}
+
+.notebook-bar .spacer { flex: 1 1 auto; }
+
+.notebook-title {
+  min-width: 14rem;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.18));
+  border-radius: 6px;
+}
+
+.notebook-title-label,
+.notebook-example-label { font-size: 0.85rem; opacity: 0.8; }
+
+.notebook-status { margin: 0.75rem 0 0.25rem; font-size: 0.9rem; opacity: 0.85; }
+
+.notebook-notice {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.18));
+  white-space: pre-wrap;
+}
+.notebook-notice[data-kind="error"] { border-color: #e26b6b; }
+
+.notebook-cells { display: grid; gap: 1rem; margin-top: 1rem; }
+
+.notebook-empty { opacity: 0.8; }
+
+.nb-cell {
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
+}
+.nb-cell-text { border-style: dashed; }
+
+.nb-cell-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.nb-cell-id { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: 600; }
+.nb-cell-kind { font-size: 0.8rem; opacity: 0.7; }
+.nb-cell-actions { margin-left: auto; display: flex; gap: 0.25rem; flex-wrap: wrap; }
+
+.nb-chip {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.nb-chip-current { color: #3fb27f; }
+.nb-chip-stale { color: #e0a33a; }
+.nb-chip-not-run { opacity: 0.6; }
+.nb-chip-running { color: #7aa7ff; }
+
+.nb-source {
+  display: block;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.6rem;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.9rem;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.nb-deps { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; font-size: 0.85rem; }
+.nb-deps input { flex: 1 1 auto; min-width: 0; padding: 0.3rem 0.5rem; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line, rgba(255, 255, 255, 0.14)); border-radius: 6px; }
+
+.nb-outputs { margin-top: 0.6rem; display: grid; gap: 0.5rem; min-width: 0; }
+.nb-meta, .nb-muted { font-size: 0.8rem; opacity: 0.75; margin: 0; }
+.nb-stale { color: #e0a33a; margin: 0; font-size: 0.9rem; }
+.nb-error { color: #e26b6b; margin: 0; white-space: pre-wrap; }
+.nb-stdout, .nb-stderr {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  overflow: auto;
+  max-height: 22rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: pre;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+.nb-stderr { color: #e26b6b; }
+
+.nb-figure { margin: 0; }
+.nb-figure img { max-width: 100%; height: auto; background: #fff; border-radius: 6px; }
+
+.nb-table-wrap { overflow-x: auto; min-width: 0; }
+.nb-table { border-collapse: collapse; font-size: 0.85rem; }
+.nb-table caption { text-align: left; font-size: 0.8rem; opacity: 0.8; padding-bottom: 0.25rem; }
+.nb-table th, .nb-table td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.1)); text-align: right; white-space: nowrap; }
+.nb-table th { text-align: right; font-weight: 600; }
+
+.notebook-resources { margin-top: 1.5rem; display: grid; gap: 0.4rem; }
+.nb-resource { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+.notebook-note { margin-top: 1.5rem; font-size: 0.85rem; opacity: 0.75; }
+
+@media (max-width: 640px) {
+  .nb-cell-actions { margin-left: 0; }
+  .notebook-title { min-width: 0; width: 100%; }
+}
+
+/* ---- toolbar groups: primary actions first, the less frequent ones in the File menu ---- */
+.notebook-bar { align-items: flex-start; }
+.nb-group { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; padding-right: 0.75rem; border-right: 1px solid var(--line, rgba(255, 255, 255, 0.12)); }
+.nb-group:last-of-type { border-right: 0; }
+.nb-primary { font-weight: 600; }
+.nb-menu { position: relative; }
+.nb-menu summary { cursor: pointer; padding: 0.3rem 0.6rem; border: 1px solid var(--line, rgba(255, 255, 255, 0.18)); border-radius: 6px; list-style: none; }
+.nb-menu summary::-webkit-details-marker { display: none; }
+.nb-menu summary:focus-visible, .notebook-bar button:focus-visible, .notebook-bar input:focus-visible, .notebook-bar select:focus-visible { outline: 2px solid #7aa7ff; outline-offset: 2px; }
+.nb-menu-body { position: absolute; z-index: 5; top: calc(100% + 0.4rem); left: 0; min-width: 16rem; display: grid; gap: 0.4rem; padding: 0.6rem; background: var(--surface, #0f1320); border: 1px solid var(--line, rgba(255, 255, 255, 0.18)); border-radius: 8px; }
+.nb-menu-body button, .nb-menu-body select { width: 100%; text-align: left; }
+.nb-title-row { display: flex; gap: 0.4rem; align-items: center; flex: 1 1 16rem; min-width: 0; }
+.nb-title-row .notebook-title { flex: 1 1 auto; min-width: 0; width: 100%; text-overflow: ellipsis; }
+.notebook-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- save state: four distinct states, the label is the message ---- */
+.nb-save-state { font-size: 0.85rem; padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.nb-save-state[data-state="saved"] { color: #3fb27f; }
+.nb-save-state[data-state="saving"] { color: #7aa7ff; }
+.nb-save-state[data-state="unsaved"] { color: #e0a33a; }
+.nb-save-state[data-state="error"] { color: #e26b6b; font-weight: 600; }
+
+/* ---- rendered Markdown of text cells: readable in light and dark schemes ---- */
+.nb-md { line-height: 1.6; min-width: 0; overflow-wrap: anywhere; }
+.nb-md h3, .nb-md h4, .nb-md h5, .nb-md h6 { margin: 0.8rem 0 0.4rem; line-height: 1.25; }
+.nb-md h3 { font-size: 1.35rem; }
+.nb-md h4 { font-size: 1.15rem; }
+.nb-md p, .nb-md ul, .nb-md ol, .nb-md blockquote { margin: 0.5rem 0; }
+.nb-md ul, .nb-md ol { padding-left: 1.4rem; }
+.nb-md blockquote { margin-left: 0; padding: 0.2rem 0.9rem; border-left: 3px solid var(--line, rgba(255, 255, 255, 0.3)); opacity: 0.9; }
+.nb-md code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.9em; padding: 0.05rem 0.3rem; border-radius: 4px; background: rgba(127, 127, 127, 0.18); }
+.nb-md-code { overflow: auto; padding: 0.6rem 0.8rem; border-radius: 6px; background: rgba(127, 127, 127, 0.15); }
+.nb-md-code code { padding: 0; background: none; font-size: 0.88rem; white-space: pre; }
+.nb-md a { color: #7aa7ff; text-decoration: underline; text-underline-offset: 2px; }
+.nb-md hr { border: 0; border-top: 1px solid var(--line, rgba(255, 255, 255, 0.2)); margin: 1rem 0; }
+
+/* ---- small screens: the groups stack, the cell actions wrap, long tables scroll inside their box ---- */
+@media (max-width: 640px) {
+  .nb-group { border-right: 0; padding-right: 0; width: 100%; }
+  .nb-save-state { white-space: normal; }
+  .nb-menu-body { position: static; min-width: 0; margin-top: 0.4rem; }
+  .nb-cell-actions button { min-height: 2.25rem; }
+  .nb-source { font-size: 16px; }
+}

@@ -1,0 +1,18 @@
+// Composite Simpson rule for the integral of sin over [0, pi] with 4,000,000 panels (exact value 2), repeated K times.
+// K is the first command-line argument (default 1). Each repetition uses its own upper bound, pi * scale, where scale
+// is exactly 1.0 and is computed from the repetition, so that the work of each repetition is needed.
+import std.numeric
+
+fn main() -> Void {
+    values = args()
+    mut repeats = 1
+    if values.length() > 0 {
+        repeats = parse_int(values[0]).unwrap()
+    }
+    mut value = 0.0
+    for r in 0 until repeats {
+        scale = 1.0 + 0.0 * (r as Float)
+        value = numeric.simpson(fn(x) { sin(x) }, 0.0, 3.141592653589793 * scale, 4000000)
+    }
+    print("RESULT simpson " + value.to_string())
+}

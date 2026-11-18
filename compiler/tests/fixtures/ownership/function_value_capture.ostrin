@@ -1,0 +1,17 @@
+// Function values that capture other function values and mut bindings, and a parameter type that comes from an annotated
+// signature. Expected (worked out by hand): 15 (double(plus(3)) + 1), then 40: the mut x is read when the closure is called
+// (x = 10), so g(3) = 30 and f(30) = 40.
+fn compose(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    return fn(x) { f(g(x)) }
+}
+fn main() -> Void {
+    double = fn(v) { v * 2 }
+    plus = fn(v) { v + 4 }
+    h = compose(double, plus)
+    k = fn(n) { h(n) + 1 }
+    print(k(3).to_string())
+    mut x = 2
+    shifted = compose(fn(v) { v + x }, fn(v) { v * x })
+    x = 10
+    print(shifted(3).to_string())
+}

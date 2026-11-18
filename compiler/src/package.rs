@@ -781,7 +781,14 @@ pub fn write_lockfile(
             toml_string(&content_sha256)
         ));
     }
+    // Entries are separated by one blank line; the file ends with exactly one newline, with no trailing blank line.
+    let out = format!("{}\n", out.trim_end_matches('\n'));
     let lock_path = manifest_dir.join("ostrin.lock");
+    // A build without --locked resolves the dependencies again; the file is rewritten only when its bytes change, so an
+    // unchanged project never modifies its lockfile.
+    if fs::read_to_string(&lock_path).is_ok_and(|existing| existing == out) {
+        return Ok(());
+    }
     fs::write(&lock_path, out)
         .map_err(|e| format!("could not write '{}': {e}", lock_path.display()))
 }

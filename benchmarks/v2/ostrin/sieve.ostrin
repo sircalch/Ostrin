@@ -1,0 +1,27 @@
+// Sieve of Eratosthenes: the number of primes below 300000, repeated K times. K is the first command-line argument (default 1).
+// The composite flags are a fresh array in every repetition, so the work of each repetition is needed.
+fn main() -> Void {
+    values = args()
+    mut repeats = 1
+    if values.length() > 0 {
+        repeats = parse_int(values[0]).unwrap()
+    }
+    n = 300000
+    mut count = 0
+    for k in 0 until repeats {
+        mut composite = zeros([n])
+        mut found = 0
+        for i in 2 until n {
+            if composite[i] == 0.0 {
+                found = found + 1
+                mut j = i * i
+                while j < n {
+                    composite.set(j, 1.0)
+                    j = j + i
+                }
+            }
+        }
+        count = found + k * 0
+    }
+    print("RESULT sieve " + count.to_string())
+}

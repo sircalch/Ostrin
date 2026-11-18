@@ -1,0 +1,162 @@
+
+Running 1 test using 1 worker
+
+[1/1] [chromium] › visual.spec.mjs:65:1 › scientific plot visual fixtures match their published gallery cards
+  1) [chromium] › visual.spec.mjs:65:1 › scientific plot visual fixtures match their published gallery cards 
+
+    Error: published scientific plot images differ from their baselines
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -   1
+    + Received  + 104
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "id": "scatter-fit",
+    +     "message": "expect(locator).toHaveScreenshot(expected) failed
+    +
+    + Locator: locator('#viz-scatter-fit').locator('img.viz-image')
+    +   Expected an image 577px by 361px, received 577px by 362px. 
+    +
+    +   Snapshot: plot-scatter-fit.png
+    +
+    + Call log:
+    +   - Expect \"toHaveScreenshot(plot-scatter-fit.png)\" locator('#viz-scatter-fit').locator('img.viz-image') with timeout 5000ms
+    +     - verifying given screenshot expectation
+    +   - waiting for locator('#viz-scatter-fit').locator('img.viz-image')
+    +     - locator resolved to <img loading=\"eager\" decoding=\"async\" class=\"viz-image\" src=\"http://127.0.0.1:4173/Ostrin/assets/viz/scatter-fit.svg\" alt=\"Scatter and fit: Calibration data, a least-squares line and its ±2σ band. Source: examples/viz_scatter_fit.ostrin\"/>
+    +   - taking element screenshot
+    +     - disabled all CSS animations
+    +   - waiting for fonts to load...
+    +   - fonts loaded
+    +   - attempting scroll into view action
+    +     - waiting for element to be stable
+    +   - Expected an image 577px by 361px, received 577px by 362px.
+    +   - waiting 100ms before taking screenshot
+    +   - waiting for locator('#viz-scatter-fit').locator('img.viz-image')
+    +     - locator resolved to <img loading=\"eager\" decoding=\"async\" class=\"viz-image\" src=\"http://127.0.0.1:4173/Ostrin/assets/viz/scatter-fit.svg\" alt=\"Scatter and fit: Calibration data, a least-squares line and its ±2σ band. Source: examples/viz_scatter_fit.ostrin\"/>
+    +   - taking element screenshot
+    +     - disabled all CSS animations
+    +   - waiting for fonts to load...
+    +   - fonts loaded
+    +   - attempting scroll into view action
+    +     - waiting for element to be stable
+    +   - captured a stable screenshot
+    +   - Expected an image 577px by 361px, received 577px by 362px.
+    + ",
+    +   },
+    +   Object {
+    +     "id": "heatmap",
+    +     "message": "expect(locator).toHaveScreenshot(expected) failed
+    +
+    + Locator: locator('#viz-heatmap').locator('img.viz-image')
+    +   4933 pixels (ratio 0.02 of all image pixels) are different.
+    +
+    +   Snapshot: plot-heatmap.png
+    +
+    + Call log:
+    +   - Expect \"toHaveScreenshot(plot-heatmap.png)\" locator('#viz-heatmap').locator('img.viz-image') with timeout 5000ms
+    +     - verifying given screenshot expectation
+    +   - waiting for locator('#viz-heatmap').locator('img.viz-image')
+    +     - locator resolved to <img loading=\"eager\" decoding=\"async\" class=\"viz-image\" src=\"http://127.0.0.1:4173/Ostrin/assets/viz/heatmap.svg\" alt=\"Heatmap and contours: A 48 × 48 field with a colorbar and ten marching-squares contour levels. Source: examples/viz_heatmap.ostrin\"/>
+    +   - taking element screenshot
+    +     - disabled all CSS animations
+    +   - waiting for fonts to load...
+    +   - fonts loaded
+    +   - attempting scroll into view action
+    +     - waiting for element to be stable
+    +   - 4933 pixels (ratio 0.02 of all image pixels) are different.
+    +   - waiting 100ms before taking screenshot
+    +   - waiting for locator('#viz-heatmap').locator('img.viz-image')
+    +     - locator resolved to <img loading=\"eager\" decoding=\"async\" class=\"viz-image\" src=\"http://127.0.0.1:4173/Ostrin/assets/viz/heatmap.svg\" alt=\"Heatmap and contours: A 48 × 48 field with a colorbar and ten marching-squares contour levels. Source: examples/viz_heatmap.ostrin\"/>
+    +   - taking element screenshot
+    +     - disabled all CSS animations
+    +   - waiting for fonts to load...
+    +   - fonts loaded
+    +   - attempting scroll into view action
+    +     - waiting for element to be stable
+    +   - captured a stable screenshot
+    +   - 4933 pixels (ratio 0.02 of all image pixels) are different.
+    + ",
+    +   },
+    +   Object {
+    +     "id": "bars",
+    +     "message": "expect(locator).toHaveScreenshot(expected) failed
+    +
+    + Locator: locator('#viz-bars').locator('img.viz-image')
+    +   Expected an image 577px by 361px, received 577px by 362px. 
+    +
+    +   Snapshot: plot-bars.png
+    +
+    + Call log:
+    +   - Expect \"toHaveScreenshot(plot-bars.png)\" locator('#viz-bars').locator('img.viz-image') with timeout 5000ms
+    +     - verifying given screenshot expectation
+    +   - waiting for locator('#viz-bars').locator('img.viz-image')
+    +     - locator resolved to <img loading=\"eager\" decoding=\"async\" class=\"viz-image\" src=\"http://127.0.0.1:4173/Ostrin/assets/viz/bars.svg\" alt=\"Bars with error bars: Group means with standard uncertainties projected from Measurement<Float> sources. Source: examples/viz_bars.ostrin\"/>
+    +   - taking element screenshot
+    +     - disabled all CSS animations
+    +   - waiting for fonts to load...
+    +   - fonts loaded
+    +   - attempting scroll into view action
+    +     - waiting for element to be stable
+    +   - Expected an image 577px by 361px, received 577px by 362px.
+    +   - waiting 100ms before taking screenshot
+    +   - waiting for locator('#viz-bars').locator('img.viz-image')
+    +     - locator resolved to <img loading=\"eager\" decoding=\"async\" class=\"viz-image\" src=\"http://127.0.0.1:4173/Ostrin/assets/viz/bars.svg\" alt=\"Bars with error bars: Group means with standard uncertainties projected from Measurement<Float> sources. Source: examples/viz_bars.ostrin\"/>
+    +   - taking element screenshot
+    +     - disabled all CSS animations
+    +   - waiting for fonts to load...
+    +   - fonts loaded
+    +   - attempting scroll into view action
+    +     - waiting for element to be stable
+    +   - captured a stable screenshot
+    +   - Expected an image 577px by 361px, received 577px by 362px.
+    + ",
+    +   },
+    + ]
+
+      89 |     }
+      90 |   }
+    > 91 |   expect(visualMismatches, "published scientific plot images differ from their baselines").toEqual([]);
+         |                                                                                            ^
+      92 | });
+      93 |
+        at C:\Users\Andre\Downloads\_Ostrin-worktrees\scientific-platform-core\tests\browser\visual.spec.mjs:91:92
+
+    attachment #1: plot-scatter-fit (image/png) ────────────────────────────────────────────────────
+    Expected: visual.spec.mjs-snapshots\plot-scatter-fit-chromium-win32.png
+    Received: ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\plot-scatter-fit-actual.png
+    Diff:     ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\plot-scatter-fit-diff.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: plot-heatmap (image/png) ────────────────────────────────────────────────────────
+    Expected: visual.spec.mjs-snapshots\plot-heatmap-chromium-win32.png
+    Received: ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\plot-heatmap-actual.png
+    Diff:     ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\plot-heatmap-diff.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: plot-bars (image/png) ───────────────────────────────────────────────────────────
+    Expected: visual.spec.mjs-snapshots\plot-bars-chromium-win32.png
+    Received: ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\plot-bars-actual.png
+    Diff:     ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\plot-bars-diff.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #4: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\error-context.md
+
+    attachment #6: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\..\..\..\..\AppData\Local\Temp\ostrin-playwright-results\visual-scientific-plot-vis-a4899-eir-published-gallery-cards-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    [chromium] › visual.spec.mjs:65:1 › scientific plot visual fixtures match their published gallery cards 

@@ -1,0 +1,130 @@
+// Exact polynomial solving and rational factorization of expressions in one symbol.
+//
+// Every expected value below is known analytically before the program runs: the roots of x^2 - 3x + 2 are 1
+// and 2, the roots of 2x^2 + 3x - 2 are 1/2 and -2, and so on. Each result is confirmed two ways that do not
+// depend on the solver: the identity expand(factor) = expand(p), decided by the store's canonical forms, and
+// substitution, p(root) expanded equals zero. The irrational roots of x^2 - 2 are checked numerically against
+// the reference value of sqrt(2).
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    two = symbolic.number(s, 2)
+    mut failures = 0
+
+    // x^2 - 3x + 2 = (x - 1)(x - 2)
+    p = symbolic.add(symbolic.power(x, two), symbolic.add(symbolic.mul(symbolic.number(s, 0 - 3), x), symbolic.number(s, 2)))
+    print("roots of x^2 - 3x + 2: " + symbolic.roots_text(p, x))
+    if symbolic.roots_text(p, x) != "2, 1" {
+        print("FAIL roots of x^2 - 3x + 2")
+        failures = failures + 1
+    }
+    match symbolic.solve_polynomial(p, x) {
+        Ok(found) => {
+            for r in found {
+                if not symbolic.is_root(p, x, r) {
+                    print("FAIL substitution at " + symbolic.show(r))
+                    failures = failures + 1
+                }
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+    match symbolic.factor_rational(p, x) {
+        Ok(f) => {
+            print("factor of x^2 - 3x + 2: " + symbolic.show(f))
+            if not symbolic.same(symbolic.expand(f), symbolic.expand(p)) {
+                print("FAIL factorization identity for x^2 - 3x + 2")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL factor: " + message)
+            failures = failures + 1
+        },
+    }
+
+    // 2x^2 + 3x - 2 = (2x - 1)(x + 2): roots 1/2 and -2
+    q = symbolic.add(symbolic.mul(symbolic.number(s, 2), symbolic.power(x, two)), symbolic.add(symbolic.mul(symbolic.number(s, 3), x), symbolic.number(s, 0 - 2)))
+    print("roots of 2x^2 + 3x - 2: " + symbolic.roots_text(q, x))
+    if symbolic.roots_text(q, x) != "1/2, -2" {
+        print("FAIL roots of 2x^2 + 3x - 2")
+        failures = failures + 1
+    }
+
+    // x^3 - 6x^2 + 11x - 6 = (x - 1)(x - 2)(x - 3): three rational roots, degree-3 path
+    cubic = symbolic.add(symbolic.power(x, symbolic.number(s, 3)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - 6), symbolic.power(x, two)), symbolic.add(symbolic.mul(symbolic.number(s, 11), x), symbolic.number(s, 0 - 6))))
+    print("roots of x^3 - 6x^2 + 11x - 6: " + symbolic.roots_text(cubic, x))
+    match symbolic.factor_rational(cubic, x) {
+        Ok(f) => {
+            if not symbolic.same(symbolic.expand(f), symbolic.expand(cubic)) {
+                print("FAIL factorization identity for the cubic")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL cubic factor: " + message)
+            failures = failures + 1
+        },
+    }
+
+    // (x - 1)^2 = x^2 - 2x + 1: the repeated root is listed once
+    double = symbolic.add(symbolic.power(x, two), symbolic.add(symbolic.mul(symbolic.number(s, 0 - 2), x), symbolic.number(s, 1)))
+    print("roots of (x - 1)^2: " + symbolic.roots_text(double, x))
+    if symbolic.roots_text(double, x) != "1" {
+        print("FAIL repeated root")
+        failures = failures + 1
+    }
+
+    // x^2 - 2 = 0: irrational roots kept exact as sqrt forms, checked numerically against sqrt(2)
+    irr = symbolic.add(symbolic.power(x, two), symbolic.number(s, 0 - 2))
+    print("roots of x^2 - 2: " + symbolic.roots_text(irr, x))
+    match symbolic.solve_polynomial(irr, x) {
+        Ok(found) => {
+            names = ["x"]
+            value = symbolic.eval_or(found[0], names, [0.0], 0.0 / 0.0)
+            other = symbolic.eval_or(found[1], names, [0.0], 0.0 / 0.0)
+            print("numeric values: " + value.to_string() + " and " + other.to_string())
+            if abs(value - 1.4142135623730951) > 1e-15 or abs(other + 1.4142135623730951) > 1e-15 {
+                print("FAIL numeric values of the irrational roots")
+                failures = failures + 1
+            }
+        },
+        Err(message) => {
+            print("FAIL irrational: " + message)
+            failures = failures + 1
+        },
+    }
+
+    // Inputs that must fail with a stated reason, never with a guess
+    complex = symbolic.add(symbolic.power(x, two), symbolic.number(s, 1))
+    print("x^2 + 1: " + symbolic.roots_text(complex, x))
+    if symbolic.roots_text(complex, x) == "" {
+        print("FAIL x^2 + 1 returned no text")
+        failures = failures + 1
+    }
+    cube_plus_one = symbolic.add(symbolic.power(x, symbolic.number(s, 3)), symbolic.number(s, 1))
+    print("x^3 + 1: " + symbolic.roots_text(cube_plus_one, x))
+    print("sin(x): " + symbolic.roots_text(symbolic.call("sin", x), x))
+    y = symbolic.symbol(s, "y")
+    print("y*x + 1: " + symbolic.roots_text(symbolic.add(symbolic.mul(y, x), symbolic.number(s, 1)), x))
+    print("0: " + symbolic.roots_text(symbolic.number(s, 0), x))
+
+    // 3x - 6 = 0 has the root 2
+    linear = symbolic.add(symbolic.mul(symbolic.number(s, 3), x), symbolic.number(s, 0 - 6))
+    print("roots of 3x - 6: " + symbolic.roots_text(linear, x))
+    if symbolic.roots_text(linear, x) != "2" {
+        print("FAIL linear root")
+        failures = failures + 1
+    }
+
+    if failures == 0 {
+        print("all solver checks passed")
+    } else {
+        print("solver checks failed: " + failures.to_string())
+    }
+}

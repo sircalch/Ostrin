@@ -1,0 +1,12 @@
+// One user function call per iteration.
+fn advance(x: Int) -> Int {
+    return x + 1
+}
+
+fn main() -> Void {
+    mut total = 0
+    for i in 0 until 10000000 {
+        total = advance(total)
+    }
+    print("RESULT function_call " + total.to_string())
+}

@@ -1,0 +1,122 @@
+// Rational equations R1(x) = R2(x) on their domains: rational roots, quadratic irrational roots, repeated roots, removable
+// singularities, shared denominators, zero numerators, contradictions, and a residue the method cannot solve.
+// The candidate from multiplying by a denominator is rejected when it is excluded from the original domain.
+import std.rational
+
+fn main() -> Void {
+    mut failures = 0
+
+    // (x^2 - 1)/(x - 1) = 3: the candidate x = 2 is a valid solution
+    f1 = rational.rational_new(["-1", "0", "1"], ["-1", "1"]).unwrap()
+    g1 = rational.rational_new(["3"], ["1"]).unwrap()
+    s1 = rational.rational_solve(f1, g1).unwrap()
+    // x = 1 is listed as an excluded point of the domain: the removable point stays excluded
+    if s1.status != "solved" or s1.solutions != ["2"] or s1.excluded.length() != 1 {
+        print("FAIL (x^2 - 1)/(x - 1) = 3")
+        failures = failures + 1
+    }
+
+    // (x^2 - 1)/(x - 1) = 2: the reduced form gives x = 1, which is excluded from the original domain
+    g2 = rational.rational_new(["2"], ["1"]).unwrap()
+    s2 = rational.rational_solve(f1, g2).unwrap()
+    if s2.status != "no_solution" or s2.solutions.length() != 0 or s2.excluded.length() != 1 {
+        print("FAIL (x^2 - 1)/(x - 1) = 2 must be rejected: " + s2.status)
+        failures = failures + 1
+    }
+    print("(x^2 - 1)/(x - 1) = 2: " + s2.status + "; excluded: " + s2.excluded.join(" | "))
+
+    // x^2 - 2 = 0: two irrational roots, verified exactly in Q(sqrt(8))
+    f3 = rational.rational_new(["-2", "0", "1"], ["1"]).unwrap()
+    g3 = rational.rational_new([], ["1"]).unwrap()
+    s3 = rational.rational_solve(f3, g3).unwrap()
+    if s3.status != "solved" or s3.solutions.length() != 2 or s3.solution_kinds[0] != "quadratic irrational" {
+        print("FAIL x^2 - 2 = 0: " + s3.status)
+        failures = failures + 1
+    }
+    print("x^2 - 2 = 0: " + s3.solutions.join(" | ") + " (" + s3.exactness + ")")
+
+    // (x - 1)^2 = 0: a repeated root with multiplicity two
+    f4 = rational.rational_new(["1", "-2", "1"], ["1"]).unwrap()
+    s4 = rational.rational_solve(f4, g3).unwrap()
+    if s4.status != "solved" or s4.solutions != ["1"] or s4.multiplicities[0] != 2 {
+        print("FAIL the repeated root")
+        failures = failures + 1
+    }
+
+    // (x^2 - 1)/(x - 1) = x + 1: equal at every admissible point, so an identity on the domain
+    g5 = rational.rational_new(["1", "1"], ["1"]).unwrap()
+    s5 = rational.rational_solve(f1, g5).unwrap()
+    if s5.status != "identity" or s5.solutions.length() != 0 or s5.domain.length() == 0 {
+        print("FAIL the identity: " + s5.status)
+        failures = failures + 1
+    }
+    print("(x^2 - 1)/(x - 1) = x + 1: " + s5.status + " on the domain " + s5.domain.join(" ; "))
+
+    // (x + 1)/(x - 2) = 3/(x - 2): the candidate x = 2 would make both sides undefined
+    f6 = rational.rational_new(["1", "1"], ["-2", "1"]).unwrap()
+    g6 = rational.rational_new(["3"], ["-2", "1"]).unwrap()
+    s6 = rational.rational_solve(f6, g6).unwrap()
+    if s6.status != "no_solution" or s6.excluded.length() != 1 {
+        print("FAIL the shared denominator: " + s6.status)
+        failures = failures + 1
+    }
+
+    // 0/(x + 1) = 0: the zero numerator is an identity on its domain
+    f7 = rational.rational_new([], ["1", "1"]).unwrap()
+    s7 = rational.rational_solve(f7, rational.rational_new([], ["1"]).unwrap()).unwrap()
+    if s7.status != "identity" {
+        print("FAIL the zero numerator: " + s7.status)
+        failures = failures + 1
+    }
+
+    // x = x + 1: a contradiction, which is a complete answer (no solution), not a missing algorithm
+    f8 = rational.rational_new(["0", "1"], ["1"]).unwrap()
+    g8 = rational.rational_new(["1", "1"], ["1"]).unwrap()
+    s8 = rational.rational_solve(f8, g8).unwrap()
+    if s8.status != "no_solution" or s8.completeness.starts_with("partial") {
+        print("FAIL the contradiction: " + s8.status)
+        failures = failures + 1
+    }
+
+    // x/2 = 1/3: the rational root 2/3
+    f9 = rational.rational_new(["0", "1"], ["2"]).unwrap()
+    g9 = rational.rational_new(["1"], ["3"]).unwrap()
+    s9 = rational.rational_solve(f9, g9).unwrap()
+    if s9.solutions != ["2/3"] {
+        print("FAIL the rational root 2/3: " + s9.status)
+        failures = failures + 1
+    }
+
+    // x^3 - 2 = 0: no rational root, and a cubic is outside the method: partial, never "no solution"
+    f10 = rational.rational_new(["-2", "0", "0", "1"], ["1"]).unwrap()
+    s10 = rational.rational_solve(f10, rational.rational_new([], ["1"]).unwrap()).unwrap()
+    if s10.status != "partial" or s10.pending.length() != 1 {
+        print("FAIL the cubic must be reported as partial: " + s10.status)
+        failures = failures + 1
+    }
+    print("x^3 - 2 = 0: " + s10.status + "; pending: " + s10.pending.join(" | "))
+
+    // x^2 + 1 = 0: over the real numbers there is no solution; the two non-real roots are listed separately
+    f11 = rational.rational_new(["1", "0", "1"], ["1"]).unwrap()
+    s11 = rational.rational_solve(f11, rational.rational_new([], ["1"]).unwrap()).unwrap()
+    if s11.status != "no_solution" or s11.solutions.length() != 0 or s11.complex_roots.length() != 2 {
+        print("FAIL the non-real roots must not be solutions over the reals")
+        failures = failures + 1
+    }
+
+    // (x^2 - 2)/(x^2 - 2) = 1: an identity on the domain. The points x = +-sqrt(2) are excluded, and they are
+    // irrational, so they are not enumerated in the excluded list (that list is not exhaustive).
+    f12 = rational.rational_new(["-2", "0", "1"], ["-2", "0", "1"]).unwrap()
+    g12 = rational.rational_new(["1"], ["1"]).unwrap()
+    s12 = rational.rational_solve(f12, g12).unwrap()
+    if s12.status != "identity" or s12.domain.length() != 2 {
+        print("FAIL the identity with irrational domain points: " + s12.status)
+        failures = failures + 1
+    }
+
+    if failures == 0 {
+        print("all rational equation checks passed")
+    } else {
+        print("rational equation checks failed: " + failures.to_string())
+    }
+}

@@ -1,0 +1,7 @@
+// Cost of the loop itself: one iteration, no work in the body.
+fn main() -> Void {
+    mut total = 0
+    for i in 0 until 10000000 {
+    }
+    print("RESULT empty_loop " + total.to_string())
+}

@@ -1,0 +1,777 @@
+{
+  "generated": "2026-11-13T03:25:56.444Z",
+  "label": "after",
+  "compiler": "C:\\Users\\Andre\\Downloads\\_Ostrin-worktrees\\scientific-platform-core\\compiler\\target\\release\\ostrinc.exe",
+  "config": {
+    "native": {
+      "kBig": 10,
+      "reps": 7
+    },
+    "interp": {
+      "kBig": 2,
+      "reps": 3
+    },
+    "python": {
+      "kBig": 5,
+      "reps": 5
+    },
+    "julia": {
+      "kBig": 5,
+      "reps": 5
+    }
+  },
+  "hardware": {
+    "os": "win32 10.0.26200 x64",
+    "cpuModel": "AMD Ryzen 7 5700X 8-Core Processor",
+    "logicalCores": 16,
+    "memoryGiB": 32,
+    "physicalCores": 8
+  },
+  "versions": {
+    "node": "v24.19.0",
+    "ostrinc": "ostrinc 0.2.0",
+    "python": "Python 3.12.10",
+    "julia": "julia version 1.13.3"
+  },
+  "threads": {
+    "julia": 1,
+    "python": 1,
+    "ostrinNative": "single-threaded unless --native-threads",
+    "envOMP_NUM_THREADS": 1,
+    "envOPENBLAS_NUM_THREADS": 1
+  },
+  "loadBefore": [
+    {
+      "name": "The iTero Coach",
+      "cpuSeconds": 38489
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 35195
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 23338
+    },
+    {
+      "name": "Taskmgr",
+      "cpuSeconds": 21778
+    },
+    {
+      "name": "LeagueClient",
+      "cpuSeconds": 15087
+    },
+    {
+      "name": "LeagueClientUx",
+      "cpuSeconds": 9561
+    }
+  ],
+  "cells": [
+    {
+      "implementation": "Ostrin native",
+      "kernel": "simpson",
+      "compileMs": {
+        "n": 5,
+        "median": 1900.4281,
+        "min": 1818.3558,
+        "max": 2023.5046,
+        "mad": 17.44549999999981
+      },
+      "compileFailure": null,
+      "incomplete": false,
+      "perRunMs": 148.2915222222222,
+      "uncertaintyMs": 13.066811111111102,
+      "startupEstimateMs": 20.026277777777807,
+      "t1": {
+        "n": 7,
+        "median": 168.3178,
+        "min": 161.8909,
+        "max": 194.385,
+        "mad": 4.576300000000003
+      },
+      "tk": {
+        "n": 7,
+        "median": 1502.9415,
+        "min": 1494.9265,
+        "max": 1580.0337,
+        "mad": 7.703399999999874
+      },
+      "kBig": 10,
+      "reps": 7
+    },
+    {
+      "implementation": "Ostrin interpreter (after)",
+      "kernel": "simpson",
+      "incomplete": false,
+      "perRunMs": 6343.610100000001,
+      "uncertaintyMs": 1403.8517999999995,
+      "startupEstimateMs": -785.590900000001,
+      "t1": {
+        "n": 3,
+        "median": 5558.0192,
+        "min": 5469.1571,
+        "max": 5887.3,
+        "mad": 88.86209999999937
+      },
+      "tk": {
+        "n": 3,
+        "median": 11901.6293,
+        "min": 11566.7912,
+        "max": 12552.5001,
+        "mad": 334.83810000000085
+      },
+      "kBig": 2,
+      "reps": 3
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "simpson",
+      "incomplete": false,
+      "perRunMs": 920.0461,
+      "uncertaintyMs": 1174.237075,
+      "startupEstimateMs": 422.6714999999999,
+      "t1": {
+        "n": 5,
+        "median": 1342.7176,
+        "min": 596.8143,
+        "max": 1538.456,
+        "mad": 195.73839999999996
+      },
+      "tk": {
+        "n": 5,
+        "median": 5022.902,
+        "min": 2403.0758,
+        "max": 6158.3824,
+        "mad": 1119.0198
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 488.3189999964088,
+          "min": 475.0460998620838,
+          "max": 526.657999958843,
+          "mad": 7.224800065159798
+        },
+        "warm": {
+          "n": 20,
+          "median": 491.2856000009924,
+          "min": 450.73339994996786,
+          "max": 570.969499880448,
+          "mad": 11.769599979743361
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "simpson",
+      "incomplete": false,
+      "perRunMs": 18.73845,
+      "uncertaintyMs": 49.04245,
+      "startupEstimateMs": 671.4593500000001,
+      "t1": {
+        "n": 5,
+        "median": 690.1978,
+        "min": 671.3642,
+        "max": 728.5181,
+        "mad": 3.581299999999942
+      },
+      "tk": {
+        "n": 5,
+        "median": 765.1516,
+        "min": 731.8656,
+        "max": 870.8815,
+        "mad": 33.28600000000006
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 25.9752,
+          "min": 24.6215,
+          "max": 30.7135,
+          "mad": 1.3537
+        },
+        "warm": {
+          "n": 20,
+          "median": 20.7146,
+          "min": 17.5848,
+          "max": 30.0344,
+          "mad": 2.103249999999999
+        }
+      }
+    },
+    {
+      "implementation": "Ostrin native",
+      "kernel": "bisect",
+      "compileMs": {
+        "n": 5,
+        "median": 1990.6204,
+        "min": 1846.7559,
+        "max": 2080.9282,
+        "mad": 57.23669999999993
+      },
+      "compileFailure": null,
+      "incomplete": false,
+      "perRunMs": 30.936544444444444,
+      "uncertaintyMs": 3.7436000000000025,
+      "startupEstimateMs": 17.323955555555557,
+      "t1": {
+        "n": 7,
+        "median": 48.2605,
+        "min": 46.5471,
+        "max": 71.1046,
+        "mad": 1.0067999999999984
+      },
+      "tk": {
+        "n": 7,
+        "median": 326.6894,
+        "min": 322.4087,
+        "max": 331.5436,
+        "mad": 2.1385999999999967
+      },
+      "kBig": 10,
+      "reps": 7
+    },
+    {
+      "implementation": "Ostrin interpreter (after)",
+      "kernel": "bisect",
+      "incomplete": false,
+      "perRunMs": 22324.322200000002,
+      "uncertaintyMs": 4002.728699999996,
+      "startupEstimateMs": -1454.2421000000031,
+      "t1": {
+        "n": 3,
+        "median": 20870.0801,
+        "min": 20548.5944,
+        "max": 22384.6923,
+        "mad": 321.48569999999745
+      },
+      "tk": {
+        "n": 3,
+        "median": 43194.4023,
+        "min": 42013.2969,
+        "max": 44179.9277,
+        "mad": 985.5253999999986
+      },
+      "kBig": 2,
+      "reps": 3
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "bisect",
+      "incomplete": false,
+      "perRunMs": 1771.6653000000001,
+      "uncertaintyMs": 2572.800975,
+      "startupEstimateMs": -83.13360000000011,
+      "t1": {
+        "n": 5,
+        "median": 1688.5317,
+        "min": 1630.8027,
+        "max": 3720.6883,
+        "mad": 15.795499999999947
+      },
+      "tk": {
+        "n": 5,
+        "median": 8775.1929,
+        "min": 8335.9471,
+        "max": 16537.2654,
+        "mad": 439.2458000000006
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 1432.394800009206,
+          "min": 1405.3080999292433,
+          "max": 1473.9878999534994,
+          "mad": 27.08670007996261
+        },
+        "warm": {
+          "n": 20,
+          "median": 1664.978599990718,
+          "min": 1409.0745002031326,
+          "max": 1741.2353998515755,
+          "mad": 26.030350010842085
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "bisect",
+      "incomplete": false,
+      "perRunMs": 17.892149999999987,
+      "uncertaintyMs": 14.50615000000002,
+      "startupEstimateMs": 619.25935,
+      "t1": {
+        "n": 5,
+        "median": 637.1515,
+        "min": 632.5979,
+        "max": 646.7327,
+        "mad": 2.518699999999967
+      },
+      "tk": {
+        "n": 5,
+        "median": 708.7201,
+        "min": 700.8365,
+        "max": 744.7263,
+        "mad": 2.9932000000000016
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 31.9203,
+          "min": 29.9553,
+          "max": 32.8771,
+          "mad": 0.9116
+        },
+        "warm": {
+          "n": 20,
+          "median": 15.1565,
+          "min": 14.4985,
+          "max": 15.846,
+          "mad": 0.2270499999999993
+        }
+      }
+    },
+    {
+      "implementation": "Ostrin native",
+      "kernel": "matmul",
+      "compileMs": {
+        "n": 5,
+        "median": 519.0027,
+        "min": 503.6089,
+        "max": 616.7588,
+        "mad": 5.96670000000006
+      },
+      "compileFailure": null,
+      "incomplete": false,
+      "perRunMs": 31.62032222222222,
+      "uncertaintyMs": 2.629100000000003,
+      "startupEstimateMs": 18.114177777777776,
+      "t1": {
+        "n": 7,
+        "median": 49.7345,
+        "min": 47.4775,
+        "max": 55.8159,
+        "mad": 1.7232999999999947
+      },
+      "tk": {
+        "n": 7,
+        "median": 334.3174,
+        "min": 326.2518,
+        "max": 341.5753,
+        "mad": 4.943200000000047
+      },
+      "kBig": 10,
+      "reps": 7
+    },
+    {
+      "implementation": "Ostrin interpreter (after)",
+      "kernel": "matmul",
+      "incomplete": false,
+      "perRunMs": 27009.036,
+      "uncertaintyMs": 1668.8080000000045,
+      "startupEstimateMs": 192.52479999999923,
+      "t1": {
+        "n": 3,
+        "median": 27201.5608,
+        "min": 26805.0425,
+        "max": 27426.3115,
+        "mad": 224.7507000000005
+      },
+      "tk": {
+        "n": 3,
+        "median": 54210.5968,
+        "min": 54145.4232,
+        "max": 55192.9622,
+        "mad": 65.1736000000019
+      },
+      "kBig": 2,
+      "reps": 3
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "matmul",
+      "incomplete": false,
+      "perRunMs": 4541.1801,
+      "uncertaintyMs": 358.59135000000003,
+      "startupEstimateMs": -1613.0578999999998,
+      "t1": {
+        "n": 5,
+        "median": 2928.1222,
+        "min": 2882.5026,
+        "max": 2975.7394,
+        "mad": 43.33789999999999
+      },
+      "tk": {
+        "n": 5,
+        "median": 21092.8426,
+        "min": 20357.1075,
+        "max": 21698.2361,
+        "mad": 210.3140999999996
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 2828.739100135863,
+          "min": 2737.3701001051813,
+          "max": 2841.8131000362337,
+          "mad": 13.073999900370836
+        },
+        "warm": {
+          "n": 20,
+          "median": 4594.531200011261,
+          "min": 3831.7216001451015,
+          "max": 5138.865800108761,
+          "mad": 389.2502000089735
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "matmul",
+      "incomplete": false,
+      "perRunMs": 15.194199999999995,
+      "uncertaintyMs": 19.022475000000014,
+      "startupEstimateMs": 651.0453,
+      "t1": {
+        "n": 5,
+        "median": 666.2395,
+        "min": 655.8847,
+        "max": 704.2355,
+        "mad": 2.9827999999999975
+      },
+      "tk": {
+        "n": 5,
+        "median": 727.0163,
+        "min": 717.2411,
+        "max": 744.9802,
+        "mad": 4.778099999999995
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 51.0817,
+          "min": 50.0362,
+          "max": 56.969,
+          "mad": 1.045499999999997
+        },
+        "warm": {
+          "n": 20,
+          "median": 17.52525,
+          "min": 16.5534,
+          "max": 31.2833,
+          "mad": 0.69815
+        }
+      }
+    },
+    {
+      "implementation": "Ostrin native",
+      "kernel": "regression",
+      "compileMs": {
+        "n": 5,
+        "median": 441.5862,
+        "min": 429.3331,
+        "max": 450.4575,
+        "mad": 7.484099999999955
+      },
+      "compileFailure": null,
+      "incomplete": false,
+      "perRunMs": 5.181622222222221,
+      "uncertaintyMs": 2.822755555555556,
+      "startupEstimateMs": 17.10997777777778,
+      "t1": {
+        "n": 7,
+        "median": 22.2916,
+        "min": 20.8704,
+        "max": 23.2066,
+        "mad": 0.9150000000000027
+      },
+      "tk": {
+        "n": 7,
+        "median": 68.9262,
+        "min": 67.1991,
+        "max": 90.2677,
+        "mad": 0.36530000000000484
+      },
+      "kBig": 10,
+      "reps": 7
+    },
+    {
+      "implementation": "Ostrin interpreter (after)",
+      "kernel": "regression",
+      "incomplete": false,
+      "perRunMs": 6037.517599999999,
+      "uncertaintyMs": 578.7659000000003,
+      "startupEstimateMs": -461.023799999999,
+      "t1": {
+        "n": 3,
+        "median": 5576.4938,
+        "min": 5569.9991,
+        "max": 5786.6231,
+        "mad": 6.4947000000001935
+      },
+      "tk": {
+        "n": 3,
+        "median": 11614.0114,
+        "min": 11382.5798,
+        "max": 11744.7217,
+        "mad": 130.71030000000064
+      },
+      "kBig": 2,
+      "reps": 3
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "regression",
+      "incomplete": false,
+      "perRunMs": 516.4099,
+      "uncertaintyMs": 91.81354999999996,
+      "startupEstimateMs": 110.42169999999999,
+      "t1": {
+        "n": 5,
+        "median": 626.8316,
+        "min": 605.2017,
+        "max": 702.8456,
+        "mad": 21.62990000000002
+      },
+      "tk": {
+        "n": 5,
+        "median": 2692.4712,
+        "min": 2573.6518,
+        "max": 2843.2621,
+        "mad": 50.34950000000026
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 504.4161002151668,
+          "min": 483.7639001198113,
+          "max": 515.5896998476237,
+          "mad": 11.173599632456899
+        },
+        "warm": {
+          "n": 20,
+          "median": 499.4117501191795,
+          "min": 478.00019988790154,
+          "max": 532.7536000404507,
+          "mad": 7.17789982445538
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "regression",
+      "incomplete": false,
+      "perRunMs": 4.734774999999985,
+      "uncertaintyMs": 15.615449999999981,
+      "startupEstimateMs": 624.158125,
+      "t1": {
+        "n": 5,
+        "median": 628.8929,
+        "min": 614.12,
+        "max": 647.1568,
+        "mad": 11.483900000000062
+      },
+      "tk": {
+        "n": 5,
+        "median": 647.832,
+        "min": 638.5262,
+        "max": 667.9512,
+        "mad": 1.6952999999999747
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 27.5343,
+          "min": 26.2605,
+          "max": 28.0929,
+          "mad": 0.5585999999999984
+        },
+        "warm": {
+          "n": 20,
+          "median": 5.99685,
+          "min": 5.8598,
+          "max": 6.2361,
+          "mad": 0.10510000000000064
+        }
+      }
+    },
+    {
+      "implementation": "Ostrin native",
+      "kernel": "horner",
+      "compileMs": {
+        "n": 5,
+        "median": 503.6756,
+        "min": 481.1469,
+        "max": 534.2174,
+        "mad": 17.87299999999999
+      },
+      "compileFailure": null,
+      "incomplete": false,
+      "perRunMs": 102.20804444444444,
+      "uncertaintyMs": 8.421166666666666,
+      "startupEstimateMs": 15.275455555555567,
+      "t1": {
+        "n": 7,
+        "median": 117.4835,
+        "min": 113.8034,
+        "max": 136.2084,
+        "mad": 3.5250000000000057
+      },
+      "tk": {
+        "n": 7,
+        "median": 1037.3559,
+        "min": 1018.2325,
+        "max": 1071.618,
+        "mad": 9.206900000000132
+      },
+      "kBig": 10,
+      "reps": 7
+    },
+    {
+      "implementation": "Ostrin interpreter (after)",
+      "kernel": "horner",
+      "incomplete": false,
+      "perRunMs": 60472.54529999999,
+      "uncertaintyMs": 41300.378399999994,
+      "startupEstimateMs": 1080.3394000000117,
+      "t1": {
+        "n": 3,
+        "median": 61552.8847,
+        "min": 60263.6751,
+        "max": 70548.2388,
+        "mad": 1289.209600000002
+      },
+      "tk": {
+        "n": 3,
+        "median": 122025.43,
+        "min": 117353.1925,
+        "max": 148369.0072,
+        "mad": 4672.237499999988
+      },
+      "kBig": 2,
+      "reps": 3
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "horner",
+      "incomplete": false,
+      "perRunMs": 4668.967525,
+      "uncertaintyMs": 157.21000000000004,
+      "startupEstimateMs": -268.5933249999998,
+      "t1": {
+        "n": 5,
+        "median": 4400.3742,
+        "min": 4254.9087,
+        "max": 4494.7333,
+        "mad": 94.35909999999967
+      },
+      "tk": {
+        "n": 5,
+        "median": 23076.2443,
+        "min": 22984.622,
+        "max": 23373.6374,
+        "mad": 73.4181000000026
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 4223.314699949697,
+          "min": 4154.439899837598,
+          "max": 4274.295400129631,
+          "mad": 24.161200039088726
+        },
+        "warm": {
+          "n": 20,
+          "median": 4664.531899965368,
+          "min": 4536.928799934685,
+          "max": 4799.7105999384075,
+          "mad": 43.9437001477927
+        }
+      }
+    },
+    {
+      "implementation": "Julia 1.13 (1 thread)",
+      "kernel": "horner",
+      "incomplete": false,
+      "perRunMs": 73.08090000000001,
+      "uncertaintyMs": 26.678325,
+      "startupEstimateMs": 652.5147999999999,
+      "t1": {
+        "n": 5,
+        "median": 725.5957,
+        "min": 697.3282,
+        "max": 791.2336,
+        "mad": 9.110300000000052
+      },
+      "tk": {
+        "n": 5,
+        "median": 1017.9193,
+        "min": 1007.7378,
+        "max": 1020.5457,
+        "mad": 2.6263999999999896
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 131.3408,
+          "min": 123.6075,
+          "max": 132.6418,
+          "mad": 1.3009999999999877
+        },
+        "warm": {
+          "n": 20,
+          "median": 72.8546,
+          "min": 71.0309,
+          "max": 78.1795,
+          "mad": 0.6563999999999979
+        }
+      }
+    }
+  ],
+  "loadAfter": [
+    {
+      "name": "The iTero Coach",
+      "cpuSeconds": 38883
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 35204
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 23374
+    },
+    {
+      "name": "Taskmgr",
+      "cpuSeconds": 22182
+    },
+    {
+      "name": "LeagueClient",
+      "cpuSeconds": 16587
+    },
+    {
+      "name": "LeagueClientUx",
+      "cpuSeconds": 10536
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+// One integer addition per iteration, with the loop variable read.
+fn main() -> Void {
+    mut total = 0
+    for i in 0 until 10000000 {
+        total = total + i
+    }
+    print("RESULT int_add " + total.to_string())
+}

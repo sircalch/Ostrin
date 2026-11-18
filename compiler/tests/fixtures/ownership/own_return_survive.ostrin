@@ -1,0 +1,36 @@
+// Closures that outlive the environment that created them: a closure returned by a function that owned a String and a list,
+// a closure stored in a record, and a closure returned by a function that received its captures as parameters.
+// Expected (worked out by hand):
+//   kept alpha 3
+//   kept alpha 4
+//   stored 5
+//   chain 12
+record Holder {
+    run: fn() -> Int
+}
+
+fn make_keeper() -> fn() -> Int {
+    tag = "alpha"
+    values = [1, 2]
+    mut count = 2
+    return fn() {
+        count = count + 1
+        print("kept " + tag + " " + count.to_string())
+        count + values.length() - 2
+    }
+}
+
+fn make_chain(base: Int, extra: Int) -> fn() -> Int {
+    return fn() { base + extra }
+}
+
+fn main() -> Void {
+    keep = make_keeper()
+    keep()
+    keep()
+    holder = Holder { run: fn() { 5 } }
+    runner = holder.run
+    print("stored " + runner().to_string())
+    chain = make_chain(7, 5)
+    print("chain " + chain().to_string())
+}

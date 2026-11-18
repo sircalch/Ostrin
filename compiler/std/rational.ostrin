@@ -1,0 +1,896 @@
+// Univariate rational functions with exact rational coefficients, and their domains.
+//
+// A rational function is numerator / denominator, lowest degree first, with coefficients in canonical rational text (see
+// std.bigint). Every operation returns the function in lowest terms: the gcd of numerator and denominator is removed with
+// the exact gcd of std.polynomial, and the denominator is monic.
+//
+// Domain: a reduction removes factors, so it can remove points where the original expression is undefined. A
+// RationalFunction therefore keeps a list of REQUIREMENTS: polynomials that must not vanish at a point. The list starts
+// with the original denominator, and every operation adds the requirements of its operands (and, for division, the
+// numerator of the divisor). Requirements are never removed by reduction. Evaluation refuses a point where any
+// requirement vanishes, so a removed point stays excluded after any later operation, substitution or derivative.
+//
+// Scope: one variable. There is no multivariate rational function here, because it needs a multivariate gcd, which is
+// not implemented (see docs/rational.md). Numerical evaluation at a Float point is not offered; evaluation is exact, at a
+// rational point given as text.
+
+import std.polynomial
+import std.bigint
+
+/// A rational function in lowest terms, with the requirements that define its domain.
+pub record RationalFunction {
+    numerator: List<String>
+    denominator: List<String>
+    requirements: List<List<String>>
+}
+
+// ---------------------------------------------------------------- plain coefficient lists
+
+fn same_list(a: List<String>, b: List<String>) -> Bool {
+    if a.length() != b.length() {
+        return false
+    }
+    for i in 0 until a.length() {
+        if a[i] != b[i] {
+            return false
+        }
+    }
+    true
+}
+
+fn list_text(a: List<String>) -> String {
+    if a.length() == 0 {
+        return "0"
+    }
+    mut text = "["
+    for i in 0 until a.length() {
+        if i > 0 {
+            text = text + ", "
+        }
+        text = text + a[i]
+    }
+    text + "]"
+}
+
+/// The requirements of `a` followed by those of `b`, without repetitions.
+fn merge_requirements(a: List<List<String>>, b: List<List<String>>) -> List<List<String>> {
+    mut out: List<List<String>> = []
+    for r in a {
+        mut present = false
+        for s in out {
+            if same_list(r, s) {
+                present = true
+            }
+        }
+        if not present {
+            out.push(r)
+        }
+    }
+    for r in b {
+        mut present = false
+        for s in out {
+            if same_list(r, s) {
+                present = true
+            }
+        }
+        if not present {
+            out.push(r)
+        }
+    }
+    out
+}
+
+fn coefficient_or_zero(a: List<String>, i: Int) -> String {
+    if i < a.length() {
+        return a[i]
+    }
+    "0"
+}
+
+// ---------------------------------------------------------------- arithmetic on coefficient lists (via std.polynomial)
+
+fn texts_mul(a: List<String>, b: List<String>) -> Result<List<String>, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => match polynomial.poly_from_texts(b) {
+            Err(message) => Err(message),
+            Ok(pb) => match polynomial.poly_mul(pa, pb) {
+                Err(message) => Err(message),
+                Ok(product) => Ok(product.coeffs),
+            },
+        },
+    }
+}
+
+fn texts_add(a: List<String>, b: List<String>) -> Result<List<String>, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => match polynomial.poly_from_texts(b) {
+            Err(message) => Err(message),
+            Ok(pb) => match polynomial.poly_add(pa, pb) {
+                Err(message) => Err(message),
+                Ok(sum) => Ok(sum.coeffs),
+            },
+        },
+    }
+}
+
+fn texts_sub(a: List<String>, b: List<String>) -> Result<List<String>, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => match polynomial.poly_from_texts(b) {
+            Err(message) => Err(message),
+            Ok(pb) => match polynomial.poly_sub(pa, pb) {
+                Err(message) => Err(message),
+                Ok(difference) => Ok(difference.coeffs),
+            },
+        },
+    }
+}
+
+fn texts_derivative(a: List<String>) -> Result<List<String>, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => match polynomial.poly_derivative(pa) {
+            Err(message) => Err(message),
+            Ok(d) => Ok(d.coeffs),
+        },
+    }
+}
+
+fn texts_eval(a: List<String>, x: String) -> Result<String, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => polynomial.poly_eval(pa, x),
+    }
+}
+
+/// The exact quotient a / b, which must be exact (the remainder is zero).
+fn texts_exact_quotient(a: List<String>, b: List<String>) -> Result<List<String>, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => match polynomial.poly_from_texts(b) {
+            Err(message) => Err(message),
+            Ok(pb) => match polynomial.poly_divmod(pa, pb) {
+                Err(message) => Err(message),
+                Ok(division) => Ok(division.quotient.coeffs),
+            },
+        },
+    }
+}
+
+fn texts_gcd(a: List<String>, b: List<String>) -> Result<List<String>, String> {
+    return match polynomial.poly_from_texts(a) {
+        Err(message) => Err(message),
+        Ok(pa) => match polynomial.poly_from_texts(b) {
+            Err(message) => Err(message),
+            Ok(pb) => match polynomial.poly_gcd(pa, pb) {
+                Err(message) => Err(message),
+                Ok(g) => Ok(g.coeffs),
+            },
+        },
+    }
+}
+
+fn texts_power(a: List<String>, k: Int) -> Result<List<String>, String> {
+    mut out = ["1"]
+    for i in 0 until k {
+        match texts_mul(out, a) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(next) => {
+                out = next
+            },
+        }
+    }
+    Ok(out)
+}
+
+// ---------------------------------------------------------------- lowest terms
+
+/// n / d in lowest terms, with a monic denominator, carrying the given requirements. The requirements are not reduced.
+fn normal(n: List<String>, d: List<String>, reqs: List<List<String>>) -> Result<RationalFunction, String> {
+    if d.length() == 0 {
+        return Err("the denominator is the zero polynomial")
+    }
+    return match texts_gcd(n, d) {
+        Err(message) => Err(message),
+        Ok(g) => match texts_exact_quotient(n, g) {
+            Err(message) => Err(message),
+            Ok(nq) => match texts_exact_quotient(d, g) {
+                Err(message) => Err(message),
+                Ok(dq) => monic(nq, dq, reqs),
+            },
+        },
+    }
+}
+
+fn monic(n: List<String>, d: List<String>, reqs: List<List<String>>) -> Result<RationalFunction, String> {
+    lead = d[d.length() - 1]
+    lead_poly = [lead]
+    return match texts_exact_quotient(n, lead_poly) {
+        Err(message) => Err(message),
+        Ok(nn) => match texts_exact_quotient(d, lead_poly) {
+            Err(message) => Err(message),
+            Ok(dd) => Ok(RationalFunction { numerator: nn, denominator: dd, requirements: reqs }),
+        },
+    }
+}
+
+// ---------------------------------------------------------------- construction and operations
+
+/// The rational function numerator / denominator. The denominator must not be zero; it is the first requirement.
+pub fn rational_new(numerator: List<String>, denominator: List<String>) -> Result<RationalFunction, String> {
+    if denominator.length() == 0 {
+        return Err("the denominator is the zero polynomial")
+    }
+    mut reqs: List<List<String>> = []
+    reqs.push(denominator)
+    normal(numerator, denominator, reqs)
+}
+
+pub fn rational_negate(a: RationalFunction) -> Result<RationalFunction, String> {
+    return match texts_mul(a.numerator, ["-1"]) {
+        Err(message) => Err(message),
+        Ok(n) => normal(n, a.denominator, a.requirements),
+    }
+}
+
+pub fn rational_add(a: RationalFunction, b: RationalFunction) -> Result<RationalFunction, String> {
+    return match texts_mul(a.numerator, b.denominator) {
+        Err(message) => Err(message),
+        Ok(p1) => match texts_mul(b.numerator, a.denominator) {
+            Err(message) => Err(message),
+            Ok(p2) => match texts_add(p1, p2) {
+                Err(message) => Err(message),
+                Ok(n) => match texts_mul(a.denominator, b.denominator) {
+                    Err(message) => Err(message),
+                    Ok(d) => normal(n, d, merge_requirements(a.requirements, b.requirements)),
+                },
+            },
+        },
+    }
+}
+
+pub fn rational_subtract(a: RationalFunction, b: RationalFunction) -> Result<RationalFunction, String> {
+    return match rational_negate(b) {
+        Err(message) => Err(message),
+        Ok(negative) => rational_add(a, negative),
+    }
+}
+
+pub fn rational_multiply(a: RationalFunction, b: RationalFunction) -> Result<RationalFunction, String> {
+    return match texts_mul(a.numerator, b.numerator) {
+        Err(message) => Err(message),
+        Ok(n) => match texts_mul(a.denominator, b.denominator) {
+            Err(message) => Err(message),
+            Ok(d) => normal(n, d, merge_requirements(a.requirements, b.requirements)),
+        },
+    }
+}
+
+/// a / b. The divisor must not be the zero function; its numerator becomes a requirement, because a / b is undefined
+/// where b is zero.
+pub fn rational_divide(a: RationalFunction, b: RationalFunction) -> Result<RationalFunction, String> {
+    if b.numerator.length() == 0 {
+        return Err("division by the zero function")
+    }
+    mut reqs = merge_requirements(a.requirements, b.requirements)
+    reqs = merge_requirements(reqs, [b.numerator])
+    return match texts_mul(a.numerator, b.denominator) {
+        Err(message) => Err(message),
+        Ok(n) => match texts_mul(a.denominator, b.numerator) {
+            Err(message) => Err(message),
+            Ok(d) => normal(n, d, reqs),
+        },
+    }
+}
+
+/// The derivative (N' D - N D') / D^2. The domain does not change.
+pub fn rational_derivative(a: RationalFunction) -> Result<RationalFunction, String> {
+    return match texts_derivative(a.numerator) {
+        Err(message) => Err(message),
+        Ok(dn) => match texts_derivative(a.denominator) {
+            Err(message) => Err(message),
+            Ok(dd) => match texts_mul(dn, a.denominator) {
+                Err(message) => Err(message),
+                Ok(left) => match texts_mul(a.numerator, dd) {
+                    Err(message) => Err(message),
+                    Ok(right) => match texts_sub(left, right) {
+                        Err(message) => Err(message),
+                        Ok(n) => match texts_mul(a.denominator, a.denominator) {
+                            Err(message) => Err(message),
+                            Ok(d) => normal(n, d, a.requirements),
+                        },
+                    },
+                },
+            },
+        },
+    }
+}
+
+/// The composition f(g(x)), with g = numerator / denominator. With K the largest degree bound of f's numerator, denominator
+/// and requirements, f(g) = P / Q where P = sum a_i Ng^i Dg^(K-i) and Q is the same sum for f's denominator. The domain of
+/// the composition contains g's requirements (so g is defined and Dg is nonzero), the composed requirements of f, and Q.
+pub fn rational_compose(f: RationalFunction, g: RationalFunction) -> Result<RationalFunction, String> {
+    mut bound = f.numerator.length()
+    if f.denominator.length() > bound {
+        bound = f.denominator.length()
+    }
+    for r in f.requirements {
+        if r.length() > bound {
+            bound = r.length()
+        }
+    }
+    mut k = bound - 1
+    if k < 0 {
+        k = 0
+    }
+    mut reqs = g.requirements
+    mut composed_numerator: List<String> = []
+    mut composed_denominator: List<String> = []
+    for i in 0 until k + 1 {
+        match texts_power(g.numerator, i) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(ng_i) => {
+                match texts_power(g.denominator, k - i) {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(dg_rest) => {
+                        match texts_mul(ng_i, dg_rest) {
+                            Err(message) => {
+                                return Err(message)
+                            },
+                            Ok(basis) => {
+                                match texts_mul([coefficient_or_zero(f.numerator, i)], basis) {
+                                    Err(message) => {
+                                        return Err(message)
+                                    },
+                                    Ok(term_n) => {
+                                        match texts_add(composed_numerator, term_n) {
+                                            Err(message) => {
+                                                return Err(message)
+                                            },
+                                            Ok(sum_n) => {
+                                                composed_numerator = sum_n
+                                            },
+                                        }
+                                    },
+                                }
+                                match texts_mul([coefficient_or_zero(f.denominator, i)], basis) {
+                                    Err(message) => {
+                                        return Err(message)
+                                    },
+                                    Ok(term_d) => {
+                                        match texts_add(composed_denominator, term_d) {
+                                            Err(message) => {
+                                                return Err(message)
+                                            },
+                                            Ok(sum_d) => {
+                                                composed_denominator = sum_d
+                                            },
+                                        }
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    }
+    if composed_denominator.length() == 0 {
+        return Err("the composition is undefined everywhere: its denominator is the zero polynomial")
+    }
+    // composed requirements of f: each requirement r of f, composed with g in the same way
+    for r in f.requirements {
+        mut composed: List<String> = []
+        for i in 0 until k + 1 {
+            match texts_power(g.numerator, i) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(ng_i) => {
+                    match texts_power(g.denominator, k - i) {
+                        Err(message) => {
+                            return Err(message)
+                        },
+                        Ok(dg_rest) => {
+                            match texts_mul(ng_i, dg_rest) {
+                                Err(message) => {
+                                    return Err(message)
+                                },
+                                Ok(basis) => {
+                                    match texts_mul([coefficient_or_zero(r, i)], basis) {
+                                        Err(message) => {
+                                            return Err(message)
+                                        },
+                                        Ok(term) => {
+                                            match texts_add(composed, term) {
+                                                Err(message) => {
+                                                    return Err(message)
+                                                },
+                                                Ok(sum) => {
+                                                    composed = sum
+                                                },
+                                            }
+                                        },
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        }
+        if composed.length() > 0 {
+            reqs = merge_requirements(reqs, [composed])
+        }
+    }
+    reqs = merge_requirements(reqs, [composed_denominator])
+    return normal(composed_numerator, composed_denominator, reqs)
+}
+
+// ---------------------------------------------------------------- domain and evaluation
+
+/// The text of each requirement, for example "[-1, 1] != 0". A requirement is a polynomial that must not vanish.
+pub fn rational_requirement_texts(a: RationalFunction) -> List<String> {
+    mut out: List<String> = []
+    for r in a.requirements {
+        out.push(list_text(r) + " != 0")
+    }
+    out
+}
+
+/// True when every requirement is nonzero at the rational point x, so that the function is defined there.
+pub fn rational_defined_at(a: RationalFunction, x: String) -> Result<Bool, String> {
+    for r in a.requirements {
+        match texts_eval(r, x) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(value) => {
+                if value == "0" {
+                    return Ok(false)
+                }
+            },
+        }
+    }
+    Ok(true)
+}
+
+/// The exact value at a rational point, or an error when the point is excluded by a requirement. The error names the
+/// requirement that vanishes at the point.
+pub fn rational_evaluate(a: RationalFunction, x: String) -> Result<String, String> {
+    for r in a.requirements {
+        match texts_eval(r, x) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(value) => {
+                if value == "0" {
+                    return Err("undefined at " + x + ": the requirement " + list_text(r) + " != 0 fails there")
+                }
+            },
+        }
+    }
+    match texts_eval(a.numerator, x) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(n) => {
+            match texts_eval(a.denominator, x) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(d) => {
+                    return match bigint.fraction_parse(n) {
+                        Err(message) => Err(message),
+                        Ok(fn_value) => match bigint.fraction_parse(d) {
+                            Err(message) => Err(message),
+                            Ok(fd_value) => match bigint.fraction_div(fn_value, fd_value) {
+                                Err(message) => Err(message),
+                                Ok(q) => Ok(bigint.fraction_to_string(q)),
+                            },
+                        },
+                    }
+                },
+            }
+        },
+    }
+    return Err("internal error: the evaluation did not produce a value")
+}
+
+// ---------------------------------------------------------------- interchange with std.mpolynomial and std.symbolic
+
+/// The numerator as interchange lines "coefficient|e" for one variable (see std.symbolic.expression_of_term_lines).
+pub fn rational_numerator_lines(a: RationalFunction) -> List<String> {
+    mut out: List<String> = []
+    for i in 0 until a.numerator.length() {
+        if a.numerator[i] != "0" {
+            out.push(a.numerator[i] + "|" + i.to_string())
+        }
+    }
+    out
+}
+
+/// The denominator as interchange lines "coefficient|e" for one variable.
+pub fn rational_denominator_lines(a: RationalFunction) -> List<String> {
+    mut out: List<String> = []
+    for i in 0 until a.denominator.length() {
+        if a.denominator[i] != "0" {
+            out.push(a.denominator[i] + "|" + i.to_string())
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------- rational equations R1(x) = R2(x)
+
+/// The result of solving R1(x) = R2(x) on the admissible domain.
+/// status: "identity" (both sides agree at every admissible point), "solved" (every root of the difference is
+/// classified and at least one is a solution), "no_solution" (every root is excluded or rejected, and nothing is
+/// pending), or "partial" (some part of the difference could not be solved by this method; the solutions listed are
+/// exact but may be incomplete). "no_solution" is never reported while part of the difference is unsolved.
+/// Parallel lists: solutions, solution_kinds and multiplicities have the same length.
+pub record RationalSolution {
+    status: String
+    domain: List<String>
+    solutions: List<String>
+    solution_kinds: List<String>
+    multiplicities: List<Int>
+    excluded: List<String>
+    rejected: List<String>
+    pending: List<String>
+    complex_roots: List<String>
+    exactness: String
+    completeness: String
+}
+
+// Scalar arithmetic on canonical rational texts. The only division is by a nonzero constant chosen by the caller (2a for
+// a quadratic cofactor with leading coefficient a, or the constant 2).
+fn fr_add(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_add(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()))
+}
+
+fn fr_sub(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_sub(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()))
+}
+
+fn fr_mul(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_mul(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()))
+}
+
+fn fr_div(a: String, b: String) -> String {
+    return bigint.fraction_to_string(bigint.fraction_div(bigint.fraction_parse(a).unwrap(), bigint.fraction_parse(b).unwrap()).unwrap())
+}
+
+fn fr_sign(a: String) -> Int {
+    return bigint.fraction_sign(bigint.fraction_parse(a).unwrap())
+}
+
+// The quadratic field Q(sqrt d): an element is [a, b] for a + b*sqrt(d). d is a rational that is not a square, so sqrt(d)
+// is irrational and a + b*sqrt(d) = 0 exactly when a = 0 and b = 0.
+fn fq_mul(x: List<String>, y: List<String>, d: String) -> List<String> {
+    a = fr_add(fr_mul(x[0], y[0]), fr_mul(fr_mul(x[1], y[1]), d))
+    b = fr_add(fr_mul(x[0], y[1]), fr_mul(x[1], y[0]))
+    return [a, b]
+}
+
+fn fq_add(x: List<String>, y: List<String>) -> List<String> {
+    return [fr_add(x[0], y[0]), fr_add(x[1], y[1])]
+}
+
+fn fq_equal(x: List<String>, y: List<String>) -> Bool {
+    return x[0] == y[0] and x[1] == y[1]
+}
+
+fn fq_is_zero(x: List<String>) -> Bool {
+    return x[0] == "0" and x[1] == "0"
+}
+
+/// The value of a coefficient list (lowest degree first) at an element of Q(sqrt d), by Horner's rule.
+fn fq_eval(coefficients: List<String>, alpha: List<String>, d: String) -> List<String> {
+    mut acc: List<String> = ["0", "0"]
+    mut i = coefficients.length() - 1
+    while i >= 0 {
+        acc = fq_add(fq_mul(acc, alpha, d), [coefficients[i], "0"])
+        i = i - 1
+    }
+    acc
+}
+
+/// "p + q*sqrt(d)", written as a subtraction when q is negative.
+fn sqrt_text(p: String, q: String, d: String) -> String {
+    if q.starts_with("-") {
+        return p + " - " + q.slice(1, q.length()) + "*sqrt(" + d + ")"
+    }
+    return p + " + " + q + "*sqrt(" + d + ")"
+}
+
+/// Solves R1(x) = R2(x) on the domain of both sides. The difference h = f - g carries the merged domain. Its numerator is
+/// factored with the rational root finder of std.polynomial, and each root is classified: excluded by a requirement,
+/// verified against the original equation, or rejected. A quadratic cofactor gives two irrational roots, verified exactly
+/// in Q(sqrt(disc)). A cofactor of degree three or more is reported as pending, never as absent.
+pub fn rational_solve(f: RationalFunction, g: RationalFunction) -> Result<RationalSolution, String> {
+    return match rational_subtract(f, g) {
+        Err(message) => Err(message),
+        Ok(h) => solve_difference(f, g, h),
+    }
+}
+
+fn solve_difference(f: RationalFunction, g: RationalFunction, h: RationalFunction) -> Result<RationalSolution, String> {
+    domain = rational_requirement_texts(h)
+    if h.numerator.length() == 0 {
+        match requirement_roots_excluded(h, []) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(identity_excluded) => {
+                return Ok(RationalSolution {
+                    status: "identity",
+                    domain: domain,
+                    solutions: [],
+                    solution_kinds: [],
+                    multiplicities: [],
+                    excluded: identity_excluded,
+                    rejected: [],
+                    pending: [],
+                    complex_roots: [],
+                    exactness: "exact",
+                    completeness: "complete: the two sides are equal at every admissible point",
+                })
+            },
+        }
+    }
+    match polynomial.poly_from_texts(h.numerator) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(np) => {
+            match polynomial.poly_factor_linear(np) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(fac) => {
+                    mut factor_texts: List<List<String>> = []
+                    for factor in fac.factors {
+                        factor_texts.push(factor.coeffs)
+                    }
+                    return solve_factored(f, g, h, domain, factor_texts, fac.cofactor.coeffs)
+                },
+            }
+        },
+    }
+    return Err("internal error: the factorisation did not produce a result")
+}
+
+/// Excluded points of the domain: the rational roots of each requirement, listed once each, after the given entries.
+fn requirement_roots_excluded(h: RationalFunction, given: List<String>) -> Result<List<String>, String> {
+    mut excluded: List<String> = given
+    for req in h.requirements {
+        match polynomial.poly_from_texts(req) {
+            Err(message) => {
+                return Err(message)
+            },
+            Ok(rp) => {
+                match polynomial.poly_roots_rational(rp) {
+                    Err(message) => {
+                        return Err(message)
+                    },
+                    Ok(points) => {
+                        for pt in points {
+                            mut listed = false
+                            for s in excluded {
+                                if s.starts_with("x = " + pt + ":") {
+                                    listed = true
+                                }
+                            }
+                            if not listed {
+                                excluded.push("x = " + pt + ": excluded, the requirement " + list_text(req) + " != 0 vanishes there")
+                            }
+                        }
+                        // The irrational roots of a requirement of degree two without rational roots: p +- q sqrt(disc),
+                        // with the same exact text as a solution. A requirement of degree above two is not enumerated here.
+                        if rp.coeffs.length() == 3 and points.length() == 0 {
+                            lead = rp.coeffs[2]
+                            b = fr_div(rp.coeffs[1], lead)
+                            c = fr_div(rp.coeffs[0], lead)
+                            disc = fr_sub(fr_mul(b, b), fr_mul("4", c))
+                            if fr_sign(disc) >= 0 {
+                                p = fr_div(fr_mul(b, "-1"), "2")
+                                for sign in ["1", "-1"] {
+                                    text = sqrt_text(p, fr_div(sign, "2"), disc)
+                                    mut listed_root = false
+                                    for s in excluded {
+                                        if s.starts_with("x = " + text + ":") {
+                                            listed_root = true
+                                        }
+                                    }
+                                    if not listed_root {
+                                        excluded.push("x = " + text + ": excluded, the requirement " + list_text(req) + " != 0 vanishes there")
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    }
+    Ok(excluded)
+}
+
+/// True when every requirement has degree at most two, so that `requirement_roots_excluded` lists all of its real roots.
+fn requirements_enumerated(h: RationalFunction) -> Bool {
+    mut all = true
+    for req in h.requirements {
+        match polynomial.poly_from_texts(req) {
+            Err(message) => {
+                all = false
+            },
+            Ok(rp) => {
+                if rp.coeffs.length() > 3 {
+                    all = false
+                }
+            },
+        }
+    }
+    all
+}
+
+fn solve_factored(f: RationalFunction, g: RationalFunction, h: RationalFunction, domain: List<String>, factor_texts: List<List<String>>, cofactor: List<String>) -> Result<RationalSolution, String> {
+    // distinct rational roots, in ascending order (the factors come in ascending order); each root is minus the constant term
+    mut roots: List<String> = []
+    for c in factor_texts {
+        r = fr_mul(c[0], "-1")
+        mut seen = false
+        for s in roots {
+            if s == r {
+                seen = true
+            }
+        }
+        if not seen {
+            roots.push(r)
+        }
+    }
+    mut solutions: List<String> = []
+    mut kinds: List<String> = []
+    mut mults: List<Int> = []
+    mut excluded: List<String> = []
+    mut rejected: List<String> = []
+    mut pending: List<String> = []
+    mut complex_roots: List<String> = []
+    for r in roots {
+        mut m = 0
+        for c in factor_texts {
+            if fr_mul(c[0], "-1") == r {
+                m = m + 1
+            }
+        }
+        mut blocked = ""
+        for req in h.requirements {
+            match texts_eval(req, r) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(value) => {
+                    if value == "0" and blocked == "" {
+                        blocked = list_text(req)
+                    }
+                },
+            }
+        }
+        if blocked != "" {
+            excluded.push("x = " + r + ": excluded, the requirement " + blocked + " != 0 vanishes there")
+        } else {
+            match rational_evaluate(f, r) {
+                Err(message) => {
+                    return Err(message)
+                },
+                Ok(left) => {
+                    match rational_evaluate(g, r) {
+                        Err(message) => {
+                            return Err(message)
+                        },
+                        Ok(right) => {
+                            if left == right {
+                                solutions.push(r)
+                                kinds.push("rational")
+                                mults.push(m)
+                            } else {
+                                rejected.push("x = " + r + ": the two sides are " + left + " and " + right)
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    }
+    // Excluded points that the numerator does not show: a factor of a requirement can be cancelled in the reduced
+    // difference, so the rational roots of each requirement are listed here as excluded points of the domain.
+    match requirement_roots_excluded(h, excluded) {
+        Err(message) => {
+            return Err(message)
+        },
+        Ok(listed) => {
+            excluded = listed
+        },
+    }
+    deg = cofactor.length() - 1
+    if deg == 2 {
+        // monic x^2 + b x + c, so that the discriminant and the texts do not depend on the scale of the cofactor
+        lead = cofactor[2]
+        b = fr_div(cofactor[1], lead)
+        c = fr_div(cofactor[0], lead)
+        disc = fr_sub(fr_mul(b, b), fr_mul("4", c))
+        p = fr_div(fr_mul(b, "-1"), "2")
+        qh = fr_div("1", "2")
+        mut kind = "quadratic irrational"
+        if fr_sign(disc) < 0 {
+            kind = "complex quadratic"
+        }
+        for sign in ["1", "-1"] {
+            q = fr_mul(qh, sign)
+            alpha = [p, q]
+            text = sqrt_text(p, q, disc)
+            mut blocked = ""
+            for req in h.requirements {
+                if blocked == "" and fq_is_zero(fq_eval(req, alpha, disc)) {
+                    blocked = list_text(req)
+                }
+            }
+            if blocked != "" {
+                excluded.push("x = " + text + ": excluded, the requirement " + blocked + " != 0 vanishes there")
+            } else {
+                left = fq_mul(fq_eval(f.numerator, alpha, disc), fq_eval(g.denominator, alpha, disc), disc)
+                right = fq_mul(fq_eval(g.numerator, alpha, disc), fq_eval(f.denominator, alpha, disc), disc)
+                if fq_equal(left, right) {
+                    if kind == "complex quadratic" {
+                        complex_roots.push(text)
+                    } else {
+                        solutions.push(text)
+                        kinds.push(kind)
+                        mults.push(1)
+                    }
+                } else {
+                    rejected.push("x = " + text + ": the two sides differ in Q(sqrt(" + disc + "))")
+                }
+            }
+        }
+    } else if deg > 0 {
+        pending.push("a factor of degree " + deg.to_string() + " without rational roots is not solved by this method")
+    }
+    mut status = "no_solution"
+    mut completeness = "complete: every real root of the difference is classified"
+    if complex_roots.length() > 0 {
+        completeness = "complete over the real numbers: " + complex_roots.length().to_string() + " non-real root(s) are listed separately and are not solutions"
+    }
+    if solutions.length() > 0 {
+        status = "solved"
+    }
+    if pending.length() > 0 {
+        status = "partial"
+        completeness = "partial: part of the difference is outside the methods of this module"
+    }
+    if not requirements_enumerated(h) {
+        completeness = completeness + "; the excluded list is not exhaustive: a requirement of degree above two may have irrational roots that are not listed"
+    }
+    return Ok(RationalSolution {
+        status: status,
+        domain: domain,
+        solutions: solutions,
+        solution_kinds: kinds,
+        multiplicities: mults,
+        excluded: excluded,
+        rejected: rejected,
+        pending: pending,
+        complex_roots: complex_roots,
+        exactness: "exact (no approximate values are produced)",
+        completeness: completeness,
+    })
+}

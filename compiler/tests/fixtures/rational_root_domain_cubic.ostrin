@@ -1,0 +1,13 @@
+// R1(x) = (x - 3)(x^2 - 2) / (x^3 - 2) and R2 = 0. The requirement x^3 - 2 != 0 does not vanish at +-sqrt(2), so those
+// are genuine solutions. The requirement has degree three, so the list of excluded points is not claimed exhaustive, and
+// the completeness field says so.
+import std.rational
+fn main() -> Void {
+    f = rational.rational_new(["6", "-2", "-3", "1"], ["-2", "0", "0", "1"]).unwrap()
+    g = rational.rational_new([], ["1"]).unwrap()
+    s = rational.rational_solve(f, g).unwrap()
+    print("status: " + s.status)
+    print("solutions: " + s.solutions.join(" | "))
+    print("excluded: " + s.excluded.join(" | "))
+    print("completeness: " + s.completeness)
+}

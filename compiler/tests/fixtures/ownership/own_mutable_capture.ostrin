@@ -1,0 +1,43 @@
+// Closures that capture mutable bindings: reassignment after creation is visible to the closure, two closures share one
+// binding, and two closures made by separate calls keep separate bindings. Expected (worked out by hand):
+//   shared 9
+//   after reassign 10
+//   independent 1 1 2
+//   depth 2
+fn counter() -> fn() -> Int {
+    mut n = 0
+    return fn() {
+        n = n + 1
+        n
+    }
+}
+
+fn main() -> Void {
+    mut shared = 0
+    add = fn(d) { shared = shared + d }
+    read = fn() { shared }
+    add(4)
+    add(5)
+    print("shared " + read().to_string())
+
+    mut late = 1
+    peek = fn() { late }
+    late = 10
+    print("after reassign " + peek().to_string())
+
+    a = counter()
+    b = counter()
+    x = a()
+    y = b()
+    z = a()
+    print("independent " + x.to_string() + " " + y.to_string() + " " + z.to_string())
+
+    mut depth = 0
+    bump = fn() {
+        inner = fn() { depth = depth + 1 }
+        inner()
+        inner()
+    }
+    bump()
+    print("depth " + depth.to_string())
+}

@@ -1,0 +1,40 @@
+// Dense 300 x 300 matrix product with integer entries; the trace and the total of C = A B, repeated K times.
+fn main() -> Void {
+    values = args()
+    mut repeats = 1
+    if values.length() > 0 {
+        repeats = parse_int(values[0]).unwrap()
+    }
+    n = 300
+    mut trace = 0.0
+    mut total = 0.0
+    for k in 0 until repeats {
+        mut a = zeros([n * n])
+        mut b = zeros([n * n])
+        for i in 0 until n {
+            for j in 0 until n {
+                a.set(i * n + j, ((i * j + i + 2 * j + k * 0) % 7) as Float)
+                b.set(i * n + j, ((3 * i + j * j) % 5) as Float)
+            }
+        }
+        mut c = zeros([n * n])
+        for i in 0 until n {
+            for j in 0 until n {
+                mut acc = 0.0
+                for m in 0 until n {
+                    acc = acc + a[i * n + m] * b[m * n + j]
+                }
+                c.set(i * n + j, acc)
+            }
+        }
+        trace = 0.0
+        total = 0.0
+        for i in 0 until n {
+            trace = trace + c[i * n + i]
+            for j in 0 until n {
+                total = total + c[i * n + j]
+            }
+        }
+    }
+    print("RESULT matmul trace " + trace.to_string() + " total " + total.to_string())
+}

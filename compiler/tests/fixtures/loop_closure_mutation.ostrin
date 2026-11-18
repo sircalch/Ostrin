@@ -1,0 +1,12 @@
+// A closure that assigns to a name of its enclosing scope, called inside a loop. Both backends give 6: the closure
+// rebinds the outer `mut` (design 02 §4). The native backend shares the binding through a record cell (capture_cells.rs).
+fn main() -> Void {
+    // 9. a closure that mutates an outer variable, called inside the loop
+    mut hits = 0
+    bump = fn(x) { hits = hits + x }
+    for i in 0 until 4 {
+        bump(i)
+    }
+    print("closure mutation: " + hits.to_string())
+
+}

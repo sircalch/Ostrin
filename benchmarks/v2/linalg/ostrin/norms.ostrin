@@ -1,0 +1,28 @@
+// The 1-, infinity and Frobenius norms of an n x n matrix (std.linalg), repeated K times. The printed value is the sum of
+// the 1-norm and the infinity norm (exact for these entries) followed by the Frobenius norm.
+import std.linalg
+
+fn main() -> Void {
+    values = args()
+    mut n = 100
+    mut repeats = 1
+    if values.length() > 0 {
+        n = parse_int(values[0]).unwrap()
+    }
+    if values.length() > 1 {
+        repeats = parse_int(values[1]).unwrap()
+    }
+    mut a = zeros([n, n])
+    for i in 0 until n {
+        for j in 0 until n {
+            a.set(i, j, ((((i * 7 + j * 3) % 11) - 5) as Float) / 4.0)
+        }
+    }
+    mut exact = 0.0
+    mut fro = 0.0
+    for k in 0 until repeats {
+        exact = linalg.matrix_norm1(a).unwrap() + linalg.matrix_norm_inf(a).unwrap()
+        fro = linalg.matrix_norm_frobenius(a).unwrap()
+    }
+    print("RESULT norms " + exact.to_string() + " " + fro.to_string())
+}

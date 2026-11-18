@@ -1,0 +1,10 @@
+// A while loop with a counter: one comparison and one addition per iteration.
+fn main() -> Void {
+    mut i = 0
+    mut total = 0
+    while i < 10000000 {
+        total = total + 1
+        i = i + 1
+    }
+    print("RESULT while_loop " + total.to_string())
+}
