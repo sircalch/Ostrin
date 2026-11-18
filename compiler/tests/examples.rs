@@ -148,10 +148,7 @@ fn hello_type_checks_ok() {
 
 #[test]
 fn community_starter_project_runs_from_manifest() {
-    let project = format!(
-        "{}/../templates/ostrin-community-starter",
-        env!("CARGO_MANIFEST_DIR")
-    );
+    let project = writable_copy("../templates/ostrin-community-starter");
     let out = run(&["--run", "--project", &project]);
     assert!(
         out.status.success(),
@@ -1137,6 +1134,55 @@ fn compiler_dap_stops_on_entry_steps_and_disconnects_cleanly() {
 
 /// Path for a temporary native artifact, unique per test process so parallel
 /// `cargo test` runs never collide.
+// A build without --locked writes the lockfile. Writing it again must not change its bytes, and the file must end with
+// exactly one newline (the generator used to add a blank line at the end, which modified the tracked example on every build).
+#[test]
+fn lockfile_rewrite_is_byte_stable_and_ends_with_one_newline() {
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/data_project");
+    let root = std::env::temp_dir().join(format!("ostrin-lock-stable-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    copy_tree(&source, &root);
+    let entry = root.join("app").join("main.ostrin").display().to_string();
+    let lock = root.join("app").join("ostrin.lock");
+    let first = run(&["--run", &entry]);
+    assert!(first.status.success(), "stderr: {}", stderr(&first));
+    let after_first = fs::read(&lock).expect("lockfile written");
+    let second = run(&["--run", &entry]);
+    assert!(second.status.success(), "stderr: {}", stderr(&second));
+    let after_second = fs::read(&lock).expect("lockfile present");
+    assert_eq!(after_first, after_second, "a second build changed the lockfile");
+    assert!(after_second.ends_with(b"\"\n"), "lockfile must end with one newline");
+    assert!(!after_second.ends_with(b"\n\n"), "lockfile must not end with a blank line");
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Copies a tracked example (or template) to a unique temporary directory and returns its path. Tests that build a project
+/// may update their ostrin.lock, so they build a copy and never the tracked files.
+fn writable_copy(source_relative: &str) -> String {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let from = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(source_relative);
+    let index = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let to = std::env::temp_dir().join(format!("ostrin-writable-{}-{index}", std::process::id()));
+    let _ = fs::remove_dir_all(&to);
+    copy_tree(&from, &to);
+    to.display().to_string()
+}
+
+/// Copies a directory tree. Used to run an example project from a temporary location, so that a build may update its
+/// lockfile without changing the tracked example.
+fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+    fs::create_dir_all(to).expect("create temporary project directory");
+    for entry in fs::read_dir(from).expect("read example project") {
+        let entry = entry.expect("read directory entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("file type").is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), &target).expect("copy example file");
+        }
+    }
+}
+
 fn temp_artifact(name: &str) -> String {
     // Tests run in parallel inside one process and several of them compile the same example. A
     // per-call counter keeps each artifact path unique, so no test can overwrite or delete another's
@@ -1397,7 +1443,7 @@ fn wasm_program_matrix_emits_without_native_thread_dependencies() {
         "--target",
         "wasm32-wasi",
         "--project",
-        &example_path("pkg_project/main_app"),
+        &format!("{}/main_app", writable_copy("../examples/pkg_project")),
     ]);
     assert!(
         package.status.success(),
@@ -17415,7 +17461,8 @@ fn parser_recovers_and_reports_every_syntax_error() {
 
 #[test]
 fn path_dependency_resolves_and_runs() {
-    let out = run(&["--run", &example_path("pkg_project/main_app/main.ostrin")]);
+    let entry = format!("{}/main_app/main.ostrin", writable_copy("../examples/pkg_project"));
+    let out = run(&["--run", &entry]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
 }
@@ -17501,7 +17548,7 @@ fn transitive_path_dependencies_resolve_and_lock_reproducibly() {
 
 #[test]
 fn native_backend_compiles_project_manifest_and_path_dependency() {
-    let project = example_path("pkg_project/main_app");
+    let project = format!("{}/main_app", writable_copy("../examples/pkg_project"));
     let exe = temp_artifact("pkg_project.exe");
     let compile = run(&["--compile", "--project", &project, "--out", &exe]);
     if skip_if_no_c_compiler(&compile) {
@@ -17529,7 +17576,7 @@ fn native_backend_compiles_project_manifest_and_path_dependency() {
 
 #[test]
 fn project_manifest_selects_entry_and_writes_portable_lockfile() {
-    let project = example_path("pkg_project/main_app");
+    let project = format!("{}/main_app", writable_copy("../examples/pkg_project"));
     let out = run(&["--run", "--project", &project]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
@@ -18009,7 +18056,13 @@ fn empty_mask_is_a_runtime_error_in_both_backends() {
 
 #[test]
 fn table_library_module_runs_identically_in_both_backends() {
-    let entry = example_path("data_project/app/main.ostrin");
+    // A build without --locked may rewrite ostrin.lock. The project is run from a copy, so the tracked example is never
+    // modified by the test; the copy keeps the relative path to ../tables that the manifest uses.
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/data_project");
+    let root = std::env::temp_dir().join(format!("ostrin-table-lib-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    copy_tree(&source, &root);
+    let entry = root.join("app").join("main.ostrin").display().to_string();
     let interpreted = run(&["--run", &entry]);
     assert!(
         interpreted.status.success(),
@@ -18034,6 +18087,7 @@ fn table_library_module_runs_identically_in_both_backends() {
         "unexpected output: {}",
         stdout(&interpreted)
     );
+    let _ = fs::remove_dir_all(&root);
 }
 
 #[test]
