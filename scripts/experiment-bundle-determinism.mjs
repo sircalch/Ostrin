@@ -68,9 +68,12 @@ function render(fixtureId, dir, rep, slot) {
 
 // Classification of a differing JSON path. Only used to explain a difference; nothing is excluded from the comparison.
 function classify(pathText) {
-  if (/(^|\.)(captured|generated|created|timestamp|time|date|at)$/i.test(pathText)) return "timestamp";
-  if (/(hardware|runner|node|image|cpu|endianness|os)/i.test(pathText)) return "environment metadata";
-  if (/(id|uuid|hash-id)$/i.test(pathText)) return "generated identifier";
+  // Host capture adds provenance.runtime.host (runner identity, hardware, node version) and removes the "missing host"
+  // notice; it rewrites provenance.json and its manifest entry. Everything else is the scientific content.
+  if (/^provenance\.runtime\.(host|missing)/.test(pathText)) return "captured host metadata";
+  if (/^(files\.provenance\.json|manifest\.files\.\d+\.(bytes|sha256|path))/.test(pathText)) return "provenance file and its manifest entry";
+  if (/(^|\.)(captured|generated|created|timestamp|time|date)$/i.test(pathText)) return "timestamp";
+  if (/(^|\.)(id|uuid)$/i.test(pathText)) return "generated identifier";
   return "scientific or serialisation content";
 }
 
@@ -144,11 +147,19 @@ const captured = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "-
 if (captured.status !== 0) throw new Error(`control render failed: ${captured.stderr.slice(0, 300)}`);
 const captureText = readFileSync(captureTarget, "utf8");
 const controlDifferences = diffPaths(JSON.parse(plain), JSON.parse(captureText)).map((d) => ({ ...d, class: classify(d.path) }));
+const plainFiles = JSON.parse(plain).files ?? {};
+const captureFiles = JSON.parse(captureText).files ?? {};
+const fileNames = [...new Set([...Object.keys(plainFiles), ...Object.keys(captureFiles)])].sort();
+const changedFiles = fileNames.filter((name) => plainFiles[name] !== captureFiles[name]);
+const unchangedFiles = fileNames.filter((name) => plainFiles[name] === captureFiles[name]);
 report.control = {
   fixture: controlFixture,
   switch: "OSTRIN_CAPTURE_HOST=1 (set by the CI workflow; embeds runner identity, hardware and node version)",
   differs: captureText !== plain,
+  controlEnvironment: { OSTRIN_CAPTURE_HOST: "1", GITHUB_ACTIONS: "true", GITHUB_RUN_ID: "control-run" },
   differingPaths: controlDifferences.length,
+  changedFiles,
+  unchangedFiles,
   examples: controlDifferences.slice(0, 6),
 };
 console.log(`control: host capture changes ${controlDifferences.length} JSON path(s) of ${controlFixture}; detected: ${captureText !== plain}`);

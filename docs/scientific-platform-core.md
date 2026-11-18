@@ -384,3 +384,66 @@ their range, not as a single value.
 - The browser run of the linalg examples (only WASI execution was checked).
 - A fix for `to_string()` on quantity arrays in the AST route.
 - MATLAB and Wolfram: not available.
+
+## V4 consistency review
+
+Branch `horizon/scientific-platform-core`. This review changes evidence and tooling only, plus one presentation change in
+`examples/linalg_units.ostrin`; no new language features.
+
+### native-sanitize exit status
+
+Before this review, `scripts/native-sanitize.mjs` returned 1 whenever a row was not `VERIFIED`, and the 6 intentional
+`REJECTED_TYPE` rows of `untyped_closure_parameter` were counted in that set. The exit status therefore said nothing about
+whether the rejections were the expected ones. Now:
+
+- Each row gets a category (`scripts/native-sanitize-classify.mjs`): VERIFIED, EXPECTED_TYPE_REJECTION,
+  UNEXPECTED_TYPE_REJECTION, COMPILER_REFUSAL, BUILD_FAILURE, EXECUTION_FAILURE, MEMORY_FAILURE, BLOCKED or
+  MISSING_EXPECTED_REJECTION.
+- An expected rejection is a program, a route, an optimisation level and a message, listed in
+  `scripts/native-sanitize-expected-rejections.json`. A rejection that does not match the list is unexpected.
+- Exit status 0: every row is VERIFIED or EXPECTED_TYPE_REJECTION, and every expected rejection of a program in the run
+  was observed. Exit status 1: any other category, or an expected rejection that was not observed (for example, the
+  program now compiles).
+- Tests: `scripts/native-sanitize-classify.test.mjs`, 18 tests. One of them checks that the expected message is still the
+  one the compiler prints.
+
+Default configuration (`node scripts/native-sanitize.mjs --report docs/sanitizer-evidence-v4-default.md`):
+72 rows, 66 VERIFIED, 6 EXPECTED_TYPE_REJECTION, 0 of every other category, 0 missing; exit status 0. The default set
+is the top-level fixtures only; the `residual/` directory is run by passing its files.
+
+### std.linalg in a real browser
+
+`tests/browser/linalg.spec.mjs` loads the page `notebook.html`, imports `ostrin-runtime.js` in the page, and calls
+`runOstrinc` with the real `ostrinc.wasm`. No mock replaces the compiler or the runtime. Eleven tests pass in chromium:
+the oracle (61 lines) and the properties (44 lines) against their references; the quadratic fit; `unit_dot` and
+`unit_matvec` with their units and their length errors; LU solve within 1e-14; `solve_checked` with status `ok` and with
+`ill_conditioned` (condition above 1e12); the refusals of singular, non-finite, non-square and mismatched inputs; a
+compile-time unit mismatch (OSTRIN-E1024); and a runtime shape error in a matrix product. In each error case the program
+prints no partial result.
+
+Limit: the browser route is the compiler's interpreter (`--run`). Native code is not generated in the browser, so the
+native backend is not verified in the browser.
+
+### Reproducibility of bundles: what is guaranteed
+
+- A. Capture off (default, local): every render is byte-identical across 3 repetitions, 2 directories and 3 environments
+  (working directory, `TZ`, `LANG`/`LC_ALL`), for 30 fixtures (180 renders), and equal to the committed bundle.
+- B. Capture on (`OSTRIN_CAPTURE_HOST=1`, as set by the CI workflow): `figure.svg`, `data.json` and `source.ostrin` stay
+  identical. Five JSON paths change, all in provenance: `provenance.runtime.host` is added (runner identity, hardware,
+  Node version, GitHub run identifiers), `provenance.runtime.missing.0` is removed, and `provenance.json` with its manifest
+  entry (bytes and SHA-256) changes. The host metadata is provenance, so it is kept in the bundle, not excluded.
+- The scientific content is reproducible in both modes. Byte-for-byte reproducibility holds only in mode A.
+
+### linalg_units presentation
+
+The label `force: [2, 2] N` on one line needs `to_string()` on a quantity array, which takes the AST route. The example
+now prints `force:` and the array on two lines; this takes the IR route and keeps the label. The change is in layout only.
+The values, the units and the error case are unchanged. The WASI checker and the browser test check the new layout exactly.
+The AST route for `to_string()` on quantity arrays remains PARTIAL.
+
+### Benchmark
+
+The interpreter timing is broken into categories in `benchmarks/v2/linalg/REPORT.md`. The start-up intercept remains
+INCONCLUSIVE, because the first repetition of a process is measurably cheaper than steady repetitions. The direct
+process-start figure is 113 ms. The steady per-repetition figure is PARTIAL: 2193 and 2282 ms in the audit, and 2569,
+2484 and 2165 ms in earlier estimates. None of these is averaged into a stable figure.

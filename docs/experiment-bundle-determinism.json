@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.experiment-determinism/v0",
-  "generated": "2026-11-17T23:13:11.685Z",
+  "generated": "2026-11-17T23:58:07.505Z",
   "node": "v24.19.0",
   "platform": "win32 10.0.26200 x64",
   "repetitions": 3,
@@ -361,37 +361,50 @@
     "fixture": "lines",
     "switch": "OSTRIN_CAPTURE_HOST=1 (set by the CI workflow; embeds runner identity, hardware and node version)",
     "differs": true,
+    "controlEnvironment": {
+      "OSTRIN_CAPTURE_HOST": "1",
+      "GITHUB_ACTIONS": "true",
+      "GITHUB_RUN_ID": "control-run"
+    },
     "differingPaths": 5,
+    "changedFiles": [
+      "provenance.json"
+    ],
+    "unchangedFiles": [
+      "data.json",
+      "figure.svg",
+      "source.ostrin"
+    ],
     "examples": [
       {
         "path": "files.provenance.json",
         "a": "{\"schema\":\"ostrin.provenance/v0\",\"level\":\"R2\",\"reproducibility\":{\"level\":\"R2\",\"l",
         "b": "{\"schema\":\"ostrin.provenance/v0\",\"level\":\"R2\",\"reproducibility\":{\"level\":\"R2\",\"l",
-        "class": "scientific or serialisation content"
+        "class": "provenance file and its manifest entry"
       },
       {
         "path": "manifest.files.2.bytes",
         "a": "93725",
         "b": "94250",
-        "class": "scientific or serialisation content"
+        "class": "provenance file and its manifest entry"
       },
       {
         "path": "manifest.files.2.sha256",
         "a": "sha256:1a0f0363bc0e4c4bd0f16cdde05b2dab45a96cbe7de6b995ecbfe2b75753a428",
         "b": "sha256:9a00baab080d6515328a167dd771b939d29417b8c9b6d265573e60cc293e79d3",
-        "class": "scientific or serialisation content"
+        "class": "provenance file and its manifest entry"
       },
       {
         "path": "provenance.runtime.host",
         "a": "undefined",
         "b": "{\"schema\":\"ostrin.host/v1\",\"source\":\"github-actions\",\"ci_run\":{\"schema\":\"ostrin.",
-        "class": "environment metadata"
+        "class": "captured host metadata"
       },
       {
         "path": "provenance.runtime.missing.0",
         "a": "\"captured host and hardware metadata\"",
         "b": "undefined",
-        "class": "scientific or serialisation content"
+        "class": "captured host metadata"
       }
     ]
   },

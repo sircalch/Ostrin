@@ -88,3 +88,31 @@ node benchmarks/v2/linalg/compare-linalg.mjs --sizes 100,200 --reps 5 --interp-r
 ```
 
 Requires `compiler/target/release/ostrinc.exe` (or `--ostrinc <path>`), Python with NumPy, and Julia 1.13 with the standard library.
+
+## Interpreter timing categories (audit of 2026-11-17)
+
+Source: `benchmarks/v2/linalg/audit-interp-startup.mjs`, `--n 200 --reps 12 --seed 20261117`; file
+`results/audit-interp-startup-n200-2026-11-17T23-12-23-975Z.json`. Every run (48) was checked against the reference.
+The earlier file `...23-09-14-826Z.json` is superseded: its K = 0 check was wrong; its data are kept unchanged.
+
+| Category | What it is | Measured value (mean, sd over 12 processes or pairs) | Protocol |
+|---|---|---|---|
+| Process start, parse, check, set-up | `ostrinc --run` with K = 0 (no repetition) | 113.4 ms, sd 4.2 (cv 3.7 %) | direct measurement, 12 processes |
+| Compilation | the interpreter does not compile to C; its parse and check are inside the K = 0 time above | not separate | — |
+| Native compilation (other row, for reference) | `ostrinc --compile` of `lu_solve.ostrin`, campaign 2026-11-16 | median 1789 ms (n = 3, range 1764 to 1891) | outside every timed run |
+| First repetition of a process | K = 1 minus K = 0, paired per repetition | 2011.5 ms, sd 33.3 (se 9.6) | paired within the same repetition index |
+| Steady repetitions | K = 2 minus K = 1, and K = 3 minus K = 2 | 2193.3 ms, sd 159.4 (se 46.0); 2282.5 ms, sd 117.6 (se 34.0) | paired |
+| Between processes (same K) | spread of independent processes | K = 1: cv 1.6 %; K = 3: cv 3.3 % (sd 217 ms) | 12 processes per K |
+| Between repetitions | spread of the paired increments | sd 159 and 118 ms per repetition (cv about 5 %) | paired |
+
+Interpretation:
+- The first repetition of a process is about 180 to 270 ms (about 8 to 12 %) faster than steady repetitions. The
+  difference is larger than its standard error, so it is not treated as noise. Its mechanism is not identified.
+- Because the first repetition is cheaper, the linear model T(K) = a + bK does not hold, and the intercept is **not**
+  a start-up estimate. The 113 ms direct measurement is the only start-up figure; it is not generalised.
+- The per-repetition figure is steady-state: the two steady increments are 2193 and 2282 ms (paired), with a mean of
+  2238 ms. The mean is reported with its spread, not as proof of stability.
+- Historical per-run figures, all for this program at n = 200: 2569.5 ms (campaign table, n = 3 processes, IQR 235 ms, n = 3), 2484 ms (re-run of five pairs, range 2312 to 2717 ms), and 2165.5 ms (least-squares slope of
+  this audit, which includes K = 0 and therefore mixes the cheaper first repetition in). These differ by about 17 %.
+- The state of the start-up estimate is INCONCLUSIVE. The state of the steady per-repetition figure is PARTIAL: one
+  machine, one commit, three campaigns with a spread of about 17 %.
