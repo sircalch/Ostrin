@@ -56,6 +56,9 @@ gallery, the visual baselines or the compiler.
 
 ## 2. Component inventory
 
+IMPLEMENTADO means the code exists and is reachable. It does not mean the component is ready for distribution. The last
+column of the distribution plan (section 8.3 and 8.4) lists what is still required for each one.
+
 Each row gives the real status. "Tests" names the checks that exist; "Run here" says whether this audit ran them.
 
 | # | Component | Implementation | Status | Public API / route | Tests | Run here | Main limit or risk | Work for a first stable distribution |
@@ -71,7 +74,7 @@ Each row gives the real status. "Tests" names the checks that exist; "Run here" 
 | 9 | Numerical calculus | `std/numeric.ostrin`, `interpreter/detmath.rs`, `detmath_runtime.c` | IMPLEMENTADO | `numeric.*` (Simpson, Brent, RK4/RK45, least squares, LU, QR, Cholesky, eigen, SVD) | `numeric_polyfit`, `numeric_lu`, `numeric_methods`, `numeric-validation.mjs` | Yes (`numeric_polyfit` ran) | Accuracy claims limited to the tests; no interval arithmetic | Publish tolerances per method |
 | 10 | Physical units | `std/measurements.ostrin` (1.9k lines), `qty_runtime.c`, `typeck` dimensions | IMPLEMENTADO, PARCIAL | `Quantity<...>`, `Measurement`, dimensional symbolic output | `symbolic_units` (interpreter, native and WASI), `measurement_*` examples | Yes (`symbolic_units` on interpreter and native; WASI after fix) | Dimensional checks are compile time for literal types; `to_string()` on quantity arrays is PARCIAL on the AST route | Keep the AST-route limit in notes |
 | 11 | Tables, files and data | `std/data.ostrin` (930 lines), `file_io_runtime.c`, `strings_runtime.c`, `examples/data_project`, `data_engine.ostrin` | IMPLEMENTADO | `data.read_table`, `complete_rows`, CSV/TSV, regression on tables | `data_engine` (run from `examples/`), `data_figures`, `data_io_checks`, `lab_data` | Yes (interpreter) | `data_engine` run from another directory exits 0 after printing "cannot read the experiment" (defect, section 5) | Fix exit status of the example or make it fail |
-| 12 | Scientific visualization | `std/viz.ostrin` (2.7k lines), 36 `viz_*` examples, `website/` gallery | IMPLEMENTADO, VERIFICADO (visual baselines on Windows) | `viz.*`, SVG output, `--run` | `viz_scatter_fit` ran; gallery visual test (Playwright `visual.spec.mjs`, 2 tests) | Yes (example run; Playwright on Windows) | Visual baselines exist for `chromium-win32` and `chromium-linux` (25 images per platform); they depend on card position (see `docs/visual-evidence/gallery-2026-11-17/`) | Keep platform-specific baselines; refresh rule documented |
+| 12 | Scientific visualization | `std/viz.ostrin` (2.7k lines), 36 `viz_*` examples, `website/` gallery | IMPLEMENTADO, VERIFICADO en Windows (baselines de Windows); baselines de Linux NO PROBADOS aquí | `viz.*`, SVG output, `--run` | `viz_scatter_fit` ran; gallery visual test (Playwright `visual.spec.mjs`, 2 tests) | Yes (example run; Playwright on Windows) | Visual baselines exist for `chromium-win32` and `chromium-linux` (25 images per platform); they depend on card position (see `docs/visual-evidence/gallery-2026-11-17/`) | Keep platform-specific baselines; refresh rule documented |
 | 13 | Notebooks | `website/notebooks/*.ostrin.notebook.json` (6), `notebook-examples.mjs`, `website/workbench-notebook.js` | IMPLEMENTADO, VERIFICADO (browser) | web Notebook page | `notebook-examples.test.mjs`, `notebook.spec.mjs` (25), `notebook-rational.spec.mjs` (5) | Yes (`notebook-examples --check` rc 0; Playwright 101/101 on Windows chromium) | Browser only; no offline desktop notebook | Document the browser-only status |
 | 14 | Workbench and Playground | `website/playground.*`, `workbench-*.js`, `website/workbench-demos/` | IMPLEMENTADO on this branch (alpha to delta); Epsilon (history, evidence packages) is **not on this branch** | web Workbench | `workbench.spec.mjs`, `workbench-demo.spec.mjs`, `workbench-gamma.spec.mjs`, `workbench-delta.spec.mjs` | Yes (chromium) | Epsilon work is in PR #297 (draft) and will conflict in three files (section 1.1) | Integrate Epsilon after the core, per section 6 |
 | 15 | Packages, manifests and lockfiles | `compiler/src/package.rs` (794 lines), `ostrin.toml`, `ostrin.lock` | IMPLEMENTADO, PARCIAL | `--project`, `--locked`, `--fetch`, path and Git dependencies | `lockfile_rewrite_is_byte_stable_and_ends_with_one_newline`, package tests in `examples.rs` (copies) | Yes (Windows and WSL) | No registry; Git dependencies need `--fetch` and network; the writer rewrites a lock on every non-locked build | Document `--locked` for CI users |
@@ -111,9 +114,9 @@ Full validation results for the final state are in section 7.
 |---|---|---|---|
 | Windows 10/11 x64 (this machine) | cargo, Playwright chromium, WASI, notebook and example runs | none on HEAD | VERIFICADO locally |
 | Linux x86_64 (WSL Ubuntu 24.04) | full cargo test (compiler suite); sanitizer runs from earlier phases | `origin/main` `ci.yml` green (ubuntu-latest) | VERIFICADO for the compiler suite; Node-based suites NO PROBADO here (no Node in WSL) |
-| macOS arm64 / x86_64 | none | `ci.yml`, `benchmarks.yml`, `release.yml` include macOS runners; `origin/main` green for `ci.yml` | NO PROBADO on HEAD |
-| WASI (wasm32-wasip1 via wasi-sdk 34.0) | 51-program matrix, pendulum, linalg checks on Windows | `wasi.yml` is `workflow_dispatch` only: it has not run on HEAD | VERIFICADO locally after the fix; CI NO PROBADO |
-| Browser WASM (Chromium 153) | Playwright 101/101 on Windows | `browser-audit.yml` on `push` to main | VERIFICADO (Chromium, Windows); Firefox and WebKit NO PROBADO |
+| macOS arm64 / x86_64 | none | `ci.yml`, `benchmarks.yml`, `release.yml` include macOS runners; `origin/main` green for `ci.yml` | PENDIENTE: NO PROBADO on HEAD |
+| WASI (wasm32-wasip1 via wasi-sdk 34.0) | 51-program matrix on the final binary, pendulum and linalg checks on Windows; fixture reproduces the trap without the flag | `wasi.yml` now runs on push and pull request; it has not run on HEAD | VERIFICADA para la matriz ejecutada (Windows); CI remoto PENDIENTE |
+| Browser WASM (Chromium 153, Windows) | Full Chromium suite 101/101 on the WASM rebuilt from the final compiler (section 7.1) | `browser-audit.yml` on `push` to main; not run on HEAD | VERIFICADO localmente (Chromium, Windows); CI remoto PENDIENTE; Firefox and WebKit NO PROBADO |
 | Native sanitizers (ASan, UBSan, LSan) | GCC 13 in WSL (from earlier phases) | `sanitizers.yml` on pull requests | VERIFICADO earlier; not rerun in this stage |
 
 Legitimate differences kept: visual baselines are per platform (`chromium-win32` and Linux); the Windows baselines were
@@ -124,6 +127,11 @@ refreshed with evidence in the previous stage and must not be copied to Linux.
 - `wasi.yml` had only `workflow_dispatch`, which is why the WASI trap above was not caught by any run. It now also runs on
   `push` to `main` and `pull_request` to `main`, filtered to the compiler, WASI scripts, examples and fixtures. This only
   takes effect after the branch is pushed, which requires owner approval.
+
+- Path filters also cover `scripts/benchmark-allocation-profile.mjs` and `scripts/benchmark-runtime-inputs.mjs`, which the
+  pendulum check imports (commit `217522f1`).
+
+Remote CI status: nothing in this section has run on GitHub. The local runs in section 7 are not CI results.
 
 Not done here, recommended: add `linalg-wasm-check.mjs` to `wasi.yml` (it needs `website/ostrinc.wasm` built by
 `tests/browser/prepare-runtime.mjs`).
@@ -139,6 +147,8 @@ Not done here, recommended: add `linalg-wasm-check.mjs` to `wasi.yml` (it needs 
 | D5 | `data_engine.ostrin` exits 0 when run from outside `examples/` | The example prints a message and continues; its input path is relative | **Not changed**: it is example behaviour, not a compiler defect. Listed for the owner to decide | Run from repo root: `cannot read the experiment`, exit 0 |
 | D6 | Tracked binary `examples/data_project/app/main.exe` | Committed in `b09b5611`; also on `origin/main` | **Not changed** (history decision) | `git ls-files` |
 | D7 | Wrapper exit code of the Linux run | The background wrapper reported exit 1 while the log ends with `EXIT=0` | Not explained. The second Linux run (section 7) is the authority | `linux-cargo-test.log` |
+| D8 | `website-check` failed (60 errors, 30 bundles stale) after the WASI fix | `scripts/experiment-bundle.mjs` hashes `compiler/src/main.rs` as analyzer provenance | Bundles regenerated with `--write-all`; only `sha256` fields changed (section 7.4) | `website-check`: rc 1 before, 0 after |
+| D9 | `wasi.yml` filters did not cover two helper scripts imported by the pendulum check | the filter list was written before the pendulum check changed its imports | Added `scripts/benchmark-allocation-profile.mjs` and `scripts/benchmark-runtime-inputs.mjs` (commit `217522f1`) | `grep` of the imports in `scripts/pendulum-wasi-check.mjs` |
 
 ## 6. Integration plan (not executed)
 
@@ -211,21 +221,83 @@ After the merge into `main`, the GitHub workflows that matter are `ci.yml`, `was
 
 ## 7. Final validation
 
-Final results are recorded after the last change. Each row is the command, its exit code and the summary line.
+Final state: branch `horizon/scientific-platform-core`, HEAD `55e7dcb6` (commits `ac9679b6`, `217522f1`, `55e7dcb6` on top of `f7477d05` and `36d20187`).
+Each row is a command run from the repository root unless noted, with its exit code.
+
+### 7.1 Browser WASM and Playwright
+
+| Step | Command | Result | Exit |
+|---|---|---|---|
+| Rebuild | `node tests/browser/prepare-runtime.mjs` | `Finished release`; `website/ostrinc.wasm` sha256 `828a8fa6…` equals `compiler/target/wasm32-wasip1/release/ostrinc.wasm`; the file contains the new diagnostic string and not the old one | 0 |
+| Chromium suite | `cd tests/browser && node_modules/.bin/playwright test --project=chromium` (Playwright 1.63.0, Chromium 153) | **101 passed** (1.2 min) | 0 |
+
+Breakdown of the 101, from the same run: linalg in browser 11 (`linalg.spec.mjs`, interpreter route); notebooks 25 (`notebook.spec.mjs`);
+notebook F 5 (`notebook-rational.spec.mjs`); gallery visual fixtures 2 (`visual.spec.mjs`); website and Playground 33
+(`website.spec.mjs`); workbench 25 (`workbench*.spec.mjs`, including "compiler errors are shown from the real compiler").
+
+Other checks:
 
 | Command | Result | Exit |
 |---|---|---|
-| `cargo test --release --manifest-path compiler/Cargo.toml --no-fail-fast` (Windows, final tree) | 40 unit, 6 differential, 472 integration | 0 |
-| `cargo test --release --no-fail-fast` (WSL Ubuntu 24.04, final tree, log `EXIT=0`) | 40 unit, 6 differential, 472 integration | 0 |
-| `node scripts/wasi-program-check.mjs` (after the project-copy change) | `ok (51 programs ...)` | 0 |
-| `node scripts/pendulum-wasi-check.mjs` (final binary) | `ok (10 compiled WASI cases ...)` | 0 |
-| `node scripts/linalg-wasm-check.mjs` | `6 of 6 WASM checks passed` | 0 |
+| `node --test scripts/rational-equations-oracle.test.mjs scripts/notebook-examples.test.mjs scripts/notebook.test.mjs` | 43 pass, 0 fail | 0 |
+| `node scripts/rational-equations-oracle.mjs` | no output (passes) | 0 |
 | `node scripts/notebook-examples.mjs --check` | `notebook examples: ok` | 0 |
+| `node scripts/linguist-check.mjs` | `ok (... 368 Ostrin examples)` | 0 |
+| `node scripts/website-check.mjs` | `ok (18 public pages, 368 examples, 472 integration tests)` after the regeneration in 7.4 | 0 (1 before it) |
 
-Not re-run after the last compiler change (the missing-file message in `modules.rs`): the Playwright browser suite and
-`website-check`/`linguist-check`. The browser WASM is built locally (`website/ostrinc.wasm` is untracked), so the browser
-suite must be rerun after `node tests/browser/prepare-runtime.mjs` before any release. The last browser result, 101/101 on
-Windows Chromium, comes from the previous stage and predates D1 to D4.
+### 7.2 WASI
+
+| Command | Result | Exit |
+|---|---|---|
+| `node scripts/wasi-program-check.mjs` (final binary, `OSTRIN_HOST_COMPILER=` unset) | `ok (51 programs, compiler + package + args/env + file I/O + ownership)` | 0 |
+| `node scripts/pendulum-wasi-check.mjs` (final binary) | `ok (10 compiled WASI cases, report/SVG and expected-error parity, zero live managed allocations)` | 0 |
+| `node scripts/linalg-wasm-check.mjs` | `6 of 6 WASM checks passed` | 0 |
+
+Correction check, run in this stage:
+
+- The fixture `compiler/tests/fixtures/wasi_float_print.ostrin.txt` was emitted to C with `ostrinc --emit-c` and compiled with the
+  pinned WASI clang and the compiler's flags, twice: with and without `-lc-printscan-long-double`.
+  Without it, the program traps: `RUN_TRAP unreachable`. With it, it prints `0.30000000000000004`, `10`, `0.3333333333333333` and exits 0.
+- The flag is added after the source file on the command line (`compiler/src/main.rs`, lines 1051 to 1054), and only in the
+  `wasm32-wasi` branch (the native branch starts at line 1058). Native `--compile` of the same fixture prints the same three lines.
+- The `wasi.yml` filters include `compiler/**`, `scripts/wasi-*.mjs`, `scripts/pendulum-wasi-check.mjs`,
+  `scripts/benchmark-allocation-profile.mjs` and `scripts/benchmark-runtime-inputs.mjs` (both imported by the pendulum check),
+  `examples/**`, `compiler/tests/fixtures/**` and the workflow file, for push and pull request to `main`.
+  `linalg-wasm-check.mjs` is not run by the workflow (see 8.2).
+
+### 7.3 Repository integrity
+
+- Before and after the project and package tests (`cargo test --release --manifest-path compiler/Cargo.toml --test examples --`
+  with `community_starter_project_runs_from_manifest`, `lockfile_rewrite_is_byte_stable`, `path_dependency_resolves_and_runs`,
+  `table_library_module_runs_identically`: 4 passed), `git status` and the index entries of every `ostrin.lock` and `main.exe`
+  were identical. These tests use temporary copies.
+- The WASI project check builds `examples/pkg_project` from a copy in `target/wasi-program-check/project-copies`.
+- `examples/data_project/app/ostrin.lock` keeps its pre-existing change, untouched.
+- `examples/data_project/app/main.exe` is not modified.
+
+### 7.4 Regenerated experiment bundles
+
+`website-check` reported 60 failures (30 bundles stale, manifests drifted) after the `compiler/src/main.rs` change: each bundle's
+analyzer provenance hashes that file. The documented regeneration (`node scripts/experiment-bundle.mjs --write-all`, the step used
+by `.github/actions/website-verify/action.yml`) rewrote the 30 files. A field-by-field comparison with HEAD found that only
+`sha256` fields changed, at the top level and inside the embedded `provenance.json`. Figures, data and source text are unchanged.
+
+### 7.5 Cargo (full runs made earlier on the same compiler source)
+
+| Command | Result | Exit |
+|---|---|---|
+| `cargo test --release --manifest-path compiler/Cargo.toml --no-fail-fast`, Windows | 40 unit, 6 differential, 472 integration | 0 |
+| `cargo test --release --no-fail-fast`, WSL Ubuntu 24.04 (gcc 13.3, cargo 1.98.1) | 40 unit, 6 differential, 472 integration (log `EXIT=0`) | 0 |
+
+These runs predate the `wasi.yml` path edit and the bundle regeneration, which do not change compiler source. The
+`main.rs` change was already in place for both runs.
+
+### 7.6 Not verified
+
+- Firefox and WebKit: no runs.
+- macOS: no runs.
+- The installer end to end (download and checksum) and `install-check`: not run; they need specific approval.
+- Remote CI on GitHub: the branch is not pushed, so no workflow has run on it. The local results above are not CI results.
 
 ## 8. Distribution plan
 
@@ -245,6 +317,8 @@ release assets.
 
 | Blocker | Status |
 |---|---|
+| Remote CI (`ci.yml`, `wasi.yml`, `browser-audit.yml`, `sanitizers.yml`) has never run on HEAD | PENDIENTE until a push is approved |
+| Firefox and WebKit Playwright runs | PENDIENTE (not run) |
 | Owner decision on the pre-existing change in `examples/data_project/app/ostrin.lock` | BLOQUEADO (owner) |
 | HEAD never pushed; no CI run on HEAD | BLOQUEADO until push is approved |
 | macOS evidence on HEAD | NO PROBADO |
