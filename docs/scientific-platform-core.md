@@ -447,3 +447,41 @@ The interpreter timing is broken into categories in `benchmarks/v2/linalg/REPORT
 INCONCLUSIVE, because the first repetition of a process is measurably cheaper than steady repetitions. The direct
 process-start figure is 113 ms. The steady per-repetition figure is PARTIAL: 2193 and 2282 ms in the audit, and 2569,
 2484 and 2165 ms in earlier estimates. None of these is averaged into a stable figure.
+
+## Visual gallery and lockfile investigation (2026-11-17)
+
+### Gallery visual failure
+
+- Cause: the Windows baselines of three gallery cards (`bars`, `scatter-fit`, `heatmap`) were recorded on 2026-10-25 and
+  were never refreshed after the gallery layout changed (2026-11-03 to 2026-11-07). The position of each card on the page
+  sets the fractional vertical offset of its image, and a fractional offset changes both the rendered height (by one
+  pixel) and the resampled pixels of the image. The SVG content is unchanged: the only difference in the published SVGs
+  since the baselines is the `clipPath` identifiers, and the previous and current SVGs render to byte-identical PNG files
+  at the same position.
+- Correction: the three Windows baselines were replaced with the images the test captured on this machine, after the
+  evidence was recorded. The other twelve baselines and the tolerances are unchanged. `visual.spec.mjs` passed three
+  consecutive runs.
+- Limits: the baselines depend on the card position, so a future layout change will need the same refresh. The Linux
+  baselines were not run here.
+- Evidence and environment (Windows 10, Playwright 1.63.0, Chromium 153.0.8010.12, viewport 1440 x 960, device scale 1):
+  `docs/visual-evidence/gallery-2026-11-17/README.md`.
+
+### ostrin.lock
+
+- Writer: `write_lockfile` in `compiler/src/package.rs`, called for every build without `--locked` of a project that has
+  dependencies. Before this change it rewrote the file on every build, and every entry was followed by a blank line, so
+  the file ended with a blank line after its last entry. The committed `examples/data_project/app/ostrin.lock` has no
+  trailing blank line, so every build changed it.
+- Tests that caused the rewrites: the tests that build the tracked examples in place (`table_library_module_runs_identically_in_both_backends`,
+  `path_dependency_resolves_and_runs`, `native_backend_compiles_project_manifest_and_path_dependency`,
+  `project_manifest_selects_entry_and_writes_portable_lockfile`, the WASI package emission in
+  `wasm_program_matrix_emits_without_native_thread_dependencies`, and `community_starter_project_runs_from_manifest` for the
+  template). They now build a copy (`writable_copy`), so the tracked files are not written by the test suite.
+- Behaviour now: the output ends with exactly one newline, and the file is written only when its bytes change. A second
+  build of an unchanged project does not modify it (`lockfile_rewrite_is_byte_stable_and_ends_with_one_newline`). An
+  isolated copy of the committed data-project lockfile stays byte-identical after `--run`, `--provenance-report` and
+  `--compile`.
+- Protected file: `examples/data_project/app/ostrin.lock` still has the blank line added before this change. It was not
+  restored or edited. A build run in place, without `--locked`, will rewrite it to the canonical form (removing that
+  line); that is the intended behaviour of the generator and is left to the owner of the file.
+- The pkg and template lockfiles that the test run had changed were restored to their committed state.
