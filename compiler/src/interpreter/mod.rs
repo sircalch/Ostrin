@@ -430,7 +430,11 @@ impl std::hash::Hasher for NameHasher {
     }
 
     fn write(&mut self, bytes: &[u8]) {
-        let mut hash = if self.0 == 0 { 0xcbf2_9ce4_8422_2325 } else { self.0 };
+        let mut hash = if self.0 == 0 {
+            0xcbf2_9ce4_8422_2325
+        } else {
+            self.0
+        };
         for byte in bytes {
             hash ^= *byte as u64;
             hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
@@ -478,9 +482,7 @@ impl Frame {
                 .get(name)
                 .copied()
                 .filter(|&p| p < self.live && self.vars[p].0 == name),
-            None => self.vars[..self.live]
-                .iter()
-                .position(|(n, _)| n == name),
+            None => self.vars[..self.live].iter().position(|(n, _)| n == name),
         }
     }
 
@@ -544,7 +546,9 @@ impl Env {
     fn get(&self, name: &str) -> Option<Value> {
         let found = {
             let frame = self.0.borrow();
-            frame.position(name).map(|position| frame.vars[position].1.clone())
+            frame
+                .position(name)
+                .map(|position| frame.vars[position].1.clone())
         };
         if found.is_some() {
             return found;
@@ -2244,7 +2248,10 @@ impl Interpreter {
                     // every iteration. After each iteration the frame is cut back to the loop variable, which
                     // is what a fresh frame would hold at the start of the next one.
                     let reuse = !crate::ast_scan::block_any(body, &|expr| {
-                        matches!(expr, Expr::Lambda(..) | Expr::Spawn(_) | Expr::SpawnScope(_))
+                        matches!(
+                            expr,
+                            Expr::Lambda(..) | Expr::Spawn(_) | Expr::SpawnScope(_)
+                        )
                     });
                     let shared = reuse.then(|| env.child());
                     let mut i = s;
@@ -2374,7 +2381,11 @@ impl Interpreter {
     }
 
     /// The bounds of a range expression: its start, its end, its step and its kind. Evaluated once, in source order.
-    fn range_plan(&mut self, expr: &Expr, env: &Env) -> Result<(i64, i64, i64, RangeKind), RuntimeError> {
+    fn range_plan(
+        &mut self,
+        expr: &Expr,
+        env: &Env,
+    ) -> Result<(i64, i64, i64, RangeKind), RuntimeError> {
         match expr.unlocated() {
             Expr::Range(start, kind, end, step) => {
                 let sv = self.eval_expr(start, env)?;
@@ -2425,7 +2436,10 @@ impl Interpreter {
             Expr::Located(inner, range) => {
                 if !self.literal_kinds.is_empty() {
                     let key = crate::typeck::ExprKey {
-                        file: self.call_stack.last().and_then(|frame| frame.decl.source_file.clone()),
+                        file: self
+                            .call_stack
+                            .last()
+                            .and_then(|frame| frame.decl.source_file.clone()),
                         start: range.start,
                         end: range.end,
                     };
@@ -4683,7 +4697,10 @@ mod frame_tests {
         for k in 0..40 {
             env.define(&format!("v{k}"), int(k));
         }
-        assert!(env.0.borrow().index.is_some(), "a frame of 40 names is indexed");
+        assert!(
+            env.0.borrow().index.is_some(),
+            "a frame of 40 names is indexed"
+        );
         env.0.borrow_mut().truncate_to(1);
         for k in 1..40 {
             assert_eq!(read(&env, &format!("v{k}")), None, "v{k} is stale");
@@ -4705,7 +4722,11 @@ mod frame_tests {
         }
         env.define("x3", int(333));
         assert_eq!(read(&env, "x3"), Some(333));
-        assert_eq!(env.0.borrow().live, 20, "a redefinition does not add a slot");
+        assert_eq!(
+            env.0.borrow().live,
+            20,
+            "a redefinition does not add a slot"
+        );
     }
 
     #[test]
@@ -4716,7 +4737,11 @@ mod frame_tests {
         assert_eq!(read(&child, "q"), Some(7));
         child.define("q", int(9));
         assert_eq!(read(&child, "q"), Some(9));
-        assert_eq!(read(&parent, "q"), Some(7), "the parent keeps its own binding");
+        assert_eq!(
+            read(&parent, "q"),
+            Some(7),
+            "the parent keeps its own binding"
+        );
     }
 
     #[test]
@@ -4726,7 +4751,13 @@ mod frame_tests {
             env.define(&format!("s{k}"), int(k));
         }
         env.0.borrow_mut().truncate_to(2);
-        let names: Vec<String> = env.0.borrow().live_vars().iter().map(|(n, _)| n.clone()).collect();
+        let names: Vec<String> = env
+            .0
+            .borrow()
+            .live_vars()
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect();
         assert_eq!(names, vec!["s0".to_string(), "s1".to_string()]);
     }
 }

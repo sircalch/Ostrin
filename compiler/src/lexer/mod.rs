@@ -12,11 +12,55 @@ static C_IDENTIFIER_ESCAPE: AtomicBool = AtomicBool::new(false);
 /// C keywords (C11 and common GNU extensions) that Ostrin programs may use as identifiers. No Ostrin builtin has one of
 /// these names, so escaping them never changes a builtin call.
 const C_RESERVED: &[&str] = &[
-    "auto", "bool", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
-    "false", "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed",
-    "sizeof", "static", "struct", "switch", "true", "typedef", "union", "unsigned", "void", "volatile", "while", "asm",
-    "typeof", "_Alignas", "_Alignof", "_Atomic", "_Bool", "_Complex", "_Generic", "_Imaginary", "_Noreturn",
-    "_Static_assert", "_Thread_local",
+    "auto",
+    "bool",
+    "break",
+    "case",
+    "char",
+    "const",
+    "continue",
+    "default",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "float",
+    "for",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "register",
+    "restrict",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "struct",
+    "switch",
+    "true",
+    "typedef",
+    "union",
+    "unsigned",
+    "void",
+    "volatile",
+    "while",
+    "asm",
+    "typeof",
+    "_Alignas",
+    "_Alignof",
+    "_Atomic",
+    "_Bool",
+    "_Complex",
+    "_Generic",
+    "_Imaginary",
+    "_Noreturn",
+    "_Static_assert",
+    "_Thread_local",
 ];
 
 /// Enables or disables the C identifier escape for the rest of the process.
@@ -27,7 +71,9 @@ pub fn set_c_identifier_escape(enabled: bool) {
 /// The C name of an identifier. With the escape enabled, a C-reserved name or a name that already starts with `K_` gets the
 /// prefix `K_`. The map is injective: prefixed names never collide with names that are kept as they are.
 fn c_identifier(text: String) -> String {
-    if C_IDENTIFIER_ESCAPE.load(Ordering::SeqCst) && (C_RESERVED.contains(&text.as_str()) || text.starts_with("K_")) {
+    if C_IDENTIFIER_ESCAPE.load(Ordering::SeqCst)
+        && (C_RESERVED.contains(&text.as_str()) || text.starts_with("K_"))
+    {
         format!("K_{text}")
     } else {
         text

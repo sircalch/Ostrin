@@ -149,7 +149,8 @@ impl<'a> Walker<'a> {
         if self.mode != Mode::Rewrite {
             return None;
         }
-        self.resolve(name).and_then(|id| self.cells.get(&id).cloned())
+        self.resolve(name)
+            .and_then(|id| self.cells.get(&id).cloned())
     }
 
     fn stmt(&mut self, s: &mut Stmt) {
@@ -286,7 +287,11 @@ impl<'a> Walker<'a> {
                 self.expr(a);
                 None
             }
-            Expr::Try(a, Some(b)) | Expr::Binary(_, a, b) | Expr::Index(a, b) | Expr::Within(a, b) | Expr::As(a, b) => {
+            Expr::Try(a, Some(b))
+            | Expr::Binary(_, a, b)
+            | Expr::Index(a, b)
+            | Expr::Within(a, b)
+            | Expr::As(a, b) => {
                 self.expr(a);
                 self.expr(b);
                 None

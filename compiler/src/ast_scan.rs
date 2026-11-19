@@ -10,32 +10,45 @@ pub fn expr_any(e: &Expr, pred: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match e {
-        Expr::Located(inner, _) | Expr::UnitLiteral(inner, _) | Expr::Unary(_, inner) | Expr::FieldAccess(inner, _) => {
-            expr_any(inner, pred)
+        Expr::Located(inner, _)
+        | Expr::UnitLiteral(inner, _)
+        | Expr::Unary(_, inner)
+        | Expr::FieldAccess(inner, _) => expr_any(inner, pred),
+        Expr::Try(a, rest) => {
+            expr_any(a, pred) || rest.as_deref().is_some_and(|b| expr_any(b, pred))
         }
-        Expr::Try(a, rest) => expr_any(a, pred) || rest.as_deref().is_some_and(|b| expr_any(b, pred)),
         Expr::Binary(_, a, b) | Expr::Index(a, b) | Expr::Within(a, b) | Expr::As(a, b) => {
             expr_any(a, pred) || expr_any(b, pred)
         }
         Expr::Range(a, _, b, rest) => {
-            expr_any(a, pred) || expr_any(b, pred) || rest.as_deref().is_some_and(|c| expr_any(c, pred))
+            expr_any(a, pred)
+                || expr_any(b, pred)
+                || rest.as_deref().is_some_and(|c| expr_any(c, pred))
         }
         Expr::Approximately(a, b, c) => expr_any(a, pred) || expr_any(b, pred) || expr_any(c, pred),
         Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
             expr_any(callee, pred) || args.iter().any(|arg| arg_any(arg, pred))
         }
         Expr::If(cond, then, otherwise) => {
-            expr_any(cond, pred) || block_any(then, pred) || otherwise.as_ref().is_some_and(|b| block_any(b, pred))
+            expr_any(cond, pred)
+                || block_any(then, pred)
+                || otherwise.as_ref().is_some_and(|b| block_any(b, pred))
         }
         Expr::Block(b) | Expr::Loop(b) => block_any(b, pred),
         Expr::Lambda(_, body) => block_any(body, pred),
         Expr::Spawn(b) | Expr::SpawnScope(b) => block_any(b, pred),
-        Expr::ListLiteral(items) | Expr::SetLiteral(items) => items.iter().any(|item| expr_any(item, pred)),
-        Expr::MapLiteral(pairs) => pairs.iter().any(|(k, v)| expr_any(k, pred) || expr_any(v, pred)),
+        Expr::ListLiteral(items) | Expr::SetLiteral(items) => {
+            items.iter().any(|item| expr_any(item, pred))
+        }
+        Expr::MapLiteral(pairs) => pairs
+            .iter()
+            .any(|(k, v)| expr_any(k, pred) || expr_any(v, pred)),
         Expr::RecordLiteral(_, fields) | Expr::GenericRecordLiteral(_, _, fields) => {
             fields.iter().any(|(_, v)| expr_any(v, pred))
         }
-        Expr::Match(scrutinee, arms) => expr_any(scrutinee, pred) || arms.iter().any(|arm| arm_any(arm, pred)),
+        Expr::Match(scrutinee, arms) => {
+            expr_any(scrutinee, pred) || arms.iter().any(|arm| arm_any(arm, pred))
+        }
         Expr::Channel(_, capacity) => capacity.as_deref().is_some_and(|c| expr_any(c, pred)),
         Expr::IntLiteral(_)
         | Expr::SizedIntLiteral(..)
@@ -51,13 +64,16 @@ pub fn expr_any(e: &Expr, pred: &dyn Fn(&Expr) -> bool) -> bool {
 
 /// True when `pred` holds for any expression inside `block`, including its statements and tail.
 pub fn block_any(block: &Block, pred: &dyn Fn(&Expr) -> bool) -> bool {
-    block.stmts.iter().any(|s| stmt_any(&s.stmt, pred)) || block.tail.as_deref().is_some_and(|t| expr_any(t, pred))
+    block.stmts.iter().any(|s| stmt_any(&s.stmt, pred))
+        || block.tail.as_deref().is_some_and(|t| expr_any(t, pred))
 }
 
 fn stmt_any(stmt: &Stmt, pred: &dyn Fn(&Expr) -> bool) -> bool {
     match stmt {
         Stmt::Binding { value, .. } | Stmt::Assign { value, .. } => expr_any(value, pred),
-        Stmt::Return(value) | Stmt::Break(value) => value.as_ref().is_some_and(|e| expr_any(e, pred)),
+        Stmt::Return(value) | Stmt::Break(value) => {
+            value.as_ref().is_some_and(|e| expr_any(e, pred))
+        }
         Stmt::For { iter, body, .. } => expr_any(iter, pred) || block_any(body, pred),
         Stmt::While { cond, body } => expr_any(cond, pred) || block_any(body, pred),
         Stmt::FieldAssign { target, value } => expr_any(target, pred) || expr_any(value, pred),
@@ -73,7 +89,9 @@ fn arg_any(arg: &Arg, pred: &dyn Fn(&Expr) -> bool) -> bool {
 }
 
 fn arm_any(arm: &MatchArm, pred: &dyn Fn(&Expr) -> bool) -> bool {
-    pattern_any(&arm.pattern, pred) || arm.guard.as_ref().is_some_and(|g| expr_any(g, pred)) || block_any(&arm.body, pred)
+    pattern_any(&arm.pattern, pred)
+        || arm.guard.as_ref().is_some_and(|g| expr_any(g, pred))
+        || block_any(&arm.body, pred)
 }
 
 fn pattern_any(pattern: &Pattern, pred: &dyn Fn(&Expr) -> bool) -> bool {
@@ -95,7 +113,11 @@ mod tests {
         let tokens = crate::lexer::Lexer::new(source).tokenize().expect("lexes");
         let (items, errors) = crate::parser::Parser::new(tokens).parse_program();
         assert!(errors.is_empty(), "parse errors: {errors:?}");
-        let Item::Function(main) = items.into_iter().find(|i| matches!(i, Item::Function(f) if f.name == "main")).expect("main") else {
+        let Item::Function(main) = items
+            .into_iter()
+            .find(|i| matches!(i, Item::Function(f) if f.name == "main"))
+            .expect("main")
+        else {
             unreachable!()
         };
         for stmt in main.body.stmts {
@@ -107,7 +129,9 @@ mod tests {
     }
 
     fn may_capture(body: &Block) -> bool {
-        block_any(body, &|e| matches!(e, Expr::Lambda(..) | Expr::Spawn(_) | Expr::SpawnScope(_)))
+        block_any(body, &|e| {
+            matches!(e, Expr::Lambda(..) | Expr::Spawn(_) | Expr::SpawnScope(_))
+        })
     }
 
     #[test]
@@ -127,9 +151,14 @@ mod tests {
             "    spawn { s = fn(a) { a } }",
         ];
         for position in positions {
-            let source = format!("fn main() -> Void {{\n    for i in 0 until 3 {{\n        {position}\n    }}\n}}\n");
+            let source = format!(
+                "fn main() -> Void {{\n    for i in 0 until 3 {{\n        {position}\n    }}\n}}\n"
+            );
             let body = first_loop_body(&source);
-            assert!(may_capture(&body), "a closure or task in `{position}` must disable frame reuse");
+            assert!(
+                may_capture(&body),
+                "a closure or task in `{position}` must disable frame reuse"
+            );
         }
     }
 

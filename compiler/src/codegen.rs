@@ -2236,7 +2236,10 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
 /// An expression that produces a new record or container value, so that a field or element read from it is fresh.
 fn fresh_object(expr: &Expr) -> bool {
     match expr.unlocated() {
-        Expr::Call(..) | Expr::GenericCall(..) | Expr::RecordLiteral(..) | Expr::GenericRecordLiteral(..) => true,
+        Expr::Call(..)
+        | Expr::GenericCall(..)
+        | Expr::RecordLiteral(..)
+        | Expr::GenericRecordLiteral(..) => true,
         Expr::FieldAccess(inner, _) | Expr::Index(inner, _) => fresh_object(inner),
         _ => false,
     }
@@ -2252,7 +2255,13 @@ fn arg_is_fresh(args: &[Arg], ty: &CType) -> bool {
 
 /// Calls a runtime function that only reads one argument and returns a value that does not share the argument's storage.
 /// A fresh argument is released after the call; a borrowed one is passed as it is.
-fn with_released_argument(fresh: bool, code: &str, arg_c: &str, result_c: &str, call: impl Fn(&str) -> String) -> String {
+fn with_released_argument(
+    fresh: bool,
+    code: &str,
+    arg_c: &str,
+    result_c: &str,
+    call: impl Fn(&str) -> String,
+) -> String {
     if !fresh {
         return call(code);
     }
@@ -3490,14 +3499,23 @@ impl<'a> Codegen<'a> {
             let releases: String = frame
                 .captures
                 .iter()
-                .filter_map(|(n, t)| release_managed_value(&format!("__e->{n}"), t).map(|body| format!("    {body};
-")))
+                .filter_map(|(n, t)| {
+                    release_managed_value(&format!("__e->{n}"), t).map(|body| {
+                        format!(
+                            "    {body};
+"
+                        )
+                    })
+                })
                 .collect();
-            self.closure_protos.push(format!("static void {drop_name}(void* __env);"));
+            self.closure_protos
+                .push(format!("static void {drop_name}(void* __env);"));
             self.closure_bodies.push((
                 format!("static void {drop_name}(void* __env)"),
-                format!("    OstrinEnv_{id}* __e = __env;
-{releases}"),
+                format!(
+                    "    OstrinEnv_{id}* __e = __env;
+{releases}"
+                ),
             ));
             format!(
                 "({{ OstrinEnv_{id}* __ce = ostrin_alloc_with_drop(sizeof *__ce, (void (*)(void*)){drop_name}); {copies}(void*)__ce; }})"
@@ -3579,7 +3597,10 @@ impl<'a> Codegen<'a> {
             let releases: String = frame
                 .captures
                 .iter()
-                .filter_map(|(n, t)| release_managed_value(&format!("__e->{n}"), t).map(|body| format!("    {body};\n")))
+                .filter_map(|(n, t)| {
+                    release_managed_value(&format!("__e->{n}"), t)
+                        .map(|body| format!("    {body};\n"))
+                })
                 .collect();
             self.closure_protos
                 .push(format!("static void {drop_name}(void* __env);"));
@@ -3841,7 +3862,8 @@ impl<'a> Codegen<'a> {
 
     fn gen_block_expr(&mut self, block: &Block) -> Result<(String, CType), String> {
         let mut body = String::new();
-        let tracks_ownership = self.ownership_active && self.lambda_depth == self.owned_context_depth;
+        let tracks_ownership =
+            self.ownership_active && self.lambda_depth == self.owned_context_depth;
         if tracks_ownership {
             self.owned_block_locals.push(Vec::new());
         }
@@ -5328,7 +5350,8 @@ impl<'a> Codegen<'a> {
                     self.register_list_types(&array_ty);
                     // `ostrin_qa_as` returns a new array. A fresh operand (a call result, a literal or another conversion)
                     // belongs to this expression only, so it is released here; a borrowed operand is left alone.
-                    let fresh = owned_call_argument(inner, &ty) || matches!(inner.unlocated(), Expr::As(..));
+                    let fresh = owned_call_argument(inner, &ty)
+                        || matches!(inner.unlocated(), Expr::As(..));
                     if fresh {
                         return Ok((
                             format!("({{ Array_Float* __as_source = {code}; Array_Float* __as_result = ostrin_qa_as(__as_source, {unit}); ostrin_release_owned((void*)__as_source); __as_result; }})"),
@@ -5520,7 +5543,10 @@ impl<'a> Codegen<'a> {
         };
         match retain_managed_value("__payload", ty) {
             Some(retain) if borrowed_reference_expr(expr) => {
-                format!("({{ {} __payload = {code}; {retain}; __payload; }})", c_type_name(ty))
+                format!(
+                    "({{ {} __payload = {code}; {retain}; __payload; }})",
+                    c_type_name(ty)
+                )
             }
             _ => code.to_string(),
         }
@@ -5529,7 +5555,14 @@ impl<'a> Codegen<'a> {
     /// Reads one element of a list or array through a temporary. A fresh container (a call result, such as `shape()[0]`)
     /// belongs to this expression: a managed element is retained, and the container is released after the read, so the
     /// element outlives it. A borrowed container is read in place, as before.
-    fn element_read(&mut self, obj: &Expr, obj_code: &str, obj_ty: &CType, elem_ty: &CType, read: impl Fn(&str) -> String) -> String {
+    fn element_read(
+        &mut self,
+        obj: &Expr,
+        obj_code: &str,
+        obj_ty: &CType,
+        elem_ty: &CType,
+        read: impl Fn(&str) -> String,
+    ) -> String {
         let container = self.next_temp();
         let element = self.next_temp();
         let fresh = owned_call_argument(obj, obj_ty);
@@ -6945,8 +6978,16 @@ impl<'a> Codegen<'a> {
             }
             let left_temp = self.next_temp();
             let right_temp = self.next_temp();
-            let left_name = if left_owned { left_temp.clone() } else { lc.clone() };
-            let right_name = if right_owned { right_temp.clone() } else { rc.clone() };
+            let left_name = if left_owned {
+                left_temp.clone()
+            } else {
+                lc.clone()
+            };
+            let right_name = if right_owned {
+                right_temp.clone()
+            } else {
+                rc.clone()
+            };
             let (code, ty) = self.gen_quantity_binary(op, &left_name, &lt, &right_name, &rt)?;
             let result = self.next_temp();
             let mut body = String::new();
@@ -8066,8 +8107,12 @@ impl<'a> Codegen<'a> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
         // A fresh receiver (a call result, a field or element of a fresh container) is released once the method has run,
         // when the method cannot return it: array methods never return their receiver, and neither do the scalar list methods.
-        let scalar_list_method = matches!(obj_ty, CType::List(_)) && args.is_empty() && matches!(method_name, "length" | "count" | "is_empty");
-        if (matches!(obj_ty, CType::Array(_)) || scalar_list_method) && owned_call_argument(obj, &obj_ty) {
+        let scalar_list_method = matches!(obj_ty, CType::List(_))
+            && args.is_empty()
+            && matches!(method_name, "length" | "count" | "is_empty");
+        if (matches!(obj_ty, CType::Array(_)) || scalar_list_method)
+            && owned_call_argument(obj, &obj_ty)
+        {
             // `(x * 2.0).sum()`: array methods never return their receiver, so a
             // fresh one is released once the method has run.
             let receiver = self.next_temp();
@@ -12087,7 +12132,10 @@ fn generate_impl(
     }
     out.push_str("    return ostrin_exit_status;\n}\n");
     // The quantity-array helpers call the unit table of the scalar quantity runtime (ostrin_unit_expr_factor), so they need it too.
-    if out.contains("Qty") || out.contains("ostrin_temperature_point_") || out.contains("ostrin_qa_") {
+    if out.contains("Qty")
+        || out.contains("ostrin_temperature_point_")
+        || out.contains("ostrin_qa_")
+    {
         // Declared units join the runtime's table; a simple one (one base dimension, exponent 1)
         // gets the same base code as the built-in units, so `ft * m` folds like `km * m`.
         let mut user = String::new();
