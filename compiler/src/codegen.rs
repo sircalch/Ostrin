@@ -3822,6 +3822,11 @@ impl<'a> Codegen<'a> {
                     self.emit_owned_return(Some(e), code, return_type.clone(), out);
                 }
             }
+            None if *return_type != CType::Void => {
+                // A function with a result and no tail expression ends in an explicit `return` (or
+                // never returns). Nothing after it is reachable, and a bare `return;` in a function
+                // that returns a value is a compile error for clang (-Wreturn-mismatch).
+            }
             None => {
                 self.emit_owned_cleanup(out, None);
                 out.push_str("    return;\n");

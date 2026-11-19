@@ -710,6 +710,12 @@ impl Emitter<'_> {
                 let ret = self.ret.clone();
                 self.emit_return(Some(tail), code, &ret, out)?;
             }
+            None if self.ret != Ty::Void => {
+                // A function with a result and no tail expression ends in an explicit `return` (or never
+                // returns). Nothing after that statement is reachable, and a bare `return;` in a function
+                // that returns a value is a compile error for clang (-Wreturn-mismatch), although gcc
+                // accepts it.
+            }
             None => {
                 self.cleanup(out, None);
                 out.push_str("    return;\n");
