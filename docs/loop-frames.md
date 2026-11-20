@@ -71,13 +71,35 @@ of the same name. A body `mut q` therefore overwrote the outer `q`, and the valu
 the branches' snapshots.
 
 Fix: a declaration uses `Builder::declare` (innermost scope only). An assignment keeps `bind` (nearest visible binding).
-A snapshot keeps the outermost binding of each name, which is the one that persists after a scope ends.
+A snapshot keeps the outermost binding of each name, which is the one that persists after a scope ends. (This rule was
+wrong inside a scope that itself shadows the name; see "Shadowing inside a shadowing scope" below, which replaces it.)
 
 HEAD's native IR also diverged on `compiler/tests/fixtures/shadowing_scopes.ostrin` (`block shadow: 51` instead of 1,
 `early: 6 12` instead of `6 10`, `nested … k: 11` instead of `k: 100`, `bc outer: 3` instead of 0). After the fix the IR,
 the forced HIR path and the forced AST path all give the interpreter's output
 (`shadowing_scopes_agree_in_every_backend_path`). The generated C of the HIR and AST paths emits a `return with no value`
 warning for functions returning from inside a block; the output is correct and the warning predates this change.
+(That bare `return;` in a function with a result is an error for clang, `-Wreturn-mismatch`, and gcc accepts it. It is no longer
+emitted for functions with a result since commit `66b5df9a`.)
+
+## Shadowing inside a shadowing scope (fixed)
+
+The outermost-wins snapshot above was wrong for a branch, a loop or a `match` nested inside a scope that itself shadows
+a variable. For `mut x = 1; if true { mut x = 10; if true { x = 20 }; print(x) }; print(x)` the interpreter and the HIR and AST
+paths print `20` and `1`; the native IR printed `1` and `1`: the nested join read the outer `x` (value 1) instead of the
+shadow, and `restore_visible` wrote the outer value into every scope that had the name. The same happened for `else`
+branches, `while` and `for` loops inside the shadow and three nested levels of one name (9 of the 17 lines of
+`compiler/tests/fixtures/shadowing_nested_control_flow.ostrin`). On `main` the same program printed `20` and `20` on the
+native IR path, wrong in the other direction: a body-local `mut` overwrote the outer variable.
+
+Fix (`compiler/src/ir.rs`): `snapshot_visible` resolves each name to the innermost binding again, as a read of the name does.
+What outermost-wins was protecting is a shadow declared *inside* a loop body, in a block nested in it or in a `match` arm
+leaking out on `break`, `continue` and arm edges. That is handled by bounding those snapshots to the scopes that were open
+when the construct started (`snapshot_visible_to`, `LoopEdges::depth`, and the entry depth in `lower_match`).
+`restore_visible` writes a snapshot back only to the nearest scope that has the name, and `lower_match` closes the arm's
+scope before it restores. Tests: `shadowing_nested_control_flow_agrees_in_every_backend_path` (the interpreter and the IR, HIR
+and AST paths, 17 lines worked out by hand), with `shadowing_scopes_agree_in_every_backend_path` and `loop_body_shadow`
+unchanged.
 
 ## Frames
 

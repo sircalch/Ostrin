@@ -21409,6 +21409,79 @@ fn shadowing_scopes_agree_in_every_backend_path() {
 }
 
 #[test]
+fn shadowing_nested_control_flow_agrees_in_every_backend_path() {
+    // A branch, a loop or a match nested inside a scope that shadows a variable must update the shadow and leave the outer
+    // variable alone. The IR route used to resolve a name to the outermost binding when it joined branches and loops, so
+    // the updates of the shadow were lost (it printed 1 where 20 was expected). The fixture has one line per construct;
+    // every value is worked out by hand. The interpreter and the IR, HIR and AST native paths must all print them.
+    let expected = "shadow after inner if: 20\n\
+                    outer after: 1\n\
+                    if else in shadow: 15 17\n\
+                    level 3: 200\n\
+                    level 2: 10\n\
+                    level 1: 1\n\
+                    while in shadow: 6\n\
+                    while outer: 100\n\
+                    for in shadow: 6\n\
+                    for outer: 1\n\
+                    break with shadow: 3\n\
+                    continue with shadow: 34\n\
+                    arm shadow: 6\n\
+                    match outer: 1\n\
+                    match outer none: 9\n\
+                    else shadow: 31\n\
+                    else outer: 1\n";
+    let path = fixture_path("shadowing_nested_control_flow.ostrin");
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        expected,
+        "interpreter"
+    );
+    let variants: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for (label, env) in variants {
+        let exe = temp_artifact(&format!("shadowing_nested_{label}.exe"));
+        let mut compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+        compile.args(["--compile", "--out", &exe, &path]);
+        for (key, value) in env {
+            compile.env(key, value);
+        }
+        let compile = compile.output().expect("run ostrinc");
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(
+            compile.status.success(),
+            "{label} compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe).output().expect("run native binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "{label} binary failed");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "{label} native path"
+        );
+    }
+}
+
+#[test]
 fn rational_roots_excluded_by_a_denominator_are_listed_exactly_and_are_not_solutions() {
     // R1 = (x-3)(x^2-2)/(x^2-2), R2 = 0. The solution 3 is valid; +-sqrt(2) vanish the original denominator x^2-2 and are
     // excluded, written exactly as +-1/2*sqrt(8) (the same text as a solution).

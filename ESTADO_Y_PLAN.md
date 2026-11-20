@@ -1,5 +1,7 @@
 # Ostrin — estado del proyecto y plan de avance
 
+*Actualización 2026-11-20 (2): se añade la prueba `shadowing_nested_control_flow_agrees_in_every_backend_path` (sombras con control de flujo anidado en la ruta IR nativa). Cuentas: 368 ejemplos, 474 pruebas de integración.*
+
 *Actualización 2026-11-20: se añade la prueba de regresión `solve_checked_terminates_on_subnormal_and_extreme_entries_on_both_backends` (entradas subnormales y extremas de `std.linalg.solve_checked`). Cuentas: 368 ejemplos, 473 pruebas de integración.*
 
 *Actualización 2026-11-17: rama `docs/design-34-polished-figures` y commits `0f38af69`, `16249f49`, `d6a69f60` (std.linalg validado, WASM y benchmark lineal). Cuentas: 368 ejemplos, 472 pruebas de integración, 503 `.ostrin` rastreados. `cargo test --release --no-fail-fast`: 40 unitarias, 6 diferenciales, 471 de integración, todas pasan.*
@@ -626,7 +628,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 473 de integración + 40 unitarias
+    cargo test                                   # 6 diferenciales + 474 de integración + 40 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..
