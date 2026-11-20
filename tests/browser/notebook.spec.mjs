@@ -269,7 +269,9 @@ test("the numeric example runs from expression to figure, and a changed paramete
   await page.getByRole("button", { name: "Run all" }).click();
   await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f'(x) = -3 + 15*x^2", { timeout: 240_000 });
   await expect(page.locator('[data-cell-id="c2"] .nb-stdout')).toContainText("f(1/2) exactly: 1/8");
-  await expect(page.locator('[data-cell-id="c3"] .nb-table').first()).toContainText("15", { timeout: 240_000 });
+  // f'(1.5) = -3 + 15 * 1.5^2 = 30.75 exists only with the new parameter. (The earlier check, "15", also matched
+  // digits of the old table, 21.00000000115898, so it passed before the table was refreshed and failed after.)
+  await expect(page.locator('[data-cell-id="c3"] .nb-table').first()).toContainText("30.75", { timeout: 240_000 });
   await expect(page.locator('[data-cell-id="c5"] .nb-figure img')).toBeVisible({ timeout: 240_000 });
 
   // the changed parameter is part of the document: a reload keeps it and does not run anything by itself
