@@ -256,8 +256,20 @@ pub fn solve_checked(a: Array<Float>, b: Array<Float>) -> Result<CheckedSolution
     for j in 0 until n {
         x.push(y[j] * col_factor[j])
     }
+    // Finite input can still overflow inside the substitution (1e308 - -1e308), even when the true solution is representable.
+    // The status below only measures conditioning, so a result made of infinities must be refused here, not returned as ok.
+    for j in 0 until n {
+        if is_finite_value(x[j]) {
+        } else {
+            return Err("solve_checked: the solution is not finite: a value overflowed while solving")
+        }
+    }
     solution = array(x)
     residual = residual_inf(a, solution, b).unwrap()
+    if is_finite_value(residual) {
+    } else {
+        return Err("solve_checked: the residual is not finite: a value overflowed while checking the solution")
+    }
     scale_xb = matrix_norm_inf(a).unwrap() * vector_norm_inf(solution) + vector_norm_inf(b)
     relative = if scale_xb > 0.0 { residual / scale_xb } else { 0.0 }
     mut inverse_norm = 0.0

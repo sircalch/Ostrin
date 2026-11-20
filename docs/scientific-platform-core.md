@@ -287,7 +287,8 @@ linked when quantity arrays are used.
 `std.linalg` provides `vector_norm1`, `vector_norm_inf`, `matrix_norm1`, `matrix_norm_inf`, `matrix_norm_frobenius`,
 `residual_inf`, `solve_checked` (returns the `CheckedSolution` record with the solution, residual, relative residual,
 1-norm condition estimate and a status), `unit_dot` and `unit_matvec` for quantity arrays. `solve_checked` equilibrates
-rows and columns by powers of two, refuses non-finite input, and reports singularity relative to ||A||_inf.
+rows and columns by powers of two, refuses non-finite input, refuses a non-finite solution or residual (an overflow inside the
+substitution), and reports singularity relative to ||A||_inf.
 
 Evidence:
 
@@ -297,7 +298,10 @@ Evidence:
   (`linalg_properties_agree_in_both_backends_and_leave_no_allocation`).
 - Magnitude extremes: `compiler/tests/fixtures/linalg_subnormal.ostrin` solves scalar and diagonal systems from 5e-324 up to 1e308
   (`solve_checked_terminates_on_subnormal_and_extreme_entries_on_both_backends`). The scale factor of each pass is capped at
-  2^1000 and 2^-1000 so that subnormal entries no longer need a factor beyond the largest double.
+  2^1000 and 2^-1000 so that subnormal entries no longer need a factor beyond the largest double. The same fixture holds a
+  system whose substitution overflows (`1e308 - -1e308`) although its solution is representable: it is refused with a
+  message, not returned as `[-inf, inf]` with status `ok`. It is not solved: scaling the right-hand side to avoid the overflow
+  is not done, so such a system is refused.
 - Regression example: an exact quadratic fit recovers 1, 2, 0.5
   (`linalg_regression_example_recovers_the_exact_quadratic_on_both_backends`).
 - WASM: `scripts/linalg-wasm-check.mjs` runs the real compiler module under `node:wasi`; 6 of 6 checks pass

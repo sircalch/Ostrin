@@ -22057,7 +22057,8 @@ fn solve_checked_terminates_on_subnormal_and_extreme_entries_on_both_backends() 
                     subnormal-1e-320 x 1 status ok\n\
                     smallest-subnormal x 1 status ok\n\
                     near-largest x 1 status ok\n\
-                    mixed-diagonal x 1 1 status ok\n";
+                    mixed-diagonal x 1 1 status ok\n\
+                    overflow-in-substitution error solve_checked: the solution is not finite: a value overflowed while solving\n";
     let interpreted = output_within(
         Command::new(env!("CARGO_BIN_EXE_ostrinc")).args(["--run", &path]),
         120,
