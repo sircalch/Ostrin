@@ -1,0 +1,25 @@
+// std.linalg.solve_checked with magnitudes at both ends of the double range. Equilibration needs a power-of-two factor for
+// each row and column; for a subnormal entry that factor is beyond the largest double, which used to make the scaling loop
+// run forever. Every system below is a scalar or diagonal system whose solution is exactly 1.
+import std.linalg
+
+fn show(label: String, a: Array<Float>, b: Array<Float>) -> Void {
+    match linalg.solve_checked(a, b) {
+        Ok(r) => {
+            mut parts = label + " x"
+            for i in 0 until r.x.length() {
+                parts = parts + " " + r.x[i].to_string()
+            }
+            print(parts + " status " + r.status)
+        },
+        Err(message) => print(label + " error " + message),
+    }
+}
+
+fn main() -> Void {
+    show("subnormal-1e-310", array([[1.0e-310]]), array([1.0e-310]))
+    show("subnormal-1e-320", array([[1.0e-320]]), array([1.0e-320]))
+    show("smallest-subnormal", array([[5.0e-324]]), array([5.0e-324]))
+    show("near-largest", array([[1.0e308]]), array([1.0e308]))
+    show("mixed-diagonal", array([[1.0e-310, 0.0], [0.0, 1.0]]), array([1.0e-310, 1.0]))
+}

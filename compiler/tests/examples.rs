@@ -21953,6 +21953,72 @@ fn linalg_regression_example_recovers_the_exact_quadratic_on_both_backends() {
     );
 }
 
+// Runs a command and fails the test, instead of hanging the suite, when it does not finish within `seconds`.
+fn output_within(command: &mut Command, seconds: u64, what: &str) -> Output {
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|error| panic!("could not start {what}: {error}"));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(seconds);
+    loop {
+        match child.try_wait().expect("poll the child process") {
+            Some(_) => return child.wait_with_output().expect("collect the child output"),
+            None if std::time::Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("{what} did not finish within {seconds} s: it is running forever");
+            }
+            None => std::thread::sleep(std::time::Duration::from_millis(50)),
+        }
+    }
+}
+
+#[test]
+fn solve_checked_terminates_on_subnormal_and_extreme_entries_on_both_backends() {
+    // Equilibration scales each row and column by a power of two. For an entry in the subnormal range that factor lies
+    // beyond the largest double, and the scaling loop used to run forever on an infinite factor. Every system in the
+    // fixture has the exact solution 1, from 5e-324 up to 1e308.
+    let path = fixture_path("linalg_subnormal.ostrin");
+    let expected = "subnormal-1e-310 x 1 status ok\n\
+                    subnormal-1e-320 x 1 status ok\n\
+                    smallest-subnormal x 1 status ok\n\
+                    near-largest x 1 status ok\n\
+                    mixed-diagonal x 1 1 status ok\n";
+    let interpreted = output_within(
+        Command::new(env!("CARGO_BIN_EXE_ostrinc")).args(["--run", &path]),
+        120,
+        "the interpreter on linalg_subnormal.ostrin",
+    );
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("linalg_subnormal.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = output_within(
+        &mut Command::new(&exe),
+        120,
+        "the native linalg_subnormal binary",
+    );
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+}
+
 #[test]
 fn untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic() {
     // The interpreter runs this program, but the native backend cannot infer the type of the untyped parameter `f`. It must

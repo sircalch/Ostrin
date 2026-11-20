@@ -295,6 +295,9 @@ Evidence:
   (`linalg_oracle_agrees_in_both_backends_and_leaves_no_allocation`).
 - Property program: `scripts/linalg-properties.mjs --check`, 44 checks with tolerances from rounding bounds
   (`linalg_properties_agree_in_both_backends_and_leave_no_allocation`).
+- Magnitude extremes: `compiler/tests/fixtures/linalg_subnormal.ostrin` solves scalar and diagonal systems from 5e-324 up to 1e308
+  (`solve_checked_terminates_on_subnormal_and_extreme_entries_on_both_backends`). The scale factor of each pass is capped at
+  2^1000 and 2^-1000 so that subnormal entries no longer need a factor beyond the largest double.
 - Regression example: an exact quadratic fit recovers 1, 2, 0.5
   (`linalg_regression_example_recovers_the_exact_quadratic_on_both_backends`).
 - WASM: `scripts/linalg-wasm-check.mjs` runs the real compiler module under `node:wasi`; 6 of 6 checks pass

@@ -154,17 +154,23 @@ pub record CheckedSolution {
 
 /// The power of two nearest to 1/m from below: multiplying by it moves m into [1, 2). Scaling by a power of two is exact, so
 /// equilibration introduces no rounding. A zero magnitude (an empty row or column) is left unscaled and is reported singular.
+///
+/// The factor is kept finite: it never goes beyond 2^1000 or below 2^-1000. A magnitude in the subnormal range (below about
+/// 2.2e-308) would need a factor above the largest double, and the loop would then run on an infinite factor forever. When the
+/// cap is reached the entry is left below 1 (or above 2); the next pass (columns after rows) scales it the rest of the way,
+/// so the product of the two factors still reaches the range of the subnormals (about 2^-1074) and the largest doubles.
 fn power_of_two_scale(m: Float) -> Float {
     if m <= 0.0 {
         return 1.0
     }
+    limit = 1.0715086071862673e301
     mut t = m
     mut s = 1.0
-    while t >= 2.0 {
+    while t >= 2.0 and s > 1.0 / limit {
         t = t / 2.0
         s = s / 2.0
     }
-    while t < 1.0 {
+    while t < 1.0 and s < limit {
         t = t * 2.0
         s = s * 2.0
     }
