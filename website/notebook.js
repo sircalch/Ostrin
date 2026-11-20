@@ -21,6 +21,7 @@ import {
   clearOutputs,
   createNotebook,
   csvRows,
+  dependencyProblems,
   freshness,
   LIMITS,
   moveCell,
@@ -53,6 +54,9 @@ let doc = createNotebook({ title: "Untitled notebook" });
 let hashes = {};
 let activeCell = null;
 let runAllActive = false;
+// Advanced whenever the open document is replaced or its context is restarted. A run remembers the value it started with
+// and publishes its outcome only if the value is unchanged: otherwise the outcome belongs to a document that is gone.
+let contextGeneration = 0;
 // The cells that ran in this page session. Any other recorded output came from the document and is labelled so.
 const ranThisSession = new Set();
 // The display mode of each text cell for this page session: "read" (rendered) or "edit" (the original text).
@@ -324,6 +328,15 @@ function renderCell(cell, index) {
     input.setAttribute("aria-label", `Dependencies of cell ${cell.id}`);
     input.addEventListener("change", () => {
       const list = input.value.split(",").map((s) => s.trim()).filter((s) => s !== "");
+      // A missing cell, a text cell, the cell itself or a cycle would make the document unusable (hashing and planning
+      // fail on it). Check the proposal first: nothing is replaced, the list is put back and the problem is shown.
+      const problems = dependencyProblems(doc, cell.id, list);
+      if (problems.length > 0) {
+        input.value = cell.deps.join(", ");
+        notice(`The dependencies of ${cell.id} were not changed: ${problems.join("; ")}.`, "error");
+        return;
+      }
+      notice("");
       commit(setDeps(doc, cell.id, list));
     });
     deps.append(input);
@@ -527,6 +540,7 @@ async function runCell(cellId) {
   }
   notice("");
   const hash = hashes[cellId];
+  const generation = contextGeneration;
   const startedAt = new Date().toISOString();
   const started = performance.now();
   activeCell = cellId;
@@ -538,6 +552,13 @@ async function runCell(cellId) {
     outcome = { state: "failed", error: { message: error.message ?? String(error) } };
   }
   activeCell = null;
+  if (generation !== contextGeneration) {
+    // The context was restarted, or another notebook was opened, while this cell ran. Its outcome (also a cancelled
+    // one) belongs to a document that is no longer open: recording it would bring back an output the user cleared, or
+    // attach it to a different notebook that has a cell with the same id.
+    renderCells();
+    return;
+  }
   const record = recordFromOutcome(outcome, hash, startedAt, performance.now() - started);
   // The cell may have been removed while it ran; its outputs are then dropped with it.
   if (doc.cells.some((c) => c.id === cellId)) {
@@ -553,10 +574,12 @@ async function runAll() {
   if (runAllActive || activeCell !== null) return;
   runAllActive = true;
   cancelRequested = false;
+  const generation = contextGeneration;
   renderStatus();
   try {
     for (const cell of doc.cells) {
-      if (cancelRequested) break;
+      // `doc.cells` is the list of the document that was open when the run started: stop when it is no longer the open one.
+      if (cancelRequested || generation !== contextGeneration) break;
       if (cell.kind !== "code") continue;
       await runCell(cell.id);
     }
@@ -569,6 +592,14 @@ async function runAll() {
 function cancel() {
   cancelRequested = true;
   executor.cancel();
+}
+
+// The open document is being replaced, or its recorded outputs are being cleared: a run in flight no longer belongs to it.
+// It is cancelled, and the generation changes so that whatever it reports when it ends (a cancelled outcome included) is
+// discarded instead of being recorded in the document that is open then.
+function closeRunningContext() {
+  contextGeneration += 1;
+  cancel();
 }
 
 // ---------------------------------------------------------------- commands
@@ -619,6 +650,7 @@ async function replaceDocument(next, what) {
   if (isUnsaved() && doc.cells.length > 0 && !window.confirm(`Replace the open notebook with ${what}? Unsaved changes will be lost.`)) {
     return false;
   }
+  closeRunningContext();
   doc = next;
   await refreshHashes();
   renderCells();
@@ -673,6 +705,7 @@ async function attachFile(file) {
 
 function newNotebook() {
   if (isUnsaved() && doc.cells.length > 0 && !window.confirm("Start a new notebook? Unsaved changes will be lost.")) return;
+  closeRunningContext();
   doc = createNotebook({ title: "Untitled notebook" });
   refreshHashes().then(() => {
     renderCells();
@@ -684,7 +717,7 @@ function newNotebook() {
 
 function restartContext() {
   if (!window.confirm("Restart the context? All recorded outputs are cleared. The code is kept.")) return;
-  cancel();
+  closeRunningContext();
   doc = clearOutputs(doc);
   refreshHashes().then(() => {
     renderCells();

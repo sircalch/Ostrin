@@ -120,6 +120,24 @@ export function setDeps(doc, cellId, deps) {
   return { ...doc, cells: doc.cells.map((c) => (c.id === cellId ? { ...c, deps: [...deps] } : c)) };
 }
 
+// The problems that listing `deps` for a cell would cause, in the words validateNotebook uses for an imported document.
+// An empty list means setDeps(doc, cellId, deps) is a valid document. Nothing is changed. The page checks a proposed list
+// with this before it replaces the document: hashing or planning a document with a missing dependency or a cycle fails.
+export function dependencyProblems(doc, cellId, deps) {
+  const cell = doc.cells.find((c) => c.id === cellId);
+  if (!cell) return [`no cell ${cellId}`];
+  const problems = [];
+  if (cell.kind === "text" && deps.length > 0) problems.push(`text cell ${cellId} cannot have dependencies`);
+  if (deps.length > LIMITS.maxDepsPerCell) problems.push(`a cell can list at most ${LIMITS.maxDepsPerCell} dependencies`);
+  const codeIds = new Set(doc.cells.filter((c) => c.kind === "code").map((c) => c.id));
+  for (const dep of deps) {
+    if (dep === cellId) problems.push(`cell ${cellId} depends on itself`);
+    else if (!codeIds.has(dep)) problems.push(`cell ${cellId} depends on ${dep}, which is not a code cell of this notebook`);
+  }
+  if (problems.length === 0 && cycleOf(setDeps(doc, cellId, deps).cells)) problems.push("the dependencies between cells form a cycle");
+  return problems;
+}
+
 export function attachResource(doc, path, text) {
   const resources = doc.resources.filter((r) => r.path !== path);
   return { ...doc, resources: [...resources, { path, text }] };

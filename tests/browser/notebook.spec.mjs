@@ -575,3 +575,94 @@ test("an imported document is the one stored, even when a save of the previous d
   expect(stored.cells[0].source).toContain("imported");
   expect(stored.cells[0].source).not.toContain("before import");
 });
+
+// ---------------------------------------------------------------- invalid dependency lists and runs that outlive their context
+
+// Waits until some cell shows the "running" state, that is, until a run is really in flight.
+async function waitForRunningCell(page) {
+  await page.waitForFunction(
+    () => [...document.querySelectorAll("[data-cell-id] .nb-chip")].some((chip) => /running/i.test(chip.textContent ?? "")),
+    null,
+    { timeout: 90_000 },
+  );
+}
+
+// After the run that was in flight has ended, no cell of the open document may show a recorded output.
+async function expectNoRecordedOutputs(page) {
+  await expect(page.locator(".nb-chip", { hasText: /running/i })).toHaveCount(0, { timeout: 120_000 });
+  const outputs = page.locator(".nb-cell-code .nb-outputs");
+  const count = await outputs.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i += 1) await expect(outputs.nth(i)).toHaveText("No run recorded for this cell.");
+}
+
+test("a dependency list with a missing cell, a text cell, the cell itself or a cycle is refused with its reason", async ({ page }) => {
+  test.setTimeout(300_000);
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await open(page);
+  await openFileMenu(page);
+  await page.locator("#nb-example").selectOption("numeric");
+  await expect(page.locator(".nb-cell")).toHaveCount(6);
+  const deps = (id) => cell(page, id).locator(".nb-deps input");
+  const notice = page.locator("#nb-notice");
+  const propose = async (id, text) => {
+    await deps(id).fill(text);
+    await deps(id).dispatchEvent("change");
+  };
+  const original = await deps("c2").inputValue();
+  expect(original).toBe("c1");
+
+  await propose("c2", "zzz");
+  await expect(notice).toContainText("The dependencies of c2 were not changed: cell c2 depends on zzz, which is not a code cell");
+  await expect(deps("c2")).toHaveValue(original);
+  await propose("c2", "t1");
+  await expect(notice).toContainText("cell c2 depends on t1, which is not a code cell");
+  await expect(deps("c2")).toHaveValue(original);
+  await propose("c2", "c2");
+  await expect(notice).toContainText("cell c2 depends on itself");
+  await propose("c1", "c2");
+  await expect(notice).toContainText("form a cycle");
+  await expect(deps("c1")).toHaveValue("");
+
+  // A valid list is accepted, the message goes away, and the notebook still runs.
+  await propose("c2", "c1");
+  await expect(notice).toBeHidden();
+  await runCell(page, "c2");
+  await expect(cell(page, "c2").locator(".nb-stdout")).toContainText("f(x) =", { timeout: 240_000 });
+  expect(pageErrors).toEqual([]);
+});
+
+test("Restart Context while a cell runs leaves no output recorded, not even the cancelled run", async ({ page }) => {
+  test.setTimeout(300_000);
+  page.on("dialog", (dialog) => dialog.accept());
+  await open(page);
+  await openFileMenu(page);
+  await page.locator("#nb-example").selectOption("numeric");
+  await expect(page.locator(".nb-cell")).toHaveCount(6);
+  await page.getByRole("button", { name: "Run all" }).click();
+  await waitForRunningCell(page);
+  await openFileMenu(page);
+  await page.locator("#nb-restart").click();
+  await expect(page.locator("#nb-notice")).toContainText("The context was restarted: no output is recorded now.");
+  await expectNoRecordedOutputs(page);
+  await expect(page.locator("#nb-notice")).toContainText("The context was restarted");
+});
+
+test("opening another notebook while a cell runs does not record that run in the new notebook", async ({ page }) => {
+  test.setTimeout(300_000);
+  page.on("dialog", (dialog) => dialog.accept());
+  await open(page);
+  await openFileMenu(page);
+  await page.locator("#nb-example").selectOption("numeric");
+  await expect(page.locator(".nb-cell")).toHaveCount(6);
+  await page.getByRole("button", { name: "Run all" }).click();
+  await waitForRunningCell(page);
+  await openFileMenu(page);
+  // The rational example has cells with the same ids (c1, c2, ...) as the numeric one.
+  await page.locator("#nb-example").selectOption("rational");
+  await expect(page.locator("#nb-notice")).toContainText("is open. Nothing has been run.");
+  await expectNoRecordedOutputs(page);
+  // "Run all" stopped with the old document: the new notebook is still untouched after the old run has ended.
+  await expect(page.locator(".nb-cell-code .nb-chip", { hasText: /current|stale/i })).toHaveCount(0);
+});

@@ -8,6 +8,7 @@ import {
   createNotebook,
   csvRows,
   dependencyOrder,
+  dependencyProblems,
   freshness,
   LIMITS,
   moveCell,
@@ -84,6 +85,40 @@ test("validation names each defect: ids, dependencies, cycles and unknown fields
   assert.ok(validateNotebook(textDeps).some((p) => /cannot have dependencies/.test(p)));
   assert.ok(validateNotebook({ ...doc, extra: 1 }).some((p) => /unknown field extra/.test(p)));
   assert.ok(validateNotebook({ ...doc, cells: [{ id: "bad id", kind: "code", source: "", deps: [] }] }).some((p) => /invalid id/.test(p)));
+});
+
+test("a proposed dependency list is checked before it replaces the document, and nothing is changed", () => {
+  // The page hashes and plans the open document; a missing cell makes hashing throw and a cycle makes it recurse forever.
+  // Such a list must be refused with a reason, before the document is replaced.
+  const doc = sample();
+  const before = JSON.stringify(doc);
+  assert.deepEqual(dependencyProblems(doc, "c2", ["c1"]), []);
+  assert.deepEqual(dependencyProblems(doc, "c2", []), []);
+  assert.match(dependencyProblems(doc, "c2", ["zzz"]).join(";"), /c2 depends on zzz, which is not a code cell/);
+  assert.match(dependencyProblems(doc, "c2", ["t1"]).join(";"), /c2 depends on t1, which is not a code cell/, "a text cell is not a dependency");
+  assert.match(dependencyProblems(doc, "c2", ["c2"]).join(";"), /itself/);
+  assert.match(dependencyProblems(doc, "c1", ["c2"]).join(";"), /cycle/, "c2 already uses c1");
+  const chain = setDeps(setDeps(addCell(doc, "code"), "c3", ["c2"]), "c2", ["c1"]);
+  assert.match(dependencyProblems(chain, "c1", ["c3"]).join(";"), /cycle/, "a longer cycle through c3 and c2");
+  assert.match(dependencyProblems(doc, "t1", ["c1"]).join(";"), /text cell t1 cannot have dependencies/);
+  const many = Array.from({ length: LIMITS.maxDepsPerCell + 1 }, (_, i) => `c${i + 10}`);
+  assert.match(dependencyProblems(doc, "c2", many).join(";"), /at most/);
+  assert.deepEqual(dependencyProblems(doc, "nope", []), ["no cell nope"]);
+  assert.equal(JSON.stringify(doc), before, "checking a proposal never changes the document");
+});
+
+test("the dependency check agrees with the document validation on which lists are valid", () => {
+  const doc = addCell(sample(), "code");
+  const ids = doc.cells.map((c) => c.id).concat(["zzz"]);
+  for (const cell of doc.cells) {
+    for (const dep of ids) {
+      for (const deps of [[dep], [dep, "c1"]]) {
+        const proposalOk = dependencyProblems(doc, cell.id, deps).length === 0;
+        const documentOk = validateNotebook(setDeps(doc, cell.id, deps)).length === 0;
+        assert.equal(proposalOk, documentOk, `${cell.id} with ${deps.join(",")}`);
+      }
+    }
+  }
 });
 
 test("resources accept only data files under data/, and their size is bounded", () => {
