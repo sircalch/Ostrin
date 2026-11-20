@@ -14,8 +14,8 @@
 //     A dependency is a definitions-only cell: it must not define `fn main`. The notebook refuses a run that
 //     would import such a cell.
 //   - Run All runs the code cells in document order, one after another, each as above.
-//   - A run's outputs are tied to the hash of the code that produced them: the cell's source, its deps' hashes and
-//     the attached data. When any of these change, the outputs are STALE and are labelled as such. Stale outputs are
+//   - A run's outputs are tied to the hash of the code that produced them: the cell's source, its deps (each by id and
+//     by hash) and the attached data. When any of these change, the outputs are STALE and are labelled as such. Stale outputs are
 //     kept, but they are never shown as current results.
 //   - Files a program writes (write_file) go to the run's own virtual file system and are discarded after the run.
 //     A notebook that needs a file as output presents its content in stdout or as a figure instead.
@@ -299,7 +299,7 @@ export function serializeNotebook(doc) {
 
 // ---------------------------------------------------------------- hashes and freshness
 
-// The hash of every code cell: its kind, source, the hashes of its deps, and the attached data. Equal hashes mean
+// The hash of every code cell: its kind, source, its deps (id and hash of each), and the attached data. Equal hashes mean
 // that a run recorded with that hash ran exactly this code and these data.
 export async function cellHashes(doc, digestOf) {
   const resourcesDigest = await digestOf(JSON.stringify([...doc.resources].sort((a, b) => (a.path < b.path ? -1 : 1))));
@@ -308,9 +308,12 @@ export async function cellHashes(doc, digestOf) {
   const hashOf = async (id) => {
     if (memo.has(id)) return memo.get(id);
     const cell = byId.get(id);
-    const depHashes = [];
-    for (const dep of cell.deps) depHashes.push(await hashOf(dep));
-    const hash = await digestOf(JSON.stringify({ kind: cell.kind, source: cell.source, deps: depHashes, resources: resourcesDigest }));
+    // Each dependency enters the hash with its id and its hash. The program is given the dependencies as files named by
+    // their ids (c1.ostrin, c2.ostrin), so switching to another cell with identical source changes the program even though
+    // the dependency's hash is the same: the id must be part of the hash, or the old output would still read "current".
+    const deps = [];
+    for (const dep of cell.deps) deps.push([dep, await hashOf(dep)]);
+    const hash = await digestOf(JSON.stringify({ kind: cell.kind, source: cell.source, deps, resources: resourcesDigest }));
     memo.set(id, hash);
     return hash;
   };
@@ -385,6 +388,33 @@ function readableDiagnostic(line) {
   } catch (_) {
     return null;
   }
+}
+
+// The part of a program's outputs that one run record can hold, and a note for each kind of output that had to be left out.
+// validateRun refuses a run with more tables or figures than the limits, or a table or figure above its size limit, and a
+// document holding such a run can be neither stored nor exported. So the recorder keeps the first outputs that fit, in the
+// order the program printed them, and says what it dropped; nothing is dropped silently.
+export function recordableOutputs(outputs) {
+  const tables = [];
+  let omittedTables = 0;
+  for (const table of outputs.tables) {
+    if (tables.length < LIMITS.maxTablesPerRun && bytes(table.csv) <= LIMITS.maxOutputBytes) tables.push(table);
+    else omittedTables += 1;
+  }
+  const figures = [];
+  let omittedFigures = 0;
+  for (const svg of outputs.figures) {
+    if (figures.length < LIMITS.maxFiguresPerRun && bytes(svg) <= LIMITS.maxFigureBytes) figures.push(svg);
+    else omittedFigures += 1;
+  }
+  const notes = [];
+  if (omittedTables > 0) {
+    notes.push(`[${omittedTables} table${omittedTables === 1 ? "" : "s"} omitted: a run records at most ${LIMITS.maxTablesPerRun} tables of at most ${LIMITS.maxOutputBytes} bytes each]`);
+  }
+  if (omittedFigures > 0) {
+    notes.push(`[${omittedFigures} figure${omittedFigures === 1 ? "" : "s"} omitted: a run records at most ${LIMITS.maxFiguresPerRun} figures of at most ${LIMITS.maxFigureBytes} bytes each]`);
+  }
+  return { tables, figures, notes };
 }
 
 export function outputsFromLines(lines) {

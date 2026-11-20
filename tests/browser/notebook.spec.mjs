@@ -45,6 +45,7 @@ async function expectSaved(page) {
   await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "saved", { timeout: 15_000 });
 }
 
+const LIMITS_MAX_TABLES = 8;
 const HELLO = 'fn main() -> Void {\n    print("hello from a cell")\n}\n';
 
 test("create a notebook, add code, run it, and see its output with a current status", async ({ page }) => {
@@ -665,4 +666,53 @@ test("opening another notebook while a cell runs does not record that run in the
   await expectNoRecordedOutputs(page);
   // "Run all" stopped with the old document: the new notebook is still untouched after the old run has ended.
   await expect(page.locator(".nb-cell-code .nb-chip", { hasText: /current|stale/i })).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------- hashes that name their dependencies, and outputs that fit a run record
+
+test("switching a cell's dependency to another cell with the same source makes its output stale", async ({ page }) => {
+  test.setTimeout(240_000);
+  await open(page);
+  const definitions = "pub fn helper() -> Int {\n    2\n}\n";
+  const first = await addCode(page);
+  await setSource(page, first, definitions);
+  const second = await addCode(page);
+  await setSource(page, second, definitions);
+  const user = await addCode(page);
+  await setSource(page, user, `import ${first}\nfn main() -> Void {\n    print(${first}.helper().to_string())\n}\n`);
+  const deps = cell(page, user).locator(".nb-deps input");
+  await deps.fill(first);
+  await deps.dispatchEvent("change");
+  await runCell(page, user);
+  await expect(cell(page, user).locator(".nb-stdout")).toContainText("2", { timeout: 120_000 });
+  await expect(cell(page, user).locator(".nb-chip")).toHaveText("current");
+  // The program is now given the other file: what it printed before no longer describes it.
+  await deps.fill(second);
+  await deps.dispatchEvent("change");
+  await expect(cell(page, user).locator(".nb-chip")).toHaveText(/stale/);
+  await expect(cell(page, user).locator(".nb-stale")).toBeVisible();
+});
+
+test("a run that prints more tables than a record can hold is stored and exported, with the omission reported", async ({ page }) => {
+  test.setTimeout(240_000);
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await open(page);
+  const lines = ["fn main() -> Void {"];
+  for (let i = 0; i < 9; i += 1) lines.push(`    print("OSTRIN-TABLE t${i}")`, '    print("a,b")', '    print("1,2")', '    print("OSTRIN-TABLE-END")');
+  lines.push("}", "");
+  const id = await addCode(page);
+  await setSource(page, id, lines.join("\n"));
+  await runCell(page, id);
+  await expect(cell(page, id).locator(".nb-meta")).toContainText("computed in this session", { timeout: 120_000 });
+  await expect(cell(page, id).locator(".nb-table")).toHaveCount(LIMITS_MAX_TABLES);
+  await expect(cell(page, id).locator(".nb-stdout")).toContainText("1 table omitted");
+  // The document is valid, so it is stored and can be exported.
+  await expectSaved(page);
+  await openFileMenu(page);
+  const [download] = await Promise.all([page.waitForEvent("download", { timeout: 15_000 }), page.locator("#nb-export").click()]);
+  expect(download.suggestedFilename()).toMatch(/\.json$/);
+  await expect(page.locator("#nb-notice")).not.toContainText("Export refused");
+  await expect(page.locator(SAVE_STATE)).toHaveAttribute("data-state", "saved");
+  expect(pageErrors).toEqual([]);
 });

@@ -29,6 +29,7 @@ import {
   outputsFromLines,
   parseNotebook,
   planRun,
+  recordableOutputs,
   removeCell,
   serializeNotebook,
   setDeps,
@@ -514,17 +515,20 @@ function recordFromOutcome(outcome, hash, startedAt, durationMs) {
   const result = outcome.result;
   const lines = Array.isArray(result.ordered) ? orderedLines(result.ordered) : bytesLines(result.stdout, result.stderr);
   const outputs = outputsFromLines(lines);
-  const cap = Math.floor(LIMITS.maxOutputBytes / 4);
+  // A character takes at most four bytes, and the record must stay within LIMITS.maxOutputBytes with the truncation note and
+  // the notes about omitted outputs added: 1024 bytes are kept free for them.
+  const cap = Math.floor((LIMITS.maxOutputBytes - 1024) / 4);
   const clip = (text) => (text.length > cap ? text.slice(0, cap) + "\n[output truncated]\n" : text);
-  const tables = outputs.tables.filter((t) => encoder.encode(t.csv).length <= LIMITS.maxOutputBytes);
+  // A record can hold only so many tables and figures (validateRun), or the document could not be stored or exported.
+  const kept = recordableOutputs(outputs);
   return {
     ...base,
     state: result.code === 0 ? "completed" : "failed",
     exitCode: result.code,
-    stdout: clip(outputs.stdout),
+    stdout: clip(outputs.stdout) + (kept.notes.length > 0 ? kept.notes.join("\n") + "\n" : ""),
     stderr: clip(outputs.stderr),
-    tables,
-    figures: outputs.figures,
+    tables: kept.tables,
+    figures: kept.figures,
     results: outputs.results,
     resultsRejected: outputs.resultsRejected,
     error: result.code === 0 ? null : `The program exited with status ${result.code}. Its diagnostics are in the error output.`,

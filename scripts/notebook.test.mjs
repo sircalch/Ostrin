@@ -16,6 +16,7 @@ import {
   outputsFromLines,
   parseNotebook,
   planRun,
+  recordableOutputs,
   removeCell,
   serializeNotebook,
   setDeps,
@@ -105,6 +106,69 @@ test("a proposed dependency list is checked before it replaces the document, and
   assert.match(dependencyProblems(doc, "c2", many).join(";"), /at most/);
   assert.deepEqual(dependencyProblems(doc, "nope", []), ["no cell nope"]);
   assert.equal(JSON.stringify(doc), before, "checking a proposal never changes the document");
+});
+
+test("a cell's hash includes which cells it uses, not only what they contain", async () => {
+  // c1 and c2 have the same source and c3 imports c1. Switching c3's dependency to c2 supplies different files to the
+  // program (c2.ostrin instead of c1.ostrin), so what c3 printed before no longer says anything about it: its recorded
+  // output must become stale. Hashing only the dependencies' hashes left the hash unchanged and the output "current".
+  const helper = "fn helper() -> Int {\n    2\n}\n";
+  let doc = createNotebook({ title: "twins", now });
+  doc = addCell(doc, "code", { source: helper });
+  doc = addCell(doc, "code", { source: helper });
+  doc = addCell(doc, "code", { source: "import c1\nfn main() -> Void {\n    print(c1.helper().to_string())\n}\n" });
+  doc = addCell(doc, "code", { source: "import c3\nfn main() -> Void {\n    print(\"c4\")\n}\n" });
+  doc = setDeps(setDeps(doc, "c3", ["c1"]), "c4", ["c3"]);
+  const before = await cellHashes(doc, digestOf);
+  assert.equal(before.c1, before.c2, "premise: the two definition cells have the same hash");
+  const switched = setDeps(doc, "c3", ["c2"]);
+  const after = await cellHashes(switched, digestOf);
+  assert.notEqual(after.c3, before.c3, "c3 uses another cell now");
+  assert.notEqual(after.c4, before.c4, "and so does a cell that uses c3");
+  assert.equal(after.c1, before.c1, "the cells that were not changed keep their hashes");
+  const recorded = { ...switched, runs: { c3: validRun(before.c3) } };
+  assert.equal(freshness(recorded, after, "c3"), "stale");
+  assert.equal((await cellHashes(doc, digestOf)).c3, before.c3, "the same document always has the same hash");
+});
+
+test("recorded outputs never exceed what a run record may hold, and what is left out is reported", () => {
+  // validateRun refuses a run with more tables or figures than the limits, or a table or figure above its size limit, and
+  // a document holding such a run can be neither stored nor exported. The recorder keeps what fits and says what it left out.
+  const table = (i, rows = 1) => ({ title: `t${i}`, csv: "a,b\n" + "1,2\n".repeat(rows) });
+  const run = (outputs) => {
+    const kept = recordableOutputs(outputs);
+    return { hash: "0".repeat(64), state: "completed", startedAt: now, durationMs: 1, exitCode: 0, stdout: "", stderr: "", tables: kept.tables, figures: kept.figures, results: null, resultsRejected: null, error: null, kept };
+  };
+  const documentWith = (record) => {
+    let doc = addCell(createNotebook({ title: "t", now }), "code", { source: "fn main() -> Void {\n}\n" });
+    const { kept, ...stored } = record;
+    return { ...doc, runs: { c1: stored } };
+  };
+  // up to the limit nothing is left out
+  for (const count of [0, 1, LIMITS.maxTablesPerRun]) {
+    const record = run({ tables: Array.from({ length: count }, (_, i) => table(i)), figures: [] });
+    assert.equal(record.tables.length, count);
+    assert.deepEqual(record.kept.notes, []);
+    assert.deepEqual(validateNotebook(documentWith(record)), []);
+  }
+  // beyond it, the first tables are kept, the rest is counted, and the document stays valid
+  const many = run({ tables: Array.from({ length: LIMITS.maxTablesPerRun + 3 }, (_, i) => table(i)), figures: [] });
+  assert.equal(many.tables.length, LIMITS.maxTablesPerRun);
+  assert.deepEqual(many.tables.map((t) => t.title), Array.from({ length: LIMITS.maxTablesPerRun }, (_, i) => `t${i}`));
+  assert.match(many.kept.notes.join(" "), /3 tables omitted/);
+  assert.deepEqual(validateNotebook(documentWith(many)), []);
+  // a table above the size limit is left out too, and counted with the others
+  const big = { title: "big", csv: "x\n" + "y".repeat(LIMITS.maxOutputBytes) };
+  const oversized = run({ tables: [table(0), big, table(1)], figures: [] });
+  assert.deepEqual(oversized.tables.map((t) => t.title), ["t0", "t1"]);
+  assert.match(oversized.kept.notes.join(" "), /1 table omitted/);
+  assert.deepEqual(validateNotebook(documentWith(oversized)), []);
+  // figures: the count and the size are bounded the same way
+  const svg = (n) => `<svg xmlns="http://www.w3.org/2000/svg">${"x".repeat(n)}</svg>`;
+  const figures = run({ tables: [], figures: [svg(10), svg(LIMITS.maxFigureBytes + 1), ...Array.from({ length: LIMITS.maxFiguresPerRun + 1 }, () => svg(10))] });
+  assert.equal(figures.figures.length, LIMITS.maxFiguresPerRun);
+  assert.match(figures.kept.notes.join(" "), /figures? omitted/);
+  assert.deepEqual(validateNotebook(documentWith(figures)), []);
 });
 
 test("the dependency check agrees with the document validation on which lists are valid", () => {
