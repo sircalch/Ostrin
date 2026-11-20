@@ -1,0 +1,40 @@
+// Quadratic least squares through the normal equations, with the solution checked by std.linalg.
+// The samples come from y = 1 + 2x + 0.5x^2 exactly, so the coefficients are known in advance: 1, 2 and 0.5.
+// Expected output:
+//   c0 1
+//   c1 2
+//   c2 0.5
+//   status ok
+//   residual below 1e-9: true
+import std.linalg
+
+fn rounded(v: Float) -> Float {
+    round(v * 1000000.0) / 1000000.0
+}
+
+fn main() -> Void {
+    xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+    ys = [1.0, 3.5, 7.0, 11.5, 17.0]
+    mut rows: List<Float> = []
+    for i in 0 until xs.length() {
+        rows.push(1.0)
+        rows.push(xs[i])
+        rows.push(xs[i] * xs[i])
+    }
+    design = array(rows).reshape([5, 3])
+    y = array(ys)
+
+    normal = design.transpose() @ design
+    rhs = design.transpose() @ y
+    solved = linalg.solve_checked(normal, rhs)
+    match solved {
+        Ok(fit) => {
+            print("c0 " + rounded(fit.x[0]).to_string())
+            print("c1 " + rounded(fit.x[1]).to_string())
+            print("c2 " + rounded(fit.x[2]).to_string())
+            print("status " + fit.status)
+            print("residual below 1e-9: " + (fit.relative_residual < 1e-9).to_string())
+        },
+        Err(message) => print("error: " + message),
+    }
+}

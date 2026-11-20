@@ -1,0 +1,184 @@
+// Scientific data engine, end to end: read an experiment from CSV, validate its schema, handle missing values,
+// compute descriptive statistics, correlation and polynomial regression with residuals and metrics, group and
+// filter the rows, and export the results as structured text.
+//
+// The data are examples/data/calibration.csv (see scripts/data-engine-fixture.mjs). The program reads them with
+// a relative path, so run it from the examples directory:
+//     cd examples && ostrinc --run data_engine.ostrin
+// Every value printed here is computed from the file; the independent reference is in
+// examples/data/calibration.reference.json and is checked by the test suite.
+import std.data
+
+fn main() -> Void {
+    text = match read_file("data/calibration.csv") {
+        Ok(contents) => contents,
+        Err(message) => {
+            print("cannot read the experiment")
+            return
+        },
+    }
+    names = ["run", "operator", "temperature_c", "pressure_kpa", "response"]
+    kinds = ["int", "text", "float", "float", "float"]
+    table = match data.read_table(text, ",", names, kinds) {
+        Ok(t) => t,
+        Err(message) => {
+            print("invalid experiment: " + message)
+            return
+        },
+    }
+    print("rows read: " + table.rows.to_string())
+
+    // Schema validation: a wrong kind or a missing column is an explicit error, not a guess.
+    match data.read_table(text, ",", ["run", "operator", "temperature_c", "pressure_kpa", "response"], ["int", "text", "int", "float", "float"]) {
+        Ok(t) => print("unexpected: temperature read as an integer"),
+        Err(message) => print("wrong kind refused: " + message),
+    }
+    match data.read_table(text, ",", ["run", "operator", "temperature_c", "pressure_kpa", "voltage"], kinds) {
+        Ok(t) => print("unexpected: missing column accepted"),
+        Err(message) => print("missing column refused: " + message),
+    }
+
+    // Missing values: pressure has NA cells, and its computations refuse them until the rows are dropped.
+    match data.floats(table, "pressure_kpa") {
+        Ok(p) => print("unexpected: pressure without missing values"),
+        Err(message) => print("pressure: " + message),
+    }
+    complete = match data.complete_rows(table, ["pressure_kpa"]) {
+        Ok(c) => c,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    print("rows with a pressure value: " + complete.rows.to_string())
+    pressure = match data.describe(match data.floats(complete, "pressure_kpa") {
+        Ok(p) => p,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }) {
+        Ok(s) => s,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    print("pressure_kpa: n=" + pressure.n.to_string() + " mean=" + pressure.mean.to_string() + " sd=" + pressure.sd.to_string())
+
+    // Descriptive statistics of the response and the temperature, and their correlation.
+    temperature_array = match data.floats(table, "temperature_c") {
+        Ok(t) => t,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    response_array = match data.floats(table, "response") {
+        Ok(r) => r,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    response = match data.describe(response_array) {
+        Ok(s) => s,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    temperature = match data.describe(temperature_array) {
+        Ok(s) => s,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    print("response: n=" + response.n.to_string() + " mean=" + response.mean.to_string() + " sd=" + response.sd.to_string() + " min=" + response.min.to_string() + " max=" + response.max.to_string() + " median=" + response.median.to_string())
+    print("temperature: n=" + temperature.n.to_string() + " mean=" + temperature.mean.to_string() + " sd=" + temperature.sd.to_string())
+    match data.correlation(temperature_array, response_array) {
+        Ok(r) => print("correlation temperature-response: " + r.to_string()),
+        Err(message) => print("error: " + message),
+    }
+
+    // Regression of the response on the temperature: linear and quadratic, in the units of the data.
+    linear = match data.fit_polynomial(temperature_array, response_array, 1) {
+        Ok(f) => f,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    linear_raw = data.raw_coefficients(linear)
+    print("linear: intercept=" + linear_raw[0].to_string() + " slope=" + linear_raw[1].to_string() + " sse=" + linear.sse.to_string() + " rmse=" + linear.rmse.to_string() + " r2=" + linear.r_squared.to_string())
+    quadratic = match data.fit_polynomial(temperature_array, response_array, 2) {
+        Ok(f) => f,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    quadratic_raw = data.raw_coefficients(quadratic)
+    print("quadratic: intercept=" + quadratic_raw[0].to_string() + " linear=" + quadratic_raw[1].to_string() + " quadratic=" + quadratic_raw[2].to_string() + " sse=" + quadratic.sse.to_string() + " rmse=" + quadratic.rmse.to_string() + " r2=" + quadratic.r_squared.to_string())
+    print("fit json: " + data.fit_json(quadratic))
+
+    // Residuals of the quadratic: observed, predicted and residual, as a table of the results.
+    results = data.fit_table(temperature_array, response_array, quadratic, "temperature_c", "response")
+    print("largest absolute residual of the quadratic: " + largest_residual(quadratic.residuals).to_string())
+
+    // Ordering, filtering and grouping on the same table.
+    ordered = match data.sort_by(table, "temperature_c", true) {
+        Ok(t) => t,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    print("coldest run: " + first_text(data.strings(ordered, "operator")) + " at " + first_float(data.floats(ordered, "temperature_c")).to_string())
+    band = match data.filter_between(table, "temperature_c", 20.0, 30.0) {
+        Ok(t) => t,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    print("rows between 20 and 30 degrees C: " + band.rows.to_string())
+    groups = match data.group_summary(table, "operator", "response") {
+        Ok(g) => g,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    print("group summary by operator:")
+    print(data.table_text(groups, ","))
+    print("results table (first lines):")
+    results_text = data.table_text(results, ",")
+    print(results_text.lines()[0])
+    print(results_text.lines()[1])
+}
+
+fn largest_residual(residuals: Array<Float>) -> Float {
+    mut best = 0.0
+    for i in 0 until residuals.length() {
+        if abs(residuals[i]) > best {
+            best = abs(residuals[i])
+        }
+    }
+    best
+}
+
+fn first_text(found: Result<List<String>, String>) -> String {
+    match found {
+        Ok(values) => values[0],
+        Err(message) => message,
+    }
+}
+
+fn first_float(found: Result<Array<Float>, String>) -> Float {
+    match found {
+        Ok(values) => values[0],
+        Err(message) => 0.0 / 0.0,
+    }
+}

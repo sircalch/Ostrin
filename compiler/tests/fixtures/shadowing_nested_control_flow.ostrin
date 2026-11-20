@@ -1,0 +1,149 @@
+// Shadowing combined with control flow inside the shadowing scope. A declaration in an inner scope is a new binding; an
+// assignment reaches the nearest visible binding, which inside a shadowing scope is the shadow. A branch, a loop or a match
+// nested in that scope must update the shadow, and must not touch the outer variable. Each expected line is worked out by
+// hand in the test; the interpreter and the three native paths must agree.
+
+fn if_else_in_shadow(flag: Bool) -> Int {
+    mut x = 1
+    if true {
+        mut x = 10
+        if flag {
+            x = x + 5
+        } else {
+            x = x + 7
+        }
+        return x
+    }
+    return x
+}
+
+fn pick(some: Bool) -> Option<Int> {
+    if some {
+        return Some(5)
+    }
+    return None
+}
+
+fn main() -> Void {
+    // the case from the review: an `if` inside the scope that shadows x assigns the shadow
+    mut x = 1
+    if true {
+        mut x = 10
+        if true {
+            x = 20
+        }
+        print("shadow after inner if: " + x.to_string())
+    }
+    print("outer after: " + x.to_string())
+
+    print("if else in shadow: " + if_else_in_shadow(true).to_string() + " " + if_else_in_shadow(false).to_string())
+
+    // three levels of the same name
+    mut z = 1
+    if true {
+        mut z = 10
+        if true {
+            mut z = 100
+            if true {
+                z = 200
+            }
+            print("level 3: " + z.to_string())
+        }
+        print("level 2: " + z.to_string())
+    }
+    print("level 1: " + z.to_string())
+
+    // a loop inside a shadowing scope updates the shadow
+    mut n = 100
+    if true {
+        mut n = 0
+        mut i = 0
+        while i < 4 {
+            n = n + i
+            i = i + 1
+        }
+        print("while in shadow: " + n.to_string())
+    }
+    print("while outer: " + n.to_string())
+
+    // `break` inside a loop body that declares another shadow of the name: the loop's own variable is the one before it
+    mut t = 1
+    if true {
+        mut t = 2
+        for i in 0 until 5 {
+            t = t + 1
+            mut t = 100 + i
+            if i == 3 {
+                break
+            }
+        }
+        print("for in shadow: " + t.to_string())
+    }
+    print("for outer: " + t.to_string())
+
+    // `break` and `continue` from a nested scope that shadows the loop's variable
+    mut w = 0
+    for i in 0 until 4 {
+        w = w + 1
+        if true {
+            mut w = 50
+            w = w + i
+            if i == 2 {
+                break
+            }
+        }
+    }
+    print("break with shadow: " + w.to_string())
+
+    mut c = 0
+    for i in 0 until 4 {
+        c = c + 1
+        if true {
+            mut c = 50
+            c = c + i
+            if i == 1 {
+                continue
+            }
+        }
+        c = c + 10
+    }
+    print("continue with shadow: " + c.to_string())
+
+    // a match arm that declares a shadow of a variable that another arm assigns
+    mut m = 1
+    match pick(true) {
+        Some(v) => {
+            mut m = v
+            m = m + 1
+            print("arm shadow: " + m.to_string())
+        },
+        None => {
+            m = 9
+        },
+    }
+    print("match outer: " + m.to_string())
+    mut m2 = 1
+    match pick(false) {
+        Some(v) => {
+            mut m2 = v
+            m2 = m2 + 1
+        },
+        None => {
+            m2 = 9
+        },
+    }
+    print("match outer none: " + m2.to_string())
+
+    // the else branch declares the shadow, and the then branch assigns the outer binding
+    mut y = 1
+    if false {
+        y = 5
+    } else {
+        mut y = 30
+        if y > 0 {
+            y = y + 1
+        }
+        print("else shadow: " + y.to_string())
+    }
+    print("else outer: " + y.to_string())
+}

@@ -1,0 +1,5 @@
+simpson     before 7500 ms [7425-7648]  after 4610 ms [4573-4686]  after/before 0.615
+regression  before 9212 ms [9121-9284]  after 4823 ms [4794-4848]  after/before 0.523
+bisect      before 21877 ms [21728-22214]  after 16095 ms [15991-16164]  after/before 0.736
+matmul      before 38681 ms [38590-38821]  after 21628 ms [21445-22103]  after/before 0.559
+done

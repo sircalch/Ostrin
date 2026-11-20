@@ -1,0 +1,11 @@
+// A captured name declared twice in one function. The interpreter runs it (the inner `mut w` is a new binding).
+// The native backend refuses it: a name can't be matched to one binding, so it stops with an error and does not guess.
+fn main() -> Void {
+    mut w = 4
+    local_w = fn(v) {
+        mut w = v
+        w = w + 100
+        w
+    }
+    print("shadow result: " + local_w(1).to_string() + " outer: " + w.to_string())
+}

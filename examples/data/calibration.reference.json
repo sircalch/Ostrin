@@ -1,0 +1,58 @@
+{
+  "schema": "ostrin.data-reference/v1",
+  "method": "exact rational arithmetic (BigInt); normal equations solved exactly; square roots rounded once",
+  "source": "examples/data/calibration.csv",
+  "rows": 36,
+  "rows_with_missing_pressure": 4,
+  "linear": {
+    "intercept": 0.00760131460865533,
+    "slope": 0.06717626527526306,
+    "sse": 0.13081467481007647,
+    "rmse": 0.06028051896713041,
+    "r_squared": 0.9874160451499687
+  },
+  "quadratic": {
+    "intercept": 0.5054399256703462,
+    "linear": 0.019589275609562456,
+    "quadratic": 0.0010074683637046693,
+    "sse": 0.0013463798672617973,
+    "rmse": 0.006115508217415144,
+    "r_squared": 0.9998704825472737
+  },
+  "response": {
+    "n": 36,
+    "mean": 1.5497444444444444,
+    "sd": 0.5449863628408878,
+    "min": 0.8166,
+    "max": 2.8932,
+    "median": 1.49685
+  },
+  "temperature": {
+    "n": 36,
+    "mean": 22.956666666666667,
+    "sd": 8.061574465149029
+  },
+  "correlation_temperature_response": 0.9936881025502765,
+  "group_means": [
+    {
+      "operator": "Bo, the second",
+      "n": 9,
+      "mean": 1.6773444444444445
+    },
+    {
+      "operator": "Cy \"the quiet\"",
+      "n": 9,
+      "mean": 1.6321666666666668
+    },
+    {
+      "operator": "Dee",
+      "n": 9,
+      "mean": 1.4756555555555555
+    },
+    {
+      "operator": "Ana",
+      "n": 9,
+      "mean": 1.4138111111111111
+    }
+  ]
+}

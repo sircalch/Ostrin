@@ -1,0 +1,134 @@
+// Irrational quadratic roots in reduced radical form.
+//
+// The square part of the radicand is taken out: the roots of x^2 - 8 are ±2*2^(1/2), not ±1/2*32^(1/2). Each root
+// is checked three ways that do not share code with the solver: its exact text, exact substitution (is_root, which
+// expands the polynomial at the root), and a numeric value compared with the reference sqrt. A candidate that is
+// not a root, 3^(1/2) for x^2 - 2, must be rejected, so the substitution check cannot pass trivially.
+import std.symbolic
+
+fn main() -> Void {
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    mut failures = 0
+
+    // Each case is a*x^2 + b*x + c with the expected roots, in the solver's order.
+    qa = [1, 1, 1, 1, 1, 2]
+    qb = [0, 0, 0, 0, 0 - 1, 0 - 3]
+    qc = [0 - 2, 0 - 8, 0 - 12, 0 - 18, 0 - 1, 0 - 1]
+    expected = [
+        "2^(1/2), -2^(1/2)",
+        "2*2^(1/2), -2*2^(1/2)",
+        "2*3^(1/2), -2*3^(1/2)",
+        "3*2^(1/2), -3*2^(1/2)",
+        "1/2 + 1/2*5^(1/2), 1/2 - 1/2*5^(1/2)",
+        "3/4 + 1/4*17^(1/2), 3/4 - 1/4*17^(1/2)",
+    ]
+    labels = ["x^2 - 2", "x^2 - 8", "x^2 - 12", "x^2 - 18", "x^2 - x - 1", "2x^2 - 3x - 1"]
+    mut i = 0
+    while i < qa.length() {
+        p = symbolic.add(symbolic.mul(symbolic.number(s, qa[i]), symbolic.power(x, symbolic.number(s, 2))), symbolic.add(symbolic.mul(symbolic.number(s, qb[i]), x), symbolic.number(s, qc[i])))
+        text = symbolic.roots_text(p, x)
+        print(labels[i] + ": " + text)
+        if text != expected[i] {
+            print("FAIL " + labels[i] + ": expected " + expected[i])
+            failures = failures + 1
+        }
+        match symbolic.solve_polynomial(p, x) {
+            Ok(found) => {
+                for r in found {
+                    if not symbolic.is_root(p, x, r) {
+                        print("FAIL substitution at " + symbolic.show(r) + " for " + labels[i])
+                        failures = failures + 1
+                    }
+                }
+            },
+            Err(message) => {
+                print("FAIL " + labels[i] + ": " + message)
+                failures = failures + 1
+            },
+        }
+        i = i + 1
+    }
+
+    // A candidate that is not a root must fail the substitution check.
+    p = symbolic.add(symbolic.power(x, symbolic.number(s, 2)), symbolic.number(s, 0 - 2))
+    wrong = symbolic.power(symbolic.number(s, 3), symbolic.number(s, 1, 2))
+    if symbolic.is_root(p, x, wrong) {
+        print("FAIL 3^(1/2) was accepted as a root of x^2 - 2")
+        failures = failures + 1
+    } else {
+        print("3^(1/2) is rejected as a root of x^2 - 2")
+    }
+
+    // The numeric values of the roots of x^2 - 2 agree with the reference square root to within rounding.
+    reference = 1.4142135623730951
+    match symbolic.solve_polynomial(p, x) {
+        Ok(found) => {
+            for r in found {
+                match symbolic.eval(r, [], []) {
+                    Ok(value) => {
+                        mut magnitude = value
+                        if value < 0.0 {
+                            magnitude = 0.0 - value
+                        }
+                        gap = magnitude - reference
+                        if gap > 0.000000000001 or gap < 0.0 - 0.000000000001 {
+                            print("FAIL numeric value of " + symbolic.show(r))
+                            failures = failures + 1
+                        }
+                    },
+                    Err(message) => {
+                        print("FAIL eval: " + message)
+                        failures = failures + 1
+                    },
+                }
+            }
+        },
+        Err(message) => {
+            print("FAIL " + message)
+            failures = failures + 1
+        },
+    }
+
+    // Standalone radicals and sums or products of them are reduced, and the reduced value is the same number.
+    // Each reference is the value of the unreduced expression, computed as an independent decimal.
+    sq8 = symbolic.power(symbolic.number(s, 8), symbolic.number(s, 1, 2))
+    sq2 = symbolic.power(symbolic.number(s, 2), symbolic.number(s, 1, 2))
+    sq12 = symbolic.power(symbolic.number(s, 12), symbolic.number(s, 1, 2))
+    sq3 = symbolic.power(symbolic.number(s, 3), symbolic.number(s, 1, 2))
+    sq18 = symbolic.power(symbolic.number(s, 18), symbolic.number(s, 1, 2))
+    cases = [sq8, sq12, symbolic.add(sq8, sq2), symbolic.add(sq12, sq3), symbolic.mul(sq2, sq8), symbolic.sub(sq18, sq2), symbolic.power(symbolic.number(s, 8), symbolic.number(s, 3, 2))]
+    texts = ["2*2^(1/2)", "2*3^(1/2)", "3*2^(1/2)", "3*3^(1/2)", "4", "2*2^(1/2)", "16*2^(1/2)"]
+    values = [2.8284271247461903, 3.4641016151377544, 4.242640687119285, 5.196152422706632, 4.0, 2.8284271247461903, 22.627416997969522]
+    mut j = 0
+    while j < cases.length() {
+        if symbolic.show(cases[j]) != texts[j] {
+            print("FAIL radical text: " + symbolic.show(cases[j]) + " expected " + texts[j])
+            failures = failures + 1
+        }
+        match symbolic.eval(cases[j], [], []) {
+            Ok(value) => {
+                mut gap = value - values[j]
+                if gap < 0.0 {
+                    gap = 0.0 - gap
+                }
+                if gap > 0.000000000001 {
+                    print("FAIL radical value of " + symbolic.show(cases[j]))
+                    failures = failures + 1
+                }
+            },
+            Err(message) => {
+                print("FAIL eval: " + message)
+                failures = failures + 1
+            },
+        }
+        j = j + 1
+    }
+    print("standalone radicals reduced: " + symbolic.show(cases[6]))
+
+    if failures == 0 {
+        print("all radical checks passed")
+    } else {
+        print("radical checks failed: " + failures.to_string())
+    }
+}

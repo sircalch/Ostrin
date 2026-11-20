@@ -1,0 +1,10 @@
+// One if statement with a block body per iteration.
+fn main() -> Void {
+    mut total = 0
+    for i in 0 until 10000000 {
+        if i % 2 == 0 {
+            total = total + 1
+        }
+    }
+    print("RESULT nested_block " + total.to_string())
+}

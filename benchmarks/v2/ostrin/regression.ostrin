@@ -1,0 +1,53 @@
+// Least-squares fit of y = c0 + c1 x + c2 x^2 through the normal equations, 2,000,000 exact points (c = 1, 2, -3),
+// repeated K times. The data of each repetition is shifted by 0.0 * k (exactly zero), so that the compiler cannot compute
+// the repetitions once.
+fn main() -> Void {
+    values = args()
+    mut repeats = 1
+    if values.length() > 0 {
+        repeats = parse_int(values[0]).unwrap()
+    }
+    n = 2000000
+    mut c0 = 0.0
+    mut c1 = 0.0
+    mut c2 = 0.0
+    for k in 0 until repeats {
+        mut s0 = 0.0
+        mut s1 = 0.0
+        mut s2 = 0.0
+        mut s3 = 0.0
+        mut s4 = 0.0
+        mut t0 = 0.0
+        mut t1 = 0.0
+        mut t2 = 0.0
+        for i in 0 until n {
+            shift = 0.0 * (k as Float)
+            x = (i as Float) / (n as Float) * 2.0 - 1.0 + shift
+            y = 1.0 + 2.0 * x - 3.0 * x * x
+            x2 = x * x
+            s0 = s0 + 1.0
+            s1 = s1 + x
+            s2 = s2 + x2
+            s3 = s3 + x2 * x
+            s4 = s4 + x2 * x2
+            t0 = t0 + y
+            t1 = t1 + x * y
+            t2 = t2 + x2 * y
+        }
+        m10 = s1 / s0
+        a11 = s2 - m10 * s1
+        a12 = s3 - m10 * s2
+        b1 = t1 - m10 * t0
+        m20 = s2 / s0
+        a21 = s3 - m20 * s1
+        a22 = s4 - m20 * s2
+        b2 = t2 - m20 * t0
+        m21 = a21 / a11
+        a22b = a22 - m21 * a12
+        b2b = b2 - m21 * b1
+        c2 = b2b / a22b
+        c1 = (b1 - a12 * c2) / a11
+        c0 = (t0 - s1 * c1 - s2 * c2) / s0
+    }
+    print("RESULT regression " + c0.to_string() + " " + c1.to_string() + " " + c2.to_string())
+}

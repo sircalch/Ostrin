@@ -1,0 +1,56 @@
+{
+  "format": "ostrin.notebook",
+  "version": 1,
+  "id": "numeric",
+  "title": "D · Symbolic to numeric",
+  "created": "2026-11-11T09:00:00.000Z",
+  "updated": "2026-11-11T09:00:00.000Z",
+  "cells": [
+    {
+      "id": "t1",
+      "kind": "text",
+      "source": "# Symbolic to numeric\n\nThe polynomial f(x) = a x^3 - b x + c is built with std.symbolic from the parameters in c1. Its derivative is computed\nsymbolically, sampled on an interval, compared with central differences, checked for counterexamples, and plotted.\n\nChange a value in c1 and run it: the cells that depend on c1 become stale. Run them again and every table, check and\nfigure shows the new values. Each code cell builds its own expression, so no value passes between cells except\nthrough c1.",
+      "deps": []
+    },
+    {
+      "id": "c1",
+      "kind": "code",
+      "source": "// The parameters of f(x) = a x^3 - b x + c. Each function returns one integer coefficient; the cells that depend on\n// this cell read them. Change a value, then run the cells again.\npub fn coefficient_a() -> Int {\n    return 2\n}\n\npub fn coefficient_b() -> Int {\n    return 3\n}\n\npub fn coefficient_c() -> Int {\n    return 1\n}",
+      "deps": []
+    },
+    {
+      "id": "c2",
+      "kind": "code",
+      "source": "import std.symbolic\nimport c1\n\nfn main() -> Void {\n    s = symbolic.store()\n    x = symbolic.symbol(s, \"x\")\n    three = symbolic.number(s, 3)\n    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))\n    print(\"f(x) = \" + symbolic.show(f))\n    print(\"expanded: \" + symbolic.show(symbolic.expand(f)))\n    match symbolic.diff(f, x) {\n        Ok(df) => print(\"f'(x) = \" + symbolic.show(df)),\n        Err(message) => print(\"derivative not available: \" + message),\n    }\n    print(\"f(1/2) exactly: \" + symbolic.show(symbolic.expand(symbolic.subs(f, x, symbolic.number(s, 1, 2)))))\n}",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c3",
+      "kind": "code",
+      "source": "import std.symbolic\nimport c1\n\nfn main() -> Void {\n    s = symbolic.store()\n    x = symbolic.symbol(s, \"x\")\n    three = symbolic.number(s, 3)\n    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))\n    match symbolic.diff(f, x) {\n        Ok(df) => {\n            xs = linspace(0.0 - 2.0, 2.0, 9)\n            h = 0.000001\n            mut up = zeros([9])\n            mut down = zeros([9])\n            for i in 0 until 9 {\n                up.set(i, xs[i] + h)\n                down.set(i, xs[i] - h)\n            }\n            values = symbolic.sample(f, x, xs)\n            slopes = symbolic.sample(df, x, xs)\n            ahead = symbolic.sample(f, x, up)\n            behind = symbolic.sample(f, x, down)\n            match values {\n                Ok(fv) => {\n                    match slopes {\n                        Ok(dv) => {\n                            print(\"OSTRIN-TABLE f and its derivative on [-2, 2]\")\n                            print(\"x,f(x),f'(x),central difference\")\n                            match ahead {\n                                Ok(uv) => {\n                                    match behind {\n                                        Ok(bv) => {\n                                            for i in 0 until 9 {\n                                                quotient = (uv[i] - bv[i]) / (2.0 * h)\n                                                print(xs[i].to_string() + \",\" + fv[i].to_string() + \",\" + dv[i].to_string() + \",\" + quotient.to_string())\n                                            }\n                                        },\n                                        Err(message) => print(\"sample: \" + message),\n                                    }\n                                },\n                                Err(message) => print(\"sample: \" + message),\n                            }\n                            print(\"OSTRIN-TABLE-END\")\n                        },\n                        Err(message) => print(\"sample: \" + message),\n                    }\n                },\n                Err(message) => print(\"sample: \" + message),\n            }\n        },\n        Err(message) => print(\"derivative not available: \" + message),\n    }\n}",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c4",
+      "kind": "code",
+      "source": "import std.symbolic\nimport c1\n\nfn main() -> Void {\n    s = symbolic.store()\n    x = symbolic.symbol(s, \"x\")\n    three = symbolic.number(s, 3)\n    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))\n    xs = linspace(0.0 - 2.0, 2.0, 41)\n    match symbolic.derivative_mismatches(f, x, xs, 0.000001, 0.000001) {\n        Ok(points) => print(\"derivative against central differences: \" + points.length().to_string() + \" mismatched points of 41\"),\n        Err(message) => print(\"derivative check refused: \" + message),\n    }\n    match symbolic.derivative_mismatches(f, x, xs, 0.0000000000000001, 0.000001) {\n        Ok(points) => print(\"a step of 1e-16 gave \" + points.length().to_string() + \" mismatches\"),\n        Err(message) => print(\"a step of 1e-16 is refused, as it should be: \" + message),\n    }\n    // The identity (x + 1)^3 = x^3 + 3x^2 + 3x + 1 holds, so it has no counterexample on the grid.\n    x_plus = symbolic.add(x, symbolic.number(s, 1))\n    cube = symbolic.power(x_plus, three)\n    expanded = symbolic.add(symbolic.power(x, three), symbolic.add(symbolic.mul(symbolic.number(s, 3), symbolic.power(x, symbolic.number(s, 2))), symbolic.add(symbolic.mul(symbolic.number(s, 3), x), symbolic.number(s, 1))))\n    match symbolic.disagreements(cube, expanded, x, xs, 0.000000000001) {\n        Ok(points) => print(\"(x + 1)^3 = x^3 + 3x^2 + 3x + 1: \" + points.length().to_string() + \" counterexamples on the grid\"),\n        Err(message) => print(\"identity check refused: \" + message),\n    }\n}",
+      "deps": [
+        "c1"
+      ]
+    },
+    {
+      "id": "c5",
+      "kind": "code",
+      "source": "import std.symbolic\nimport c1\nimport std.viz\n\nfn main() -> Void {\n    s = symbolic.store()\n    x = symbolic.symbol(s, \"x\")\n    three = symbolic.number(s, 3)\n    f = symbolic.add(symbolic.mul(symbolic.number(s, c1.coefficient_a()), symbolic.power(x, three)), symbolic.add(symbolic.mul(symbolic.number(s, 0 - c1.coefficient_b()), x), symbolic.number(s, c1.coefficient_c())))\n    xs = linspace(0.0 - 2.0, 2.0, 81)\n    match symbolic.diff(f, x) {\n        Ok(df) => {\n            match symbolic.sample(f, x, xs) {\n                Ok(fv) => {\n                    match symbolic.sample(df, x, xs) {\n                        Ok(dv) => {\n                            fig = viz.figure(\"f and its derivative, from the symbolic expressions\")\n                                .describe(\"f(x) = a x^3 - b x + c with the parameters of c1; the derivative is computed symbolically\")\n                                .labels(\"x\", \"value\")\n                                .line(xs, fv, label: \"f(x)\")\n                                .line(xs, dv, label: \"f'(x)\", dash: \"6 4\")\n                                .hline(0.0)\n                            print(fig.svg())\n                        },\n                        Err(message) => print(\"sample: \" + message),\n                    }\n                },\n                Err(message) => print(\"sample: \" + message),\n            }\n        },\n        Err(message) => print(\"derivative not available: \" + message),\n    }\n}",
+      "deps": [
+        "c1"
+      ]
+    }
+  ],
+  "resources": [],
+  "runs": {}
+}

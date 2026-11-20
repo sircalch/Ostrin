@@ -1,0 +1,6 @@
+// An untyped closure parameter that holds a function value. The interpreter runs it; the native backend cannot infer the
+// parameter type, so it must refuse with an explicit diagnostic (tests/examples.rs: untyped_closure_parameter_...).
+fn main() -> Void {
+    apply2 = fn(f, v) { f(v) }
+    print(apply2(fn(z) { z + 1 }, 2).to_string())
+}

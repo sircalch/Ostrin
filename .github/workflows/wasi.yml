@@ -1,6 +1,28 @@
 name: Build Ostrin WASI compiler
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "compiler/**"
+      - "scripts/wasi-*.mjs"
+      - "scripts/pendulum-wasi-check.mjs"
+      - "scripts/benchmark-allocation-profile.mjs"
+      - "scripts/benchmark-runtime-inputs.mjs"
+      - "examples/**"
+      - "compiler/tests/fixtures/**"
+      - ".github/workflows/wasi.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "compiler/**"
+      - "scripts/wasi-*.mjs"
+      - "scripts/pendulum-wasi-check.mjs"
+      - "scripts/benchmark-allocation-profile.mjs"
+      - "scripts/benchmark-runtime-inputs.mjs"
+      - "examples/**"
+      - "compiler/tests/fixtures/**"
+      - ".github/workflows/wasi.yml"
   workflow_dispatch:
 
 permissions:

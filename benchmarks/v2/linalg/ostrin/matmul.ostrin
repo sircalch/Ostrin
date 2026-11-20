@@ -1,0 +1,33 @@
+// Dense product C = A B of n x n matrices, n given by the first argument (default 100); the sum of all entries of C is
+// printed, repeated K times (K is the second argument). Entries are multiples of 1/32 of small size: every product and sum
+// is exact in double precision, so the checksum is exact.
+fn main() -> Void {
+    values = args()
+    mut n = 100
+    mut repeats = 1
+    if values.length() > 0 {
+        n = parse_int(values[0]).unwrap()
+    }
+    if values.length() > 1 {
+        repeats = parse_int(values[1]).unwrap()
+    }
+    mut a = zeros([n, n])
+    mut b = zeros([n, n])
+    for i in 0 until n {
+        for j in 0 until n {
+            a.set(i, j, ((((i * 7 + j * 3) % 11) - 5) as Float) / 4.0)
+            b.set(i, j, ((((i * 5 + j * 13) % 9) - 4) as Float) / 8.0)
+        }
+    }
+    mut total = 0.0
+    for k in 0 until repeats {
+        c = a @ b
+        total = 0.0
+        for i in 0 until n {
+            for j in 0 until n {
+                total = total + c.get(i, j)
+            }
+        }
+    }
+    print("RESULT matmul " + total.to_string())
+}

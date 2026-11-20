@@ -1,0 +1,15 @@
+record Inner {
+    tag: String
+}
+
+record Outer {
+    inner: Inner
+}
+
+fn make() -> Outer {
+    Outer { inner: Inner { tag: "nested" } }
+}
+
+fn main() -> Void {
+    print(make().inner.tag)
+}

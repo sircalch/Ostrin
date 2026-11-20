@@ -1,0 +1,8 @@
+fn check() -> Result<String, String> {
+    Ok("fine")
+}
+
+fn main() -> Void {
+    print(check().is_ok())
+    print(check().is_err())
+}

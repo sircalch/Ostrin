@@ -1,0 +1,127 @@
+// Scientific model with dimensions: a first-order decay and a damped oscillator, solved by std.numeric's RK4 and
+// RK45, validated against their analytic solutions, and written as tables and figures.
+//
+// Units are checked by the compiler: parameters are quantities (kg, 1/s, m, m/s), and a dimensionless ratio is
+// converted to a number only where the model needs one, by dividing by a unit. The solver works on SI floats.
+//
+// Run from the examples directory:  cd examples && ostrinc --run scientific_model.ostrin
+// Writes data/model/decay.csv, data/model/decay_figure.svg, data/model/oscillator.csv and
+// data/model/oscillator_figure.svg. scripts/scientific-model.test.mjs checks them against the analytic solutions.
+import std.numeric
+import std.data
+import std.viz
+
+fn main() -> Void {
+    // ---- first-order decay: dm/dt = -k m, m(t) = m0 exp(-k t)
+    m0 = 2.0 kg
+    k = 0.35 / (1 s)
+    t_end = 12.0 s
+    rate = (k * (1 s)).value()
+    m0_si = m0 / (1 kg)
+    t_end_si = t_end / (1 s)
+
+    steps = 1200
+    decay = numeric.rk4(fn(t, y) { array([0.0 - rate * y[0]]) }, array([m0_si]), 0.0, t_end_si, steps)
+    mass = decay.component(0)
+    times = decay.t
+    analytic_mass = zeros([times.length()])
+    mut worst_decay = 0.0
+    for i in 0 until times.length() {
+        exact = m0_si * exp(0.0 - rate * times[i])
+        analytic_mass.set(i, exact)
+        error = abs(mass[i] - exact)
+        if error > worst_decay {
+            worst_decay = error
+        }
+    }
+    print("decay: " + times.length().to_string() + " RK4 nodes, max error " + worst_decay.to_string() + " kg")
+    adaptive = numeric.rk45(fn(t, y) { array([0.0 - rate * y[0]]) }, array([m0_si]), 0.0, t_end_si, tol: 1e-10)
+    final_exact = m0_si * exp(0.0 - rate * t_end_si)
+    print("decay RK45 final mass error " + abs(adaptive.final_state()[0] - final_exact).to_string() + " kg")
+
+    // Convergence failure is detected, not reported as success: a step budget of 3 cannot reach t_end.
+    starved = numeric.rk45(fn(t, y) { array([0.0 - rate * y[0]]) }, array([m0_si]), 0.0, t_end_si, tol: 1e-10, max_steps: 3)
+    last_time = starved.t[starved.t.length() - 1]
+    if last_time < t_end_si - 1e-9 {
+        print("convergence failure detected: stopped at t = " + last_time.to_string() + " s before " + t_end_si.to_string() + " s")
+    } else {
+        print("unexpected: the starved solve reached the end")
+    }
+
+    decay_table = match data.table_from_columns(["time_s", "mass_kg", "analytic_mass_kg", "error_kg"], [times, mass, analytic_mass, abs_difference(mass, analytic_mass)]) {
+        Ok(t) => t,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    match write_file("data/model/decay.csv", data.table_text(decay_table, ",")) {
+        Ok(_) => print("wrote data/model/decay.csv"),
+        Err(message) => print("cannot write the file"),
+    }
+    decay_figure = viz.figure("First-order decay with dimensional parameters")
+        .describe("m(t) = m0 exp(-k t), m0 = 2 kg, k = 0.35 / s, RK4 with 1200 steps")
+        .labels("time / s", "mass / kg")
+        .line(times, mass, label: "RK4")
+        .line(times, analytic_mass, label: "analytic", dash: "6 4")
+    match decay_figure.save("data/model/decay_figure.svg") {
+        Ok(_) => print("wrote data/model/decay_figure.svg"),
+        Err(message) => print("cannot write the file"),
+    }
+
+    // ---- damped oscillator: x'' + 2 zeta w x' + w^2 x = 0, underdamped, state (x, v)
+    w = 2.0 / (1 s)
+    zeta = 0.1
+    x0 = 0.5 m
+    v0 = 0.0 m / (1 s)
+    omega = (w * (1 s)).value()
+    x0_si = x0 / (1 m)
+    v0_si = v0 / (1 m / (1 s))
+    omega_d = omega * sqrt(1.0 - zeta * zeta)
+    oscillator = numeric.rk4(fn(t, y) { array([y[1], 0.0 - 2.0 * zeta * omega * y[1] - omega * omega * y[0]]) }, array([x0_si, v0_si]), 0.0, t_end_si, 2400)
+    position = oscillator.component(0)
+    oscillator_times = oscillator.t
+    analytic_position = zeros([oscillator_times.length()])
+    mut worst_position = 0.0
+    for i in 0 until oscillator_times.length() {
+        tt = oscillator_times[i]
+        decay_factor = exp(0.0 - zeta * omega * tt)
+        exact = decay_factor * (x0_si * cos(omega_d * tt) + ((v0_si + zeta * omega * x0_si) / omega_d) * sin(omega_d * tt))
+        analytic_position.set(i, exact)
+        error = abs(position[i] - exact)
+        if error > worst_position {
+            worst_position = error
+        }
+    }
+    print("oscillator: " + oscillator_times.length().to_string() + " RK4 nodes, max error " + worst_position.to_string() + " m")
+
+    oscillator_table = match data.table_from_columns(["time_s", "position_m", "analytic_position_m", "error_m"], [oscillator_times, position, analytic_position, abs_difference(position, analytic_position)]) {
+        Ok(t) => t,
+        Err(message) => {
+            print("error: " + message)
+            return
+        },
+    }
+    match write_file("data/model/oscillator.csv", data.table_text(oscillator_table, ",")) {
+        Ok(_) => print("wrote data/model/oscillator.csv"),
+        Err(message) => print("cannot write the file"),
+    }
+    oscillator_figure = viz.figure("Damped oscillator")
+        .describe("x'' + 2 zeta w x' + w^2 x = 0 with w = 2 / s, zeta = 0.1, x0 = 0.5 m, v0 = 0")
+        .labels("time / s", "position / m")
+        .line(oscillator_times, position, label: "RK4")
+        .line(oscillator_times, analytic_position, label: "analytic", dash: "6 4")
+        .hline(0.0)
+    match oscillator_figure.save("data/model/oscillator_figure.svg") {
+        Ok(_) => print("wrote data/model/oscillator_figure.svg"),
+        Err(message) => print("cannot write the file"),
+    }
+}
+
+fn abs_difference(a: Array<Float>, b: Array<Float>) -> Array<Float> {
+    mut out: List<Float> = []
+    for i in 0 until a.length() {
+        out.push(abs(a[i] - b[i]))
+    }
+    array(out)
+}

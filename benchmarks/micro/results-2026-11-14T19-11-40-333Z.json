@@ -1,0 +1,84 @@
+{
+  "repetitions": 5,
+  "baselineSamplesMs": [
+    19.4095,
+    18.3776,
+    17.7085,
+    42.4496,
+    19.6199
+  ],
+  "rows": [
+    {
+      "name": "empty_loop",
+      "iterations": 10000000,
+      "totalMs": 1421.4151,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 140.20056,
+      "uncertaintyNs": 19.18883000000001,
+      "result": "RESULT empty_loop 0"
+    },
+    {
+      "name": "int_add",
+      "iterations": 10000000,
+      "totalMs": 2941.8192,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 292.24096999999995,
+      "uncertaintyNs": 38.509170000000026,
+      "result": "RESULT int_add 49999995000000"
+    },
+    {
+      "name": "float_mul_add",
+      "iterations": 10000000,
+      "totalMs": 3166.3419,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 314.69323999999995,
+      "uncertaintyNs": 40.151180000000004,
+      "result": "RESULT float_mul_add 3160603.254687258"
+    },
+    {
+      "name": "array_read",
+      "iterations": 10000000,
+      "totalMs": 4127.5932,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 410.8183700000001,
+      "uncertaintyNs": 20.35280999999998,
+      "result": "RESULT array_read 0"
+    },
+    {
+      "name": "function_call",
+      "iterations": 10000000,
+      "totalMs": 5768.8545,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 574.9445000000001,
+      "uncertaintyNs": 34.82331999999995,
+      "result": "RESULT function_call 10000000"
+    },
+    {
+      "name": "nested_block",
+      "iterations": 10000000,
+      "totalMs": 3712.3769,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 369.29674,
+      "uncertaintyNs": 16.02049,
+      "result": "RESULT nested_block 5000000"
+    },
+    {
+      "name": "while_loop",
+      "iterations": 10000000,
+      "totalMs": 3558.1872,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 353.87776999999994,
+      "uncertaintyNs": 18.090289999999985,
+      "result": "RESULT while_loop 10000000"
+    },
+    {
+      "name": "quantity_add",
+      "iterations": 1000000,
+      "totalMs": 1288.8043,
+      "baselineMs": 19.4095,
+      "nsPerIteration": 1269.3948,
+      "uncertaintyNs": 214.48729999999978,
+      "result": "RESULT quantity_add 500000"
+    }
+  ]
+}

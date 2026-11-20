@@ -1,0 +1,13 @@
+record Box {
+    tag: String
+}
+
+fn make() -> Result<Box, String> {
+    Ok(Box { tag: "kept" })
+}
+
+fn main() -> Void {
+    keep = make().unwrap()
+    print(keep.tag)
+    print(keep.tag)
+}

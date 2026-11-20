@@ -1,0 +1,61 @@
+{
+  "A": "C:/Users/Andre/AppData/Local/Temp/claude/7cdd557d8fbe86c0/339ad1d3-cd53-4780-b8a9-cc5c4aee97b5/scratchpad/ostrinc-head.exe",
+  "B": "C:/Users/Andre/AppData/Local/Temp/claude/7cdd557d8fbe86c0/339ad1d3-cd53-4780-b8a9-cc5c4aee97b5/scratchpad/ostrinc-new.exe",
+  "repetitions": 8,
+  "results": [
+    {
+      "program": "function_call",
+      "iterations": 10000000,
+      "repetitions": 8,
+      "A": {
+        "per": 661.749245,
+        "unc": 72.35307000000003,
+        "base": 21.55565
+      },
+      "B": {
+        "per": 571.9704949999999,
+        "unc": 51.85687000000001,
+        "base": 22.4602
+      },
+      "ratioBoverA": 0.8643311636872362,
+      "outputsAgree": true,
+      "output": "RESULT function_call 10000000"
+    },
+    {
+      "program": "int_add",
+      "iterations": 10000000,
+      "repetitions": 8,
+      "A": {
+        "per": 277.27402,
+        "unc": 19.945090000000008,
+        "base": 22.6659
+      },
+      "B": {
+        "per": 275.130325,
+        "unc": 19.54989,
+        "base": 21.4456
+      },
+      "ratioBoverA": 0.9922686770293156,
+      "outputsAgree": true,
+      "output": "RESULT int_add 49999995000000"
+    },
+    {
+      "program": "empty_loop",
+      "iterations": 10000000,
+      "repetitions": 8,
+      "A": {
+        "per": 135.302355,
+        "unc": 8.217359999999996,
+        "base": 20.9565
+      },
+      "B": {
+        "per": 134.063375,
+        "unc": 10.378170000000019,
+        "base": 21.616349999999997
+      },
+      "ratioBoverA": 0.9908428792684355,
+      "outputsAgree": true,
+      "output": "RESULT empty_loop 0"
+    }
+  ]
+}

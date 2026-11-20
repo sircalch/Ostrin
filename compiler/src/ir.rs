@@ -344,6 +344,9 @@ pub struct VerifyReport {
 struct LoopEdges {
     breaks: Vec<(BlockId, HashMap<String, ValueId>)>,
     continues: Vec<(BlockId, HashMap<String, ValueId>)>,
+    /// How many local scopes were open when the loop started. A `break` or `continue` records the values of the bindings
+    /// of those scopes only: scopes opened inside the loop (its body, a nested block) end before the loop does.
+    depth: usize,
 }
 
 struct Builder {
@@ -652,6 +655,15 @@ impl Builder {
             .find_map(|scope| scope.get(name).copied())
     }
 
+    /// Creates a binding in the innermost scope (a declaration; see `bind` for assignments).
+    fn declare(&mut self, name: &str, value: ValueId) {
+        self.locals
+            .last_mut()
+            .expect("an IR local scope always exists")
+            .insert(name.to_string(), value);
+    }
+
+    /// Rebinds the nearest visible binding of `name` (an assignment), or declares it when none is visible.
     fn bind(&mut self, name: &str, value: ValueId) {
         if let Some(scope) = self
             .locals
@@ -668,9 +680,21 @@ impl Builder {
         }
     }
 
+    /// The value of the binding each visible name resolves to right now: the innermost scope wins, as it does when the
+    /// program reads the name. At the entry of a branch, loop or match this is the binding that the construct updates and
+    /// that its join gives a `Phi`. A snapshot taken while a construct is being lowered inside a deeper scope must not
+    /// use this; see `snapshot_visible_to`.
     fn snapshot_visible(&self) -> HashMap<String, ValueId> {
+        self.snapshot_visible_to(self.locals.len())
+    }
+
+    /// Like `snapshot_visible`, but only through the first `depth` scopes: the bindings that existed when a construct
+    /// started, with the value they have now. A scope opened inside the construct (a loop body, a `match` arm) may declare
+    /// a shadow of one of those names; that shadow is a different binding, it ends with its scope, and it must not
+    /// stand in for the outer binding on the construct's `break`, `continue` and arm edges.
+    fn snapshot_visible_to(&self, depth: usize) -> HashMap<String, ValueId> {
         let mut visible = HashMap::new();
-        for scope in &self.locals {
+        for scope in self.locals.iter().take(depth) {
             visible.extend(scope.iter().map(|(name, value)| (name.clone(), *value)));
         }
         visible
@@ -874,12 +898,17 @@ impl Builder {
         }
     }
 
+    /// Puts the values of a snapshot back into the bindings it was taken from: for each name, the nearest scope that has
+    /// it (the one the snapshot read). A shadowed outer binding of the same name is another binding and is not touched.
     fn restore_visible(&mut self, visible: &HashMap<String, ValueId>) {
-        for scope in &mut self.locals {
-            for (name, value) in visible {
-                if scope.contains_key(name) {
-                    scope.insert(name.clone(), *value);
-                }
+        for (name, value) in visible {
+            if let Some(scope) = self
+                .locals
+                .iter_mut()
+                .rev()
+                .find(|scope| scope.contains_key(name))
+            {
+                scope.insert(name.clone(), *value);
             }
         }
     }
@@ -915,7 +944,9 @@ impl Builder {
                     name: name.clone(),
                     value,
                 });
-                self.bind(name, value);
+                // A declaration always creates a binding in the innermost scope. It never rebinds an outer name of the
+                // same spelling: that outer binding is still in effect after the block ends.
+                self.declare(name, value);
             }
             HirStmt::Assign { name, value } => {
                 let expected = self
@@ -992,11 +1023,16 @@ impl Builder {
         }
     }
 
-    /// Records a `break`/`continue` edge with the visible bindings at that point,
-    /// so the loop can give its `Phi`s one incoming value per edge.
+    /// Records a `break`/`continue` edge with the values, at that point, of the bindings that existed when the loop
+    /// started, so the loop can give its `Phi`s one incoming value per edge. Shadows declared inside the loop (in its
+    /// body or in a block nested in it) are other bindings and are left out.
     fn record_loop_edge(&mut self, is_break: bool) {
         let block = self.current;
-        let visible = self.snapshot_visible();
+        let depth = self
+            .loop_edges
+            .last()
+            .map_or(self.locals.len(), |edges| edges.depth);
+        let visible = self.snapshot_visible_to(depth);
         if let Some(edges) = self.loop_edges.last_mut() {
             if is_break {
                 edges.breaks.push((block, visible));
@@ -1086,7 +1122,10 @@ impl Builder {
         let scope_depth = self.active_scopes.len();
         self.break_targets
             .push((after_block, condition_block, scope_depth));
-        self.loop_edges.push(LoopEdges::default());
+        self.loop_edges.push(LoopEdges {
+            depth: self.locals.len(),
+            ..LoopEdges::default()
+        });
         let _ = self.lower_block(body);
         self.break_targets.pop();
         let edges = self.loop_edges.pop().unwrap_or_default();
@@ -1170,7 +1209,10 @@ impl Builder {
         let scope_depth = self.active_scopes.len();
         self.break_targets
             .push((after_block, step_block, scope_depth));
-        self.loop_edges.push(LoopEdges::default());
+        self.loop_edges.push(LoopEdges {
+            depth: self.locals.len(),
+            ..LoopEdges::default()
+        });
         self.locals.push(HashMap::new());
         let item = self.fresh();
         self.emit(IrInstr::Index {
@@ -1373,7 +1415,10 @@ impl Builder {
         let scope_depth = self.active_scopes.len();
         self.break_targets
             .push((after_block, step_block, scope_depth));
-        self.loop_edges.push(LoopEdges::default());
+        self.loop_edges.push(LoopEdges {
+            depth: self.locals.len(),
+            ..LoopEdges::default()
+        });
         self.locals.push(HashMap::new());
         let item = self.fresh();
         self.emit(IrInstr::Move {
@@ -1525,7 +1570,10 @@ impl Builder {
         let scope_depth = self.active_scopes.len();
         self.break_targets
             .push((after_block, condition_block, scope_depth));
-        self.loop_edges.push(LoopEdges::default());
+        self.loop_edges.push(LoopEdges {
+            depth: self.locals.len(),
+            ..LoopEdges::default()
+        });
         self.locals.push(HashMap::new());
         let item = self.fresh();
         self.emit(IrInstr::TryValue {
@@ -1624,7 +1672,10 @@ impl Builder {
         let scope_depth = self.active_scopes.len();
         self.break_targets
             .push((after_block, condition_block, scope_depth));
-        self.loop_edges.push(LoopEdges::default());
+        self.loop_edges.push(LoopEdges {
+            depth: self.locals.len(),
+            ..LoopEdges::default()
+        });
         self.locals.push(HashMap::new());
         let item = self.fresh();
         self.emit(IrInstr::IterNext {
@@ -1766,6 +1817,9 @@ impl Builder {
         let mut incoming = Vec::new();
         let mut edges = Vec::new();
         let visible_before = self.snapshot_visible();
+        // The scopes open when the match starts. An arm opens its own scope for the names its pattern binds, which may
+        // shadow one of the match's variables; its edge records only the bindings of the scopes below it.
+        let entry_depth = self.locals.len();
         let arm_texts: Vec<String> = arms.iter().map(|arm| format!("{:?}", arm.body)).collect();
         let assigned = Self::assigned_names(&visible_before, &arm_texts);
 
@@ -1823,11 +1877,12 @@ impl Builder {
             let body_open = !self.terminated();
             if body_open {
                 incoming.push((self.current, body_value));
-                edges.push((self.current, self.snapshot_visible()));
+                edges.push((self.current, self.snapshot_visible_to(entry_depth)));
                 self.terminate(IrTerminator::Goto(merge_block));
             }
-            self.restore_visible(&visible_before);
+            // The arm's scope ends first, so that the values go back to the match's own bindings.
             self.locals.pop();
+            self.restore_visible(&visible_before);
             test_block = next_test;
         }
 

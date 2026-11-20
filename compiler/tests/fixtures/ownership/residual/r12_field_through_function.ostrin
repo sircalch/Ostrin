@@ -1,0 +1,15 @@
+record Box {
+    tag: String
+}
+
+fn make() -> Box {
+    Box { tag: "passed" }
+}
+
+fn same(text: String) -> String {
+    text
+}
+
+fn main() -> Void {
+    print(same(make().tag))
+}

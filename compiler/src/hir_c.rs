@@ -492,7 +492,10 @@ impl Emitter<'_> {
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
         match &expr.kind {
-            HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..) => true,
+            HirKind::Local(_) => true,
+            // A field or element read from a temporary container is an owned value: the read retains it and releases the
+            // container (see the Field and Index emitters), so consumers must treat it as fresh.
+            HirKind::Field(obj, _) | HirKind::Index(obj, _) => Self::borrowed_expr(obj),
             // A by-value wrapper does not create another payload reference.
             // Unwrapping a borrowed wrapper borrows its payload; binding or
             // returning that payload must retain it, and iteration must not
@@ -507,6 +510,34 @@ impl Emitter<'_> {
             }
             _ => false,
         }
+    }
+
+    /// `unwrap` of an Option or a Result. A borrowed wrapper lends its payload, as before. A fresh wrapper (a call result)
+    /// belongs to this expression: its payload is retained, the wrapper is released, and the caller owns the payload.
+    fn unwrap_payload(
+        &mut self,
+        recv: &HirExpr,
+        e: &HirExpr,
+        recv_code: &str,
+        rc: &str,
+        temp: &str,
+        check: &str,
+        message: &str,
+    ) -> Bail<String> {
+        if Self::borrowed_expr(recv) {
+            return Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.{check}) {{ fprintf(stderr, \"ostrin: {message}\\n\"); exit(1); }} {temp}.value; }})"));
+        }
+        let payload_c = self.c_type(&e.ty)?;
+        let value = self.next_temp();
+        let retain = self
+            .retain_managed_value(&value, &e.ty)
+            .map(|r| format!("{r}; "))
+            .unwrap_or_default();
+        let release = self
+            .release_managed_value(temp, &recv.ty)
+            .map(|r| format!("{r}; "))
+            .unwrap_or_default();
+        Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.{check}) {{ fprintf(stderr, \"ostrin: {message}\\n\"); exit(1); }} {payload_c} {value} = {temp}.value; {retain}{release}{value}; }})"))
     }
 
     fn contains_enum(&self, ty: &Ty) -> bool {
@@ -678,6 +709,12 @@ impl Emitter<'_> {
                 let code = self.expr(tail)?;
                 let ret = self.ret.clone();
                 self.emit_return(Some(tail), code, &ret, out)?;
+            }
+            None if self.ret != Ty::Void => {
+                // A function with a result and no tail expression ends in an explicit `return` (or never
+                // returns). Nothing after that statement is reachable, and a bare `return;` in a function
+                // that returns a value is a compile error for clang (-Wreturn-mismatch), although gcc
+                // accepts it.
             }
             None => {
                 self.cleanup(out, None);
@@ -1347,7 +1384,22 @@ impl Emitter<'_> {
                 if field_ty != self.c_type(&e.ty)? {
                     return Err(());
                 }
-                Ok(format!("{}->{field}", self.expr(obj)?))
+                if Self::borrowed_expr(obj) {
+                    return Ok(format!("{}->{field}", self.expr(obj)?));
+                }
+                let object = self.expr(obj)?;
+                let object_c = self.c_type(&obj.ty)?;
+                let owner = self.next_temp();
+                let value = self.next_temp();
+                let retain = self
+                    .retain_managed_value(&value, &e.ty)
+                    .map(|r| format!("{r}; "))
+                    .unwrap_or_default();
+                let release = self
+                    .release_managed_value(&owner, &obj.ty)
+                    .map(|r| format!("{r}; "))
+                    .unwrap_or_default();
+                Ok(format!("({{ {object_c} {owner} = {object}; {field_ty} {value} = {owner}->{field}; {retain}{release}{value}; }})"))
             }
             HirKind::DynCoerce(value) => {
                 let code = self.expr(value)?;
@@ -1422,7 +1474,23 @@ impl Emitter<'_> {
                 let list_name = self.mangle_type(&obj.ty)?;
                 let obj_code = self.expr(obj)?;
                 let index_code = self.expr(index)?;
-                Ok(format!("{list_name}_get({obj_code}, {index_code})"))
+                if Self::borrowed_expr(obj) {
+                    return Ok(format!("{list_name}_get({obj_code}, {index_code})"));
+                }
+                // A fresh container is read through a temporary: the element is retained and the container released.
+                let owner = self.next_temp();
+                let value = self.next_temp();
+                let owner_c = self.c_type(&obj.ty)?;
+                let value_c = self.c_type(&e.ty)?;
+                let retain = self
+                    .retain_managed_value(&value, &e.ty)
+                    .map(|r| format!("{r}; "))
+                    .unwrap_or_default();
+                let release = self
+                    .release_managed_value(&owner, &obj.ty)
+                    .map(|r| format!("{r}; "))
+                    .unwrap_or_default();
+                Ok(format!("({{ {owner_c} {owner} = {obj_code}; {value_c} {value} = {list_name}_get({owner}, {index_code}); {retain}{release}{value}; }})"))
             }
             HirKind::MethodCall {
                 recv,
@@ -1669,7 +1737,11 @@ impl Emitter<'_> {
                         Ty::Bool => Ok(format!(
                             "printf(\"%s\\n\", (({code}) ? \"true\" : \"false\"))"
                         )),
-                        Ty::String => Ok(format!("printf(\"%s\\n\", {code})")),
+                        Ty::String if Self::borrowed_expr(arg) => Ok(format!("printf(\"%s\\n\", {code})")),
+                        // A fresh string (a concatenation or a call result) is owned by this statement: it is released after printing.
+                        Ty::String => Ok(format!(
+                            "({{ const char* __print_value = {code}; printf(\"%s\\n\", __print_value); ostrin_release((void*)__print_value); }})"
+                        )),
                         _ => Err(()),
                     };
                 }
@@ -1824,17 +1896,43 @@ impl Emitter<'_> {
         let recv_code = self.expr(recv)?;
         let temp = self.next_temp();
         match method {
-            "is_some" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.has; }})")),
-            "is_none" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; !{temp}.has; }})")),
-            "unwrap" if args.is_empty() && e.ty == inner => Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} {temp}.value; }})")),
+            // A boolean answer keeps no part of the receiver, so a fresh receiver is released after it is read.
+            "is_some" | "is_none" if args.is_empty() && e.ty == Ty::Bool => {
+                let release = if Self::borrowed_expr(recv) {
+                    String::new()
+                } else {
+                    self.release_managed_value(&temp, &recv.ty)
+                        .map(|r| format!("{r}; "))
+                        .unwrap_or_default()
+                };
+                let answer = if method == "is_some" {
+                    format!("{temp}.has")
+                } else {
+                    format!("!{temp}.has")
+                };
+                Ok(format!(
+                    "({{ {rc} {temp} = {recv_code}; bool __is = {answer}; {release}__is; }})"
+                ))
+            }
+            "unwrap" if args.is_empty() && e.ty == inner => {
+                self.unwrap_payload(recv, e, &recv_code, &rc, &temp, "has", "unwrap on None")
+            }
             "unwrap_or" if args.len() == 1 && e.ty == inner && args[0].value.ty == inner => {
                 let fallback = self.expr(&args[0].value)?;
-                Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.has ? {temp}.value : ({fallback}); }})"))
+                Ok(format!(
+                    "({{ {rc} {temp} = {recv_code}; {temp}.has ? {temp}.value : ({fallback}); }})"
+                ))
             }
             "ok_or" if args.len() == 1 => {
                 let error = args[0].value.ty.clone();
-                let Ty::Applied(n, result_args) = &e.ty else { return Err(()) };
-                if n != "Result" || result_args.len() != 2 || result_args[0] != inner || result_args[1] != error {
+                let Ty::Applied(n, result_args) = &e.ty else {
+                    return Err(());
+                };
+                if n != "Result"
+                    || result_args.len() != 2
+                    || result_args[0] != inner
+                    || result_args[1] != error
+                {
                     return Err(());
                 }
                 let result_c = self.c_type(&e.ty)?;
@@ -1860,12 +1958,32 @@ impl Emitter<'_> {
         let recv_code = self.expr(recv)?;
         let temp = self.next_temp();
         match method {
-            "is_ok" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.ok; }})")),
-            "is_err" if args.is_empty() && e.ty == Ty::Bool => Ok(format!("({{ {rc} {temp} = {recv_code}; !{temp}.ok; }})")),
-            "unwrap" if args.is_empty() && e.ty == ok => Ok(format!("({{ {rc} {temp} = {recv_code}; if (!{temp}.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} {temp}.value; }})")),
+            // A boolean answer keeps no part of the receiver, so a fresh receiver is released after it is read.
+            "is_ok" | "is_err" if args.is_empty() && e.ty == Ty::Bool => {
+                let release = if Self::borrowed_expr(recv) {
+                    String::new()
+                } else {
+                    self.release_managed_value(&temp, &recv.ty)
+                        .map(|r| format!("{r}; "))
+                        .unwrap_or_default()
+                };
+                let answer = if method == "is_ok" {
+                    format!("{temp}.ok")
+                } else {
+                    format!("!{temp}.ok")
+                };
+                Ok(format!(
+                    "({{ {rc} {temp} = {recv_code}; bool __is = {answer}; {release}__is; }})"
+                ))
+            }
+            "unwrap" if args.is_empty() && e.ty == ok => {
+                self.unwrap_payload(recv, e, &recv_code, &rc, &temp, "ok", "unwrap on Err")
+            }
             "unwrap_or" if args.len() == 1 && e.ty == ok && args[0].value.ty == ok => {
                 let fallback = self.expr(&args[0].value)?;
-                Ok(format!("({{ {rc} {temp} = {recv_code}; {temp}.ok ? {temp}.value : ({fallback}); }})"))
+                Ok(format!(
+                    "({{ {rc} {temp} = {recv_code}; {temp}.ok ? {temp}.value : ({fallback}); }})"
+                ))
             }
             "ok" if args.is_empty() => {
                 let option = Ty::Applied("Option".to_string(), vec![ok.clone()]);
@@ -1873,7 +1991,23 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 let option_c = self.c_type(&option)?;
-                Ok(format!("({{ {rc} {temp} = {recv_code}; {option_c} __hir_o; memset(&__hir_o, 0, sizeof __hir_o); if ({temp}.ok) {{ __hir_o.has = true; __hir_o.value = {temp}.value; }} __hir_o; }})"))
+                // A fresh receiver: the option takes a reference of its own, then the wrapper is released.
+                let fresh = !Self::borrowed_expr(recv);
+                let keep = if fresh {
+                    self.retain_managed_value("__hir_o.value", &ok)
+                        .map(|r| format!("{r}; "))
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                let drop_receiver = if fresh {
+                    self.release_managed_value(&temp, &recv.ty)
+                        .map(|r| format!("{r}; "))
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                Ok(format!("({{ {rc} {temp} = {recv_code}; {option_c} __hir_o; memset(&__hir_o, 0, sizeof __hir_o); if ({temp}.ok) {{ __hir_o.has = true; __hir_o.value = {temp}.value; {keep}}} {drop_receiver}__hir_o; }})"))
             }
             _ => Err(()),
         }

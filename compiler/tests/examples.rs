@@ -148,10 +148,7 @@ fn hello_type_checks_ok() {
 
 #[test]
 fn community_starter_project_runs_from_manifest() {
-    let project = format!(
-        "{}/../templates/ostrin-community-starter",
-        env!("CARGO_MANIFEST_DIR")
-    );
+    let project = writable_copy("../templates/ostrin-community-starter");
     let out = run(&["--run", "--project", &project]);
     assert!(
         out.status.success(),
@@ -1137,6 +1134,64 @@ fn compiler_dap_stops_on_entry_steps_and_disconnects_cleanly() {
 
 /// Path for a temporary native artifact, unique per test process so parallel
 /// `cargo test` runs never collide.
+// A build without --locked writes the lockfile. Writing it again must not change its bytes, and the file must end with
+// exactly one newline (the generator used to add a blank line at the end, which modified the tracked example on every build).
+#[test]
+fn lockfile_rewrite_is_byte_stable_and_ends_with_one_newline() {
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/data_project");
+    let root = std::env::temp_dir().join(format!("ostrin-lock-stable-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    copy_tree(&source, &root);
+    let entry = root.join("app").join("main.ostrin").display().to_string();
+    let lock = root.join("app").join("ostrin.lock");
+    let first = run(&["--run", &entry]);
+    assert!(first.status.success(), "stderr: {}", stderr(&first));
+    let after_first = fs::read(&lock).expect("lockfile written");
+    let second = run(&["--run", &entry]);
+    assert!(second.status.success(), "stderr: {}", stderr(&second));
+    let after_second = fs::read(&lock).expect("lockfile present");
+    assert_eq!(
+        after_first, after_second,
+        "a second build changed the lockfile"
+    );
+    assert!(
+        after_second.ends_with(b"\"\n"),
+        "lockfile must end with one newline"
+    );
+    assert!(
+        !after_second.ends_with(b"\n\n"),
+        "lockfile must not end with a blank line"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Copies a tracked example (or template) to a unique temporary directory and returns its path. Tests that build a project
+/// may update their ostrin.lock, so they build a copy and never the tracked files.
+fn writable_copy(source_relative: &str) -> String {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let from = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(source_relative);
+    let index = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let to = std::env::temp_dir().join(format!("ostrin-writable-{}-{index}", std::process::id()));
+    let _ = fs::remove_dir_all(&to);
+    copy_tree(&from, &to);
+    to.display().to_string()
+}
+
+/// Copies a directory tree. Used to run an example project from a temporary location, so that a build may update its
+/// lockfile without changing the tracked example.
+fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+    fs::create_dir_all(to).expect("create temporary project directory");
+    for entry in fs::read_dir(from).expect("read example project") {
+        let entry = entry.expect("read directory entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("file type").is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), &target).expect("copy example file");
+        }
+    }
+}
+
 fn temp_artifact(name: &str) -> String {
     // Tests run in parallel inside one process and several of them compile the same example. A
     // per-call counter keeps each artifact path unique, so no test can overwrite or delete another's
@@ -1397,7 +1452,7 @@ fn wasm_program_matrix_emits_without_native_thread_dependencies() {
         "--target",
         "wasm32-wasi",
         "--project",
-        &example_path("pkg_project/main_app"),
+        &format!("{}/main_app", writable_copy("../examples/pkg_project")),
     ]);
     assert!(
         package.status.success(),
@@ -17415,7 +17470,11 @@ fn parser_recovers_and_reports_every_syntax_error() {
 
 #[test]
 fn path_dependency_resolves_and_runs() {
-    let out = run(&["--run", &example_path("pkg_project/main_app/main.ostrin")]);
+    let entry = format!(
+        "{}/main_app/main.ostrin",
+        writable_copy("../examples/pkg_project")
+    );
+    let out = run(&["--run", &entry]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
 }
@@ -17501,7 +17560,7 @@ fn transitive_path_dependencies_resolve_and_lock_reproducibly() {
 
 #[test]
 fn native_backend_compiles_project_manifest_and_path_dependency() {
-    let project = example_path("pkg_project/main_app");
+    let project = format!("{}/main_app", writable_copy("../examples/pkg_project"));
     let exe = temp_artifact("pkg_project.exe");
     let compile = run(&["--compile", "--project", &project, "--out", &exe]);
     if skip_if_no_c_compiler(&compile) {
@@ -17529,7 +17588,7 @@ fn native_backend_compiles_project_manifest_and_path_dependency() {
 
 #[test]
 fn project_manifest_selects_entry_and_writes_portable_lockfile() {
-    let project = example_path("pkg_project/main_app");
+    let project = format!("{}/main_app", writable_copy("../examples/pkg_project"));
     let out = run(&["--run", "--project", &project]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
@@ -18009,7 +18068,13 @@ fn empty_mask_is_a_runtime_error_in_both_backends() {
 
 #[test]
 fn table_library_module_runs_identically_in_both_backends() {
-    let entry = example_path("data_project/app/main.ostrin");
+    // A build without --locked may rewrite ostrin.lock. The project is run from a copy, so the tracked example is never
+    // modified by the test; the copy keeps the relative path to ../tables that the manifest uses.
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/data_project");
+    let root = std::env::temp_dir().join(format!("ostrin-table-lib-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    copy_tree(&source, &root);
+    let entry = root.join("app").join("main.ostrin").display().to_string();
     let interpreted = run(&["--run", &entry]);
     assert!(
         interpreted.status.success(),
@@ -18034,6 +18099,7 @@ fn table_library_module_runs_identically_in_both_backends() {
         "unexpected output: {}",
         stdout(&interpreted)
     );
+    let _ = fs::remove_dir_all(&root);
 }
 
 #[test]
@@ -21062,10 +21128,993 @@ fn std_symbolic_validation_agrees_with_independent_oracles_in_both_backends() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/symbolic.ostrin "))
         .unwrap_or_else(|| panic!("missing std.symbolic source report: {report_text}"));
     assert!(
-        symbolic_source.contains("ir=94")
+        // The IR count grows with the module (157 after the composition of conditional steps was added; 162 after the
+        // multivariate expression conversions, expression_term_lines and expression_of_term_lines, were added; 163 after
+        // the repeated-name check and the negative-exponent refusal); the guarded property is that no node falls back to
+        // the slower HIR or AST lowering.
+        symbolic_source.contains("ir=163")
             && symbolic_source.contains("hir=0")
             && symbolic_source.contains("ast=0"),
         "symbolic lowering regressed: {symbolic_source}"
+    );
+}
+
+#[test]
+fn std_mpolynomial_identities_and_refusals_match_in_both_backends() {
+    // Distributivity, commutativity, the product rule, evaluation as a homomorphism, merging and zero-dropping, exact
+    // fractions, degrees, and agreement with std.symbolic's derivative and expression round trip, plus refusals.
+    let output = interpreter_and_native_agree("mpolynomial_core.ostrin");
+    assert_eq!(
+        output,
+        "p = 2*x^2*y - 3*y + 1/2\n(p q)(2,-1,3) = -45/2 (p = -9/2, q = 5)\ndifferent variables: the polynomials are over different variables\nwrong arity: a term has 2 exponents for 3 variables\nbad exponent: refused\nsin(x): not a polynomial in these variables: sin(x)\nnegative exponent: refused\nrepeated variable: the variable x is repeated\nindex outside the variables: refused\nexponent above the limit: refused\nall multivariate checks passed\n"
+    );
+    let path = example_path("mpolynomial_core.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    let source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: examples/mpolynomial_core.ostrin "))
+        .unwrap_or_else(|| panic!("missing mpolynomial source report: {report_text}"));
+    assert!(
+        source.contains("hir=0") && source.contains("ast=0"),
+        "mpolynomial lowering fell back to HIR or AST: {source}"
+    );
+}
+
+#[test]
+fn mpolynomial_oracle_cases_match_the_independent_bigint_oracle_in_both_backends() {
+    // 58 interchange cases (9 of them refusals) generated by scripts/mpolynomial-oracle.mjs, whose expected lines come from
+    // a separate BigInt implementation of rationals and polynomials. Any difference is a failure, not a snapshot update.
+    let output = interpreter_and_native_agree("mpolynomial_oracle.ostrin");
+    let expected_path = format!(
+        "{}/../tests/oracle/mpolynomial-expected.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let expected = std::fs::read_to_string(&expected_path)
+        .unwrap_or_else(|error| panic!("cannot read {expected_path}: {error}"));
+    assert_eq!(output, expected.replace("\r\n", "\n"));
+}
+
+#[test]
+fn mpolynomial_division_hand_cases_and_refusals_match_in_both_backends() {
+    // Exact division, several divisors (hand computed), rational coefficients, the zero polynomial, a univariate
+    // cross-check against std.polynomial.poly_divmod, the identity and remainder property, and refusals.
+    let output = interpreter_and_native_agree("mpolynomial_division.ostrin");
+    assert_eq!(
+        output,
+        "no divisors: give at least one divisor\nzero divisor: a divisor is the zero polynomial\ndifferent variables: the divisors and the polynomial are over different variables\nall division checks passed\n"
+    );
+}
+
+#[test]
+fn mpolynomial_division_cases_match_the_independent_bigint_oracle_in_both_backends() {
+    // 42 division cases (4 refusals) generated by scripts/mpolynomial-oracle.mjs, compared exactly with its expected lines.
+    let output = interpreter_and_native_agree("mpolynomial_division_oracle.ostrin");
+    let expected_path = format!(
+        "{}/../tests/oracle/mpolynomial-division-expected.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let expected = std::fs::read_to_string(&expected_path)
+        .unwrap_or_else(|error| panic!("cannot read {expected_path}: {error}"));
+    assert_eq!(output, expected.replace("\r\n", "\n"));
+}
+
+#[test]
+fn rational_hand_cases_keep_excluded_points_in_both_backends() {
+    // (x^2 - 1)/(x - 1) reduces to x + 1, and x = 1 stays excluded through sums, products, quotients, derivatives and
+    // compositions; hand-computed values; refusals with the requirement named.
+    let output = interpreter_and_native_agree("rational_core.ostrin");
+    assert_eq!(
+        output,
+        "division by zero: division by the zero function\nzero denominator: the denominator is the zero polynomial\nexcluded point: undefined at 1: the requirement [-1, 1] != 0 fails there\nall rational checks passed\n"
+    );
+}
+
+#[test]
+fn rational_cases_match_the_independent_oracle_in_both_backends() {
+    // 528 points of 66 generated cases (92 undefined), from un-reduced formulas computed by scripts/rational-oracle.mjs.
+    let output = interpreter_and_native_agree("rational_oracle.ostrin");
+    let expected_path = format!(
+        "{}/../tests/oracle/rational-expected.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let expected = std::fs::read_to_string(&expected_path)
+        .unwrap_or_else(|error| panic!("cannot read {expected_path}: {error}"));
+    assert_eq!(output, expected.replace("\r\n", "\n"));
+}
+
+#[test]
+fn rational_equation_cases_hold_in_both_backends() {
+    // (x^2 - 1)/(x - 1) = 3 keeps x = 2 and lists x = 1 as an excluded point; = 2 is rejected; x^2 - 2 has two exact
+    // irrational roots; repeated roots keep their multiplicity; identities and contradictions are complete answers; a
+    // cubic residue is partial, never "no solution".
+    let output = interpreter_and_native_agree("rational_equations.ostrin");
+    assert_eq!(output, "(x^2 - 1)/(x - 1) = 2: no_solution; excluded: x = 1: excluded, the requirement [-1, 1] != 0 vanishes there\nx^2 - 2 = 0: 0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8) (exact (no approximate values are produced))\n(x^2 - 1)/(x - 1) = x + 1: identity on the domain [-1, 1] != 0 ; [1] != 0\nx^3 - 2 = 0: partial; pending: a factor of degree 3 without rational roots is not solved by this method\nall rational equation checks passed\n");
+}
+
+#[test]
+fn rational_equation_cases_match_the_independent_oracle_in_both_backends() {
+    // 60 equations (fixed and seeded) from scripts/rational-equations-oracle.mjs, computed from the un-reduced formulas.
+    let output = interpreter_and_native_agree("rational_equations_oracle.ostrin");
+    let expected_path = format!(
+        "{}/../tests/oracle/rational-equations-expected.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let expected = std::fs::read_to_string(&expected_path)
+        .unwrap_or_else(|error| panic!("cannot read {expected_path}: {error}"));
+    assert_eq!(output, expected.replace("\r\n", "\n"));
+}
+
+#[test]
+fn loop_frame_semantics_agree_in_both_backends() {
+    // Closures created in loops (per-iteration capture, survivors), outer rebinding, nested loops, break and continue,
+    // early return from a loop, recursion, mutation through a record, and shadowing. Each value was checked by hand.
+    let output = interpreter_and_native_agree("loop_semantics.ostrin");
+    assert_eq!(
+        output,
+        "capture per iteration: 33\nsurvivors: 10 11 12\nouter after loop: 9\nnested sum: 99\ncontinue sum: 25 break at: 5\nfirst above 50: 8\nfib sum: 88\nrecord count: 10\nshadow untouched: 7\ndone\n"
+    );
+}
+
+#[test]
+fn loop_closure_mutation_pins_the_interpreter_semantics() {
+    // A closure that assigns to an outer name, called in a loop: the interpreter rebinds the outer name (6).
+    let output = stdout(&run(&[
+        "--run",
+        &fixture_path("loop_closure_mutation.ostrin"),
+    ]));
+    assert_eq!(output, "closure mutation: 6\n");
+}
+
+#[test]
+fn loop_closure_mutation_agrees_on_native_backend() {
+    // The native path compiles and runs the binary: a closure that assigns an outer `mut` must rebind it (6).
+    let path = fixture_path("loop_closure_mutation.ostrin");
+    let exe = temp_artifact("loop_closure_mutation.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "closure mutation: 6\n"
+    );
+}
+
+#[test]
+fn captured_mutable_bindings_share_storage_with_closures_in_both_backends() {
+    // design 02 §4: a closure that captures a `mut` binding reads and reassigns that same binding.
+    // The expected values are worked out by hand from the program; the interpreter and the native backend must agree.
+    let expected = "A read after outer write: 5\nB closure writes: 2\nC mixed writes: 23\ncall through cell: 40\ndirect call: 20\nlog: 12\n";
+    let interpreted = stdout(&run(&["--run", &fixture_path("capture_cells.ostrin")]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("capture_cells.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &fixture_path("capture_cells.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native"
+    );
+    assert!(
+        stderr(&native).contains("live_allocations=0"),
+        "captured cells must not leak: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn loop_body_shadow_is_pinned_on_the_interpreter() {
+    // A body `mut` that shadows an outer `mut` is a new binding: the outer value stays 7.
+    let output = stdout(&run(&["--run", &fixture_path("loop_body_shadow.ostrin")]));
+    assert_eq!(
+        output.replace("\r\n", "\n"),
+        "shadow reads: 21 outer q: 7\n"
+    );
+}
+
+#[test]
+fn loop_body_shadow_agrees_on_native_backend() {
+    let path = fixture_path("loop_body_shadow.ostrin");
+    let exe = temp_artifact("loop_body_shadow.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "shadow reads: 21 outer q: 7\n"
+    );
+}
+
+#[test]
+fn shadowing_scopes_agree_in_every_backend_path() {
+    // Blocks, nested loops, branches, functions with return inside a loop, break/continue. Expected values are by hand.
+    // The default native path is IR; the HIR and AST fallbacks are forced by their environment switches, so the three
+    // native paths and the interpreter are checked against the same output.
+    let expected = "block shadow: 1\nearly: 6 10\nassign outer: 4\nnested: 22 k: 100\nbranch assign: 9\nbranch shadow: 6\nbc outer: 0\n";
+    let path = fixture_path("shadowing_scopes.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let variants: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for (label, env) in variants {
+        let exe = temp_artifact(&format!("shadowing_scopes_{label}.exe"));
+        let mut compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+        compile.args(["--compile", "--out", &exe, &path]);
+        for (key, value) in env {
+            compile.env(key, value);
+        }
+        let compile = compile.output().expect("run ostrinc");
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(
+            compile.status.success(),
+            "{label} compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe).output().expect("run native binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "{label} binary failed");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "{label} native path"
+        );
+    }
+}
+
+#[test]
+fn shadowing_nested_control_flow_agrees_in_every_backend_path() {
+    // A branch, a loop or a match nested inside a scope that shadows a variable must update the shadow and leave the outer
+    // variable alone. The IR route used to resolve a name to the outermost binding when it joined branches and loops, so
+    // the updates of the shadow were lost (it printed 1 where 20 was expected). The fixture has one line per construct;
+    // every value is worked out by hand. The interpreter and the IR, HIR and AST native paths must all print them.
+    let expected = "shadow after inner if: 20\n\
+                    outer after: 1\n\
+                    if else in shadow: 15 17\n\
+                    level 3: 200\n\
+                    level 2: 10\n\
+                    level 1: 1\n\
+                    while in shadow: 6\n\
+                    while outer: 100\n\
+                    for in shadow: 6\n\
+                    for outer: 1\n\
+                    break with shadow: 3\n\
+                    continue with shadow: 34\n\
+                    arm shadow: 6\n\
+                    match outer: 1\n\
+                    match outer none: 9\n\
+                    else shadow: 31\n\
+                    else outer: 1\n";
+    let path = fixture_path("shadowing_nested_control_flow.ostrin");
+    let interpreted = run(&["--run", &path]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        expected,
+        "interpreter"
+    );
+    let variants: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for (label, env) in variants {
+        let exe = temp_artifact(&format!("shadowing_nested_{label}.exe"));
+        let mut compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+        compile.args(["--compile", "--out", &exe, &path]);
+        for (key, value) in env {
+            compile.env(key, value);
+        }
+        let compile = compile.output().expect("run ostrinc");
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(
+            compile.status.success(),
+            "{label} compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe).output().expect("run native binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "{label} binary failed");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "{label} native path"
+        );
+    }
+}
+
+#[test]
+fn rational_roots_excluded_by_a_denominator_are_listed_exactly_and_are_not_solutions() {
+    // R1 = (x-3)(x^2-2)/(x^2-2), R2 = 0. The solution 3 is valid; +-sqrt(2) vanish the original denominator x^2-2 and are
+    // excluded, written exactly as +-1/2*sqrt(8) (the same text as a solution).
+    let output = stdout(&run(&[
+        "--run",
+        &fixture_path("rational_root_domain.ostrin"),
+    ]));
+    assert_eq!(
+        output.replace("\r\n", "\n"),
+        "status: solved\nsolutions: 3\nkinds: rational\nexcluded: x = 0 + 1/2*sqrt(8): excluded, the requirement [-2, 0, 1] != 0 vanishes there | x = 0 - 1/2*sqrt(8): excluded, the requirement [-2, 0, 1] != 0 vanishes there\n"
+    );
+}
+
+#[test]
+fn rational_solver_states_when_the_excluded_list_is_not_exhaustive() {
+    // A requirement of degree three: +-sqrt(2) do not vanish x^3 - 2, so they are solutions; the excluded list is not
+    // claimed exhaustive, and the completeness field says so.
+    let output = stdout(&run(&[
+        "--run",
+        &fixture_path("rational_root_domain_cubic.ostrin"),
+    ]));
+    let output = output.replace("\r\n", "\n");
+    assert!(
+        output.contains("solutions: 3 | 0 + 1/2*sqrt(8) | 0 - 1/2*sqrt(8)\n"),
+        "{output}"
+    );
+    assert!(output.contains("excluded: \n"), "{output}");
+    assert!(
+        output.contains("the excluded list is not exhaustive"),
+        "completeness must say the excluded list is not exhaustive: {output}"
+    );
+}
+
+#[test]
+fn captured_loop_frame_reuse_agrees_in_both_backends() {
+    // Frame reuse (interpreter): a body must see a fresh frame each iteration, including a large body and break/continue.
+    let expected = "big frame: 88\nbreak continue total: 22\n";
+    let path = fixture_path("loop_frame_reuse.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("loop_frame_reuse.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native"
+    );
+}
+
+#[test]
+fn captured_mutable_binding_shadowed_in_the_same_function_agrees_natively() {
+    // The name `w` is declared twice; the closure captures the inner declaration only. Capture is per declaration,
+    // so the native backend agrees with the interpreter.
+    let path = fixture_path("capture_cells_shadowed.ostrin");
+    let expected = "shadow result: 101 outer: 4\n";
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("capture_cells_shadowed.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native"
+    );
+    assert!(
+        stderr(&native).contains("live_allocations=0"),
+        "leak: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn captured_mutable_bindings_across_scopes_agree_in_both_backends() {
+    // Independent closures, closures sharing a binding, a captured name shadowed in a loop, nested captures, and a
+    // closure that outlives the function that created it. Expected values are by hand.
+    let expected = "c1 3 c2 1\nshared 9\nshadow total 23 outer 5\nnested 22\n";
+    let path = fixture_path("capture_scopes.ostrin");
+    let interpreted = stdout(&run(&["--run", &path]));
+    assert_eq!(interpreted.replace("\r\n", "\n"), expected, "interpreter");
+    let exe = temp_artifact("capture_scopes.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native"
+    );
+    assert!(
+        stderr(&native).contains("live_allocations=0"),
+        "leak: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn captured_lambda_env_leak_on_ast_path() {
+    // A closure created inside another closure's body is released by the AST codegen (see docs/loop-frames.md).
+    let path = fixture_path("lambda_env_leak.ostrin");
+    let exe = temp_artifact("lambda_env_leak.exe");
+    let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(["--compile", "--leak-check", "--out", &exe, &path])
+        .env("OSTRIN_NO_IR_CODEGEN", "1")
+        .env("OSTRIN_NO_HIR_CODEGEN", "1")
+        .output()
+        .expect("run ostrinc");
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        stderr(&native).contains("live_allocations=0"),
+        "leak: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn ownership_fixtures_agree_on_every_codegen_route_and_leave_no_allocation() {
+    // The ownership programs under tests/fixtures/ownership. Each one runs on the IR, HIR and AST native routes: every route
+    // must print what the interpreter prints and must end with no live allocation (--leak-check). Sanitizers are not part of
+    // this test; scripts/native-sanitize.mjs runs them under WSL gcc with AddressSanitizer and UndefinedBehaviorSanitizer.
+    const PROGRAMS: &[&str] = &[
+        "own_immutable_capture.ostrin",
+        "own_mutable_capture.ostrin",
+        "own_nested_closure.ostrin",
+        "own_return_survive.ostrin",
+        "own_early_return_error.ostrin",
+        "own_recursion.ostrin",
+        "own_collections_reassign.ostrin",
+        "own_c_keyword_names.ostrin",
+        "capture_declarations.ostrin",
+        "function_value_capture.ostrin",
+        "native_round_regressions.ostrin",
+        "residual/r10_field_array_receiver.ostrin",
+        "residual/r11_field_into_list.ostrin",
+        "residual/r12_field_through_function.ostrin",
+        "residual/r13_payload_kept_after_unwrap.ostrin",
+        "residual/r14_reassign_from_own_field.ostrin",
+        "residual/r15_option_field.ostrin",
+        "residual/r16_is_ok_on_fresh_result.ostrin",
+        "residual/r17_index_then_field.ostrin",
+        "residual/r1_temp_field.ostrin",
+        "residual/r2_temp_field_method.ostrin",
+        "residual/r3_chained_fields.ostrin",
+        "residual/r4_result_unwrap_field.ostrin",
+        "residual/r5_stored_then_field.ostrin",
+        "residual/r6_field_used_twice.ostrin",
+        "residual/r7_field_outlives_temp.ostrin",
+        "residual/r8_solve_chain.ostrin",
+        "residual/r9_fresh_array_receiver.ostrin",
+        "residual/r18_closure_captures_temp_field.ostrin",
+        "residual/r19_early_return_temp_field.ostrin",
+        "residual/r20_loop_temp_field_break.ostrin",
+        "residual/r21_fresh_result_option_methods.ostrin",
+    ];
+    let routes: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for program in PROGRAMS {
+        let path = fixture_path(&format!("ownership/{program}"));
+        let interpreted = run(&["--run", &path]);
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed on {program}: {}",
+            stderr(&interpreted)
+        );
+        let expected = stdout(&interpreted);
+        for (route, env) in routes {
+            let exe = temp_artifact(&format!("{route}_{}.exe", program.replace('/', "_")));
+            let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+            command.args(["--compile", "--leak-check", "--out", &exe, &path]);
+            for (key, value) in env.iter().copied() {
+                command.env(key, value);
+            }
+            let compile = command.output().expect("run ostrinc");
+            if skip_if_no_c_compiler(&compile) {
+                return;
+            }
+            assert!(
+                compile.status.success(),
+                "{program} on the {route} route: compile failed: {}",
+                stderr(&compile)
+            );
+            let native = Command::new(&exe).output().expect("run native binary");
+            let _ = fs::remove_file(&exe);
+            assert_eq!(
+                stdout(&native).replace("\r\n", "\n"),
+                expected.replace("\r\n", "\n"),
+                "{program} on the {route} route: native output differs from the interpreter"
+            );
+            assert!(
+                stderr(&native).contains("live_allocations=0"),
+                "{program} on the {route} route leaks: {}",
+                stderr(&native)
+            );
+        }
+    }
+}
+
+#[test]
+fn existing_closure_fixtures_agree_on_every_codegen_route_and_leave_no_allocation() {
+    // The closure, capture and task fixtures that predate the ownership suite. Same contract as the ownership test: every
+    // IR, HIR and AST route prints what the interpreter prints and ends with no live allocation. A task that captures a
+    // `dyn Trait` value was the case that failed to compile on the HIR and AST routes before the task environment used the
+    // typed release helpers.
+    const PROGRAMS: &[&str] = &[
+        "capture_cells.ostrin",
+        "capture_cells_shadowed.ostrin",
+        "capture_scopes.ostrin",
+        "lambda_env_leak.ostrin",
+        "loop_closure_mutation.ostrin",
+        "loop_frame_reuse.ostrin",
+        "managed_enum_closure_capture.ostrin",
+        "managed_enum_task_capture.ostrin",
+        "managed_enum_task_cancel.ostrin",
+        "native_dyn_trait_task_capture.ostrin",
+        "native_dyn_trait_task_cancel.ostrin",
+    ];
+    let routes: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for program in PROGRAMS {
+        let path = fixture_path(program);
+        let interpreted = run(&["--run", &path]);
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed on {program}: {}",
+            stderr(&interpreted)
+        );
+        let expected = stdout(&interpreted);
+        for (route, env) in routes {
+            let exe = temp_artifact(&format!("existing_{route}_{program}.exe"));
+            let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+            command.args(["--compile", "--leak-check", "--out", &exe, &path]);
+            for (key, value) in env.iter().copied() {
+                command.env(key, value);
+            }
+            let compile = command.output().expect("run ostrinc");
+            if skip_if_no_c_compiler(&compile) {
+                return;
+            }
+            assert!(
+                compile.status.success(),
+                "{program} on the {route} route: compile failed: {}",
+                stderr(&compile)
+            );
+            let native = Command::new(&exe).output().expect("run native binary");
+            let _ = fs::remove_file(&exe);
+            assert_eq!(
+                stdout(&native).replace("\r\n", "\n"),
+                expected.replace("\r\n", "\n"),
+                "{program} on the {route} route: native output differs from the interpreter"
+            );
+            assert!(
+                stderr(&native).contains("live_allocations=0"),
+                "{program} on the {route} route leaks: {}",
+                stderr(&native)
+            );
+        }
+    }
+}
+
+/// One expected token of an oracle line: exact text, `value|tolerance`, `<=bound`, or `text|alternative`.
+fn oracle_token_matches(expected: &str, actual: &str) -> bool {
+    if let Some(bound) = expected.strip_prefix("<=") {
+        return match (actual.parse::<f64>(), bound.parse::<f64>()) {
+            (Ok(x), Ok(b)) => x <= b,
+            _ => false,
+        };
+    }
+    if let Some((left, right)) = expected.split_once('|') {
+        if let (Ok(value), Ok(tolerance)) = (left.parse::<f64>(), right.parse::<f64>()) {
+            return match actual.parse::<f64>() {
+                Ok(x) => (x - value).abs() <= tolerance,
+                Err(_) => false,
+            };
+        }
+        return actual == left || actual == right;
+    }
+    expected == actual
+}
+
+#[test]
+fn linalg_oracle_agrees_in_both_backends_and_leaves_no_allocation() {
+    // examples/linalg_oracle.ostrin is generated by scripts/linalg-oracle.mjs from exact rational arithmetic. Every
+    // route must match every expected line (tokens as documented in the generator), and must end with no live allocation.
+    let program = example_path("linalg_oracle.ostrin");
+    let expected = fs::read_to_string(format!(
+        "{}/../tests/oracle/linalg-expected.txt",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("read linalg-expected.txt");
+    let expected_lines: Vec<&str> = expected.lines().collect();
+    let interpreted = run(&["--run", &program]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let interp_out = stdout(&interpreted);
+    let routes: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for (route, env) in routes {
+        let exe = temp_artifact(&format!("linalg_oracle_{route}.exe"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+        command.args(["--compile", "--leak-check", "--out", &exe, &program]);
+        for (key, value) in env.iter().copied() {
+            command.env(key, value);
+        }
+        let compile = command.output().expect("run ostrinc");
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(
+            compile.status.success(),
+            "{route}: compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe).output().expect("run native binary");
+        let _ = fs::remove_file(&exe);
+        let out = stdout(&native).replace("\r\n", "\n");
+        // Both backends must produce the same double for every printed number. The text may differ: the interpreter prints
+        // the shortest round-tripping decimal, and the native formatter sometimes prints one more digit for the same double.
+        let interp_lines: Vec<&str> = interp_out.lines().collect();
+        let native_lines: Vec<&str> = out.lines().collect();
+        assert_eq!(
+            native_lines.len(),
+            interp_lines.len(),
+            "{route}: line count differs from the interpreter"
+        );
+        for (index, (n, i)) in native_lines.iter().zip(&interp_lines).enumerate() {
+            let nt: Vec<&str> = n.split(' ').collect();
+            let it: Vec<&str> = i.split(' ').collect();
+            assert_eq!(
+                nt.len(),
+                it.len(),
+                "{route}, line {index}: token count differs from the interpreter"
+            );
+            for (a, b) in nt.iter().zip(&it) {
+                let same = a == b
+                    || matches!((a.parse::<f64>(), b.parse::<f64>()), (Ok(x), Ok(y)) if x.to_bits() == y.to_bits());
+                assert!(
+                    same,
+                    "{route}, line {index}: {a:?} and {b:?} are different values"
+                );
+            }
+        }
+        assert!(
+            stderr(&native).contains("live_allocations=0"),
+            "{route} leaks: {}",
+            stderr(&native)
+        );
+        let actual_lines: Vec<&str> = out.lines().collect();
+        assert_eq!(
+            actual_lines.len(),
+            expected_lines.len(),
+            "{route}: line count"
+        );
+        for (index, (line, want)) in actual_lines.iter().zip(&expected_lines).enumerate() {
+            let got: Vec<&str> = line.split(' ').collect();
+            let wanted: Vec<&str> = want.split(' ').collect();
+            assert_eq!(
+                got.len(),
+                wanted.len(),
+                "{route}, line {index}: token count\n  got:  {line}\n  want: {want}"
+            );
+            for (g, w) in got.iter().zip(&wanted) {
+                assert!(oracle_token_matches(w, g), "{route}, line {index}: token {g:?} does not match {w:?}\n  got:  {line}\n  want: {want}");
+            }
+        }
+    }
+}
+
+#[test]
+fn linalg_properties_agree_in_both_backends_and_leave_no_allocation() {
+    // examples/linalg_properties.ostrin is generated by scripts/linalg-properties.mjs. Each check prints a number or a
+    // status; the expected lines carry the reference value and its rounding bound (see the generator). Every route must
+    // match every line, print the same doubles as the interpreter, and end with no live allocation.
+    let program = example_path("linalg_properties.ostrin");
+    let expected = fs::read_to_string(format!(
+        "{}/../tests/oracle/linalg-properties-expected.txt",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("read linalg-properties-expected.txt");
+    let expected_lines: Vec<&str> = expected.lines().collect();
+    let interpreted = run(&["--run", &program]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let interp_out = stdout(&interpreted);
+    let routes: [(&str, &[(&str, &str)]); 3] = [
+        ("ir", &[]),
+        ("hir", &[("OSTRIN_NO_IR_CODEGEN", "1")]),
+        (
+            "ast",
+            &[
+                ("OSTRIN_NO_IR_CODEGEN", "1"),
+                ("OSTRIN_NO_HIR_CODEGEN", "1"),
+            ],
+        ),
+    ];
+    for (route, env) in routes {
+        let exe = temp_artifact(&format!("linalg_properties_{route}.exe"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_ostrinc"));
+        command.args(["--compile", "--leak-check", "--out", &exe, &program]);
+        for (key, value) in env.iter().copied() {
+            command.env(key, value);
+        }
+        let compile = command.output().expect("run ostrinc");
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(
+            compile.status.success(),
+            "{route}: compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe).output().expect("run native binary");
+        let _ = fs::remove_file(&exe);
+        let out = stdout(&native).replace("\r\n", "\n");
+        let interp_lines: Vec<&str> = interp_out.lines().collect();
+        let native_lines: Vec<&str> = out.lines().collect();
+        assert_eq!(
+            native_lines.len(),
+            interp_lines.len(),
+            "{route}: line count differs from the interpreter"
+        );
+        for (index, (n, i)) in native_lines.iter().zip(&interp_lines).enumerate() {
+            let nt: Vec<&str> = n.split(' ').collect();
+            let it: Vec<&str> = i.split(' ').collect();
+            assert_eq!(
+                nt.len(),
+                it.len(),
+                "{route}, line {index}: token count differs from the interpreter"
+            );
+            for (a, b) in nt.iter().zip(&it) {
+                let same = a == b
+                    || matches!((a.parse::<f64>(), b.parse::<f64>()), (Ok(x), Ok(y)) if x.to_bits() == y.to_bits());
+                assert!(
+                    same,
+                    "{route}, line {index}: {a:?} and {b:?} are different values"
+                );
+            }
+        }
+        assert!(
+            stderr(&native).contains("live_allocations=0"),
+            "{route} leaks: {}",
+            stderr(&native)
+        );
+        assert_eq!(
+            native_lines.len(),
+            expected_lines.len(),
+            "{route}: line count"
+        );
+        for (index, (line, want)) in native_lines.iter().zip(&expected_lines).enumerate() {
+            let got: Vec<&str> = line.split(' ').collect();
+            let wanted: Vec<&str> = want.split(' ').collect();
+            assert_eq!(
+                got.len(),
+                wanted.len(),
+                "{route}, line {index}: token count\n  got:  {line}\n  want: {want}"
+            );
+            for (g, w) in got.iter().zip(&wanted) {
+                assert!(oracle_token_matches(w, g), "{route}, line {index}: token {g:?} does not match {w:?}\n  got:  {line}\n  want: {want}");
+            }
+        }
+    }
+}
+
+#[test]
+fn linalg_regression_example_recovers_the_exact_quadratic_on_both_backends() {
+    // Normal equations of an exact quadratic fit, solved by std.linalg.solve_checked. The expected coefficients are 1, 2, 0.5.
+    let output = interpreter_and_native_agree("linalg_regression.ostrin");
+    assert_eq!(
+        output.replace("\r\n", "\n"),
+        "c0 1\nc1 2\nc2 0.5\nstatus ok\nresidual below 1e-9: true\n"
+    );
+}
+
+// Runs a command and fails the test, instead of hanging the suite, when it does not finish within `seconds`.
+fn output_within(command: &mut Command, seconds: u64, what: &str) -> Output {
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|error| panic!("could not start {what}: {error}"));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(seconds);
+    loop {
+        match child.try_wait().expect("poll the child process") {
+            Some(_) => return child.wait_with_output().expect("collect the child output"),
+            None if std::time::Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("{what} did not finish within {seconds} s: it is running forever");
+            }
+            None => std::thread::sleep(std::time::Duration::from_millis(50)),
+        }
+    }
+}
+
+#[test]
+fn solve_checked_terminates_on_subnormal_and_extreme_entries_on_both_backends() {
+    // Equilibration scales each row and column by a power of two. For an entry in the subnormal range that factor lies
+    // beyond the largest double, and the scaling loop used to run forever on an infinite factor. Every system in the
+    // fixture has the exact solution 1, from 5e-324 up to 1e308.
+    let path = fixture_path("linalg_subnormal.ostrin");
+    let expected = "subnormal-1e-310 x 1 status ok\n\
+                    subnormal-1e-320 x 1 status ok\n\
+                    smallest-subnormal x 1 status ok\n\
+                    near-largest x 1 status ok\n\
+                    mixed-diagonal x 1 1 status ok\n\
+                    overflow-in-substitution error solve_checked: the solution is not finite: a value overflowed while solving\n";
+    let interpreted = output_within(
+        Command::new(env!("CARGO_BIN_EXE_ostrinc")).args(["--run", &path]),
+        120,
+        "the interpreter on linalg_subnormal.ostrin",
+    );
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("linalg_subnormal.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = output_within(
+        &mut Command::new(&exe),
+        120,
+        "the native linalg_subnormal binary",
+    );
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+}
+
+#[test]
+fn untyped_closure_parameter_is_refused_by_the_native_backend_with_a_diagnostic() {
+    // The interpreter runs this program, but the native backend cannot infer the type of the untyped parameter `f`. It must
+    // refuse with a diagnostic that names the limitation; it must never emit code for the call.
+    let path = fixture_path("ownership/untyped_closure_parameter.ostrin");
+    let exe = temp_artifact("untyped_closure_parameter.exe");
+    let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(["--compile", "--out", &exe, &path])
+        .output()
+        .expect("run ostrinc");
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    let _ = fs::remove_file(&exe);
+    assert!(
+        !compile.status.success(),
+        "the native backend must refuse this program"
+    );
+    assert!(
+        stderr(&compile).contains("cannot determine the type of the function value 'f'"),
+        "unexpected diagnostic: {}",
+        stderr(&compile)
     );
 }
 
@@ -21440,7 +22489,7 @@ fn symbolic_units_propagate_dimensions_through_expressions_in_both_backends() {
     // are reported as typed errors; E / E simplifies to the dimensionless 1.
     assert_eq!(
         interpreter_and_native_agree("symbolic_units.ostrin"),
-        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*(L*g^(-1))^(1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
+        "E = 1/2*m*v^2\ndim E = Length^2*Mass*Time^-2\ndE/dv = m*v\ndim dE/dv = Length*Mass*Time^-1\ndim d(E/L)/dL = Mass*Time^-2\nT = 2*pi*L^(1/2)*g^(-1/2)\ndim L/g = Time^2\ndim T = Time\ndim dT/dL = Length^-1*Time\nE / E = 1 with dim 1\nm + v: error: cannot add terms with different dimensions: Mass and Length*Time^-1\nsin(L): error: sin needs a dimensionless argument, got Length\nsin(L / L): 1\nm^v: error: an exponent must be dimensionless, got Length*Time^-1\nL^(1/3): Length^(1/3)\nk: Length^2*Time^-1\nw: Base2^2*Ángulo^-1\nw^2: Base2^4*Ángulo^-2\nleading digit: dimension '2D' has an unexpected character at position 0\nbad dimension: a dimension exponent after ^ must be an integer or n/d\n"
     );
     let path = example_path("symbolic_units.ostrin");
     let report = run(&["--native-type-report", &path]);
@@ -21983,4 +23032,450 @@ fn std_arrays_slicing_joining_reductions_and_grids_match_an_oracle_in_both_backe
         "leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
+}
+
+#[test]
+fn std_symbolic_solve_matches_interpreter_and_native_without_leaks() {
+    // Exact roots of quadratics and of cubics that split over the rationals, the sqrt form of an
+    // irrational quadratic root, the repeated root listed once, a rational factorization checked by
+    // identity, and the stated failures for complex, non-polynomial and symbolic-coefficient inputs.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_solve.ostrin"),
+        "roots of x^2 - 3x + 2: 2, 1\nfactor of x^2 - 3x + 2: (-1 + x)*(-2 + x)\nroots of 2x^2 + 3x - 2: 1/2, -2\nroots of x^3 - 6x^2 + 11x - 6: 1, 2, 3\nroots of (x - 1)^2: 1\nroots of x^2 - 2: 2^(1/2), -2^(1/2)\nnumeric values: 1.414213562373095 and -1.414213562373095\nx^2 + 1: error: the discriminant is negative: the roots are complex, which is not represented\nx^3 + 1: error: a factor of degree 2 has no rational root; its exact solution is not implemented\nsin(x): error: the expression is not a polynomial in the variable\ny*x + 1: error: solving needs exact rational coefficients; a coefficient depends on another symbol\n0: error: every value is a solution: the expression is zero\nroots of 3x - 6: 2\nall solver checks passed\n"
+    );
+    let path = example_path("symbolic_solve.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_solve_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_radicals_match_interpreter_and_native_without_leaks() {
+    // Irrational quadratic roots in reduced radical form (2^(1/2), 2*2^(1/2), 3/4 + 1/4*17^(1/2)), each checked by
+    // exact substitution, a rejected wrong candidate and a numeric value against the reference square root.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_radicals.ostrin"),
+        "x^2 - 2: 2^(1/2), -2^(1/2)\nx^2 - 8: 2*2^(1/2), -2*2^(1/2)\nx^2 - 12: 2*3^(1/2), -2*3^(1/2)\nx^2 - 18: 3*2^(1/2), -3*2^(1/2)\nx^2 - x - 1: 1/2 + 1/2*5^(1/2), 1/2 - 1/2*5^(1/2)\n2x^2 - 3x - 1: 3/4 + 1/4*17^(1/2), 3/4 - 1/4*17^(1/2)\n3^(1/2) is rejected as a root of x^2 - 2\nstandalone radicals reduced: 16*2^(1/2)\nall radical checks passed\n"
+    );
+    let path = example_path("symbolic_radicals.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_radicals_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_assumptions_match_interpreter_and_native_without_leaks() {
+    // Positive symbols let a radical split over a product and remove a square; real symbols keep the same
+    // radicals; the queries is_positive and is_nonzero follow the assumptions; values are checked at points.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_assumptions.ostrin"),
+        "(x^2)^(1/2), x positive: x\n(4x^2)^(1/2), x positive: 2*x\n(x*y)^(1/2), x and y positive: x^(1/2)*y^(1/2)\n(2x)^(1/2), x positive: x^(1/2)*2^(1/2)\nreal symbols keep their radicals: (x^2)^(1/2) and (x*y)^(1/2)\nqueries: positive x true, real x false, nonzero x true\nall assumption checks passed\n"
+    );
+    let path = example_path("symbolic_assumptions.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_assumptions_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_numeric_bridge_matches_interpreter_and_native_without_leaks() {
+    // Symbolic derivatives against central differences, counterexamples to a true and a false identity, a sample
+    // that names the point where 1/x cannot be evaluated, and a figure built from sampled values.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_numeric.ostrin"),
+        "derivative of x^3 - 2x + 1: 0 mismatched points\nderivative of sin(x) exp(x): 0 mismatched points\nderivative of cos(x^2): 0 mismatched points\nwrong derivative 3x^2 + 1 disagrees at all 41 points\n(x + 1)^2 = x^2 + 2x + 1: 0 counterexamples\nsin^2 + cos^2 = 1: 0 counterexamples\n(x + 1)^2 = x^2 + 1: 40 counterexamples\n1/x through 0 fails: at 0: division by zero\nx + y with y free fails: at -2: no value for symbol y\nfigure of the sampled cubic is svg: true\nstep 1e-16 is refused: the step is not reliable at -0.8999999999999999: steps 0.0000000000000001 and 0.000000000000000009999999999999999 give different quotients; choose a step between them\nstep 1 is refused for cos(x^2): the step is not reliable at -2: steps 1 and 0.1 give different quotients; choose a step between them\nexp(1000) = exp(1000) is reported as a non-finite mismatch\nall numeric bridge checks passed\n"
+    );
+    let path = example_path("symbolic_numeric.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_numeric_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_conditional_matches_interpreter_and_native_without_leaks() {
+    // Conditional simplification under explicit contexts: the sqrt, cancellation, self-quotient and logarithm rules,
+    // contradictions and intervals, each checked with the numeric bridge and with the expected status.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_conditional.ostrin"),
+        "A. empty context: no assumptions (every symbol real)\nA. after x positive: x positive\nA. the empty context is unchanged: no assumptions (every symbol real)\nA. x > 0 and x < 0: contradictory assumptions for x: positive and negative\nA. x >= 0 and x <= 0 give x = 0: x nonnegative, x nonpositive\nA. x nonzero: positive is unknown, not false\nA. unknown kind: unknown assumption sometimes: use real, complex, positive, negative, nonnegative, nonpositive or nonzero\nA. x in (0, 3]: sign positive\nA. [2, 1]: the interval for x is empty\nB. sqrt(x^2) for real x: abs(x) (applied)\nB. abs(x) against sqrt(x*x) on the grid: largest gap 0\nB. sqrt(x^2) for x >= 0: x (applied)\nB. x against sqrt(x*x) on the grid: 20 counterexamples, all with x < 0: true\nB. sqrt(x^2) for x <= 0: -x (applied)\nB. sqrt(x^2) for complex x: refused: sqrt(x^2) = abs(x) holds for real x only, and x is not known to be real\nC. (x^2 - 1)/(x - 1) for real x: 1 + x (applied-conditional), requires 1 condition, unknown 1\nC. the original at x = 1: at 1: division by zero\nC. original against 1 + x on the grid: 0 counterexamples\nC. (x^2 - 1)/(x + 1) for x > 0: -1 + x (applied)\nC. (x + 1)/(x - 1): refused: the numerator does not vanish at the root, so nothing cancels\nD. x / x for real x: 1 (applied-conditional)\nD. x / x for nonzero x: 1 (applied)\nD. x / x when x = 0: refused: x is zero in this context, so x / x is undefined\nE. ln(x y) with x, y positive: ln(x) + ln(y) (applied)\nE. ln(x y) for real x, y: refused: ln(a b) = ln(a) + ln(b) needs a > 0 and b > 0, and the context does not establish both, so the rule is not applied\nE. ln(x) at x = -2, the factor the split needs: at -2: ln of a non-positive number\nall conditional checks passed\n"
+    );
+    let path = example_path("symbolic_conditional.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_conditional_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_assumption_audit_matches_interpreter_and_native_without_leaks() {
+    // Audit: a built-in assumption is combined with the context and a contradiction is refused; contexts are values; a conditional result is not an identity.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_assumption_audit.ostrin"),
+        "A. knows positive under w negative: contradictory\nA. sqrt(w^2) under the contradiction: refused: the built-in assumption of w contradicts the context: positive and negative\nB. sign of x: positive under one context, negative under another\nC. identity for real x: true; identity under x >= 0: false\nall audit checks passed\n"
+    );
+    let path = example_path("symbolic_assumption_audit.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_audit_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_abs_derivative_matches_interpreter_and_native_without_leaks() {
+    // The derivative of abs is sign(x) away from 0; at 0 it has no value and the numeric check refuses a grid through 0.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_abs_derivative.ostrin"),
+        "d abs(x)/dx = sign(x)\nat 0: sign is undefined at 0: the derivative of abs has a corner there and no value\nabs(x) against central differences away from 0: 0 mismatched points\na grid through 0 is refused: at 0: sign is undefined at 0: the derivative of abs has a corner there and no value\nd abs(2x)/dx at 1: 2\nall abs derivative checks passed\n"
+    );
+    let path = example_path("symbolic_abs_derivative.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_abs_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_symbolic_chain_matches_interpreter_and_native_without_leaks() {
+    // Composition of conditional steps: both conditions kept, the value checked against the original at points, the
+    // removable point x = 1 refused, a point outside the context refused, and wrong-context and absent-input steps refused.
+    assert_eq!(
+        interpreter_and_native_agree("symbolic_chain.ostrin"),
+        "E = (-1 + x^2)*(-1 + x)^(-1) + (x^2)^(1/2)\nstep 1: applied-conditional, steps 1, value 1 + x + (x^2)^(1/2)\nstep 2: applied-conditional, steps 2, value 1 + x + abs(x)\nkept conditions: 1 unknown: x != 1\nE(2) by the derivation: 5 (original: 3 + 2 = 5)\nE(-2) by the derivation: 1 (original: -1 + 2 = 1)\nat x = 1: outside the domain: x != 1 fails (the expression has the value 1)\nunder x positive: applied-conditional, value 1 + 2*x, pending 1\nx = -2 under x positive: outside the context: x positive fails at x = -2\nstep under another context: refused: the step was computed under another context: x positive (the chain uses no assumptions (every symbol real))\nstep on an absent subexpression: refused: the step was computed on (-1 + x^2)*(-1 + x)^(-1), not on -1 + x\nz / z: applied-conditional, pending 1 (z != 0)\nall chain checks passed\n"
+    );
+    let path = example_path("symbolic_chain.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("symbolic_chain_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn interpreter_range_loops_match_native_and_keep_their_semantics() {
+    // Range loops run lazily in the interpreter: continue and break, negative and zero steps, bounds evaluated once,
+    // nested break and an empty range keep their meaning, and the native build agrees.
+    assert_eq!(
+        interpreter_and_native_agree("interp_lazy_range.ostrin"),
+        "all range checks passed\n"
+    );
+}
+
+#[test]
+fn interpreter_calls_match_native_and_keep_their_semantics() {
+    // Calls: the positional fast path, named and default arguments, recursion, methods and closures, and the
+    // evaluation order of the arguments. The native build agrees.
+    assert_eq!(
+        interpreter_and_native_agree("interp_calls.ostrin"),
+        "all call checks passed\n"
+    );
+}
+
+fn interpreter_and_native_agree_from(file: &str, dir: &std::path::Path) -> String {
+    // Like interpreter_and_native_agree, but the program runs from `dir`, so it can read its data by a relative path.
+    let interpreted = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(dir)
+        .args(["--run", file])
+        .output()
+        .expect("failed to run ostrinc");
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed on {file}: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    let exe = temp_artifact(&format!("{file}.exe"));
+    let compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .current_dir(dir)
+        .args(["--compile", "--out", &exe, file])
+        .output()
+        .expect("failed to run ostrinc");
+    if skip_if_no_c_compiler(&compile) {
+        return expected;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).current_dir(dir).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "output mismatch for {file}"
+    );
+    expected
+}
+
+#[test]
+fn std_data_engine_reads_validates_fits_and_exports_identically_in_both_backends() {
+    // A CSV experiment with quoted text, NA cells and a blank line: schema checks, missing-value policy,
+    // statistics, correlation, linear and quadratic regression in physical units, residuals, sorting,
+    // filtering and grouping. The reference values are checked by scripts/data-engine.test.mjs.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("examples");
+    let output = interpreter_and_native_agree_from("data_engine.ostrin", &examples_dir);
+    assert!(output.contains("rows read: 36"), "{output}");
+    assert!(
+        output.contains("rows with a pressure value: 32"),
+        "{output}"
+    );
+    assert!(
+        output.contains("wrong kind refused: line 2, column temperature_c: not an integer: 30.23"),
+        "{output}"
+    );
+    assert!(
+        output.contains("missing column refused: the header has no column voltage"),
+        "{output}"
+    );
+    assert!(
+        output.contains("correlation temperature-response: 0.99368810255027"),
+        "{output}"
+    );
+}
+
+#[test]
+fn std_scientific_model_agrees_in_both_backends_and_writes_its_tables() {
+    // Dimensional parameters, RK4 and RK45 from std.numeric, analytic validation and the detected convergence failure.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("examples");
+    let output = interpreter_and_native_agree_from("scientific_model.ostrin", &examples_dir);
+    assert!(output.contains("decay: 1201 RK4 nodes"), "{output}");
+    assert!(output.contains("convergence failure detected"), "{output}");
+    assert!(output.contains("oscillator: 2401 RK4 nodes"), "{output}");
+}
+
+#[test]
+fn a_dimension_mismatch_is_refused_at_compile_time() {
+    // Adding a mass to a time is a type error, reported before the program can run.
+    let path = temp_artifact("dimension_mismatch.ostrin");
+    fs::write(
+        &path,
+        "fn main() -> Void {\n    x = 2.0 kg + 1.0 s\n    print(\"unreachable\")\n}\n",
+    )
+    .unwrap();
+    let check = run(&["--check", &path]);
+    let _ = fs::remove_file(&path);
+    assert!(!check.status.success(), "a mismatched sum was accepted");
+    let text = format!("{}{}", stdout(&check), stderr(&check));
+    assert!(!text.contains("unreachable"), "{text}");
+}
+
+#[test]
+fn std_data_figures_agree_in_both_backends() {
+    // The figures and the table written from the computed fits. Backend agreement covers the printed summary;
+    // scripts/data-figures.test.mjs checks the written files against the exact reference.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("examples");
+    let output = interpreter_and_native_agree_from("data_figures.ostrin", &examples_dir);
+    assert!(
+        output.contains("wrote data/figures/calibration_table.csv with 36 rows"),
+        "{output}"
+    );
+    assert!(output.contains("quadratic residual sum:"), "{output}");
+}
+
+#[test]
+fn std_void_payload_bindings_compile_and_agree_in_both_backends_without_leaks() {
+    // A Result whose Ok payload is Void: the named binding `Ok(done)`, the wildcard `Ok(_)`, and the constructor
+    // `Ok(announce())`. The native backend used to fail on the named binding and on the constructor.
+    assert_eq!(
+        interpreter_and_native_agree("native_void_binding.ostrin"),
+        "announced\nnamed binding: passed\nnamed binding: refused\nannounced\nwildcard: passed\n"
+    );
+    let path = example_path("native_void_binding.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+    let exe = temp_artifact("native_void_binding_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_data_reader_checks_hold_in_both_backends() {
+    // RFC 4180 records spanning lines, Unicode, empty text versus missing values, refused schemas and malformed
+    // quotes, CSV and TSV round trips, stable sorting and filtering, and a 3000-record round trip.
+    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("examples");
+    let output = interpreter_and_native_agree_from("data_io_checks.ostrin", &examples_dir);
+    assert!(!output.contains("FAIL"), "{output}");
+    assert!(output.ends_with("all data checks passed\n"), "{output}");
+    assert_eq!(output.matches("ok: ").count(), 22, "{output}");
 }

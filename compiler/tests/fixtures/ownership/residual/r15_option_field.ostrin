@@ -1,0 +1,11 @@
+record Box {
+    tag: String
+}
+
+fn find() -> Option<Box> {
+    Some(Box { tag: "found" })
+}
+
+fn main() -> Void {
+    print(find().unwrap().tag)
+}

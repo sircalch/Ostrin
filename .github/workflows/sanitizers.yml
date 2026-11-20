@@ -16,7 +16,7 @@ jobs:
   address:
     name: AddressSanitizer native suite
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       OSTRIN_CC: clang
       OSTRIN_CFLAGS: "-fsanitize=address -fno-omit-frame-pointer"

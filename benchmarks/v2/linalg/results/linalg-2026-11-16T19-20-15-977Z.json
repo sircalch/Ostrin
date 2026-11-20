@@ -1,0 +1,2373 @@
+{
+  "generated": "2026-11-16T19:20:15.978Z",
+  "commit": "0f38af69",
+  "hardware": {
+    "os": "win32 10.0.26200 x64",
+    "cpuModel": "AMD Ryzen 7 5700X 8-Core Processor",
+    "logicalCores": 16,
+    "memoryGiB": 31.9,
+    "physicalCores": 8
+  },
+  "versions": {
+    "ostrinc": "ostrinc 0.2.0",
+    "python": "Python 3.12.10",
+    "numpy": "2.5.2",
+    "julia": "julia version 1.13.3",
+    "juliaBlas": "LBTConfig([ILP64] libopenblas64_.dll)",
+    "node": "v24.19.0",
+    "ostrincSha256": "3fe2cf15a812accc52948c0225f02dd58495dafc6f9145159dc9da1ffea9de56"
+  },
+  "sizes": [
+    100,
+    200
+  ],
+  "reps": 5,
+  "interpReps": 3,
+  "kBigNative": 40,
+  "kBigInterp": 3,
+  "internalK": 5,
+  "compileMs": {
+    "matmul": {
+      "n": 3,
+      "median": 477.0539,
+      "iqr": 8.768349999999941,
+      "min": 467.0773,
+      "max": 484.614
+    },
+    "lu_solve": {
+      "n": 3,
+      "median": 1789.2524,
+      "iqr": 63.19750000000022,
+      "min": 1764.4,
+      "max": 1890.795
+    },
+    "norms": {
+      "n": 3,
+      "median": 1944.993,
+      "iqr": 41.572949999999764,
+      "min": 1876.6447,
+      "max": 1959.7906
+    },
+    "solve_checked": {
+      "n": 3,
+      "median": 1946.8209,
+      "iqr": 10.283300000000054,
+      "min": 1930.7708,
+      "max": 1951.3374
+    }
+  },
+  "results": [
+    {
+      "size": 100,
+      "kernel": "matmul",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 0.5453846153846155,
+      "iqr": 0.11097179487179482,
+      "min": 0.46021282051282053,
+      "max": 0.6475512820512821,
+      "samples": [
+        0.46021282051282053,
+        0.49658461538461535,
+        0.6475512820512821,
+        0.5453846153846155,
+        0.6075564102564102
+      ],
+      "startupEstimateMs": 9.445615384615385,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 29,
+          "after": 18
+        },
+        "rep1": {
+          "before": 77,
+          "after": 71
+        },
+        "rep2": {
+          "before": 65,
+          "after": 68
+        },
+        "rep3": {
+          "before": 62,
+          "after": 53
+        },
+        "rep4": {
+          "before": 63,
+          "after": 77
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "matmul",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 55.354600000000005,
+      "iqr": 6.303025000000005,
+      "min": 50.758649999999996,
+      "max": 63.36469999999999,
+      "samples": [
+        55.354600000000005,
+        50.758649999999996,
+        63.36469999999999
+      ],
+      "startupEstimateMs": 25.717100000000002,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 41,
+          "after": 39
+        },
+        "rep1": {
+          "before": 59,
+          "after": 59
+        },
+        "rep2": {
+          "before": 71,
+          "after": 54
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "matmul",
+      "implementation": "python-pure",
+      "label": "CPython 3.12 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 43.632700020680204,
+        "iqr": 2.2523000079672784,
+        "min": 40.0863999966532,
+        "max": 44.64690000168048
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 42.37455001566559,
+        "iqr": 3.632299994933419,
+        "min": 39.22849998343736,
+        "max": 49.99569998471998
+      },
+      "perRunMs": 42.37455001566559,
+      "iqr": 3.632299994933419,
+      "min": 39.22849998343736,
+      "max": 49.99569998471998,
+      "samples": [
+        42.27420000825077,
+        40.69970001000911,
+        41.30969999823719,
+        40.411699999822304,
+        39.22849998343736,
+        40.60019997996278,
+        40.89070000918582,
+        42.47490002308041,
+        46.69899999862537,
+        43.98550000041723,
+        47.15889997896738,
+        44.48650000267662,
+        46.256600006017834,
+        39.77350000059232,
+        42.03070001676679,
+        41.62870001164265,
+        44.47150000487454,
+        43.88759998255409,
+        43.56520000146702,
+        49.99569998471998
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 56,
+          "after": 29
+        },
+        "rep1": {
+          "before": 65,
+          "after": 76
+        },
+        "rep2": {
+          "before": 76,
+          "after": 76
+        },
+        "rep3": {
+          "before": 85,
+          "after": 54
+        },
+        "rep4": {
+          "before": 57,
+          "after": 71
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "matmul",
+      "implementation": "python-numpy",
+      "label": "CPython 3.12 + NumPy",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 201.4873999869451,
+        "iqr": 35.42250001919456,
+        "min": 183.2476000126917,
+        "max": 238.14110000967048
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.7073000015225261,
+        "iqr": 0.29394999728538096,
+        "min": 0.6414000235963613,
+        "max": 1.2117000005673617
+      },
+      "perRunMs": 0.7073000015225261,
+      "iqr": 0.29394999728538096,
+      "min": 0.6414000235963613,
+      "max": 1.2117000005673617,
+      "samples": [
+        0.6585999799426645,
+        0.6414000235963613,
+        0.6929000082891434,
+        0.7055000169202685,
+        0.8440999954473227,
+        0.7090999861247838,
+        0.6631000142078847,
+        0.6568999961018562,
+        0.6762999983038753,
+        0.6556999869644642,
+        0.7481000211555511,
+        1.0237999958917499,
+        0.7049999840091914,
+        0.6779000104870647,
+        0.8159999852068722,
+        0.9480000007897615,
+        1.1865999840665609,
+        1.2117000005673617,
+        1.1634999827947468,
+        1.0682000138331205
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 73,
+          "after": 70
+        },
+        "rep1": {
+          "before": 67,
+          "after": 31
+        },
+        "rep2": {
+          "before": 46,
+          "after": 79
+        },
+        "rep3": {
+          "before": 66,
+          "after": 68
+        },
+        "rep4": {
+          "before": 54,
+          "after": 57
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "matmul",
+      "implementation": "julia-pure",
+      "label": "Julia 1.13 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 38.9404,
+        "iqr": 3.165299999999995,
+        "min": 37.6489,
+        "max": 53.9896
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.77915,
+        "iqr": 0.23202500000000004,
+        "min": 0.5855,
+        "max": 1.376
+      },
+      "perRunMs": 0.77915,
+      "iqr": 0.23202500000000004,
+      "min": 0.5855,
+      "max": 1.376,
+      "samples": [
+        0.722,
+        1.376,
+        0.8739,
+        0.9956,
+        0.6015,
+        0.7061,
+        0.7044,
+        0.6134,
+        0.9129,
+        0.7523,
+        0.7348,
+        0.904,
+        0.806,
+        1.1357,
+        1.0055,
+        0.8127,
+        0.5994,
+        0.5858,
+        0.5855,
+        0.916
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 41,
+          "after": 52
+        },
+        "rep1": {
+          "before": 38,
+          "after": 46
+        },
+        "rep2": {
+          "before": 43,
+          "after": 70
+        },
+        "rep3": {
+          "before": 59,
+          "after": 62
+        },
+        "rep4": {
+          "before": 46,
+          "after": 66
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "matmul",
+      "implementation": "julia-lib",
+      "label": "Julia 1.13 + OpenBLAS/LAPACK",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 33.9686,
+        "iqr": 4.3687000000000005,
+        "min": 30.4184,
+        "max": 37.0219
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.10175000000000001,
+        "iqr": 0.055499999999999994,
+        "min": 0.0516,
+        "max": 0.1748
+      },
+      "perRunMs": 0.10175000000000001,
+      "iqr": 0.055499999999999994,
+      "min": 0.0516,
+      "max": 0.1748,
+      "samples": [
+        0.1347,
+        0.1157,
+        0.1118,
+        0.1001,
+        0.1408,
+        0.1439,
+        0.1146,
+        0.0769,
+        0.0852,
+        0.0711,
+        0.0516,
+        0.0613,
+        0.0789,
+        0.0627,
+        0.0725,
+        0.0527,
+        0.1748,
+        0.1034,
+        0.1391,
+        0.1253
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 77,
+          "after": 52
+        },
+        "rep1": {
+          "before": 72,
+          "after": 79
+        },
+        "rep2": {
+          "before": 59,
+          "after": 76
+        },
+        "rep3": {
+          "before": 69,
+          "after": 77
+        },
+        "rep4": {
+          "before": 82,
+          "after": 79
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "lu_solve",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 2.539620512820513,
+      "iqr": 0.1958666666666664,
+      "min": 2.388128205128205,
+      "max": 3.387205128205128,
+      "samples": [
+        3.387205128205128,
+        2.725825641025641,
+        2.388128205128205,
+        2.539620512820513,
+        2.5299589743589745
+      ],
+      "startupEstimateMs": 10.251779487179487,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 74,
+          "after": 80
+        },
+        "rep1": {
+          "before": 51,
+          "after": 70
+        },
+        "rep2": {
+          "before": 59,
+          "after": 80
+        },
+        "rep3": {
+          "before": 65,
+          "after": 85
+        },
+        "rep4": {
+          "before": 77,
+          "after": 77
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "lu_solve",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 325.32759999999996,
+      "iqr": 7.6592750000000365,
+      "min": 314.81014999999996,
+      "max": 330.1287,
+      "samples": [
+        330.1287,
+        314.81014999999996,
+        325.32759999999996
+      ],
+      "startupEstimateMs": 76.90330000000006,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 69,
+          "after": 73
+        },
+        "rep1": {
+          "before": 67,
+          "after": 45
+        },
+        "rep2": {
+          "before": 71,
+          "after": 66
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "lu_solve",
+      "implementation": "python-pure",
+      "label": "CPython 3.12 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 25.94459999818355,
+        "iqr": 3.779099992243573,
+        "min": 22.049499995773658,
+        "max": 27.43489999556914
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 24.02040000015404,
+        "iqr": 4.985524996300228,
+        "min": 20.10219998192042,
+        "max": 31.09289999702014
+      },
+      "perRunMs": 24.02040000015404,
+      "iqr": 4.985524996300228,
+      "min": 20.10219998192042,
+      "max": 31.09289999702014,
+      "samples": [
+        27.867199998581782,
+        24.067699996521696,
+        27.46589999878779,
+        29.54909999971278,
+        31.09289999702014,
+        21.95890000439249,
+        20.639399997889996,
+        21.056199999293312,
+        25.23330002441071,
+        22.35579999978654,
+        21.0977999959141,
+        21.578499989118427,
+        25.539599999319762,
+        27.741199999582022,
+        26.64379999623634,
+        26.460799999767914,
+        23.973100003786385,
+        20.10219998192042,
+        23.36479999939911,
+        23.328999988734722
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 55,
+          "after": 62
+        },
+        "rep1": {
+          "before": 53,
+          "after": 72
+        },
+        "rep2": {
+          "before": 62,
+          "after": 71
+        },
+        "rep3": {
+          "before": 68,
+          "after": 57
+        },
+        "rep4": {
+          "before": 73,
+          "after": 65
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "lu_solve",
+      "implementation": "python-numpy",
+      "label": "CPython 3.12 + NumPy",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 216.7716000112705,
+        "iqr": 7.815299992216751,
+        "min": 206.98850002372637,
+        "max": 227.00829998939298
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.4838500026380643,
+        "iqr": 0.15940001321723685,
+        "min": 0.37230001180432737,
+        "max": 0.7829999958630651
+      },
+      "perRunMs": 0.4838500026380643,
+      "iqr": 0.15940001321723685,
+      "min": 0.37230001180432737,
+      "max": 0.7829999958630651,
+      "samples": [
+        0.6078000005800277,
+        0.5775000026915222,
+        0.5545000021811575,
+        0.5674000130966306,
+        0.4634000069927424,
+        0.3823000006377697,
+        0.42169998050667346,
+        0.37230001180432737,
+        0.696599978255108,
+        0.4310999938752502,
+        0.38529999437741935,
+        0.4144000122323632,
+        0.4665000014938414,
+        0.4295000107958913,
+        0.5012000037822872,
+        0.6170999840833247,
+        0.728700018953532,
+        0.7829999958630651,
+        0.578900013351813,
+        0.4284000024199486
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 79,
+          "after": 74
+        },
+        "rep1": {
+          "before": 65,
+          "after": 88
+        },
+        "rep2": {
+          "before": 63,
+          "after": 83
+        },
+        "rep3": {
+          "before": 71,
+          "after": 65
+        },
+        "rep4": {
+          "before": 62,
+          "after": 54
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "lu_solve",
+      "implementation": "julia-pure",
+      "label": "Julia 1.13 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 157.9128,
+        "iqr": 19.470800000000025,
+        "min": 140.4274,
+        "max": 176.6544
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.25435,
+        "iqr": 0.050125,
+        "min": 0.2088,
+        "max": 0.4727
+      },
+      "perRunMs": 0.25435,
+      "iqr": 0.050125,
+      "min": 0.2088,
+      "max": 0.4727,
+      "samples": [
+        0.2782,
+        0.25,
+        0.2121,
+        0.2166,
+        0.2314,
+        0.224,
+        0.2655,
+        0.2415,
+        0.4453,
+        0.4727,
+        0.3932,
+        0.2841,
+        0.2766,
+        0.2706,
+        0.2446,
+        0.2534,
+        0.2553,
+        0.2088,
+        0.2235,
+        0.2888
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 66,
+          "after": 80
+        },
+        "rep1": {
+          "before": 79,
+          "after": 76
+        },
+        "rep2": {
+          "before": 77,
+          "after": 66
+        },
+        "rep3": {
+          "before": 62,
+          "after": 57
+        },
+        "rep4": {
+          "before": 65,
+          "after": 51
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "lu_solve",
+      "implementation": "julia-lib",
+      "label": "Julia 1.13 + OpenBLAS/LAPACK",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 235.4234,
+        "iqr": 22.619799999999998,
+        "min": 212.5802,
+        "max": 242.0476
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.0938,
+        "iqr": 0.04445,
+        "min": 0.0594,
+        "max": 0.4477
+      },
+      "perRunMs": 0.0938,
+      "iqr": 0.04445,
+      "min": 0.0594,
+      "max": 0.4477,
+      "samples": [
+        0.0822,
+        0.0826,
+        0.0885,
+        0.0788,
+        0.0822,
+        0.2956,
+        0.1245,
+        0.1211,
+        0.1807,
+        0.1707,
+        0.1343,
+        0.4477,
+        0.0957,
+        0.0834,
+        0.0597,
+        0.0594,
+        0.1158,
+        0.1014,
+        0.0914,
+        0.0919
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 84,
+          "after": 76
+        },
+        "rep1": {
+          "before": 57,
+          "after": 68
+        },
+        "rep2": {
+          "before": 62,
+          "after": 62
+        },
+        "rep3": {
+          "before": 61,
+          "after": 74
+        },
+        "rep4": {
+          "before": 60,
+          "after": 71
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "norms",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 0.06706923076923078,
+      "iqr": 0.042656410256410274,
+      "min": 0.04489230769230769,
+      "max": 0.1163051282051282,
+      "samples": [
+        0.05092820512820513,
+        0.06706923076923078,
+        0.0935846153846154,
+        0.1163051282051282,
+        0.04489230769230769
+      ],
+      "startupEstimateMs": 10.641330769230768,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 61,
+          "after": 51
+        },
+        "rep1": {
+          "before": 68,
+          "after": 69
+        },
+        "rep2": {
+          "before": 62,
+          "after": 50
+        },
+        "rep3": {
+          "before": 58,
+          "after": 48
+        },
+        "rep4": {
+          "before": 77,
+          "after": 84
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "norms",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 16.29475,
+      "iqr": 5.5823750000000025,
+      "min": 8.816899999999997,
+      "max": 19.981650000000002,
+      "samples": [
+        16.29475,
+        8.816899999999997,
+        19.981650000000002
+      ],
+      "startupEstimateMs": 61.33434999999999,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 67,
+          "after": 74
+        },
+        "rep1": {
+          "before": 37,
+          "after": 40
+        },
+        "rep2": {
+          "before": 66,
+          "after": 59
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "norms",
+      "implementation": "python-pure",
+      "label": "CPython 3.12 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 1.3288999907672405,
+        "iqr": 0.2366000262554735,
+        "min": 1.2934999831486493,
+        "max": 2.082999999402091
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 1.5085999912116677,
+        "iqr": 0.3803499857895076,
+        "min": 1.1738000030163676,
+        "max": 2.2963999945204705
+      },
+      "perRunMs": 1.5085999912116677,
+      "iqr": 0.3803499857895076,
+      "min": 1.1738000030163676,
+      "max": 2.2963999945204705,
+      "samples": [
+        1.2051000085193664,
+        1.7330999835394323,
+        2.2963999945204705,
+        2.134600013960153,
+        1.2570999970193952,
+        1.6755999822635204,
+        1.7334000149276108,
+        1.569599990034476,
+        1.3107999984640628,
+        1.1738000030163676,
+        1.3658000098075718,
+        1.948899996932596,
+        1.5688999847043306,
+        1.3060999917797744,
+        1.4482999977190048,
+        1.652900013141334,
+        1.2183999933768064,
+        1.4199000142980367,
+        1.5951000095810741,
+        1.357000001007691
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 82,
+          "after": 74
+        },
+        "rep1": {
+          "before": 85,
+          "after": 80
+        },
+        "rep2": {
+          "before": 68,
+          "after": 57
+        },
+        "rep3": {
+          "before": 80,
+          "after": 76
+        },
+        "rep4": {
+          "before": 62,
+          "after": 66
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "norms",
+      "implementation": "python-numpy",
+      "label": "CPython 3.12 + NumPy",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 213.99160000146367,
+        "iqr": 7.6484999735839665,
+        "min": 211.62610000465065,
+        "max": 229.06400001375005
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.3649499994935468,
+        "iqr": 0.097999996796716,
+        "min": 0.32660001306794584,
+        "max": 0.6965000065974891
+      },
+      "perRunMs": 0.3649499994935468,
+      "iqr": 0.097999996796716,
+      "min": 0.32660001306794584,
+      "max": 0.6965000065974891,
+      "samples": [
+        0.5703000060748309,
+        0.4633000062312931,
+        0.3347999881953001,
+        0.33340000663883984,
+        0.4074999887961894,
+        0.3741999971680343,
+        0.35570000181905925,
+        0.3339000104460865,
+        0.4036000173073262,
+        0.42299999040551484,
+        0.6337999948300421,
+        0.6965000065974891,
+        0.34749999758787453,
+        0.33909999183379114,
+        0.33569999504834414,
+        0.3318999952170998,
+        0.32660001306794584,
+        0.3273999900557101,
+        0.46129999100230634,
+        0.4084999964106828
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 82,
+          "after": 65
+        },
+        "rep1": {
+          "before": 70,
+          "after": 91
+        },
+        "rep2": {
+          "before": 60,
+          "after": 38
+        },
+        "rep3": {
+          "before": 51,
+          "after": 54
+        },
+        "rep4": {
+          "before": 51,
+          "after": 63
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "norms",
+      "implementation": "julia-pure",
+      "label": "Julia 1.13 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 57.4894,
+        "iqr": 9.592599999999997,
+        "min": 47.3478,
+        "max": 62.9833
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.0155,
+        "iqr": 0.005075,
+        "min": 0.0152,
+        "max": 0.0283
+      },
+      "perRunMs": 0.0155,
+      "iqr": 0.005075,
+      "min": 0.0152,
+      "max": 0.0283,
+      "samples": [
+        0.0283,
+        0.0242,
+        0.0221,
+        0.022,
+        0.0192,
+        0.0152,
+        0.0152,
+        0.0152,
+        0.0186,
+        0.0153,
+        0.0153,
+        0.0152,
+        0.023,
+        0.0156,
+        0.0155,
+        0.0154,
+        0.0198,
+        0.0155,
+        0.0153,
+        0.0152
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 68,
+          "after": 70
+        },
+        "rep1": {
+          "before": 82,
+          "after": 80
+        },
+        "rep2": {
+          "before": 70,
+          "after": 70
+        },
+        "rep3": {
+          "before": 70,
+          "after": 86
+        },
+        "rep4": {
+          "before": 54,
+          "after": 82
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "norms",
+      "implementation": "julia-lib",
+      "label": "Julia 1.13 + OpenBLAS/LAPACK",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 103.9714,
+        "iqr": 11.426400000000001,
+        "min": 98.9932,
+        "max": 132.1367
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.0129,
+        "iqr": 0.001174999999999999,
+        "min": 0.0128,
+        "max": 0.0182
+      },
+      "perRunMs": 0.0129,
+      "iqr": 0.001174999999999999,
+      "min": 0.0128,
+      "max": 0.0182,
+      "samples": [
+        0.0175,
+        0.0129,
+        0.0128,
+        0.0128,
+        0.0182,
+        0.0128,
+        0.0128,
+        0.0129,
+        0.0169,
+        0.0128,
+        0.0129,
+        0.0128,
+        0.0175,
+        0.0129,
+        0.0129,
+        0.013,
+        0.0175,
+        0.013,
+        0.0128,
+        0.0129
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 53,
+          "after": 77
+        },
+        "rep1": {
+          "before": 73,
+          "after": 80
+        },
+        "rep2": {
+          "before": 62,
+          "after": 54
+        },
+        "rep3": {
+          "before": 68,
+          "after": 66
+        },
+        "rep4": {
+          "before": 65,
+          "after": 71
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "solve_checked",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 12.65358205128205,
+      "iqr": 0.6763538461538481,
+      "min": 12.298520512820513,
+      "max": 18.583028205128205,
+      "samples": [
+        13.286169230769232,
+        12.298520512820513,
+        12.65358205128205,
+        12.609815384615384,
+        18.583028205128205
+      ],
+      "startupEstimateMs": 10.265817948717949,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 65,
+          "after": 66
+        },
+        "rep1": {
+          "before": 42,
+          "after": 43
+        },
+        "rep2": {
+          "before": 39,
+          "after": 39
+        },
+        "rep3": {
+          "before": 68,
+          "after": 63
+        },
+        "rep4": {
+          "before": 59,
+          "after": 12
+        }
+      }
+    },
+    {
+      "size": 100,
+      "kernel": "solve_checked",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 903.89735,
+      "iqr": 73.37694999999997,
+      "min": 838.49705,
+      "max": 985.25095,
+      "samples": [
+        985.25095,
+        903.89735,
+        838.49705
+      ],
+      "startupEstimateMs": 192.68984999999998,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 55,
+          "after": 72
+        },
+        "rep1": {
+          "before": 73,
+          "after": 66
+        },
+        "rep2": {
+          "before": 34,
+          "after": 62
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "matmul",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 4.783261538461539,
+      "iqr": 0.07163333333333277,
+      "min": 4.7143,
+      "max": 4.9142820512820515,
+      "samples": [
+        4.9142820512820515,
+        4.748335897435898,
+        4.7143,
+        4.783261538461539,
+        4.819969230769231
+      ],
+      "startupEstimateMs": 10.53443846153846,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 45,
+          "after": 80
+        },
+        "rep1": {
+          "before": 35,
+          "after": 50
+        },
+        "rep2": {
+          "before": 38,
+          "after": 59
+        },
+        "rep3": {
+          "before": 49,
+          "after": 49
+        },
+        "rep4": {
+          "before": 32,
+          "after": 54
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "matmul",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 518.42385,
+      "iqr": 112.74380000000002,
+      "min": 455.14175,
+      "max": 680.62935,
+      "samples": [
+        680.62935,
+        455.14175,
+        518.42385
+      ],
+      "startupEstimateMs": 207.94584999999995,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 65,
+          "after": 56
+        },
+        "rep1": {
+          "before": 44,
+          "after": 37
+        },
+        "rep2": {
+          "before": 33,
+          "after": 60
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "matmul",
+      "implementation": "python-pure",
+      "label": "CPython 3.12 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 330.83769999211654,
+        "iqr": 14.58630000706762,
+        "min": 322.6153000141494,
+        "max": 382.0461999857798
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 329.935600006138,
+        "iqr": 13.620475016068667,
+        "min": 317.8147999860812,
+        "max": 351.41510001267307
+      },
+      "perRunMs": 329.935600006138,
+      "iqr": 13.620475016068667,
+      "min": 317.8147999860812,
+      "max": 351.41510001267307,
+      "samples": [
+        351.41510001267307,
+        347.21999999601394,
+        346.1730999988504,
+        331.4859999809414,
+        319.5914000098128,
+        327.9960999789182,
+        319.79629999841563,
+        317.8147999860812,
+        319.21950000105426,
+        321.1863999895286,
+        320.19250001758337,
+        344.50060001108795,
+        326.04430001811124,
+        330.50410001305863,
+        321.4206999982707,
+        333.7716000096407,
+        333.699799986789,
+        330.781399999978,
+        329.3670999992173,
+        336.91880002152175
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 54,
+          "after": 40
+        },
+        "rep1": {
+          "before": 46,
+          "after": 41
+        },
+        "rep2": {
+          "before": 51,
+          "after": 55
+        },
+        "rep3": {
+          "before": 58,
+          "after": 23
+        },
+        "rep4": {
+          "before": 17,
+          "after": 19
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "matmul",
+      "implementation": "python-numpy",
+      "label": "CPython 3.12 + NumPy",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 185.26200001360849,
+        "iqr": 12.426499975845218,
+        "min": 180.3412000008393,
+        "max": 204.70779997413047
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 3.0483000009553507,
+        "iqr": 0.12817501556128263,
+        "min": 2.8987000114284456,
+        "max": 3.5595000081229955
+      },
+      "perRunMs": 3.0483000009553507,
+      "iqr": 0.12817501556128263,
+      "min": 2.8987000114284456,
+      "max": 3.5595000081229955,
+      "samples": [
+        3.0605999927502126,
+        2.9728999943472445,
+        2.8987000114284456,
+        3.408000018680468,
+        3.042900003492832,
+        2.991700021084398,
+        2.910299983341247,
+        3.0629000102635473,
+        3.020900010596961,
+        2.965099993161857,
+        2.9762999911326915,
+        3.0706000106874853,
+        3.0297999910544604,
+        3.5595000081229955,
+        3.053699998417869,
+        3.5485999833326787,
+        3.2516999926883727,
+        3.065900004003197,
+        2.903199987486005,
+        3.2026999979279935
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 40,
+          "after": 52
+        },
+        "rep1": {
+          "before": 34,
+          "after": 34
+        },
+        "rep2": {
+          "before": 32,
+          "after": 11
+        },
+        "rep3": {
+          "before": 25,
+          "after": 50
+        },
+        "rep4": {
+          "before": 8,
+          "after": 41
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "matmul",
+      "implementation": "julia-pure",
+      "label": "Julia 1.13 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 41.145,
+        "iqr": 3.0382999999999996,
+        "min": 38.0379,
+        "max": 42.6291
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 5.16805,
+        "iqr": 0.44417499999999954,
+        "min": 4.9522,
+        "max": 5.9581
+      },
+      "perRunMs": 5.16805,
+      "iqr": 0.44417499999999954,
+      "min": 4.9522,
+      "max": 5.9581,
+      "samples": [
+        5.9581,
+        5.4498,
+        5.2611,
+        5.5488,
+        5.0971,
+        5.0873,
+        5.1475,
+        5.6853,
+        5.0468,
+        5.0929,
+        5.7549,
+        5.1612,
+        5.5088,
+        5.6072,
+        4.991,
+        4.961,
+        5.1749,
+        5.5122,
+        4.976,
+        4.9522
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 51,
+          "after": 71
+        },
+        "rep1": {
+          "before": 28,
+          "after": 60
+        },
+        "rep2": {
+          "before": 9,
+          "after": 46
+        },
+        "rep3": {
+          "before": 24,
+          "after": 54
+        },
+        "rep4": {
+          "before": 23,
+          "after": 28
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "matmul",
+      "implementation": "julia-lib",
+      "label": "Julia 1.13 + OpenBLAS/LAPACK",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 29.4352,
+        "iqr": 2.045099999999998,
+        "min": 28.3547,
+        "max": 39.4434
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.4763,
+        "iqr": 0.2328,
+        "min": 0.3195,
+        "max": 0.8937
+      },
+      "perRunMs": 0.4763,
+      "iqr": 0.2328,
+      "min": 0.3195,
+      "max": 0.8937,
+      "samples": [
+        0.4816,
+        0.6638,
+        0.721,
+        0.5227,
+        0.478,
+        0.3892,
+        0.3772,
+        0.3631,
+        0.365,
+        0.3526,
+        0.6409,
+        0.5449,
+        0.6437,
+        0.8937,
+        0.5828,
+        0.3683,
+        0.4746,
+        0.3382,
+        0.3223,
+        0.3195
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 73,
+          "after": 65
+        },
+        "rep1": {
+          "before": 37,
+          "after": 29
+        },
+        "rep2": {
+          "before": 32,
+          "after": 37
+        },
+        "rep3": {
+          "before": 55,
+          "after": 71
+        },
+        "rep4": {
+          "before": 40,
+          "after": 28
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "lu_solve",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 18.086561538461538,
+      "iqr": 0.43653076923077094,
+      "min": 17.7601641025641,
+      "max": 20.164633333333335,
+      "samples": [
+        20.164633333333335,
+        18.346846153846155,
+        18.086561538461538,
+        17.910315384615384,
+        17.7601641025641
+      ],
+      "startupEstimateMs": 11.283838461538462,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 69,
+          "after": 12
+        },
+        "rep1": {
+          "before": 65,
+          "after": 41
+        },
+        "rep2": {
+          "before": 32,
+          "after": 36
+        },
+        "rep3": {
+          "before": 33,
+          "after": 40
+        },
+        "rep4": {
+          "before": 51,
+          "after": 58
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "lu_solve",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 2569.4909,
+      "iqr": 234.67644999999993,
+      "min": 2423.4165000000003,
+      "max": 2892.7694,
+      "samples": [
+        2892.7694,
+        2569.4909,
+        2423.4165000000003
+      ],
+      "startupEstimateMs": -377.8947999999996,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 25,
+          "after": 80
+        },
+        "rep1": {
+          "before": 51,
+          "after": 63
+        },
+        "rep2": {
+          "before": 42,
+          "after": 40
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "lu_solve",
+      "implementation": "python-pure",
+      "label": "CPython 3.12 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 172.9398999887053,
+        "iqr": 18.382600013865158,
+        "min": 157.2959000186529,
+        "max": 218.08830002555624
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 163.27285001170821,
+        "iqr": 11.034600014681928,
+        "min": 156.3882000045851,
+        "max": 323.76790000125766
+      },
+      "perRunMs": 163.27285001170821,
+      "iqr": 11.034600014681928,
+      "min": 156.3882000045851,
+      "max": 323.76790000125766,
+      "samples": [
+        235.142999998061,
+        238.80990000907332,
+        305.64109998522326,
+        323.76790000125766,
+        166.78569998475723,
+        164.82880001422018,
+        175.48130001523532,
+        167.17279999284074,
+        157.58319999440573,
+        167.50770001090132,
+        156.3882000045851,
+        158.86490000411868,
+        160.09889999986626,
+        159.52340001240373,
+        161.15479997824878,
+        156.4076000067871,
+        160.32809999887832,
+        161.71690000919625,
+        169.4924000184983,
+        160.73709999909624
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 71,
+          "after": 94
+        },
+        "rep1": {
+          "before": 40,
+          "after": 40
+        },
+        "rep2": {
+          "before": 43,
+          "after": 48
+        },
+        "rep3": {
+          "before": 32,
+          "after": 47
+        },
+        "rep4": {
+          "before": 51,
+          "after": 13
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "lu_solve",
+      "implementation": "python-numpy",
+      "label": "CPython 3.12 + NumPy",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 203.05119999102317,
+        "iqr": 20.309200015617535,
+        "min": 181.56219998490997,
+        "max": 280.8948000019882
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 1.675099993008189,
+        "iqr": 0.17972500063478947,
+        "min": 1.4873000036459416,
+        "max": 2.141599979950115
+      },
+      "perRunMs": 1.675099993008189,
+      "iqr": 0.17972500063478947,
+      "min": 1.4873000036459416,
+      "max": 2.141599979950115,
+      "samples": [
+        2.082099992549047,
+        1.9271000055596232,
+        2.005299989832565,
+        2.141599979950115,
+        1.589299994520843,
+        1.6869000100996345,
+        1.4873000036459416,
+        1.5733000182081014,
+        1.5324999985750765,
+        1.7689999949652702,
+        1.6281999996863306,
+        1.6641999827697873,
+        1.6860000032465905,
+        1.6238999960478395,
+        1.5817999956198037,
+        1.6158999933395535,
+        1.6938000044319779,
+        1.8488999921828508,
+        1.6874999855645,
+        1.6371000092476606
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 79,
+          "after": 65
+        },
+        "rep1": {
+          "before": 20,
+          "after": 33
+        },
+        "rep2": {
+          "before": 24,
+          "after": 38
+        },
+        "rep3": {
+          "before": 43,
+          "after": 56
+        },
+        "rep4": {
+          "before": 33,
+          "after": 29
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "lu_solve",
+      "implementation": "julia-pure",
+      "label": "Julia 1.13 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 135.0456,
+        "iqr": 5.610899999999987,
+        "min": 130.2423,
+        "max": 151.8824
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 1.5314999999999999,
+        "iqr": 0.17854999999999976,
+        "min": 1.3767,
+        "max": 1.9107
+      },
+      "perRunMs": 1.5314999999999999,
+      "iqr": 0.17854999999999976,
+      "min": 1.3767,
+      "max": 1.9107,
+      "samples": [
+        1.4458,
+        1.7031,
+        1.384,
+        1.4964,
+        1.5971,
+        1.9107,
+        1.567,
+        1.3767,
+        1.597,
+        1.5665,
+        1.5248,
+        1.4174,
+        1.6383,
+        1.6898,
+        1.7837,
+        1.5382,
+        1.4911,
+        1.423,
+        1.4011,
+        1.4308
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 90,
+          "after": 84
+        },
+        "rep1": {
+          "before": 26,
+          "after": 66
+        },
+        "rep2": {
+          "before": 63,
+          "after": 69
+        },
+        "rep3": {
+          "before": 37,
+          "after": 28
+        },
+        "rep4": {
+          "before": 33,
+          "after": 24
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "lu_solve",
+      "implementation": "julia-lib",
+      "label": "Julia 1.13 + OpenBLAS/LAPACK",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 218.6521,
+        "iqr": 17.536399999999986,
+        "min": 194.6086,
+        "max": 250.8221
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.3649,
+        "iqr": 0.11007499999999998,
+        "min": 0.2701,
+        "max": 0.4957
+      },
+      "perRunMs": 0.3649,
+      "iqr": 0.11007499999999998,
+      "min": 0.2701,
+      "max": 0.4957,
+      "samples": [
+        0.292,
+        0.3162,
+        0.2715,
+        0.2701,
+        0.3745,
+        0.4332,
+        0.3958,
+        0.3686,
+        0.3612,
+        0.3211,
+        0.2774,
+        0.2857,
+        0.4957,
+        0.4609,
+        0.4815,
+        0.4787,
+        0.4159,
+        0.328,
+        0.3447,
+        0.4136
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 66,
+          "after": 42
+        },
+        "rep1": {
+          "before": 79,
+          "after": 60
+        },
+        "rep2": {
+          "before": 32,
+          "after": 42
+        },
+        "rep3": {
+          "before": 42,
+          "after": 51
+        },
+        "rep4": {
+          "before": 26,
+          "after": 60
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "norms",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 0.36593846153846155,
+      "iqr": 0.029433333333333256,
+      "min": 0.3198512820512821,
+      "max": 0.4941589743589744,
+      "samples": [
+        0.4941589743589744,
+        0.37416410256410254,
+        0.3198512820512821,
+        0.36593846153846155,
+        0.3447307692307693
+      ],
+      "startupEstimateMs": 9.993161538461539,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 48,
+          "after": 60
+        },
+        "rep1": {
+          "before": 52,
+          "after": 43
+        },
+        "rep2": {
+          "before": 44,
+          "after": 35
+        },
+        "rep3": {
+          "before": 36,
+          "after": 26
+        },
+        "rep4": {
+          "before": 54,
+          "after": 59
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "norms",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 60.36879999999999,
+      "iqr": 3.896349999999998,
+      "min": 53.813050000000004,
+      "max": 61.60575,
+      "samples": [
+        60.36879999999999,
+        61.60575,
+        53.813050000000004
+      ],
+      "startupEstimateMs": 71.9187,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 43,
+          "after": 44
+        },
+        "rep1": {
+          "before": 56,
+          "after": 63
+        },
+        "rep2": {
+          "before": 28,
+          "after": 37
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "norms",
+      "implementation": "python-pure",
+      "label": "CPython 3.12 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 5.581400007940829,
+        "iqr": 0.8222000033129007,
+        "min": 5.28790001408197,
+        "max": 7.123099989257753
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 5.436450010165572,
+        "iqr": 0.5670750106219202,
+        "min": 4.607500013662502,
+        "max": 7.536799996159971
+      },
+      "perRunMs": 5.436450010165572,
+      "iqr": 0.5670750106219202,
+      "min": 4.607500013662502,
+      "max": 7.536799996159971,
+      "samples": [
+        5.7446999999228865,
+        4.7697999980300665,
+        5.5081000027712435,
+        5.294500006129965,
+        5.504900007508695,
+        7.536799996159971,
+        7.025300001259893,
+        6.655200006207451,
+        5.2337999804876745,
+        4.607500013662502,
+        5.493000004207715,
+        5.535700009204447,
+        5.379900016123429,
+        4.805000004125759,
+        5.17670001136139,
+        5.166599992662668,
+        5.673899984685704,
+        4.894999990938231,
+        5.6668000179342926,
+        4.906200018012896
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 46,
+          "after": 74
+        },
+        "rep1": {
+          "before": 69,
+          "after": 25
+        },
+        "rep2": {
+          "before": 26,
+          "after": 55
+        },
+        "rep3": {
+          "before": 45,
+          "after": 27
+        },
+        "rep4": {
+          "before": 21,
+          "after": 12
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "norms",
+      "implementation": "python-numpy",
+      "label": "CPython 3.12 + NumPy",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 197.34390001394786,
+        "iqr": 8.706399996299297,
+        "min": 183.02609998499975,
+        "max": 205.32310000271536
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 1.5577999874949455,
+        "iqr": 0.23964998399605975,
+        "min": 1.3291999930515885,
+        "max": 2.066499990178272
+      },
+      "perRunMs": 1.5577999874949455,
+      "iqr": 0.23964998399605975,
+      "min": 1.3291999930515885,
+      "max": 2.066499990178272,
+      "samples": [
+        1.6571999876759946,
+        1.9574000034481287,
+        1.6542000230401754,
+        1.3307999761309475,
+        1.4531000051647425,
+        1.68009998742491,
+        1.4788999978918582,
+        1.4423999818973243,
+        1.3291999930515885,
+        1.7438000068068504,
+        1.450899988412857,
+        1.501299993833527,
+        1.5502999885939062,
+        1.5652999863959849,
+        1.7586000030860305,
+        2.066499990178272,
+        1.5813999925740063,
+        1.3666000158991665,
+        1.7284999776165932,
+        1.4608000055886805
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 60,
+          "after": 60
+        },
+        "rep1": {
+          "before": 20,
+          "after": 22
+        },
+        "rep2": {
+          "before": 35,
+          "after": 37
+        },
+        "rep3": {
+          "before": 30,
+          "after": 44
+        },
+        "rep4": {
+          "before": 23,
+          "after": 26
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "norms",
+      "implementation": "julia-pure",
+      "label": "Julia 1.13 pure",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 49.0987,
+        "iqr": 2.679700000000004,
+        "min": 47.0353,
+        "max": 53.4004
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.0694,
+        "iqr": 0.003799999999999998,
+        "min": 0.0691,
+        "max": 0.097
+      },
+      "perRunMs": 0.0694,
+      "iqr": 0.003799999999999998,
+      "min": 0.0691,
+      "max": 0.097,
+      "samples": [
+        0.0726,
+        0.0695,
+        0.0694,
+        0.0694,
+        0.0727,
+        0.0693,
+        0.0693,
+        0.0692,
+        0.0736,
+        0.0692,
+        0.0692,
+        0.0691,
+        0.097,
+        0.0922,
+        0.0938,
+        0.0918,
+        0.0729,
+        0.0693,
+        0.0694,
+        0.0692
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 40,
+          "after": 33
+        },
+        "rep1": {
+          "before": 28,
+          "after": 46
+        },
+        "rep2": {
+          "before": 28,
+          "after": 56
+        },
+        "rep3": {
+          "before": 57,
+          "after": 66
+        },
+        "rep4": {
+          "before": 45,
+          "after": 45
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "norms",
+      "implementation": "julia-lib",
+      "label": "Julia 1.13 + OpenBLAS/LAPACK",
+      "kind": "internal",
+      "incomplete": false,
+      "coldMs": {
+        "n": 5,
+        "median": 105.5732,
+        "iqr": 8.468499999999992,
+        "min": 92.4252,
+        "max": 112.191
+      },
+      "warmMs": {
+        "n": 20,
+        "median": 0.0603,
+        "iqr": 0.004025000000000008,
+        "min": 0.0601,
+        "max": 0.0662
+      },
+      "perRunMs": 0.0603,
+      "iqr": 0.004025000000000008,
+      "min": 0.0601,
+      "max": 0.0662,
+      "samples": [
+        0.0662,
+        0.0608,
+        0.0646,
+        0.0603,
+        0.0652,
+        0.0606,
+        0.0602,
+        0.0603,
+        0.0641,
+        0.0601,
+        0.0601,
+        0.0601,
+        0.0662,
+        0.0602,
+        0.0602,
+        0.0603,
+        0.0647,
+        0.0604,
+        0.0602,
+        0.0602
+      ],
+      "method": "internal: 5 processes of 5 repetitions; cold = repetition 1, warm = repetitions 2..5",
+      "load": {
+        "rep0": {
+          "before": 40,
+          "after": 67
+        },
+        "rep1": {
+          "before": 54,
+          "after": 54
+        },
+        "rep2": {
+          "before": 62,
+          "after": 80
+        },
+        "rep3": {
+          "before": 74,
+          "after": 54
+        },
+        "rep4": {
+          "before": 60,
+          "after": 58
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "solve_checked",
+      "implementation": "ostrin-native",
+      "label": "Ostrin native",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 96.15480512820513,
+      "iqr": 4.679443589743585,
+      "min": 93.49130512820513,
+      "max": 100.3602846153846,
+      "samples": [
+        94.97411538461539,
+        100.3602846153846,
+        99.65355897435897,
+        96.15480512820513,
+        93.49130512820513
+      ],
+      "startupEstimateMs": 10.056494871794868,
+      "method": "external slope, K=1 and K=40, 5 repetitions",
+      "load": {
+        "rep0": {
+          "before": 58,
+          "after": 40
+        },
+        "rep1": {
+          "before": 63,
+          "after": 62
+        },
+        "rep2": {
+          "before": 80,
+          "after": 96
+        },
+        "rep3": {
+          "before": 47,
+          "after": 38
+        },
+        "rep4": {
+          "before": 19,
+          "after": 51
+        }
+      }
+    },
+    {
+      "size": 200,
+      "kernel": "solve_checked",
+      "implementation": "ostrin-interp",
+      "label": "Ostrin interpreter",
+      "kind": "external",
+      "incomplete": false,
+      "perRunMs": 6979.156,
+      "iqr": 1191.753924999999,
+      "min": 6791.706499999999,
+      "max": 9175.214349999998,
+      "samples": [
+        6791.706499999999,
+        6979.156,
+        9175.214349999998
+      ],
+      "startupEstimateMs": 429.6953000000003,
+      "method": "external slope, K=1 and K=3, 3 repetitions",
+      "load": {
+        "rep0": {
+          "before": 90,
+          "after": 28
+        },
+        "rep1": {
+          "before": 30,
+          "after": 51
+        },
+        "rep2": {
+          "before": 99,
+          "after": 71
+        }
+      }
+    }
+  ]
+}

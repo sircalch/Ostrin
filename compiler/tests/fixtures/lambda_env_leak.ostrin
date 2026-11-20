@@ -1,0 +1,14 @@
+// Known defect (AST fallback): a closure created inside a lambda body is never released when the path is the AST codegen
+// (the IR path releases it). The leak is reproduced by captured_lambda_env_leak_on_ast_path (ignored) in tests/examples.rs.
+fn main() -> Void {
+    k = 0
+    add = fn(d) { k + d }
+    print("v9 " + add(4).to_string())
+    mut depth = 0
+    outer_f = fn() {
+        inner_f = fn() { depth = depth + 10 }
+        inner_f()
+    }
+    outer_f()
+    print("v9b " + depth.to_string())
+}

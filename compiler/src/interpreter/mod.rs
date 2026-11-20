@@ -418,9 +418,109 @@ pub enum RuntimeError {
 
 pub type EvalResult = Result<Value, RuntimeError>;
 
+/// FNV-1a: a fast, deterministic hasher for the interpreter's name tables. Names are short, and every variable read,
+/// binding and call looks one up; the standard hasher is much slower on such keys, and it is not needed here because no
+/// security property depends on these tables.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct NameHasher(u64);
+
+impl std::hash::Hasher for NameHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let mut hash = if self.0 == 0 {
+            0xcbf2_9ce4_8422_2325
+        } else {
+            self.0
+        };
+        for byte in bytes {
+            hash ^= *byte as u64;
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        self.0 = hash;
+    }
+}
+
+pub(crate) type NameMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<NameHasher>>;
+
+/// Frames up to this many names are searched linearly (no hashing, no table). Larger frames build a name index: a linear
+/// search over a long frame cost about twice as much per lookup (measured: a 120-name loop body was 2.1x slower than the
+/// hash-map frame it replaced, and the linear search only helped frames of a few names).
+const FRAME_INDEX_THRESHOLD: usize = 16;
+
+/// The variables of one frame, in definition order. Only the first `live` entries of `vars` belong to the frame; the
+/// rest are stale slots left by `truncate_to`, kept so that a loop body that defines the same names on every iteration
+/// does not allocate again. `index` maps a name to a position; an entry is trusted only if that position is live and
+/// holds that name, so stale entries never answer a lookup. The debugger sorts the names it reports, so order is not
+/// observable.
 struct Frame {
-    vars: HashMap<String, Value>,
+    vars: Vec<(String, Value)>,
+    live: usize,
+    index: Option<HashMap<String, usize>>,
     parent: Option<Env>,
+}
+
+impl Frame {
+    fn new(parent: Option<Env>) -> Self {
+        Frame {
+            vars: Vec::new(),
+            live: 0,
+            index: None,
+            parent,
+        }
+    }
+
+    fn live_vars(&self) -> &[(String, Value)] {
+        &self.vars[..self.live]
+    }
+
+    fn position(&self, name: &str) -> Option<usize> {
+        match &self.index {
+            Some(index) => index
+                .get(name)
+                .copied()
+                .filter(|&p| p < self.live && self.vars[p].0 == name),
+            None => self.vars[..self.live].iter().position(|(n, _)| n == name),
+        }
+    }
+
+    /// Adds a name that is not in the frame. A stale slot is reused in place, so its name is rewritten without a new
+    /// allocation when the buffer is large enough.
+    fn push(&mut self, name: &str, value: Value) {
+        let position = self.live;
+        if position < self.vars.len() {
+            let slot = &mut self.vars[position];
+            slot.0.clear();
+            slot.0.push_str(name);
+            slot.1 = value;
+        } else {
+            self.vars.push((name.to_string(), value));
+        }
+        self.live += 1;
+        if let Some(index) = &mut self.index {
+            match index.get_mut(name) {
+                Some(entry) => *entry = position,
+                None => {
+                    index.insert(name.to_string(), position);
+                }
+            }
+        } else if self.live > FRAME_INDEX_THRESHOLD {
+            self.index = Some(
+                self.vars[..self.live]
+                    .iter()
+                    .enumerate()
+                    .map(|(position, (n, _))| (n.clone(), position))
+                    .collect(),
+            );
+        }
+    }
+
+    /// Makes the frame hold only its first `len` variables, as a fresh frame would at that point.
+    fn truncate_to(&mut self, len: usize) {
+        self.live = self.live.min(len);
+    }
 }
 
 #[derive(Clone)]
@@ -428,26 +528,30 @@ pub struct Env(Rc<RefCell<Frame>>);
 
 impl Env {
     fn root() -> Self {
-        Env(Rc::new(RefCell::new(Frame {
-            vars: HashMap::new(),
-            parent: None,
-        })))
+        Env(Rc::new(RefCell::new(Frame::new(None))))
     }
 
     fn child(&self) -> Self {
-        Env(Rc::new(RefCell::new(Frame {
-            vars: HashMap::new(),
-            parent: Some(self.clone()),
-        })))
+        Env(Rc::new(RefCell::new(Frame::new(Some(self.clone())))))
     }
 
     fn define(&self, name: &str, value: Value) {
-        self.0.borrow_mut().vars.insert(name.to_string(), value);
+        let mut frame = self.0.borrow_mut();
+        match frame.position(name) {
+            Some(position) => frame.vars[position].1 = value,
+            None => frame.push(name, value),
+        }
     }
 
     fn get(&self, name: &str) -> Option<Value> {
-        if let Some(v) = self.0.borrow().vars.get(name) {
-            return Some(v.clone());
+        let found = {
+            let frame = self.0.borrow();
+            frame
+                .position(name)
+                .map(|position| frame.vars[position].1.clone())
+        };
+        if found.is_some() {
+            return found;
         }
         self.0.borrow().parent.as_ref().and_then(|p| p.get(name))
     }
@@ -456,11 +560,14 @@ impl Env {
     /// si no existe en ninguno, lo define en el frame actual (nuevo binding
     /// inmutable implícito, documento 01 §1.1 / documento 10 §5.1).
     fn assign(&self, name: &str, value: Value) {
-        if self.0.borrow().vars.contains_key(name) {
-            self.0.borrow_mut().vars.insert(name.to_string(), value);
-            return;
-        }
-        let parent = self.0.borrow().parent.clone();
+        let parent = {
+            let mut frame = self.0.borrow_mut();
+            if let Some(position) = frame.position(name) {
+                frame.vars[position].1 = value;
+                return;
+            }
+            frame.parent.clone()
+        };
         match parent {
             Some(p) if p.contains(name) => p.assign(name, value),
             _ => self.define(name, value),
@@ -468,7 +575,7 @@ impl Env {
     }
 
     fn contains(&self, name: &str) -> bool {
-        self.0.borrow().vars.contains_key(name)
+        self.0.borrow().position(name).is_some()
             || self
                 .0
                 .borrow()
@@ -485,8 +592,8 @@ impl Env {
 /// the frame that is already on top, since none of those introduce a new
 /// logical stack frame.
 struct CallFrame {
-    name: String,
-    file: Option<String>,
+    /// The function this frame runs. Shared, so a call records it without copying its name or file.
+    decl: Rc<FunctionDecl>,
     line: usize,
     /// The environment `call_user_function` created for this call (holding
     /// its parameters). `variables` walks from `current_env` up to and
@@ -613,10 +720,10 @@ fn dap_set_breakpoints(dbg: &mut Debugger, arguments: &JsonValue) -> JsonValue {
 }
 
 pub struct Interpreter {
-    functions: HashMap<String, Rc<FunctionDecl>>,
+    functions: NameMap<String, Rc<FunctionDecl>>,
     records: HashMap<String, RecordDecl>,
     enums: HashMap<String, EnumDecl>,
-    variant_to_enum: HashMap<String, String>,
+    variant_to_enum: NameMap<String, String>,
     impls: HashMap<String, Vec<RuntimeImpl>>,
     traits: HashMap<String, TraitDecl>,
     derives: HashMap<String, Vec<String>>,
@@ -653,10 +760,10 @@ impl Interpreter {
     }
 
     pub fn new(items: &[Item]) -> Self {
-        let mut functions = HashMap::new();
+        let mut functions = NameMap::default();
         let mut records = HashMap::new();
         let mut enums = HashMap::new();
-        let mut variant_to_enum = HashMap::new();
+        let mut variant_to_enum = NameMap::default();
         let mut impls: HashMap<String, Vec<RuntimeImpl>> = HashMap::new();
         let mut traits: HashMap<String, TraitDecl> = HashMap::new();
         let mut derives: HashMap<String, Vec<String>> = HashMap::new();
@@ -1670,15 +1777,14 @@ impl Interpreter {
     /// already needed. Not used by `call_callable` (lambdas don't carry a
     /// declared name/source span worth showing as their own frame; their
     /// statements are attributed to whichever named frame called them).
-    fn run_function_body(&mut self, f: &FunctionDecl, call_env: &Env) -> EvalResult {
+    fn run_function_body(&mut self, f: &Rc<FunctionDecl>, call_env: &Env) -> EvalResult {
         self.call_stack.push(CallFrame {
-            name: f.name.clone(),
-            file: f.source_file.clone(),
+            decl: Rc::clone(f),
             line: f.span.line,
             base_env: call_env.clone(),
             current_env: call_env.clone(),
         });
-        let result = match self.eval_block(&f.body, call_env) {
+        let result = match self.eval_block_in(&f.body, call_env) {
             Ok(v) => Ok(v),
             Err(RuntimeError::Return(v)) => Ok(v),
             other => other,
@@ -1692,11 +1798,11 @@ impl Interpreter {
     /// call sites' symmetry with closures.
     fn call_user_function(
         &mut self,
-        f: &FunctionDecl,
+        f: &Rc<FunctionDecl>,
         args: Vec<Value>,
         _caller_env: Env,
     ) -> EvalResult {
-        let call_env = Env::root().child();
+        let call_env = Env::root();
         for (param, arg) in f.params.iter().zip(args.into_iter()) {
             call_env.define(&param.name, arg);
         }
@@ -1705,7 +1811,7 @@ impl Interpreter {
 
     fn call_user_function_with_args(
         &mut self,
-        f: &FunctionDecl,
+        f: &Rc<FunctionDecl>,
         args: &[Arg],
         closure_env: Env,
     ) -> EvalResult {
@@ -1716,11 +1822,24 @@ impl Interpreter {
     /// evaluated receiver fills the first parameter (`self`).
     fn call_with_receiver(
         &mut self,
-        f: &FunctionDecl,
+        f: &Rc<FunctionDecl>,
         receiver: Option<Value>,
         args: &[Arg],
         closure_env: Env,
     ) -> EvalResult {
+        // Fast path: a purely positional call with one argument per parameter. The arguments are evaluated in the
+        // caller's environment, in order, and bound directly; this is what the general path below does for such a call.
+        if receiver.is_none()
+            && args.len() == f.params.len()
+            && args.iter().all(|arg| matches!(arg, Arg::Positional(_)))
+        {
+            let call_env = Env::root();
+            for (param, arg) in f.params.iter().zip(args.iter()) {
+                let value = self.eval_arg(arg, &closure_env)?;
+                call_env.define(&param.name, value);
+            }
+            return self.run_function_body(f, &call_env);
+        }
         let mut values: Vec<Option<Value>> = (0..f.params.len()).map(|_| None).collect();
         let mut next_positional = 0usize;
         if let Some(receiver) = receiver {
@@ -1769,7 +1888,7 @@ impl Interpreter {
             }
         }
 
-        let call_env = Env::root().child();
+        let call_env = Env::root();
         for (index, param) in f.params.iter().enumerate() {
             let value = match values[index].take() {
                 Some(value) => value,
@@ -1791,9 +1910,15 @@ impl Interpreter {
 
     fn eval_block(&mut self, block: &Block, env: &Env) -> EvalResult {
         let inner = env.child();
+        self.eval_block_in(block, &inner)
+    }
+
+    /// Runs a block in the frame it is given. A loop body uses the frame that holds its loop variable, which is created
+    /// fresh for each iteration, so a variable of the body is local to that iteration exactly as before.
+    fn eval_block_in(&mut self, block: &Block, inner: &Env) -> EvalResult {
         for stmt in &block.stmts {
-            self.before_statement(&inner, stmt.span.line)?;
-            self.eval_stmt(&stmt.stmt, &inner)?;
+            self.before_statement(inner, stmt.span.line)?;
+            self.eval_stmt(&stmt.stmt, inner)?;
         }
         match &block.tail {
             Some(e) => {
@@ -1803,9 +1928,9 @@ impl Interpreter {
                 // would never fire. `parse_expr` always wraps its result in
                 // `Expr::Located`, so the source line is right here.
                 if let Expr::Located(_, range) = e.as_ref() {
-                    self.before_statement(&inner, range.start.line)?;
+                    self.before_statement(inner, range.start.line)?;
                 }
-                self.eval_expr(e, &inner)
+                self.eval_expr(e, inner)
             }
             None => Ok(Value::Void),
         }
@@ -1854,7 +1979,7 @@ impl Interpreter {
             } else if self
                 .call_stack
                 .last()
-                .and_then(|frame| frame.file.as_deref())
+                .and_then(|frame| frame.decl.source_file.as_deref())
                 .is_some_and(|file| {
                     dbg.breakpoints
                         .get(file)
@@ -1987,10 +2112,10 @@ impl Interpreter {
             .map(|(id, frame)| {
                 json!({
                     "id": id,
-                    "name": frame.name,
+                    "name": frame.decl.name,
                     "line": frame.line,
                     "column": 1,
-                    "source": frame.file.as_ref().map(|file| json!({
+                    "source": frame.decl.source_file.as_ref().map(|file| json!({
                         "path": file,
                         "name": std::path::Path::new(file).file_name().and_then(|n| n.to_str()).unwrap_or(file)
                     }))
@@ -2017,7 +2142,7 @@ impl Interpreter {
             let is_base = Rc::as_ptr(&env.0) as usize == base_ptr;
             let parent = {
                 let borrowed = env.0.borrow();
-                for (name, value) in &borrowed.vars {
+                for (name, value) in borrowed.live_vars() {
                     if seen.insert(name.clone()) {
                         variables.push((name.clone(), format!("{value}")));
                     }
@@ -2118,16 +2243,35 @@ impl Interpreter {
                 body,
             } => {
                 if matches!(iter.unlocated(), Expr::Range(..)) {
-                    let items = self.eval_iterable(iter, env)?;
-                    for item in items {
-                        let loop_env = env.child();
-                        loop_env.define(pattern, item);
-                        match self.eval_block(body, &loop_env) {
+                    let (s, e, step_v, kind) = self.range_plan(iter, env)?;
+                    // A body without a closure or a spawned task cannot keep its frame, so one frame serves
+                    // every iteration. After each iteration the frame is cut back to the loop variable, which
+                    // is what a fresh frame would hold at the start of the next one.
+                    let reuse = !crate::ast_scan::block_any(body, &|expr| {
+                        matches!(
+                            expr,
+                            Expr::Lambda(..) | Expr::Spawn(_) | Expr::SpawnScope(_)
+                        )
+                    });
+                    let shared = reuse.then(|| env.child());
+                    let mut i = s;
+                    while Self::range_has_next(i, e, step_v, kind) {
+                        let loop_env = match &shared {
+                            Some(frame) => frame.clone(),
+                            None => env.child(),
+                        };
+                        loop_env.define(pattern, Value::Int(i));
+                        let outcome = self.eval_block_in(body, &loop_env);
+                        if reuse {
+                            loop_env.0.borrow_mut().truncate_to(1);
+                        }
+                        match outcome {
                             Ok(_) => {}
                             Err(RuntimeError::Break(_)) => break,
-                            Err(RuntimeError::Continue) => continue,
+                            Err(RuntimeError::Continue) => {}
                             Err(other) => return Err(other),
                         }
+                        i += step_v;
                     }
                     return Ok(Value::Void);
                 }
@@ -2236,7 +2380,12 @@ impl Interpreter {
         }
     }
 
-    fn eval_iterable(&mut self, expr: &Expr, env: &Env) -> Result<Vec<Value>, RuntimeError> {
+    /// The bounds of a range expression: its start, its end, its step and its kind. Evaluated once, in source order.
+    fn range_plan(
+        &mut self,
+        expr: &Expr,
+        env: &Env,
+    ) -> Result<(i64, i64, i64, RangeKind), RuntimeError> {
         match expr.unlocated() {
             Expr::Range(start, kind, end, step) => {
                 let sv = self.eval_expr(start, env)?;
@@ -2246,21 +2395,32 @@ impl Interpreter {
                     None => 1,
                 };
                 let (s, e) = (as_i64(&sv)?, as_i64(&ev)?);
+                Ok((s, e, step_v, *kind))
+            }
+            _ => Err(RuntimeError::Error("not a range".to_string())),
+        }
+    }
+
+    /// True while a range with these bounds still has a value to produce. A zero step produces no values.
+    fn range_has_next(i: i64, e: i64, step_v: i64, kind: RangeKind) -> bool {
+        if step_v > 0 {
+            (kind == RangeKind::To && i <= e) || (kind == RangeKind::Until && i < e)
+        } else if step_v < 0 {
+            (kind == RangeKind::To && i >= e) || (kind == RangeKind::Until && i > e)
+        } else {
+            false
+        }
+    }
+
+    fn eval_iterable(&mut self, expr: &Expr, env: &Env) -> Result<Vec<Value>, RuntimeError> {
+        match expr.unlocated() {
+            Expr::Range(..) => {
+                let (s, e, step_v, kind) = self.range_plan(expr, env)?;
                 let mut values = Vec::new();
-                if step_v > 0 {
-                    let mut i = s;
-                    while (*kind == RangeKind::To && i <= e) || (*kind == RangeKind::Until && i < e)
-                    {
-                        values.push(Value::Int(i));
-                        i += step_v;
-                    }
-                } else if step_v < 0 {
-                    let mut i = s;
-                    while (*kind == RangeKind::To && i >= e) || (*kind == RangeKind::Until && i > e)
-                    {
-                        values.push(Value::Int(i));
-                        i += step_v;
-                    }
+                let mut i = s;
+                while Self::range_has_next(i, e, step_v, kind) {
+                    values.push(Value::Int(i));
+                    i += step_v;
                 }
                 Ok(values)
             }
@@ -2276,7 +2436,10 @@ impl Interpreter {
             Expr::Located(inner, range) => {
                 if !self.literal_kinds.is_empty() {
                     let key = crate::typeck::ExprKey {
-                        file: self.call_stack.last().and_then(|frame| frame.file.clone()),
+                        file: self
+                            .call_stack
+                            .last()
+                            .and_then(|frame| frame.decl.source_file.clone()),
                         start: range.start,
                         end: range.end,
                     };
@@ -4496,6 +4659,107 @@ fn convert(value: f64, from_unit: &str, to_unit: &str) -> Result<f64, RuntimeErr
         resolve_unit_factor(to_unit).map_err(unit_error)?,
     );
     convert_value_with_role(value, &from, &to, &QuantityRole::Linear).map_err(unit_error)
+}
+
+#[cfg(test)]
+mod frame_tests {
+    //! Stale slots of a reused loop frame must never answer a lookup, and the name index must stay consistent with the
+    //! live part of the frame across truncations, shadowing and redefinitions.
+    use super::*;
+
+    fn int(value: i64) -> Value {
+        Value::Int(value)
+    }
+
+    fn read(env: &Env, name: &str) -> Option<i64> {
+        match env.get(name) {
+            Some(Value::Int(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn small_frame_lookup_and_truncation() {
+        let env = Env::root().child();
+        env.define("a", int(1));
+        env.define("b", int(2));
+        env.0.borrow_mut().truncate_to(1);
+        assert_eq!(read(&env, "a"), Some(1));
+        assert_eq!(read(&env, "b"), None, "a stale slot must not be visible");
+        env.define("c", int(3));
+        assert_eq!(read(&env, "c"), Some(3));
+        assert_eq!(read(&env, "b"), None);
+    }
+
+    #[test]
+    fn indexed_frame_stale_entries_never_answer() {
+        let env = Env::root().child();
+        for k in 0..40 {
+            env.define(&format!("v{k}"), int(k));
+        }
+        assert!(
+            env.0.borrow().index.is_some(),
+            "a frame of 40 names is indexed"
+        );
+        env.0.borrow_mut().truncate_to(1);
+        for k in 1..40 {
+            assert_eq!(read(&env, &format!("v{k}")), None, "v{k} is stale");
+        }
+        // redefine in a different order: the stale index entries point at slots now holding other names
+        env.define("w", int(100));
+        env.define("v5", int(55));
+        assert_eq!(read(&env, "w"), Some(100));
+        assert_eq!(read(&env, "v5"), Some(55));
+        assert_eq!(read(&env, "v6"), None);
+        assert_eq!(read(&env, "v0"), Some(0), "the kept slot is untouched");
+    }
+
+    #[test]
+    fn redefinition_updates_the_existing_slot() {
+        let env = Env::root().child();
+        for k in 0..20 {
+            env.define(&format!("x{k}"), int(k));
+        }
+        env.define("x3", int(333));
+        assert_eq!(read(&env, "x3"), Some(333));
+        assert_eq!(
+            env.0.borrow().live,
+            20,
+            "a redefinition does not add a slot"
+        );
+    }
+
+    #[test]
+    fn shadowed_name_in_the_parent_is_found_only_when_not_in_the_frame() {
+        let parent = Env::root().child();
+        parent.define("q", int(7));
+        let child = parent.child();
+        assert_eq!(read(&child, "q"), Some(7));
+        child.define("q", int(9));
+        assert_eq!(read(&child, "q"), Some(9));
+        assert_eq!(
+            read(&parent, "q"),
+            Some(7),
+            "the parent keeps its own binding"
+        );
+    }
+
+    #[test]
+    fn live_vars_excludes_stale_slots() {
+        let env = Env::root().child();
+        for k in 0..5 {
+            env.define(&format!("s{k}"), int(k));
+        }
+        env.0.borrow_mut().truncate_to(2);
+        let names: Vec<String> = env
+            .0
+            .borrow()
+            .live_vars()
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect();
+        assert_eq!(names, vec!["s0".to_string(), "s1".to_string()]);
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,11 @@
+// A `mut` declared in a loop body with the name of an outer `mut`. The body binding is new, so the outer one keeps 7.
+// The interpreter and both native routes give 7. Before the IR fix the native backend gave 200 (see docs/loop-frames.md).
+fn main() -> Void {
+    mut q = 7
+    mut seen = 0
+    for i in 0 until 3 {
+        seen = seen + q
+        mut q = i * 100
+    }
+    print("shadow reads: " + seen.to_string() + " outer q: " + q.to_string())
+}

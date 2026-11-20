@@ -1,0 +1,297 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import {
+  addCell,
+  attachResource,
+  cellHashes,
+  createNotebook,
+  csvRows,
+  dependencyOrder,
+  dependencyProblems,
+  freshness,
+  LIMITS,
+  moveCell,
+  NotebookError,
+  outputsFromLines,
+  parseNotebook,
+  planRun,
+  recordableOutputs,
+  removeCell,
+  serializeNotebook,
+  setDeps,
+  setSource,
+  validateNotebook,
+} from "../website/workbench-notebook.js";
+
+const sha = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+const digestOf = async (text) => sha(text);
+const now = "2026-11-11T10:00:00.000Z";
+
+// t1: a text cell. c1: definitions only. c2: the program, which imports c1 and depends on it.
+function sample() {
+  let doc = createNotebook({ title: "sample", now });
+  doc = addCell(doc, "text", { source: "Notes." });
+  doc = addCell(doc, "code", { source: "fn helper() -> Int {\n    2\n}\n" });
+  doc = addCell(doc, "code", { source: "import c1\nfn main() -> Void {\n    print(c1.helper().to_string())\n}\n" });
+  return setDeps(doc, "c2", ["c1"]);
+}
+
+const validRun = (hash) => ({
+  hash,
+  state: "completed",
+  startedAt: now,
+  durationMs: 12,
+  exitCode: 0,
+  stdout: "2\n",
+  stderr: "",
+  tables: [],
+  figures: [],
+  results: null,
+  resultsRejected: null,
+  error: null,
+});
+
+test("a new notebook gets stable ids and the operations keep it valid", () => {
+  const doc = sample();
+  assert.deepEqual(validateNotebook(doc), []);
+  assert.deepEqual(doc.cells.map((c) => c.id), ["t1", "c1", "c2"]);
+  const moved = moveCell(doc, "c2", -1);
+  assert.deepEqual(moved.cells.map((c) => c.id), ["t1", "c2", "c1"]);
+  assert.equal(moveCell(doc, "t1", -1), doc, "moving the first cell up changes nothing");
+  const removed = removeCell(doc, "c1");
+  assert.deepEqual(removed.cells.map((c) => c.id), ["t1", "c2"]);
+  assert.deepEqual(removed.cells.find((c) => c.id === "c2").deps, [], "a removed dependency is also removed from deps");
+  const grown = addCell(doc, "code", { afterId: "c1", source: "fn other() -> Int { 3 }" });
+  assert.deepEqual(grown.cells.map((c) => c.id), ["t1", "c1", "c3", "c2"]);
+});
+
+test("serialization round-trips exactly and refuses an invalid document", () => {
+  const doc = sample();
+  const text = serializeNotebook(doc);
+  assert.deepEqual(parseNotebook(text), JSON.parse(text));
+  assert.throws(() => parseNotebook("{ not json"), (e) => e instanceof NotebookError && /not valid JSON/.test(e.problems[0]));
+  assert.throws(() => parseNotebook(JSON.stringify({ ...doc, version: 2 })), (e) => /unsupported version/.test(e.problems[0]));
+  assert.throws(() => parseNotebook(JSON.stringify({ ...doc, format: "other" })), (e) => /format must be/.test(e.problems.join(";")));
+});
+
+test("validation names each defect: ids, dependencies, cycles and unknown fields", () => {
+  const doc = sample();
+  const duplicated = { ...doc, cells: [...doc.cells, { ...doc.cells[1] }] };
+  assert.ok(validateNotebook(duplicated).some((p) => /appears twice/.test(p)));
+  assert.ok(validateNotebook(setDeps(doc, "c1", ["nope"])).some((p) => /not a code cell/.test(p)));
+  assert.ok(validateNotebook(setDeps(doc, "c1", ["c1"])).some((p) => /itself/.test(p)));
+  assert.ok(validateNotebook(setDeps(setDeps(doc, "c1", ["c2"]), "c2", ["c1"])).some((p) => /cycle/.test(p)));
+  const textDeps = { ...doc, cells: doc.cells.map((c) => (c.kind === "text" ? { ...c, deps: ["c1"] } : c)) };
+  assert.ok(validateNotebook(textDeps).some((p) => /cannot have dependencies/.test(p)));
+  assert.ok(validateNotebook({ ...doc, extra: 1 }).some((p) => /unknown field extra/.test(p)));
+  assert.ok(validateNotebook({ ...doc, cells: [{ id: "bad id", kind: "code", source: "", deps: [] }] }).some((p) => /invalid id/.test(p)));
+});
+
+test("a proposed dependency list is checked before it replaces the document, and nothing is changed", () => {
+  // The page hashes and plans the open document; a missing cell makes hashing throw and a cycle makes it recurse forever.
+  // Such a list must be refused with a reason, before the document is replaced.
+  const doc = sample();
+  const before = JSON.stringify(doc);
+  assert.deepEqual(dependencyProblems(doc, "c2", ["c1"]), []);
+  assert.deepEqual(dependencyProblems(doc, "c2", []), []);
+  assert.match(dependencyProblems(doc, "c2", ["zzz"]).join(";"), /c2 depends on zzz, which is not a code cell/);
+  assert.match(dependencyProblems(doc, "c2", ["t1"]).join(";"), /c2 depends on t1, which is not a code cell/, "a text cell is not a dependency");
+  assert.match(dependencyProblems(doc, "c2", ["c2"]).join(";"), /itself/);
+  assert.match(dependencyProblems(doc, "c1", ["c2"]).join(";"), /cycle/, "c2 already uses c1");
+  const chain = setDeps(setDeps(addCell(doc, "code"), "c3", ["c2"]), "c2", ["c1"]);
+  assert.match(dependencyProblems(chain, "c1", ["c3"]).join(";"), /cycle/, "a longer cycle through c3 and c2");
+  assert.match(dependencyProblems(doc, "t1", ["c1"]).join(";"), /text cell t1 cannot have dependencies/);
+  const many = Array.from({ length: LIMITS.maxDepsPerCell + 1 }, (_, i) => `c${i + 10}`);
+  assert.match(dependencyProblems(doc, "c2", many).join(";"), /at most/);
+  assert.deepEqual(dependencyProblems(doc, "nope", []), ["no cell nope"]);
+  assert.equal(JSON.stringify(doc), before, "checking a proposal never changes the document");
+});
+
+test("a cell's hash includes which cells it uses, not only what they contain", async () => {
+  // c1 and c2 have the same source and c3 imports c1. Switching c3's dependency to c2 supplies different files to the
+  // program (c2.ostrin instead of c1.ostrin), so what c3 printed before no longer says anything about it: its recorded
+  // output must become stale. Hashing only the dependencies' hashes left the hash unchanged and the output "current".
+  const helper = "fn helper() -> Int {\n    2\n}\n";
+  let doc = createNotebook({ title: "twins", now });
+  doc = addCell(doc, "code", { source: helper });
+  doc = addCell(doc, "code", { source: helper });
+  doc = addCell(doc, "code", { source: "import c1\nfn main() -> Void {\n    print(c1.helper().to_string())\n}\n" });
+  doc = addCell(doc, "code", { source: "import c3\nfn main() -> Void {\n    print(\"c4\")\n}\n" });
+  doc = setDeps(setDeps(doc, "c3", ["c1"]), "c4", ["c3"]);
+  const before = await cellHashes(doc, digestOf);
+  assert.equal(before.c1, before.c2, "premise: the two definition cells have the same hash");
+  const switched = setDeps(doc, "c3", ["c2"]);
+  const after = await cellHashes(switched, digestOf);
+  assert.notEqual(after.c3, before.c3, "c3 uses another cell now");
+  assert.notEqual(after.c4, before.c4, "and so does a cell that uses c3");
+  assert.equal(after.c1, before.c1, "the cells that were not changed keep their hashes");
+  const recorded = { ...switched, runs: { c3: validRun(before.c3) } };
+  assert.equal(freshness(recorded, after, "c3"), "stale");
+  assert.equal((await cellHashes(doc, digestOf)).c3, before.c3, "the same document always has the same hash");
+});
+
+test("recorded outputs never exceed what a run record may hold, and what is left out is reported", () => {
+  // validateRun refuses a run with more tables or figures than the limits, or a table or figure above its size limit, and
+  // a document holding such a run can be neither stored nor exported. The recorder keeps what fits and says what it left out.
+  const table = (i, rows = 1) => ({ title: `t${i}`, csv: "a,b\n" + "1,2\n".repeat(rows) });
+  const run = (outputs) => {
+    const kept = recordableOutputs(outputs);
+    return { hash: "0".repeat(64), state: "completed", startedAt: now, durationMs: 1, exitCode: 0, stdout: "", stderr: "", tables: kept.tables, figures: kept.figures, results: null, resultsRejected: null, error: null, kept };
+  };
+  const documentWith = (record) => {
+    let doc = addCell(createNotebook({ title: "t", now }), "code", { source: "fn main() -> Void {\n}\n" });
+    const { kept, ...stored } = record;
+    return { ...doc, runs: { c1: stored } };
+  };
+  // up to the limit nothing is left out
+  for (const count of [0, 1, LIMITS.maxTablesPerRun]) {
+    const record = run({ tables: Array.from({ length: count }, (_, i) => table(i)), figures: [] });
+    assert.equal(record.tables.length, count);
+    assert.deepEqual(record.kept.notes, []);
+    assert.deepEqual(validateNotebook(documentWith(record)), []);
+  }
+  // beyond it, the first tables are kept, the rest is counted, and the document stays valid
+  const many = run({ tables: Array.from({ length: LIMITS.maxTablesPerRun + 3 }, (_, i) => table(i)), figures: [] });
+  assert.equal(many.tables.length, LIMITS.maxTablesPerRun);
+  assert.deepEqual(many.tables.map((t) => t.title), Array.from({ length: LIMITS.maxTablesPerRun }, (_, i) => `t${i}`));
+  assert.match(many.kept.notes.join(" "), /3 tables omitted/);
+  assert.deepEqual(validateNotebook(documentWith(many)), []);
+  // a table above the size limit is left out too, and counted with the others
+  const big = { title: "big", csv: "x\n" + "y".repeat(LIMITS.maxOutputBytes) };
+  const oversized = run({ tables: [table(0), big, table(1)], figures: [] });
+  assert.deepEqual(oversized.tables.map((t) => t.title), ["t0", "t1"]);
+  assert.match(oversized.kept.notes.join(" "), /1 table omitted/);
+  assert.deepEqual(validateNotebook(documentWith(oversized)), []);
+  // figures: the count and the size are bounded the same way
+  const svg = (n) => `<svg xmlns="http://www.w3.org/2000/svg">${"x".repeat(n)}</svg>`;
+  const figures = run({ tables: [], figures: [svg(10), svg(LIMITS.maxFigureBytes + 1), ...Array.from({ length: LIMITS.maxFiguresPerRun + 1 }, () => svg(10))] });
+  assert.equal(figures.figures.length, LIMITS.maxFiguresPerRun);
+  assert.match(figures.kept.notes.join(" "), /figures? omitted/);
+  assert.deepEqual(validateNotebook(documentWith(figures)), []);
+});
+
+test("the dependency check agrees with the document validation on which lists are valid", () => {
+  const doc = addCell(sample(), "code");
+  const ids = doc.cells.map((c) => c.id).concat(["zzz"]);
+  for (const cell of doc.cells) {
+    for (const dep of ids) {
+      for (const deps of [[dep], [dep, "c1"]]) {
+        const proposalOk = dependencyProblems(doc, cell.id, deps).length === 0;
+        const documentOk = validateNotebook(setDeps(doc, cell.id, deps)).length === 0;
+        assert.equal(proposalOk, documentOk, `${cell.id} with ${deps.join(",")}`);
+      }
+    }
+  }
+});
+
+test("resources accept only data files under data/, and their size is bounded", () => {
+  const doc = sample();
+  assert.deepEqual(validateNotebook(attachResource(doc, "data/calibration.csv", "a,b\n1,2\n")), []);
+  assert.ok(validateNotebook(attachResource(doc, "/abs/path.csv", "x")).some((p) => /resource path/.test(p)));
+  assert.ok(validateNotebook(attachResource(doc, "data/../x.csv", "x")).some((p) => /resource path/.test(p)));
+  assert.ok(validateNotebook(attachResource(doc, "data/x.exe", "x")).some((p) => /resource path/.test(p)));
+  const big = "x".repeat(LIMITS.maxResourceBytes + 1);
+  assert.ok(validateNotebook(attachResource(doc, "data/big.csv", big)).some((p) => /more than/.test(p)));
+});
+
+test("runs are checked: hash, state, outputs, figures, results and unknown fields", () => {
+  const doc = sample();
+  const hash = "a".repeat(64);
+  const withRun = (run) => ({ ...doc, runs: { c2: run } });
+  assert.deepEqual(validateNotebook(withRun(validRun(hash))), []);
+  assert.ok(validateNotebook(withRun({ ...validRun("xyz") })).some((p) => /hash/.test(p)));
+  assert.ok(validateNotebook(withRun({ ...validRun(hash), state: "done" })).some((p) => /unknown state/.test(p)));
+  assert.ok(validateNotebook(withRun({ ...validRun(hash), figures: ["<script>alert(1)</script>"] })).some((p) => /malformed figure/.test(p)));
+  assert.ok(validateNotebook(withRun({ ...validRun(hash), extra: true })).some((p) => /unknown field/.test(p)));
+  assert.ok(validateNotebook(withRun({ ...validRun(hash), results: { schema: "ostrin.results/v1", experiment: "e", rows: [] } })).some((p) => /results are invalid/.test(p)));
+  assert.ok(validateNotebook({ ...doc, runs: { t1: validRun(hash) } }).some((p) => /not a code cell/.test(p)));
+});
+
+test("a run plan carries the cell, its dependencies and the data, and refuses a main in a dependency", () => {
+  const doc = attachResource(sample(), "data/x.csv", "a\n1\n");
+  const plan = planRun(doc, "c2");
+  assert.equal(plan.ok, true, plan.problems.join(";"));
+  assert.equal(plan.request.entry, "c2.ostrin");
+  assert.deepEqual(plan.request.order, ["c1", "c2"]);
+  assert.deepEqual(Object.keys(plan.request.files).sort(), ["c1.ostrin", "c2.ostrin", "data/x.csv"]);
+  assert.deepEqual(plan.request.command, ["--run", "--json", "c2.ostrin"]);
+  const refused = planRun(setSource(doc, "c1", "fn helper() -> Int { 2 }\nfn main() -> Void { print(\"x\") }\n"), "c2");
+  assert.equal(refused.ok, false);
+  assert.ok(refused.problems.some((p) => /cannot be a dependency/.test(p)));
+  assert.equal(planRun(doc, "t1").ok, false, "a text cell has nothing to run");
+  assert.ok(planRun(doc, "c1").problems.some((p) => /no fn main/.test(p)), "a definitions-only cell has nothing to run");
+});
+
+test("dependency order is topological and each cell appears once", () => {
+  let doc = sample();
+  doc = addCell(doc, "code", { source: "fn x() -> Int { 1 }" });
+  doc = setDeps(doc, "c3", ["c2", "c1"]);
+  assert.deepEqual(dependencyOrder(doc, "c3"), ["c1", "c2", "c3"]);
+});
+
+test("a change to a cell or to its data makes its outputs and its dependents' outputs stale", async () => {
+  let doc = sample();
+  const first = await cellHashes(doc, digestOf);
+  doc = { ...doc, runs: { c1: validRun(first.c1), c2: validRun(first.c2) } };
+  assert.equal(freshness(doc, first, "c1"), "current");
+  assert.equal(freshness(doc, first, "c2"), "current");
+  const edited = setSource(doc, "c1", "fn helper() -> Int {\n    3\n}\n");
+  const second = await cellHashes(edited, digestOf);
+  assert.equal(freshness(edited, second, "c1"), "stale", "the edited cell is stale");
+  assert.equal(freshness(edited, second, "c2"), "stale", "its dependent is stale");
+  const withData = attachResource(doc, "data/x.csv", "a\n1\n");
+  const third = await cellHashes(withData, digestOf);
+  assert.equal(freshness(withData, third, "c1"), "stale", "changed data makes every run stale");
+  assert.deepEqual(await cellHashes(doc, digestOf), first, "hashes are deterministic");
+  assert.equal(freshness(doc, first, "c2"), "current");
+});
+
+test("outputs are split into text, tables, a figure and a structured result", () => {
+  const svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"1\"/></svg>";
+  const lines = [
+    ["out", "hello"],
+    ["out", "OSTRIN-TABLE fit"],
+    ["out", "x,y"],
+    ["out", "1,\"a, b\""],
+    ["out", "OSTRIN-TABLE-END"],
+    ["out", svg],
+    ["err", "warning"],
+    ["out", "done"],
+  ];
+  const out = outputsFromLines(lines);
+  assert.equal(out.tables.length, 1);
+  assert.equal(out.tables[0].title, "fit");
+  assert.equal(out.figures.length, 1);
+  assert.equal(out.stdout, "hello\ndone\n");
+  assert.equal(out.stderr, "warning\n");
+  assert.deepEqual(csvRows(out.tables[0].csv), [["x", "y"], ["1", "a, b"]]);
+});
+
+test("a valid RESULTS line becomes a result and a rejected one keeps its reason", () => {
+  const good = { schema: "ostrin.results/v1", experiment: "e", family: "f", bracket: [1, 3], method: "m", tolerances: "t",
+    rows: [{ c: 1, status: "converged", root: 1.5, residual: 0, residual_bound: 1, analytic_derivative: 1, numeric_derivative: 1, passed: true, message: "" }] };
+  const ok = outputsFromLines([["out", "RESULTS " + JSON.stringify(good)]]);
+  assert.equal(ok.results.experiment, "e");
+  assert.equal(ok.stdout, "");
+  const bad = outputsFromLines([["out", "RESULTS {\"schema\":\"ostrin.results/v1\",\"experiment\":\"e\",\"rows\":[{\"c\":\"x\"}]}"]]);
+  assert.equal(bad.results, null);
+  assert.ok(bad.resultsRejected);
+});
+
+test("csvRows reads quotes, escaped quotes and line breaks inside quoted fields", () => {
+  assert.deepEqual(csvRows("a,\"b\"\"c\",\"d\ne\"\n"), [["a", "b\"c", "d\ne"]]);
+});
+
+test("the limits are the ones the document promises", () => {
+  assert.equal(LIMITS.maxCells, 200);
+  assert.equal(LIMITS.maxFigureBytes, 2 * 1024 * 1024);
+});
+
+test("a compiler diagnostic printed as JSON is shown as a readable error, not as raw text", () => {
+  const json = JSON.stringify({ severity: "error", code: null, message: "Error OSTRIN-E1080\n'x' is private", file: "c2.ostrin", line: 3, column: null });
+  const out = outputsFromLines([["out", json], ["out", "plain output"]]);
+  assert.equal(out.stdout, "plain output\n");
+  assert.match(out.stderr, /^error: Error OSTRIN-E1080/m);
+  assert.match(out.stderr, /\(line 3\)/);
+});

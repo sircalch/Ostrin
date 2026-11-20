@@ -167,8 +167,12 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("bigint", include_str!("../std/bigint.ostrin")),
     ("arrays", include_str!("../std/arrays.ostrin")),
     ("polynomial", include_str!("../std/polynomial.ostrin")),
+    ("mpolynomial", include_str!("../std/mpolynomial.ostrin")),
+    ("rational", include_str!("../std/rational.ostrin")),
+    ("linalg", include_str!("../std/linalg.ostrin")),
     ("solve", include_str!("../std/solve.ostrin")),
     ("autodiff", include_str!("../std/autodiff.ostrin")),
+    ("data", include_str!("../std/data.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {
@@ -243,8 +247,12 @@ fn load_module_file(
             1,
             1,
             format!(
-                "could not read module '{}' ({}): {e}",
-                module_path.join("."),
+                "could not read {} ({}): {e}",
+                if module_path.is_empty() {
+                    "the main source file".to_string()
+                } else {
+                    format!("module '{}'", module_path.join("."))
+                },
                 file_path.display()
             ),
         )

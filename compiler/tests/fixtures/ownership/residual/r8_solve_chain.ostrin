@@ -1,0 +1,7 @@
+import std.linalg
+
+fn main() -> Void {
+    a = array([[4.0, 1.0], [2.0, 3.0]])
+    b = array([1.0, 2.0])
+    print("x " + linalg.solve_checked(a, b).unwrap().x.to_string())
+}

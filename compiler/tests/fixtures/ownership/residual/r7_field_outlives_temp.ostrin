@@ -1,0 +1,13 @@
+record Box {
+    tag: String
+}
+
+fn make() -> Box {
+    Box { tag: "outlives" }
+}
+
+fn main() -> Void {
+    kept = make().tag
+    print(kept)
+    print(kept)
+}

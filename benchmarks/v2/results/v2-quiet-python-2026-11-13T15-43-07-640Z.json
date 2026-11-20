@@ -1,0 +1,297 @@
+{
+  "generated": "2026-11-13T05:49:36.728Z",
+  "label": "quiet-python",
+  "compiler": "C:\\Users\\Andre\\Downloads\\_Ostrin-worktrees\\scientific-platform-core\\compiler\\target\\release\\ostrinc.exe",
+  "config": {
+    "native": {
+      "kBig": 10,
+      "reps": 7
+    },
+    "interp": {
+      "kBig": 2,
+      "reps": 3
+    },
+    "python": {
+      "kBig": 5,
+      "reps": 5
+    },
+    "julia": {
+      "kBig": 5,
+      "reps": 5
+    }
+  },
+  "hardware": {
+    "os": "win32 10.0.26200 x64",
+    "cpuModel": "AMD Ryzen 7 5700X 8-Core Processor",
+    "logicalCores": 16,
+    "memoryGiB": 32,
+    "physicalCores": 8
+  },
+  "versions": {
+    "node": "v24.19.0",
+    "ostrinc": "ostrinc 0.2.0",
+    "python": "Python 3.12.10",
+    "julia": "julia version 1.13.3"
+  },
+  "threads": {
+    "julia": 1,
+    "python": 1,
+    "ostrinNative": "single-threaded unless --native-threads",
+    "envOMP_NUM_THREADS": 1,
+    "envOPENBLAS_NUM_THREADS": 1
+  },
+  "loadBefore": [
+    {
+      "name": "chrome",
+      "cpuSeconds": 35225
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 23463
+    },
+    {
+      "name": "Taskmgr",
+      "cpuSeconds": 22522
+    },
+    {
+      "name": "LeagueClient",
+      "cpuSeconds": 20597
+    },
+    {
+      "name": "LeagueClientUx",
+      "cpuSeconds": 13099
+    },
+    {
+      "name": "EpicGamesLauncher",
+      "cpuSeconds": 8497
+    }
+  ],
+  "cells": [
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "simpson",
+      "incomplete": false,
+      "perRunMs": 419.62037499999997,
+      "uncertaintyMs": 25.606174999999965,
+      "startupEstimateMs": 103.34732500000007,
+      "t1": {
+        "n": 5,
+        "median": 522.9677,
+        "min": 511.1288,
+        "max": 541.0057,
+        "mad": 11.838900000000024
+      },
+      "tk": {
+        "n": 5,
+        "median": 2201.4492,
+        "min": 2178.9312,
+        "max": 2251.479,
+        "mad": 22.51800000000003
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 419.3669999949634,
+          "min": 407.04900003038347,
+          "max": 1372.4768999963999,
+          "mad": 7.691500009968877
+        },
+        "warm": {
+          "n": 20,
+          "median": 424.7730999486521,
+          "min": 408.65660016424954,
+          "max": 1352.88120014593,
+          "mad": 9.285749983973801
+        }
+      }
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "bisect",
+      "incomplete": false,
+      "perRunMs": 1364.6711,
+      "uncertaintyMs": 121.11722500000002,
+      "startupEstimateMs": 99.2337,
+      "t1": {
+        "n": 5,
+        "median": 1463.9048,
+        "min": 1440.9971,
+        "max": 1767.0896,
+        "mad": 17.56359999999995
+      },
+      "tk": {
+        "n": 5,
+        "median": 6922.5892,
+        "min": 6888.1559,
+        "max": 7046.5323,
+        "mad": 8.810100000000602
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 1354.8389999195933,
+          "min": 1325.3699999768287,
+          "max": 1372.224099934101,
+          "mad": 17.38510001450777
+        },
+        "warm": {
+          "n": 20,
+          "median": 1350.8940000319853,
+          "min": 1320.4949998762459,
+          "max": 1386.3051999360323,
+          "mad": 8.54685006197542
+        }
+      }
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "matmul",
+      "incomplete": false,
+      "perRunMs": 2382.8518,
+      "uncertaintyMs": 304.8665500000002,
+      "startupEstimateMs": -5.869999999999891,
+      "t1": {
+        "n": 5,
+        "median": 2376.9818,
+        "min": 2369.4255,
+        "max": 2425.8743,
+        "mad": 7.556300000000192
+      },
+      "tk": {
+        "n": 5,
+        "median": 11908.389,
+        "min": 11725.0491,
+        "max": 12888.0665,
+        "mad": 161.20679999999993
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 2293.665000004694,
+          "min": 2247.927000047639,
+          "max": 2425.8891998324543,
+          "mad": 40.25870002806187
+        },
+        "warm": {
+          "n": 20,
+          "median": 2410.2947501232848,
+          "min": 2303.859499981627,
+          "max": 4174.655799986795,
+          "mad": 61.24549999367446
+        }
+      }
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "regression",
+      "incomplete": false,
+      "perRunMs": 649.10455,
+      "uncertaintyMs": 1393.353575,
+      "startupEstimateMs": 346.21865,
+      "t1": {
+        "n": 5,
+        "median": 995.3232,
+        "min": 622.9089,
+        "max": 2886.5505,
+        "mad": 290.97530000000006
+      },
+      "tk": {
+        "n": 5,
+        "median": 3591.7414,
+        "min": 2737.4009,
+        "max": 6047.1736,
+        "mad": 808.2647999999999
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 474.039499880746,
+          "min": 462.8153999801725,
+          "max": 542.6533999852836,
+          "mad": 11.224099900573492
+        },
+        "warm": {
+          "n": 20,
+          "median": 479.9333999399096,
+          "min": 458.30960012972355,
+          "max": 555.796799948439,
+          "mad": 7.177099934779108
+        }
+      }
+    },
+    {
+      "implementation": "Python (CPython 3.12)",
+      "kernel": "horner",
+      "incomplete": false,
+      "perRunMs": 4382.459150000001,
+      "uncertaintyMs": 132.9246499999996,
+      "startupEstimateMs": -303.54825000000073,
+      "t1": {
+        "n": 5,
+        "median": 4078.9109,
+        "min": 4036.4345,
+        "max": 4097.8368,
+        "mad": 15.512700000000223
+      },
+      "tk": {
+        "n": 5,
+        "median": 21608.7475,
+        "min": 21506.1837,
+        "max": 21976.48,
+        "mad": 100.72279999999955
+      },
+      "kBig": 5,
+      "reps": 5,
+      "internal": {
+        "cold": {
+          "n": 5,
+          "median": 3927.222599973902,
+          "min": 3905.353399924934,
+          "max": 3978.617100045085,
+          "mad": 11.829800205305219
+        },
+        "warm": {
+          "n": 20,
+          "median": 4378.868250059895,
+          "min": 4327.534999931231,
+          "max": 4467.559200013056,
+          "mad": 24.061799980700016
+        }
+      }
+    }
+  ],
+  "loadAfter": [
+    {
+      "name": "chrome",
+      "cpuSeconds": 35225
+    },
+    {
+      "name": "chrome",
+      "cpuSeconds": 23485
+    },
+    {
+      "name": "Taskmgr",
+      "cpuSeconds": 22531
+    },
+    {
+      "name": "LeagueClient",
+      "cpuSeconds": 20978
+    },
+    {
+      "name": "LeagueClientUx",
+      "cpuSeconds": 13330
+    },
+    {
+      "name": "EpicGamesLauncher",
+      "cpuSeconds": 8511
+    }
+  ]
+}

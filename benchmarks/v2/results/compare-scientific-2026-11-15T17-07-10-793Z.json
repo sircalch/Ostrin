@@ -1,0 +1,358 @@
+{
+  "schema": "ostrin-benchmark-v2-scientific-compare/1",
+  "started": "2026-11-15T17:07:10.793Z",
+  "finished": "2026-11-15T17:32:01.849Z",
+  "kernels": [
+    "horner"
+  ],
+  "repetitions": {
+    "native": 7,
+    "interp": 3,
+    "internal": 5
+  },
+  "kBig": {
+    "native": 10,
+    "interpreter": 2,
+    "internalPerProcess": 5
+  },
+  "builds": [
+    {
+      "label": "B0",
+      "path": "C:/Users/Andre/AppData/Local/Temp/claude/7cdd557d8fbe86c0/5c87b6ba-0d59-40ba-ad6c-6d53c6eff46c/scratchpad/tgt-7a38ee8b/release/ostrinc.exe",
+      "commit": "7a38ee8b",
+      "sha256": "94784d1db7fe7ec08f2008c328348af19ada44b42959ffcf71f12f610aff6a56",
+      "version": "ostrinc 0.2.0"
+    },
+    {
+      "label": "B1",
+      "path": "C:/Users/Andre/AppData/Local/Temp/claude/7cdd557d8fbe86c0/5c87b6ba-0d59-40ba-ad6c-6d53c6eff46c/scratchpad/tgt-ffe90033/release/ostrinc.exe",
+      "commit": "ffe90033",
+      "sha256": "0239ff781c8f473cfdc155036b2de02672ce37c0e587f20d072ea65fd5201ace",
+      "version": "ostrinc 0.2.0"
+    },
+    {
+      "label": "HEAD",
+      "path": "C:/Users/Andre/AppData/Local/Temp/claude/7cdd557d8fbe86c0/5c87b6ba-0d59-40ba-ad6c-6d53c6eff46c/scratchpad/bench-head/ostrinc-d2035687.exe",
+      "commit": "d2035687",
+      "sha256": "8eb45ea52f4ff542af15fbdcdde410787328f4475e72b64bf3dc6752b922d04e",
+      "version": "ostrinc 0.2.0"
+    }
+  ],
+  "native": {
+    "path": "C:/Users/Andre/AppData/Local/Temp/claude/7cdd557d8fbe86c0/5c87b6ba-0d59-40ba-ad6c-6d53c6eff46c/scratchpad/bench-head/ostrinc-d2035687.exe",
+    "commit": "d2035687",
+    "sha256": "8eb45ea52f4ff542af15fbdcdde410787328f4475e72b64bf3dc6752b922d04e",
+    "version": "ostrinc 0.2.0"
+  },
+  "versions": {
+    "node": "v24.19.0",
+    "python": "Python 3.12.10",
+    "julia": "julia version 1.13.3"
+  },
+  "system": {
+    "hardware": {
+      "os": "win32 10.0.26200 x64",
+      "cpuModel": "AMD Ryzen 7 5700X 8-Core Processor",
+      "logicalCores": 16,
+      "memoryGiB": 31.9,
+      "physicalCores": 8
+    },
+    "threads": {
+      "OMP_NUM_THREADS": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "julia": 1,
+      "python": 1,
+      "ostrinNative": "single-threaded"
+    }
+  },
+  "load": {
+    "start": {
+      "processorPercent": 12,
+      "topProcesses": [
+        {
+          "name": "powershell",
+          "cumulativeCpuSeconds": 8313.7
+        },
+        {
+          "name": "claude",
+          "cumulativeCpuSeconds": 2820.1
+        },
+        {
+          "name": "The iTero Coach",
+          "cumulativeCpuSeconds": 2342.4
+        },
+        {
+          "name": "claude",
+          "cumulativeCpuSeconds": 2202.1
+        },
+        {
+          "name": "chrome",
+          "cumulativeCpuSeconds": 2013.7
+        },
+        {
+          "name": "chrome",
+          "cumulativeCpuSeconds": 1748.3
+        }
+      ]
+    },
+    "end": {
+      "processorPercent": 32,
+      "topProcesses": [
+        {
+          "name": "powershell",
+          "cumulativeCpuSeconds": 9822.8
+        },
+        {
+          "name": "claude",
+          "cumulativeCpuSeconds": 3049
+        },
+        {
+          "name": "claude",
+          "cumulativeCpuSeconds": 2408.9
+        },
+        {
+          "name": "The iTero Coach",
+          "cumulativeCpuSeconds": 2367.5
+        },
+        {
+          "name": "chrome",
+          "cumulativeCpuSeconds": 2286.6
+        },
+        {
+          "name": "chrome",
+          "cumulativeCpuSeconds": 1825.5
+        }
+      ]
+    }
+  },
+  "cells": [
+    {
+      "kernel": "horner",
+      "implementation": "Ostrin interpreter",
+      "label": "B0",
+      "commit": "7a38ee8b",
+      "sha256": "94784d1db7fe7ec08f2008c328348af19ada44b42959ffcf71f12f610aff6a56",
+      "method": "external slope, alternating, K=1 and K=2, 3 repetitions",
+      "incomplete": false,
+      "perRunMs": 51256.3791,
+      "rangeMs": [
+        50643.5124,
+        54382.923800000004
+      ],
+      "uncertaintyMs": 1869.705700000006,
+      "samples": [
+        54382.923800000004,
+        51256.3791,
+        50643.5124
+      ],
+      "load": {
+        "before": 12,
+        "after": 77
+      }
+    },
+    {
+      "kernel": "horner",
+      "implementation": "Ostrin interpreter",
+      "label": "B1",
+      "commit": "ffe90033",
+      "sha256": "0239ff781c8f473cfdc155036b2de02672ce37c0e587f20d072ea65fd5201ace",
+      "method": "external slope, alternating, K=1 and K=2, 3 repetitions",
+      "incomplete": false,
+      "perRunMs": 40590.800899999995,
+      "rangeMs": [
+        39909.030600000006,
+        41354.0969
+      ],
+      "uncertaintyMs": 722.5331499999957,
+      "samples": [
+        41354.0969,
+        39909.030600000006,
+        40590.800899999995
+      ],
+      "load": {
+        "before": 10,
+        "after": 34
+      }
+    },
+    {
+      "kernel": "horner",
+      "implementation": "Ostrin interpreter",
+      "label": "HEAD",
+      "commit": "d2035687",
+      "sha256": "8eb45ea52f4ff542af15fbdcdde410787328f4475e72b64bf3dc6752b922d04e",
+      "method": "external slope, alternating, K=1 and K=2, 3 repetitions",
+      "incomplete": false,
+      "perRunMs": 36701.3559,
+      "rangeMs": [
+        36608.940299999995,
+        40569.0666
+      ],
+      "uncertaintyMs": 1980.0631500000018,
+      "samples": [
+        40569.0666,
+        36608.940299999995,
+        36701.3559
+      ],
+      "load": {
+        "before": 66,
+        "after": 42
+      }
+    },
+    {
+      "kernel": "horner",
+      "implementation": "Ostrin native",
+      "label": "HEAD native",
+      "commit": "d2035687",
+      "sha256": "8eb45ea52f4ff542af15fbdcdde410787328f4475e72b64bf3dc6752b922d04e",
+      "method": "compile 3x outside the timed runs; external slope, K=1 and K=10, 7 repetitions",
+      "compileMs": {
+        "n": 3,
+        "median": 419.4716,
+        "iqr": 13.794550000000015,
+        "min": 396.0242,
+        "max": 423.6133
+      },
+      "incomplete": false,
+      "perRunMs": 100.75556666666667,
+      "rangeMs": [
+        99.14144444444445,
+        111.61268888888887
+      ],
+      "uncertaintyMs": 4.06538333333333,
+      "samples": [
+        111.61268888888887,
+        105.19182222222221,
+        100.75556666666667,
+        99.14144444444445,
+        99.57803333333334,
+        102.0461888888889,
+        99.52921111111111
+      ],
+      "startupEstimateMs": 6.661033333333336,
+      "load": {
+        "before": 28,
+        "after": 42
+      }
+    },
+    {
+      "kernel": "horner",
+      "implementation": "CPython 3.12",
+      "label": "CPython 3.12",
+      "method": "internal: each process repeats the kernel 5 times and times each repetition; cold = first repetition, warm = the others",
+      "load": {
+        "before": 36,
+        "after": 26
+      },
+      "incomplete": false,
+      "cold": {
+        "n": 5,
+        "median": 4399.4422999967355,
+        "iqr": 138.1933999946341,
+        "min": 3913.876500002516,
+        "max": 4472.290699995938
+      },
+      "warm": {
+        "n": 20,
+        "median": 4211.651849996997,
+        "iqr": 822.4483750000218,
+        "min": 4050.197399999888,
+        "max": 5293.440299996291
+      },
+      "wallOneProcess": {
+        "n": 5,
+        "median": 4254.4961,
+        "iqr": 81.6257999999998,
+        "min": 4134.9516,
+        "max": 4512.7601
+      },
+      "perRunMs": 4211.651849996997,
+      "rangeMs": [
+        4050.197399999888,
+        5293.440299996291
+      ],
+      "uncertaintyMs": 822.4483750000218,
+      "samples": [
+        5218.146700004581,
+        5293.440299996291,
+        5142.593800002942,
+        5118.718000005174,
+        4121.08150000131,
+        4077.3859999972046,
+        4586.672699995688,
+        4454.2866999981925,
+        5276.906399994914,
+        4879.556899999443,
+        4143.689499993343,
+        4215.43269999529,
+        4100.637499999721,
+        4104.350699999486,
+        4207.870999998704,
+        4050.197399999888,
+        4265.026000000944,
+        4070.1047999973525,
+        4203.215699999419,
+        4163.668099994538
+      ]
+    },
+    {
+      "kernel": "horner",
+      "implementation": "Julia 1.13 (1 thread)",
+      "label": "Julia 1.13 (1 thread)",
+      "method": "internal: as CPython; cold includes the first-call compilation of the kernel",
+      "load": {
+        "before": 40,
+        "after": 40
+      },
+      "incomplete": false,
+      "cold": {
+        "n": 5,
+        "median": 126.9073,
+        "iqr": 1.1792999999999978,
+        "min": 123.0631,
+        "max": 131.6176
+      },
+      "warm": {
+        "n": 20,
+        "median": 71.7907,
+        "iqr": 2.9707250000000016,
+        "min": 69.8759,
+        "max": 75.8852
+      },
+      "wallOneProcess": {
+        "n": 5,
+        "median": 717.7298,
+        "iqr": 55.73410000000001,
+        "min": 678.3255,
+        "max": 743.6687
+      },
+      "perRunMs": 71.7907,
+      "rangeMs": [
+        69.8759,
+        75.8852
+      ],
+      "uncertaintyMs": 2.9707250000000016,
+      "samples": [
+        70.2316,
+        70.2065,
+        70.0928,
+        71.9049,
+        73.3677,
+        72.9665,
+        72.3663,
+        73.3319,
+        72.8834,
+        71.6551,
+        71.1191,
+        70.1118,
+        70.4163,
+        74.9916,
+        71.3808,
+        74.1398,
+        69.8759,
+        75.2674,
+        71.6765,
+        75.8852
+      ]
+    }
+  ]
+}

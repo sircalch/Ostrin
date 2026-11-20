@@ -43,6 +43,9 @@ export const LIMITS = Object.freeze({
 
 const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const PATH_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_-]*(\/[A-Za-z0-9_][A-Za-z0-9_-]*)*\.ostrin$/;
+// Run requests may also carry data files, one level below `data/`, which programs read with read_file. Project
+// files (PATH_PATTERN) stay program-only: the Workbench project model never accepts a data file.
+const DATA_PATH_PATTERN = /^data\/[A-Za-z0-9_][A-Za-z0-9_-]*\.(csv|tsv|txt|json)$/;
 
 export function isRunId(value) {
   return typeof value === "string" && value.length > 0 && value.length <= LIMITS.maxRunIdLength && ID_PATTERN.test(value);
@@ -68,7 +71,7 @@ export function validateRunRequest(request) {
   if (typeof request.entry !== "string" || !paths.includes(request.entry)) problems.push("entry must be one of the files");
   let total = 0;
   for (const path of paths) {
-    if (!PATH_PATTERN.test(path) || path.includes("..")) {
+    if (!(PATH_PATTERN.test(path) || DATA_PATH_PATTERN.test(path)) || path.includes("..")) {
       problems.push(`invalid file path ${JSON.stringify(path)}`);
       continue;
     }

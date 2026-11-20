@@ -1,0 +1,206 @@
+// Multivariate exact polynomials: canonical form, identities that cross code paths, and refusals.
+//
+// The identities compare results computed in different ways: distributivity and commutativity of the new engine, the
+// product rule, evaluation as a homomorphism, and the derivative of the new engine against std.symbolic's symbolic
+// differentiation of the same expression. Agreement is exact (canonical lines compared as text), not numeric.
+import std.symbolic
+import std.mpolynomial
+
+fn main() -> Void {
+    vars = ["x", "y", "z"]
+    mut failures = 0
+
+    // 2 x^2 y - 3 y + 1/2
+    p = mpolynomial.mpoly_parse(vars, ["2|2,1,0", "-3|0,1,0", "1/2|0,0,0"]).unwrap()
+    // x z - 1
+    q = mpolynomial.mpoly_parse(vars, ["1|1,0,1", "-1|0,0,0"]).unwrap()
+    // 3/2 y^2 + x y z
+    r = mpolynomial.mpoly_parse(vars, ["3/2|0,2,0", "1|1,1,1"]).unwrap()
+
+    // canonical text
+    print("p = " + mpolynomial.mpoly_to_text(p))
+    if mpolynomial.mpoly_to_text(p) != "2*x^2*y - 3*y + 1/2" {
+        print("FAIL the text of p")
+        failures = failures + 1
+    }
+
+    // distributivity: p (q + r) = p q + p r, exactly
+    left = mpolynomial.mpoly_multiply(p, mpolynomial.mpoly_add(q, r).unwrap()).unwrap()
+    right = mpolynomial.mpoly_add(mpolynomial.mpoly_multiply(p, q).unwrap(), mpolynomial.mpoly_multiply(p, r).unwrap()).unwrap()
+    if mpolynomial.mpoly_lines(left) != mpolynomial.mpoly_lines(right) {
+        print("FAIL distributivity")
+        failures = failures + 1
+    }
+
+    // commutativity of the product
+    if mpolynomial.mpoly_lines(mpolynomial.mpoly_multiply(p, q).unwrap()) != mpolynomial.mpoly_lines(mpolynomial.mpoly_multiply(q, p).unwrap()) {
+        print("FAIL commutativity")
+        failures = failures + 1
+    }
+
+    // product rule: d(p q)/dx = p dq/dx + q dp/dx
+    dpq = mpolynomial.mpoly_derivative(mpolynomial.mpoly_multiply(p, q).unwrap(), 0).unwrap()
+    rule = mpolynomial.mpoly_add(
+        mpolynomial.mpoly_multiply(p, mpolynomial.mpoly_derivative(q, 0).unwrap()).unwrap(),
+        mpolynomial.mpoly_multiply(q, mpolynomial.mpoly_derivative(p, 0).unwrap()).unwrap()).unwrap()
+    if mpolynomial.mpoly_lines(dpq) != mpolynomial.mpoly_lines(rule) {
+        print("FAIL the product rule")
+        failures = failures + 1
+    }
+
+    // evaluation is a homomorphism: (p q)(2, -1, 3) = p(2, -1, 3) q(2, -1, 3), exactly
+    point = ["2", "-1", "3"]
+    value_pq = mpolynomial.mpoly_evaluate(mpolynomial.mpoly_multiply(p, q).unwrap(), point).unwrap()
+    value_p = mpolynomial.mpoly_evaluate(p, point).unwrap()
+    value_q = mpolynomial.mpoly_evaluate(q, point).unwrap()
+    product_of_values = mpolynomial.mpoly_lines(mpolynomial.mpoly_multiply(
+        mpolynomial.mpoly_constant(vars, value_p).unwrap(), mpolynomial.mpoly_constant(vars, value_q).unwrap()).unwrap())
+    if mpolynomial.mpoly_lines(mpolynomial.mpoly_constant(vars, value_pq).unwrap()) != product_of_values {
+        print("FAIL evaluation is not multiplicative")
+        failures = failures + 1
+    }
+    print("(p q)(2,-1,3) = " + value_pq + " (p = " + value_p + ", q = " + value_q + ")")
+
+    // cancellation to the zero polynomial, and its text
+    zero = mpolynomial.mpoly_subtract(p, p).unwrap()
+    if mpolynomial.mpoly_to_text(zero) != "0" or mpolynomial.mpoly_total_degree(zero) != -1 {
+        print("FAIL p - p is not the zero polynomial")
+        failures = failures + 1
+    }
+
+    // merging equal exponent vectors and dropping zeros
+    merged = mpolynomial.mpoly_parse(vars, ["2|1,0,0", "3|1,0,0"]).unwrap()
+    if mpolynomial.mpoly_lines(merged) != ["5|1,0,0"] {
+        print("FAIL merging equal exponent vectors")
+        failures = failures + 1
+    }
+    if mpolynomial.mpoly_to_text(mpolynomial.mpoly_parse(vars, ["1|1,0,0", "-1|1,0,0"]).unwrap()) != "0" {
+        print("FAIL a cancelled term was kept")
+        failures = failures + 1
+    }
+
+    // exact fractions: 1/3 + 1/6 = 1/2
+    halves = mpolynomial.mpoly_parse(vars, ["1/3|0,0,0", "1/6|0,0,0"]).unwrap()
+    if mpolynomial.mpoly_lines(halves) != ["1/2|0,0,0"] {
+        print("FAIL exact fraction sum")
+        failures = failures + 1
+    }
+
+    // degrees: total degree of p is 3 (x^2 y), in x it is 2; the product of degrees adds for these polynomials
+    if mpolynomial.mpoly_total_degree(p) != 3 or mpolynomial.mpoly_degree_in(p, 0).unwrap() != 2 {
+        print("FAIL degrees of p")
+        failures = failures + 1
+    }
+    if mpolynomial.mpoly_total_degree(mpolynomial.mpoly_multiply(p, q).unwrap()) != 5 {
+        print("FAIL total degree of a product")
+        failures = failures + 1
+    }
+
+    // a derivative of a constant is zero
+    if mpolynomial.mpoly_to_text(mpolynomial.mpoly_derivative(mpolynomial.mpoly_constant(vars, "7").unwrap(), 1).unwrap()) != "0" {
+        print("FAIL derivative of a constant")
+        failures = failures + 1
+    }
+
+    // symbolic consistency: the expression of p, differentiated by std.symbolic, has the lines of the derivative here
+    s = symbolic.store()
+    x = symbolic.symbol(s, "x")
+    y = symbolic.symbol(s, "y")
+    z = symbolic.symbol(s, "z")
+    expression = symbolic.expression_of_term_lines([x, y, z], mpolynomial.mpoly_lines(p)).unwrap()
+    symbolic_derivative = symbolic.diff(expression, x).unwrap()
+    lines_from_symbols = symbolic.expression_term_lines(symbolic_derivative, vars).unwrap()
+    if mpolynomial.mpoly_lines(mpolynomial.mpoly_parse(vars, lines_from_symbols).unwrap()) != mpolynomial.mpoly_lines(mpolynomial.mpoly_derivative(p, 0).unwrap()) {
+        print("FAIL the derivative disagrees with std.symbolic")
+        failures = failures + 1
+    }
+
+    // the expression round trip keeps the polynomial
+    back = symbolic.expression_term_lines(expression, vars).unwrap()
+    if mpolynomial.mpoly_lines(mpolynomial.mpoly_parse(vars, back).unwrap()) != mpolynomial.mpoly_lines(p) {
+        print("FAIL expression round trip")
+        failures = failures + 1
+    }
+
+    // refusals: variables that differ, a malformed line, a non-integer exponent, a function of a variable
+    match mpolynomial.mpoly_add(p, mpolynomial.mpoly_zero(["x", "y"])) {
+        Ok(v) => {
+            print("FAIL polynomials over different variables were added")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("different variables: " + message)
+        },
+    }
+    match mpolynomial.mpoly_parse(vars, ["1|1,0"]) {
+        Ok(v) => {
+            print("FAIL a line with the wrong number of exponents was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("wrong arity: " + message)
+        },
+    }
+    match mpolynomial.mpoly_parse(vars, ["1|a,0,0"]) {
+        Ok(v) => {
+            print("FAIL a non-integer exponent was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("bad exponent: refused")
+        },
+    }
+    match symbolic.expression_term_lines(symbolic.call("sin", x), vars) {
+        Ok(v) => {
+            print("FAIL sin(x) was accepted as a polynomial")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("sin(x): " + message)
+        },
+    }
+
+    // interchange contract: negative exponents, repeated variables, out-of-range indices and size limits are refused
+    match mpolynomial.mpoly_parse(vars, ["1|-1,0,0"]) {
+        Ok(v) => {
+            print("FAIL a negative exponent was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("negative exponent: refused")
+        },
+    }
+    match mpolynomial.mpoly_parse(["x", "x"], ["1|1,0"]) {
+        Ok(v) => {
+            print("FAIL a repeated variable was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("repeated variable: " + message)
+        },
+    }
+    match mpolynomial.mpoly_degree_in(p, 3) {
+        Ok(v) => {
+            print("FAIL an index outside the variables was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("index outside the variables: refused")
+        },
+    }
+    match mpolynomial.mpoly_parse(vars, ["1|1001,0,0"]) {
+        Ok(v) => {
+            print("FAIL an exponent above the limit was accepted")
+            failures = failures + 1
+        },
+        Err(message) => {
+            print("exponent above the limit: refused")
+        },
+    }
+
+    if failures == 0 {
+        print("all multivariate checks passed")
+    } else {
+        print("multivariate checks failed: " + failures.to_string())
+    }
+}

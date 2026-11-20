@@ -1,7 +1,84 @@
 mod token;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use token::keyword_from_str;
 pub use token::{Token, TokenKind};
+
+/// Set by the native backends (`--emit-c`, `--compile`) before any source is lexed. Ostrin accepts identifiers that the
+/// generated C reserves (for example `double` or `int`), so those identifiers are escaped while the native output is built.
+static C_IDENTIFIER_ESCAPE: AtomicBool = AtomicBool::new(false);
+
+/// C keywords (C11 and common GNU extensions) that Ostrin programs may use as identifiers. No Ostrin builtin has one of
+/// these names, so escaping them never changes a builtin call.
+const C_RESERVED: &[&str] = &[
+    "auto",
+    "bool",
+    "break",
+    "case",
+    "char",
+    "const",
+    "continue",
+    "default",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "float",
+    "for",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "register",
+    "restrict",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "struct",
+    "switch",
+    "true",
+    "typedef",
+    "union",
+    "unsigned",
+    "void",
+    "volatile",
+    "while",
+    "asm",
+    "typeof",
+    "_Alignas",
+    "_Alignof",
+    "_Atomic",
+    "_Bool",
+    "_Complex",
+    "_Generic",
+    "_Imaginary",
+    "_Noreturn",
+    "_Static_assert",
+    "_Thread_local",
+];
+
+/// Enables or disables the C identifier escape for the rest of the process.
+pub fn set_c_identifier_escape(enabled: bool) {
+    C_IDENTIFIER_ESCAPE.store(enabled, Ordering::SeqCst);
+}
+
+/// The C name of an identifier. With the escape enabled, a C-reserved name or a name that already starts with `K_` gets the
+/// prefix `K_`. The map is injective: prefixed names never collide with names that are kept as they are.
+fn c_identifier(text: String) -> String {
+    if C_IDENTIFIER_ESCAPE.load(Ordering::SeqCst)
+        && (C_RESERVED.contains(&text.as_str()) || text.starts_with("K_"))
+    {
+        format!("K_{text}")
+    } else {
+        text
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct LexError {
@@ -345,7 +422,7 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
         let text: String = self.chars[start..self.pos].iter().collect();
-        keyword_from_str(&text).unwrap_or(TokenKind::Ident(text))
+        keyword_from_str(&text).unwrap_or_else(|| TokenKind::Ident(c_identifier(text)))
     }
 
     fn lex_operator_or_punct(&mut self) -> Result<TokenKind, LexError> {

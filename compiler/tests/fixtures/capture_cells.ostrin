@@ -1,0 +1,38 @@
+// A closure that captures a `mut` binding reads and reassigns that same binding (design 02 §4).
+// The native backend gives the captured bindings shared storage (see compiler/src/capture_cells.rs).
+// Each line is checked by hand and must agree on the interpreter and on the native backend.
+fn main() -> Void {
+    // A. a read-only closure sees a later outer assignment
+    mut x = 1
+    read_x = fn() { x }
+    x = 5
+    print("A read after outer write: " + read_x().to_string())
+
+    // B. a closure writes an outer binding, called twice
+    mut y = 0
+    add_y = fn() { y = y + 1 }
+    add_y()
+    add_y()
+    print("B closure writes: " + y.to_string())
+
+    // C. outer and closure writes interleave
+    mut z = 10
+    bump_z = fn(d) { z = z + d }
+    z = z * 2
+    bump_z(3)
+    print("C mixed writes: " + z.to_string())
+
+    // D. a captured function value, reassigned after a closure captured it
+    mut op: fn(Int) -> Int = fn(k) { k + 1 }
+    run = fn(v) { op(v) }
+    op = fn(k) { k * 10 }
+    print("call through cell: " + run(4).to_string())
+    print("direct call: " + op(2).to_string())
+
+    // E. a closure that accumulates into an outer binding
+    mut log = 0
+    note = fn(s) { log = log + s }
+    note(5)
+    note(7)
+    print("log: " + log.to_string())
+}

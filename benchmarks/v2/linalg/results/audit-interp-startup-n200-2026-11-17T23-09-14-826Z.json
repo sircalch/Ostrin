@@ -1,0 +1,455 @@
+{
+  "schema": "ostrin.interpreter-startup-audit/v0",
+  "generated": "2026-11-17T23:09:14.824Z",
+  "program": "benchmarks/v2/linalg/ostrin/lu_solve.ostrin",
+  "n": 200,
+  "reps": 12,
+  "seed": 20261117,
+  "levels": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "orderPerRepetition": [
+    [
+      2,
+      1,
+      0,
+      3
+    ],
+    [
+      1,
+      2,
+      3,
+      0
+    ],
+    [
+      3,
+      0,
+      1,
+      2
+    ],
+    [
+      3,
+      0,
+      1,
+      2
+    ],
+    [
+      1,
+      2,
+      3,
+      0
+    ],
+    [
+      2,
+      1,
+      0,
+      3
+    ],
+    [
+      2,
+      3,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      3,
+      2
+    ],
+    [
+      3,
+      2,
+      1,
+      0
+    ],
+    [
+      3,
+      2,
+      1,
+      0
+    ],
+    [
+      3,
+      2,
+      0,
+      1
+    ],
+    [
+      3,
+      0,
+      1,
+      2
+    ]
+  ],
+  "runs": [
+    {
+      "rep": 0,
+      "k": 2,
+      "ms": 4691.8427,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 0,
+      "k": 1,
+      "ms": 2192.6012,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 0,
+      "k": 0,
+      "ms": 127.7499,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 0,
+      "k": 3,
+      "ms": 7075.4656,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 1,
+      "ms": 2163.4583,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 2,
+      "ms": 4495.121,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 3,
+      "ms": 6816.3003,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 1,
+      "k": 0,
+      "ms": 117.2422,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 2,
+      "k": 3,
+      "ms": 6665.7171,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 2,
+      "k": 0,
+      "ms": 113.9684,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 2,
+      "k": 1,
+      "ms": 2166.5907,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 2,
+      "k": 2,
+      "ms": 4591.4144,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 3,
+      "ms": 6530.4684,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 0,
+      "ms": 109.7277,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 3,
+      "k": 1,
+      "ms": 2215.4055,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 3,
+      "k": 2,
+      "ms": 4232.1794,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 1,
+      "ms": 2136.8343,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 2,
+      "ms": 4223.3699,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 3,
+      "ms": 6534.1061,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 4,
+      "k": 0,
+      "ms": 111.9547,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 5,
+      "k": 2,
+      "ms": 4396.7381,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 5,
+      "k": 1,
+      "ms": 2097.6321,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 5,
+      "k": 0,
+      "ms": 113.0631,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 5,
+      "k": 3,
+      "ms": 6572.3831,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 2,
+      "ms": 4462.2236,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 3,
+      "ms": 6594.0929,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 6,
+      "k": 0,
+      "ms": 105.9327,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 6,
+      "k": 1,
+      "ms": 2063.9518,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 1,
+      "ms": 2094.0684,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 0,
+      "ms": 110.2016,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 7,
+      "k": 3,
+      "ms": 6703.844,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 7,
+      "k": 2,
+      "ms": 4279.6539,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 3,
+      "ms": 6564.1756,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 2,
+      "ms": 4242.9521,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 1,
+      "ms": 2104.663,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 8,
+      "k": 0,
+      "ms": 109.9789,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 9,
+      "k": 3,
+      "ms": 6440.5151,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 2,
+      "ms": 4242.0516,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 1,
+      "ms": 2141.0872,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 9,
+      "k": 0,
+      "ms": 111.9038,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 10,
+      "k": 3,
+      "ms": 6626.1692,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 10,
+      "k": 2,
+      "ms": 4256.0612,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 10,
+      "k": 0,
+      "ms": 109.4014,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 10,
+      "k": 1,
+      "ms": 2173.5025,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 3,
+      "ms": 6554.5148,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 0,
+      "ms": 110.3171,
+      "verified": false,
+      "message": "value 0 differs from -7 by 7 (tolerance 6.394884621840902e-10)"
+    },
+    {
+      "rep": 11,
+      "k": 1,
+      "ms": 2061.8247,
+      "verified": true,
+      "message": null
+    },
+    {
+      "rep": 11,
+      "k": 2,
+      "ms": 4633.7175,
+      "verified": true,
+      "message": null
+    }
+  ],
+  "allVerified": false,
+  "directK0": {
+    "samples": [],
+    "mean": null,
+    "sd": 0,
+    "interval95": [
+      null,
+      null
+    ]
+  },
+  "fit": {
+    "intercept": -115.60278333333372,
+    "interceptSe": 61.89053241265354,
+    "interceptInterval95": [
+      -241.27697032655726,
+      10.071403659889839
+    ],
+    "slope": 2252.755520833334,
+    "slopeSe": 28.64974944662962,
+    "slopeInterval95": [
+      2194.5796766628837,
+      2310.931365003784
+    ],
+    "residualSd": 140.35453480565457,
+    "dof": 34,
+    "t": 2.030588235294118
+  },
+  "classification": "INCONCLUSIVE",
+  "reason": "the start-up intercept and the direct K = 0 measurement have disjoint 95 % intervals"
+}
